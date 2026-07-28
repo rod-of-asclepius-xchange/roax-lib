@@ -76,7 +76,9 @@ All four profiles were derived from the reference schemata read in place, read-o
 `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`.
 
 **No reference schema is copied into this repository.** `references/` is excluded by `.gitignore`
-by design. Everything below cites by path, file and line.
+by design. These four documents cite the reference schemas by file and by the section or definition
+concerned; line-level citations into `dogtag-mono-repo` appear in
+[the specification section 14](../spec/roax-canon-1.md#14-reconciliation-with-dogtag).
 
 ## Documents
 

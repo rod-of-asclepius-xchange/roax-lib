@@ -321,6 +321,9 @@ valid: ROAX normalizes to NFC **and pins the Unicode version**.
 > An implementation whose NFC tables are from a different Unicode version MAY produce a different
 > root for a string containing characters whose composition changed between versions, and MUST NOT
 > claim conformance to `ROAX-CANON/1`.
+> Tested by `docs/conformance-corpus.md` class 16, which is honest about its own limit: no character
+> whose NFC form actually changed between Unicode versions has yet been identified, so that class
+> currently detects a version mismatch by declaration rather than by demonstration.
 
 This pin is adopted from dogtag, which learned it in code:
 `crates/dogtag-standard-rs/src/encode.rs:6-7` declares `UNICODE_VERSION = "15.1"` with the comment
@@ -418,11 +421,21 @@ implementation.
 ## 7. Salt derivation
 
 ```
-salt(path) = HMAC-SHA-256(masterSalt, DOMAIN ‖ "/salt" ‖ recordId ‖ encodePath(path))[0..16]
+salt(path) = HMAC-SHA-256(masterSalt, saltPreimage(path))[0..16]
+
+saltPreimage(path) =
+      u32be(len(DOMAIN))   ‖ DOMAIN       // DOMAIN = ASCII "ROAX-CANON/1"
+    ‖ u32be(len(LABEL))    ‖ LABEL        // LABEL  = ASCII "/salt"
+    ‖ u32be(len(RID))      ‖ RID          // RID    = utf8(recordId), from the envelope (section 11)
+    ‖ u32be(len(P))        ‖ P            // P      = encodePath(path)
 ```
 
-where `DOMAIN` is the ASCII bytes `ROAX-CANON/1` and `recordId` is
-`u32be(len(utf8(recordId))) ‖ utf8(recordId)`, the record's envelope `recordId` (section 11).
+**Every component is length-prefixed, exactly as in section 8, and for the same reason.**
+This is spelled out as a byte layout rather than as a concatenation expression because it is a place
+two implementations could otherwise diverge: without the prefixes, a future `ROAX-CANON/2` whose
+domain string is a different length could overlap preimages with v1 under an adversarially chosen
+`recordId`, and an implementer would have to infer the framing from section 8's style rather than
+read it here.
 
 - `masterSalt` MUST be 32 bytes freshly generated from a CSPRNG, **per record**.
 - It MUST NOT be derived from record content, from a record identifier, from the issuer's signing
@@ -431,6 +444,12 @@ where `DOMAIN` is the ASCII bytes `ROAX-CANON/1` and `recordId` is
   `salt(path)` values are.
 
 There is exactly **one** salt-derivation preimage builder in a conforming implementation.
+
+**`recordId` is not circular, though it looks it.** It is an input to every salt (above) and is also
+itself committed as a reserved leaf at `roax.recordId` (section 11.2). There is no cycle: the
+preimage consumes `recordId` as a plain UTF-8 string taken from the envelope, never a leaf hash or a
+salt. So `salt(roax.recordId)` is computed the same way as every other salt, and the leaf at
+`roax.recordId` is then built from it normally. Implement it in that order and nothing recurses.
 
 ### 7.1 Why the record identifier is in the preimage
 
