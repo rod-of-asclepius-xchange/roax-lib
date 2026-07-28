@@ -1,6 +1,8 @@
 # Decisions: settled, open, and the reasoning
 
-**Status:** every decision marked OPEN is genuinely open. None has been ruled on.
+**Status:** every decision marked OPEN is genuinely open. One - **Decision B**, the hash function -
+has since been ruled, and is marked RULED with the residual open questions named inside it. The rest
+have not been ruled on.
 
 The protocol specification is **written on the recommended answer to each open decision**, so that
 it is concrete and readable rather than hedged into uselessness. That is a drafting choice, not a
@@ -78,7 +80,11 @@ source-2 reproductions are carried from the audit and were not independently re-
 
 ---
 
-## Part 1 - The four decisions the project owner has not ruled on
+## Part 1 - The four decisions that belong to the project owner
+
+Three of them - A, C and D - have not been ruled on.
+**B has been ruled**, and is kept here rather than moved to Part 3 because what remains open under
+it is substantive and is named in its own section.
 
 ### Decision A - Does roax-lib need EU recognition? **OPEN**
 
@@ -106,10 +112,47 @@ running two unrelated disclosure systems side by side. That mapping is much chea
 design constraint now than to retrofit. **A ruling of "not now, but keep it possible" is materially
 different from "no", and is worth making explicitly.**
 
-### Decision B - SHA-256 with declared agility, or Poseidon now? **OPEN**
+### Decision B - SHA-256, or Poseidon now? **RULED. Both, permanently.**
 
-**Written into the spec:** B2. `hashAlg` is a declared field pinned at `SHA-256` for v1, with the
-algorithm identifier part of the domain string (specification section 12).
+**The ruling.** ZK-friendly and non-ZK hashes are **both first-class and selectable per record,
+permanently.** This is not "SHA-256 now with an escape hatch later" and it is not "Poseidon now". It
+is a standing commitment that `hashAlg` is a real per-record choice between two supported families,
+and that neither is provisional.
+
+**What the ruling changed in the specification, and why it is a security matter rather than a
+labelling one.** If both families are permanent then the algorithm identifier is load-bearing:
+`hashAlg` is the field that selects which hash function a verifier runs. Left outside the root it
+would sit in exactly the region specification section 11.3 declares normatively to be
+attacker-controlled and never authority, and nothing would stop a party asserting a different
+algorithm over the same leaves.
+
+So the identifier is now bound **twice** (specification section 7.4):
+
+1. the domain string is algorithm-qualified - `DOMAIN = ASCII "ROAX-CANON/1/" + hashAlg`, for
+   example `ROAX-CANON/1/SHA-256` - and `DOMAIN` is inside every salt preimage (section 7) and every
+   leaf preimage (section 8);
+2. `hashAlg` is committed inside the root as the reserved leaf `roax.hashAlg` (section 11.2), and
+   appears as its own axis in the versioning table (section 12).
+
+Before the ruling the envelope schema **claimed** the first of these while the specification defined
+neither, which is the defect this records the fix for. Binding it is far cheaper before a second
+algorithm exists than after.
+
+**What remains open under B.** Two things, and they are narrower than the original question:
+
+- **The `Poseidon-BN254` parameterization is not pinned**, and no parameterization is invented here.
+  The field, the rate and capacity, the round constants, and the encoding from a length-prefixed
+  byte string to field elements all have to be pinned before any Poseidon record is issued. The
+  byte-level preimages in specification sections 7 and 8 are stated over byte strings and do **not**
+  transfer to a prime-field permutation unmodified. `ROAX-CANON/1` therefore **defines** the
+  construction for `SHA-256` only and **registers** `Poseidon-BN254`, with a normative MUST NOT
+  against issuing under it until a revision pins the parameterization.
+- **The cost consequences below are unchanged by the ruling** and still have to be planned for
+  rather than discovered. They are what makes selecting Poseidon a deliberate per-record act.
+
+**Written into the spec:** `hashAlg` as an algorithm-qualified domain component and a reserved leaf
+(sections 7, 7.4, 8, 11.2, 12), with the enum in `schemas/envelope-1.0.json` carrying both values
+and the Poseidon caution stated in the schema itself.
 
 | | **SHA-256** | **Poseidon over BN254** |
 |---|---|---|
@@ -127,23 +170,29 @@ algorithm identifier part of the domain string (specification section 12).
 A single embedded PNG - the real vaccination `logo`, 14 KB - costs about 14 ms of Poseidon against
 about 41 microseconds of SHA-256.
 
-**The honest framing.** dogtag needs Poseidon because it proves consent in zero knowledge, and a
-SHA-256 Merkle path inside a circuit is prohibitive. If ROAX's disclosure story is "reveal this leaf
-plus an inclusion proof", it needs no circuit, and Poseidon buys nothing while costing a 56x
-slowdown, a prime-field dependency in five languages, and the loss of native crypto on both mobile
-platforms.
+**The honest framing, restated under the ruling.** dogtag needs Poseidon because it proves consent
+in zero knowledge, and a SHA-256 Merkle path inside a circuit is prohibitive. Where ROAX's
+disclosure story is "reveal this leaf plus an inclusion proof" there is no circuit, so SHA-256 is
+the right selection and Poseidon would buy nothing while costing a 52-63x slowdown, a prime-field
+dependency in five languages, and the loss of native crypto on both mobile platforms. Where a record
+genuinely needs zero-knowledge consent proofs, that cost is the price of the capability. **The
+ruling is that this is a per-record engineering choice rather than a project-wide one**, which is
+why `hashAlg` had to become cryptographically real rather than declarative.
 
-**Hash agility is not free.** Two records with identical content and different `hashAlg` have
-different roots, and every verifier eventually implements both.
+**Hash agility is not free, and the ruling does not make it free.** Two records with identical
+content and different `hashAlg` have different roots, and every verifier eventually implements both.
+That cost was previously an argument for deferring the choice; it is now a planned cost.
 
-**What flips this decision:** a commitment that zero-knowledge consent proofs are in scope for v1.
-If so, B3 is right and several other things move with it, notably D9 - blob handling stops being an
-optimization and becomes necessary, since blobs are 60-70% of hashed bytes.
+**What still moves with a Poseidon selection:** D9 in particular. Blob handling stops being an
+optimization and becomes necessary for any record issued under Poseidon, since blobs are 60-70% of
+hashed bytes and a 14 KB logo costs about 14 ms rather than about 41 microseconds.
 
-**The v2 path if ZK arrives later:** keep the structure of the specification exactly - path
-encoding, type tags, value encoding, leaf composition, tree shape - and swap only the hash, giving
-`ROAX-CANON/2` with `hashAlg: "Poseidon-BN254"`. Because the structure is unchanged, the schema
-binding, the conformance corpus and every library's flatten logic survive untouched.
+**Why this is not a `canon` bump.** Path encoding, type tags, value encoding, leaf composition and
+tree shape are unchanged when the hash changes, so the algorithm is its own versioning axis
+(specification section 12) rather than a new canonicalization version. The schema binding, the
+conformance corpus structure and every library's flatten logic survive a Poseidon record untouched.
+What does not survive untouched is the byte-string preimage, which is precisely the parameterization
+gap recorded above.
 
 **Evidence note:** the timings are carried from the canonicalization research, which benchmarked
 `light-poseidon` 0.3 with `Poseidon::<Fr>::new_circom(n)` over `ark_bn254::Fr` - the exact primitive
@@ -192,13 +241,17 @@ buildable. The question is who has to keep verifying what, for how long.
 
 ### Decision D - Five independent libraries, or a shared core over a binding layer? **OPEN**
 
-**Written into the spec:** nothing directly, but the conformance corpus is specified as though D1
+**Written into the spec:** nothing directly, but the conformance corpus is specified as though Da
 will be chosen, because that is the conservative assumption - see below.
+
+Both options are labelled with a letter suffix, matching every other decision in this document. They
+were previously `D1` and `D2`, which collided with the renumbering table above, where `D1` became
+`S1` and `D2` became `B`.
 
 | Option | Consequence |
 |---|---|
-| **D1. Five independent, corpus-enforced** | Genuinely idiomatic libraries in each language. The corpus becomes the entire enforcement mechanism, with no fallback. |
-| **D2. Rust core plus a binding layer for Swift and Kotlin; independent TypeScript and Go** | What dogtag actually does, and it works. Go still ends up independent, because UniFFI has no first-class Go backend. |
+| **Da. Five independent, corpus-enforced** | Genuinely idiomatic libraries in each language. The corpus becomes the entire enforcement mechanism, with no fallback. |
+| **Db. Rust core plus a binding layer for Swift and Kotlin; independent TypeScript and Go** | What dogtag actually does, and it works. Go still ends up independent, because UniFFI has no first-class Go backend. |
 
 **What dogtag proves.** It got four-language agreement with **two** implementations, not four.
 Rust and TypeScript are independent and mirror each other file for file; Swift and Kotlin call the
@@ -208,14 +261,14 @@ between the two real implementations is enforced by a shared vector file with 15
 `bytesToField`, 11 Merkle-root and 110 inclusion vectors, driven from the Rust side by
 `crates/dogtag-standard-rs/tests/ffi_parity.rs`.
 
-**What dogtag also proves about the risk of D1.** Its TypeScript `verify` silently diverged from the
+**What dogtag also proves about the risk of Da.** Its TypeScript `verify` silently diverged from the
 Rust one and the divergence is recorded rather than fixed, because it has no production consumer
 (`AGENTS.md:357`). An independent implementation not covered by the corpus will drift.
 
-**Why the corpus is specified as though D1 were chosen.** Under D2 the corpus is a safety net; under
-D1 it is the only thing standing between five libraries and silent divergence. Building it to the
-D1 standard costs more now and is correct under either ruling. Building it to the D2 standard and
-then choosing D1 means discovering the gap after divergence has already shipped.
+**Why the corpus is specified as though Da were chosen.** Under Db the corpus is a safety net; under
+Da it is the only thing standing between five libraries and silent divergence. Building it to the
+Da standard costs more now and is correct under either ruling. Building it to the Db standard and
+then choosing Da means discovering the gap after divergence has already shipped.
 
 **This is a strategy call, not a technical one.** Both work.
 
@@ -327,9 +380,13 @@ records: 14,314 bytes in the vaccination sample, 17,440 in the endorsed PDT, 2,6
 
 Content-addressing them - hash in the tree, blob out of band - would shrink records dramatically.
 
-**Not urgent under B2 (SHA-256), where a 14 KB blob costs about 41 microseconds.
-Becomes urgent under B3 (Poseidon), where the same blob costs about 14 ms.** So D9 is partly
-downstream of decision B and should be revisited if B moves.
+**Not urgent for a record issued under `hashAlg: "SHA-256"`, where a 14 KB blob costs about 41
+microseconds. Becomes urgent for one issued under Poseidon, where the same blob costs about 14 ms.**
+
+Decision B is ruled, and it rules that both are permanent per-record selections rather than one
+project-wide choice, so D9 is no longer downstream of "which hash wins". It is downstream of
+**whether any record family will select Poseidon**, and for those families blob handling is a
+requirement rather than an optimization.
 
 A `BYTES` binding would additionally require pinning one canonical base64 form, since padding and
 line-wrap variants encode the same bytes differently.
@@ -403,7 +460,7 @@ These are not open. They are recorded with their reasons so the reasons are audi
 | **S5** | Empty array, empty object and null are **three distinct leaves** | dogtag collapses them; in FHIR the difference between "no entries" and "field absent" can be clinically meaningful. |
 | **S6** | Path encoding is **length-prefixed with no reserved characters** | Removes the need for a rejection rule, and removes the OpenAttestation array-versus-object and empty-key collisions by construction. |
 | **S7** | Each profile declares a **minimum-disclosure floor** | Adopted from dogtag's `NON_OBFUSCATABLE` (`verify.rs:253`). Without it a disclosed copy can withhold what the record is and still verify. |
-| **S8** | Reserved namespaces are guarded by **prefix, not exact match** | dogtag changed to a prefix guard deliberately, recording that exact-match left both a bare-namespace blob leaf and an adjacent-name squat reachable (`profile_tree.rs:54-66`). |
+| **S8** | Reserved namespaces are guarded by a **segment prefix, not by exact path match** | Under ROAX's structured paths the guard is on the decoded first segment: a record-supplied path whose first segment is `KEY("roax")` is rejected, which also catches the bare namespace `[KEY("roax")]` (specification section 11.2). dogtag changed from exact match to a prefix guard deliberately, recording that exact match left both a bare-namespace blob leaf and an adjacent-name squat reachable (`profile_tree.rs:54-66`). What transfers is the argument, not the string operation: dogtag reasons over a display string so its prefix is a string prefix, and guarding only the exact reserved paths here would leave `[KEY("roax"), KEY("recordIdX")]` reachable. |
 | **S9** | The **corpus is a release gate**, including validation by a different author's implementation | [`conformance-corpus.md`](conformance-corpus.md) section 2. |
 | **S10** | **No contract set is permanent** | dogtag keeps its contract-set axis and its artifact axis in separate keyspaces precisely so rotating one does not change what an already-issued record claims (`wrap.rs:30-42`). Another smart-contract round is expected. |
 
@@ -420,5 +477,6 @@ Recorded so that nobody mistakes a gap for a conclusion.
 | **The five reference implementations share one author.** | They do not share a JSON parser, number representation, Unicode API, map or sort. They do share one reading of the specification. Hence gate 3 in the corpus. |
 | **No character with version-dependent NFC has been identified.** | The Unicode pin is inferred from dogtag having found it necessary in code, not from an exhibited failing character. Conformance class 16 says so explicitly. |
 | **The ROAX chain integration is not designed.** | Anchoring registry shape, batching and revocation semantics are a real design space that no research leg covered. |
-| **Whether ZK is coming is unknown.** | Decision B's recommendation is conditional on it not being a near-term requirement. If it is, B flips and D9 moves with it. |
+| **The `Poseidon-BN254` parameterization is not pinned.** | Decision B is ruled: both hash families are first-class and selectable per record. What is not settled is the parameterization - field, rate and capacity, round constants, and the byte-string-to-field-element encoding, which the byte-level preimages of specification sections 7 and 8 do not survive without. `ROAX-CANON/1` defines SHA-256 only and registers Poseidon-BN254 with a MUST NOT against issuing under it. No parameterization has been invented to fill the gap. |
+| **Which record families will select Poseidon is unknown.** | This is what D9 now turns on. Blob handling is an optimization for a SHA-256 record and a requirement for a Poseidon one. |
 | **The audit's boundary conclusion was reached without consulting dogtag.** | **Closed.** Checked during this work; the conclusion survives, and dogtag's narrower single-profile shape is explained rather than adopted. See specification section 14.1. |

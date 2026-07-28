@@ -23,25 +23,20 @@
     },
 
     "hashAlg": {
-      "description": "Hash agility. Part of the domain string, so two records with identical content and different hashAlg have different roots. Only SHA-256 is defined for v1. See decision B/D2 - OPEN.",
-      "enum": ["SHA-256"]
+      "description": "Hash algorithm, selected per record. ZK-friendly and non-ZK hashes are both first-class (decision B, ruled). Bound TWICE so it cannot be substituted: it is appended to the domain string, which is ASCII 'ROAX-CANON/1/' + hashAlg and sits in every salt preimage and every leaf preimage (spec sections 7, 8, 7.4), AND it is committed inside the root as the reserved leaf roax.hashAlg (spec section 11.2). So two records with identical content and different hashAlg have different roots. CAUTION: only SHA-256 has a construction DEFINED by ROAX-CANON/1. Poseidon-BN254 is REGISTERED but its parameterization - field, rate and capacity, round constants, and the byte-string-to-field-element encoding the byte layouts do not survive without - is NOT yet pinned. A record MUST NOT be issued under Poseidon-BN254 until a revision pins it (spec section 7.4).",
+      "enum": ["SHA-256", "Poseidon-BN254"]
     },
 
     "recordType": {
-      "description": "Profile identifier. Committed inside the root at a reserved path. One profile document exists per value - see docs/profiles/. This list is extensible by adding a profile document; it is not a closed universe.",
+      "description": "Profile identifier, in lowercase reverse-DNS form. Committed inside the root at the reserved path roax.recordType. NORMATIVE: the registry of valid values is docs/profiles/, one document per value, and adding a value REQUIRES adding a profile document declaring at minimum its schemaVersion, its type-map scope and its non-redactable path set (spec section 10.2). The v1 registry is sg.gov.moh.vaccination-healthcert, sg.gov.moh.pdt-healthcert, sg.gov.moh.recovery-healthcert and hl7.fhir.bundle. A pattern rather than an enum, because the registry is extensible by adding a profile document and is not a closed universe; the pattern constrains the FORM only, and a syntactically valid value with no profile document is not a valid record.",
       "type": "string",
-      "enum": [
-        "sg.gov.moh.vaccination-healthcert",
-        "sg.gov.moh.pdt-healthcert",
-        "sg.gov.moh.recovery-healthcert",
-        "hl7.fhir.bundle"
-      ]
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*(\\.[a-z0-9]+(-[a-z0-9]+)*)+$"
     },
 
     "schemaVersion": {
-      "description": "Version of the record profile named by recordType. Committed inside the root.",
+      "description": "Version of the record profile named by recordType. Committed inside the root. Two or three components: the healthcert profiles use two (1.0, 2.0) and hl7.fhir.bundle uses the real FHIR version 4.0.1, which is three.",
       "type": "string",
-      "pattern": "^[0-9]+\\.[0-9]+$"
+      "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$"
     },
 
     "recordId": {
@@ -57,9 +52,9 @@
     },
 
     "leafCount": {
-      "description": "Total number of leaves in the tree. Required to verify an RFC 9162 inclusion proof, which is bound to (index, tree size). A record with zero leaves MUST be rejected at issuance.",
+      "description": "Total number of leaves in the tree, which is the UNION of the record's own leaves and the reserved roax.* leaves - NOT the record's leaves alone (spec sections 3.3 and 11.2). Six reserved leaves are always emitted (roax.canon, roax.hashAlg, roax.recordType, roax.schemaVersion, roax.recordId, roax.issuer.id) and roax.issuer.keyId adds a seventh when issuer.keyId is present. Required to verify an RFC 9162 inclusion proof, which is bound to (index, tree size), so an implementation that counts only the record produces a leafCount that does not match its own root. The minimum is 7: a record contributing zero leaves of its own MUST be rejected at issuance (spec section 3.3), so the tree is never empty.",
       "type": "integer",
-      "minimum": 1
+      "minimum": 7
     },
 
     "issuer": {
@@ -102,8 +97,14 @@
     },
 
     "record": {
-      "description": "Present in a FULL copy only. The typed record. A verifier recomputes the root from scratch. Mutually exclusive with `disclosure`.",
+      "description": "Present in a FULL copy only. The typed record. A verifier derives every salt from masterSalt and recomputes the root from scratch. Mutually exclusive with `disclosure`. CAUTION: this object carries record numbers in their original JSON form, so the parser requirement of spec section 6.4 applies to the WHOLE ENVELOPE and not only to a bare record. An implementation that reads a full copy through a float-based JSON parser destroys the very literals it is about to recompute the root from (spec section 7.3).",
       "type": "object"
+    },
+
+    "masterSalt": {
+      "description": "The per-record master secret, 32 bytes as lowercase hex. REQUIRED in a full copy and FORBIDDEN in a disclosed copy, enforced by the allOf clauses below (spec section 7.3). A full copy needs it because leafHash needs salt(path), salt(path) needs masterSalt, and the record body carries no per-leaf salts; without it a full copy has no route to any leaf hash and therefore none to the root. It leaks nothing there, because a full copy already discloses every value at every path. A DISCLOSED copy carries only the individual derived salts of the leaves it reveals, because masterSalt would let its holder brute-force every withheld low-entropy leaf. MUST be 32 fresh CSPRNG bytes PER RECORD: reuse lets a holder of one full copy derive the salts of the other record too. A holder downgrading a full copy to a disclosed copy MUST strip this field.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   },
 
@@ -168,7 +169,7 @@
           "description": "The value, in the carrier form for its tag: boolean for BOOL; string for STRING; a canonical numeric STRING for INTEGER and DECIMAL - never a JSON number, because a JSON number would be parsed through a float and destroy precision (spec section 6.4); lowercase hex for BYTES. Absent for NULL, EMPTY_ARRAY and EMPTY_OBJECT. The concrete type is pinned per tag by the allOf conditionals below."
         },
         "salt": {
-          "description": "The derived salt for this path, 16 bytes as lowercase hex. Disclosing it reveals nothing about any other leaf's salt, because derivation is HMAC (spec section 7.2). The masterSalt itself MUST NEVER appear in an envelope.",
+          "description": "The derived salt for this path, 16 bytes as lowercase hex. Disclosing it reveals nothing about any other leaf's salt, because derivation is HMAC (spec section 7.2). The masterSalt itself MUST NEVER appear in a DISCLOSED copy - it would let the verifier derive the salt of every withheld leaf and brute-force the low-entropy ones. It is carried in a FULL copy, where it discloses nothing extra and is required to recompute the root at all (spec section 7.3).",
           "type": "string",
           "pattern": "^[0-9a-f]{32}$"
         },
@@ -241,6 +242,16 @@
         { "required": ["record"], "properties": { "record": true } },
         { "required": ["disclosure"], "properties": { "disclosure": true } }
       ]
+    },
+    {
+      "description": "A FULL copy MUST carry masterSalt. Without it there is no route from the record to any leaf hash, because leafHash needs salt(path) and salt(path) needs masterSalt (spec section 7.3).",
+      "if": { "required": ["record"], "properties": { "record": true } },
+      "then": { "required": ["masterSalt"], "properties": { "masterSalt": true } }
+    },
+    {
+      "description": "A DISCLOSED copy MUST NOT carry masterSalt. It carries only the per-leaf derived salts of the leaves it reveals; masterSalt would let its holder derive the salt of every withheld leaf (spec section 7.3).",
+      "if": { "required": ["disclosure"], "properties": { "disclosure": true } },
+      "then": { "not": { "required": ["masterSalt"], "properties": { "masterSalt": true } } }
     }
   ],
 

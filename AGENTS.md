@@ -45,6 +45,24 @@ These are the things a future agent is most likely to get wrong.
 - **The display path is never hashed.** `a.b[0].c` is for humans. Hashing uses the length-prefixed
   structured encoding (spec section 5). Never reconstruct a path by parsing a display string.
 
+- **The leaf set is a union, not the record.** Reserved `roax.*` leaves are ordinary leaves with
+  ordinary structured paths - one `KEY` segment per dot component - and they join the record's
+  leaves before the sort (spec sections 3.3 and 11.2). A flattener that walks the record only
+  produces a different root. `roax.issuer.keyId` is the one conditional leaf: absent means no leaf,
+  not a NULL leaf.
+
+- **The reserved-namespace guard is on the first decoded segment**, not on a `"roax."` display-path
+  prefix. So a key named `roax` is rejected and one named `roaxX` is accepted (spec section 11.2).
+  Implementing it as a string match is the section 5.2 trap wearing a different hat.
+
+- **`DOMAIN` is algorithm-qualified:** `"ROAX-CANON/1/" + hashAlg`, not a bare `"ROAX-CANON/1"`
+  (spec sections 7, 7.4, 8). `hashAlg` is also a reserved leaf. Only SHA-256 has a defined
+  construction; Poseidon-BN254 is registered but unparameterized and MUST NOT be issued against.
+
+- **`masterSalt` is asymmetric.** A full copy MUST carry it, because otherwise there is no route
+  from the record to any leaf hash. A disclosed copy MUST NOT (spec section 7.3). Downgrading a full
+  copy to a disclosed one means stripping it.
+
 - **The vaccination healthcert's `fhirBundle.entry[]` is flattened pseudo-FHIR**, not a real FHIR
   Bundle. Normalizing it to the genuine `entry[i].resource` shape changes every path and therefore
   every root, which silently breaks existing commitments. See
@@ -66,8 +84,11 @@ These are the things a future agent is most likely to get wrong.
 
 ## The open decisions are open on purpose
 
-`docs/decisions.md` holds four unruled decisions (A, B, C, D) plus nine more. The specification is
-written on the *recommended* answer to each so it reads as a real specification.
+`docs/decisions.md` holds four decisions belonging to the project owner (A, B, C, D) plus ten more.
+Three of the four are unruled: A, C and D. **B is ruled** - both hash families are first-class and
+selectable per record - and what stays open under it is the `Poseidon-BN254` parameterization. The
+specification is written on the *recommended* answer to each unruled decision so it reads as a real
+specification.
 
 **Do not resolve any of them in code or prose without an explicit ruling**, and if one is ruled,
 update `docs/decisions.md` in the same change rather than only the specification. A decision that

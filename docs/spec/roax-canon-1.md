@@ -9,7 +9,10 @@ how those leaves are hashed and merklized into a single 32-byte root, and how in
 leaves are later disclosed and verified against that root.
 
 It is written to be implementable independently.
-Two engineers implementing only from sections 3 through 9 should produce byte-identical roots.
+Two engineers implementing only from sections 3 through 9, plus the reserved leaf set in section
+11.2, should produce byte-identical roots.
+Section 11.2 is named explicitly because the leaf set is the union of the record's leaves and those
+reserved leaves (section 3.3), so sections 3 through 9 alone do not determine a root.
 Section 11 states what makes that claim checkable, and section 13 states honestly how far it has
 actually been demonstrated.
 
@@ -46,8 +49,8 @@ and only when, they appear in all capitals.
 | **leaf** | One `(path, typeTag, value, salt)` tuple, and its 32-byte hash. |
 | **path** | The location of a leaf in the record, as a sequence of typed segments. |
 | **root** | The 32-byte Merkle Tree Head over all of a record's leaves. |
-| **full copy** | An envelope carrying the whole record; the verifier recomputes the root from scratch. |
-| **disclosed copy** | An envelope carrying only selected leaves plus inclusion proofs. |
+| **full copy** | An envelope carrying the whole record and its `masterSalt`; the verifier derives every salt itself and recomputes the root from scratch. See section 7.3. |
+| **disclosed copy** | An envelope carrying only selected leaves plus inclusion proofs, and never `masterSalt`. |
 | **type map** | The data file binding each path pattern to a ROAX type tag. See section 4. |
 
 Byte-level notation used throughout:
@@ -57,6 +60,23 @@ Byte-level notation used throughout:
 - `u64be(n)` is `n` as an 8-byte big-endian unsigned integer.
 - `utf8(s)` is the UTF-8 encoding of string `s`.
 - `NFC(s)` is Unicode Normalization Form C of `s` (see section 6.1 for the version pin).
+
+### 1.1 Normative precedence between this document and the conformance corpus
+
+**This specification is normative for meaning.**
+[`docs/conformance-corpus.md`](../conformance-corpus.md) and the corpus file it defines are the
+executable arbiter between two implementations that disagree, but they are **derived from** this
+document rather than independent of it.
+
+Where the two diverge, this specification governs.
+A divergence is a **release-blocking corpus defect**, and the corpus build MUST report it rather
+than letting an implementation pass against a vector the specification does not support.
+Neither document may be changed alone: a change to a canonicalization rule here MUST land in the
+same change as the corpus vectors that assert it.
+
+The reason is stated in `docs/conformance-corpus.md` section 1.
+If ROAX ships five independent libraries the corpus is the entire enforcement mechanism, and an
+arbiter that disagrees with the specification it arbitrates is worse than no arbiter at all.
 
 ---
 
@@ -166,6 +186,22 @@ flatten(node, path):
   otherwise:                            emit (path, typeTag(path, node), node)
 ```
 
+**The leaf set is not the record alone.** It is the union of the reserved leaves and the record
+leaves:
+
+```
+leaves(envelope, record) =
+      reservedLeaves(envelope)      // section 11.2 - a fixed set, derived from envelope fields
+    U flatten(record, [])           // this section - derived from the record
+```
+
+The union is formed **before** the sort in section 9, so reserved and record leaves are ordered
+together by encoded path and are indistinguishable to the tree function.
+Section 11.2 gives every reserved leaf with its exact path segments and type tag, states which of
+them are conditional, and states the guard that keeps the two sets disjoint.
+An implementation that flattens the record only produces a different root from one that does not,
+so this is not an optional step.
+
 Map iteration order is irrelevant, because leaves are sorted by encoded path in section 9.
 This is deliberate: it means a Go implementation works despite Go randomising map iteration order,
 and it removes the class of bug that OpenAttestation inherits from JavaScript key enumeration.
@@ -176,7 +212,11 @@ single leaf (`crates/dogtag-standard-rs/src/flatten.rs:96-115` in the dogtag mon
 array and an empty object both yield `TypedScalar::Null`, which is also what a genuine null yields).
 Section 14.2 explains why ROAX does not inherit that.
 
-A record with zero leaves MUST be rejected at issuance rather than anchored.
+**A record that contributes zero leaves of its own MUST be rejected at issuance rather than
+anchored.** The rejection is on the record's own contribution, because the union above always
+carries the reserved leaves, so the tree itself is never empty: its floor is 7 leaves, being the six
+always-emitted reserved leaves plus at least one from the record. Section 11.2 gives the reserved
+set and states which one is conditional.
 
 ---
 
@@ -355,8 +395,71 @@ at `crates/dogtag-standard-rs/src/encode.rs:9-10`).
 - Input grammar: `^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$`, which is exactly the FHIR R4
   `decimal` pattern as shipped in the reference `fhir/4.0.1/schema.json`.
 - Canonicalization does **only** two things:
-  1. expands exponent notation into positional notation, preserving the digit count;
+  1. expands exponent notation into positional notation, by the rule below;
   2. drops the sign of a zero-valued magnitude.
+
+#### Exponent expansion, stated exactly
+
+Let the input be a sign, a mantissa written as `intDigits` optionally followed by `.` and
+`fracDigits`, and an exponent `e`, where an absent exponent means `e = 0`.
+Let `f = len(fracDigits)`, which is `0` when there is no fraction part.
+
+Expansion shifts the decimal point right by `e` places.
+The fraction of the result then has exactly `f'` digits, where:
+
+```
+  f' = max(0, f - e)     for e >= 0
+  f' = f + |e|           for e <  0
+```
+
+The digit sequence is never rounded, extended or truncated to a target precision.
+Shifting pads with `0` where the point runs past the digits that are present.
+The result is then normalized to the output grammar `^-?(0|[1-9][0-9]*)(\.[0-9]+)?$`, which is the
+same grammar `schemas/envelope-1.0.json` pins for a DECIMAL value:
+
+- leading zeros in the integer part are removed, and an emptied integer part becomes a single `0`;
+- a fraction of zero digits is dropped along with its `.`;
+- a zero-valued magnitude keeps its fraction digits and loses its sign.
+
+Worked examples, which a conforming implementation MUST reproduce:
+
+```
+  1e2      ->  100        f = 0, e =  2, f' = max(0, 0 - 2) = 0
+  1.0e2    ->  100        f = 1, e =  2, f' = max(0, 1 - 2) = 0
+  1.00e1   ->  10.0       f = 2, e =  1, f' = max(0, 2 - 1) = 1
+  1.5e-2   ->  0.015      f = 1, e = -2, f' = 1 + 2         = 3
+  1e-3     ->  0.001      f = 0, e = -3, f' = 0 + 3         = 3
+  0e5      ->  0          f = 0, e =  5, f' = 0, integer part normalizes to a single 0
+  0.010    ->  0.010      no exponent, unchanged
+```
+
+Note precisely what this preserves.
+Trailing zeros of the **fraction** are significant and survive, which is the FHIR requirement stated
+immediately below.
+Trailing zeros of the **integer part** carry no precision in this grammar and cannot, so `1e2`,
+`1.0e2` and `100` all encode to `100` and are therefore the **same leaf**, while `100.0` encodes to
+`100.0` and is a **different leaf**.
+`docs/conformance-corpus.md` class 1 states that trio explicitly, so the corpus cannot be misread as
+requiring the three to differ.
+
+#### Bound on expansion
+
+**An implementation MUST reject any input whose expanded positional form would carry more than 1024
+digits in total, counting integer digits and fraction digits together.**
+
+This bound is a fixed constant of `ROAX-CANON/1` and MUST NOT be implementation-chosen.
+Section 13.3 rejects RDFC-1.0 partly because an implementation-chosen iteration limit means two
+conformant implementations disagree about which records they will canonicalize at all; an
+implementation-chosen digit limit here would be that same defect in this design.
+Changing the bound changes which records canonicalize, so it is a canonicalization-version change
+under section 12.
+
+The bound is what gives the input grammar an error path.
+The grammar admits `1.4e+9999`, whose expansion is ten thousand digits, and
+`docs/conformance-corpus.md` class 3 requires exactly that input to error rather than be
+canonicalized.
+1024 clears every vector the corpus requires to succeed, including class 1's 40-digit integer part
+and 40-digit fraction and class 2's 40-digit integer.
 
 **Trailing zeros in the fraction are significant and MUST be preserved.**
 
@@ -424,11 +527,15 @@ implementation.
 salt(path) = HMAC-SHA-256(masterSalt, saltPreimage(path))[0..16]
 
 saltPreimage(path) =
-      u32be(len(DOMAIN))   ‖ DOMAIN       // DOMAIN = ASCII "ROAX-CANON/1"
+      u32be(len(DOMAIN))   ‖ DOMAIN       // DOMAIN = ASCII "ROAX-CANON/1/" ‖ hashAlg
     ‖ u32be(len(LABEL))    ‖ LABEL        // LABEL  = ASCII "/salt"
     ‖ u32be(len(RID))      ‖ RID          // RID    = utf8(recordId), from the envelope (section 11)
     ‖ u32be(len(P))        ‖ P            // P      = encodePath(path)
 ```
+
+`DOMAIN` is **algorithm-qualified**: it is the ASCII string `ROAX-CANON/1/` followed by the
+envelope's `hashAlg` value, so for v1's defined algorithm it is `ROAX-CANON/1/SHA-256`.
+Section 7.4 states why the algorithm identifier is bound here and not merely declared.
 
 **Every component is length-prefixed, exactly as in section 8, and for the same reason.**
 This is spelled out as a byte layout rather than as a concatenation expression because it is a place
@@ -440,16 +547,16 @@ read it here.
 - `masterSalt` MUST be 32 bytes freshly generated from a CSPRNG, **per record**.
 - It MUST NOT be derived from record content, from a record identifier, from the issuer's signing
   key, or from any other issuer-stable secret.
-- It is held by the issuer and then the holder, and is **never disclosed**. Only individual derived
-  `salt(path)` values are.
+- It is disclosed only in a **full copy**, and never in a disclosed copy. See section 7.3.
 
 There is exactly **one** salt-derivation preimage builder in a conforming implementation.
 
-**`recordId` is not circular, though it looks it.** It is an input to every salt (above) and is also
-itself committed as a reserved leaf at `roax.recordId` (section 11.2). There is no cycle: the
-preimage consumes `recordId` as a plain UTF-8 string taken from the envelope, never a leaf hash or a
-salt. So `salt(roax.recordId)` is computed the same way as every other salt, and the leaf at
-`roax.recordId` is then built from it normally. Implement it in that order and nothing recurses.
+**Neither `recordId` nor `hashAlg` is circular, though both look it.** Each is an input to every
+salt (above) and each is also itself committed as a reserved leaf, at `roax.recordId` and
+`roax.hashAlg` (section 11.2). There is no cycle: the preimage consumes both as plain UTF-8 strings
+taken from the envelope, never a leaf hash or a salt. So `salt` for those two reserved paths is
+computed the same way as every other salt, and their leaves are then built from it normally.
+Implement it in that order and nothing recurses.
 
 ### 7.1 Why the record identifier is in the preimage
 
@@ -491,6 +598,72 @@ uniform.
 This is decision D4, and the alternative - dogtag's stored per-leaf salt - is genuinely defensible.
 See `docs/decisions.md`.
 
+### 7.3 Which copy carries `masterSalt`
+
+**A full copy MUST carry `masterSalt`, as 32 bytes in lowercase hex.**
+**A disclosed copy MUST NOT carry it**, and carries only the individual derived `salt(path)` values
+of the leaves it reveals.
+`schemas/envelope-1.0.json` enforces both structurally: `masterSalt` is required alongside `record`
+and forbidden alongside `disclosure`.
+
+Without this a full copy is not verifiable at all, which would make the definition in section 1
+false. `leafHash` (section 8) needs `salt(path)`, `salt(path)` needs `masterSalt`, and the record
+body carries no per-leaf salts. A verifier holding a full copy would have no route to any leaf hash
+and therefore none to the root.
+
+**This leaks nothing about that record.** A full copy already discloses every value at every path,
+so handing its holder `masterSalt` reveals nothing it does not already have: the only thing
+`masterSalt` unlocks is the salts of that record's own leaves, and their values are all present in
+the copy. The property `masterSalt` protects is brute-forcing a **withheld** low-entropy field
+(section 7.2), and a full copy withholds nothing.
+
+**The per-record freshness MUST above is unaffected, and this makes it load-bearing in a second
+way.** Under section 7.1 reuse across two records already lets a verifier who sees both disclosures
+link them. Once full copies carry `masterSalt`, reuse is worse than that: anyone holding a full copy
+of record A can derive salt(path) for every path of record B that shares the reused `masterSalt`,
+and so can brute-force B's withheld low-entropy leaves directly. Freshness per record is what keeps
+the two records' salt spaces disjoint.
+
+**Operationally:** a holder downgrading a full copy to a disclosed copy MUST strip `masterSalt` and
+emit only the derived salts of the leaves being revealed. An envelope carrying both `masterSalt` and
+`disclosure` MUST be rejected rather than repaired.
+
+Note also that the record body of a full copy carries record numbers in their original JSON form.
+The parser requirement of section 6.4 therefore applies to the **envelope**, not only to a bare
+record: an implementation that reads a full copy through a float-based JSON parser destroys the very
+literals it is about to recompute the root from, and will fail to reproduce a root it should have
+matched.
+
+### 7.4 Why the algorithm identifier is inside the domain string
+
+`hashAlg` selects which hash function a verifier runs, so it is authority rather than a hint, and
+section 11.3 states normatively that anything outside the root is never authority.
+
+It is therefore bound **twice**, deliberately:
+
+1. it is part of `DOMAIN`, so it enters every salt preimage (this section) and every leaf preimage
+   (section 8);
+2. it is committed inside the root as the reserved leaf `roax.hashAlg` (section 11.2).
+
+Either alone would be enough to make substitution detectable. Both are cheap now and neither is
+cheap to retrofit once records exist under a second algorithm, which section 12 records as an
+explicit versioning axis.
+
+Without the first, a party could assert a different algorithm over the same leaves and the domain
+string would not notice. Without the second, the field selecting the hash function would sit in the
+region the specification itself declares attacker-controlled.
+
+**Which algorithms are defined.** `ROAX-CANON/1` **defines** the construction for `SHA-256` only.
+`Poseidon-BN254` is **registered** in the envelope schema because ZK-friendly and non-ZK hashes are
+both first-class and selectable per record (decision B in `docs/decisions.md`), but its
+parameterization is **not pinned** by this document: the field, the rate and capacity, the round
+constants and - the part the byte layouts above do not survive without - the encoding from a
+length-prefixed byte string to field elements.
+
+> **Normative:** a record MUST NOT be issued with `hashAlg: "Poseidon-BN254"` until a revision of
+> this specification pins that parameterization. The byte-level preimages in sections 7 and 8 are
+> stated over byte strings and do not transfer to a prime-field permutation unmodified.
+
 ---
 
 ## 8. Leaf construction
@@ -498,7 +671,7 @@ See `docs/decisions.md`.
 ```
 leafHash(path, tag, value, salt) = SHA-256(
       0x00                              // RFC 9162 leaf domain byte
-    ‖ u32be(len(DOMAIN)) ‖ DOMAIN       // DOMAIN = "ROAX-CANON/1"
+    ‖ u32be(len(DOMAIN)) ‖ DOMAIN       // DOMAIN = "ROAX-CANON/1/" ‖ hashAlg
     ‖ u32be(len(P))      ‖ P            // P = encodePath(path)
     ‖ tag                               // one byte
     ‖ u32be(len(salt))   ‖ salt         // 16 bytes
@@ -514,7 +687,7 @@ node, which is prefixed `0x01`. RFC 9162 section 2.1.1 states the reason: "the h
 for leaves and nodes differ; this domain separation is required to give second preimage resistance".
 
 `DOMAIN` is inside every leaf preimage, which is what cryptographically binds the canonicalization
-version. See section 12.
+version **and**, because it is algorithm-qualified, the hash algorithm. See sections 7.4 and 12.
 
 ---
 
@@ -547,8 +720,14 @@ The composition `leafHash` then `MTH` is therefore bit-identical to RFC 9162's `
 entries whose entry bytes are everything after the `0x00` in section 8.
 The internal-node rule and the split rule for `k` are unchanged from the RFC.
 
-An empty record MUST be rejected at issuance rather than anchored.
-`MTH([])` is defined only so the function is total.
+A record that contributes zero leaves of its own MUST be rejected at issuance rather than anchored.
+
+**`MTH([])` is unreachable in a conforming implementation**, and is stated only so the function is
+total. The leaf set is the union of section 3.3, which always carries the reserved leaves of section
+11.2, so `L` is never empty and its length is never below 7. The branch is kept rather than deleted
+because a total function is easier to port than one with an undefined case, and because an
+implementation that reaches it has a defect worth failing loudly on rather than an input worth
+hashing.
 
 ### 9.2 Inclusion proofs
 
@@ -581,8 +760,10 @@ canonical order proves no leaf exists between them. dogtag sorts by hash
 
 ## 10. Selective disclosure
 
-A disclosed copy carries, for each revealed leaf: its display path, its leaf index, its type tag,
-its value, its `salt(path)`, and its RFC 9162 audit path.
+A disclosed copy carries, for each revealed leaf: its path as **structured segments**, its leaf
+index, its type tag, its value, its `salt(path)`, and its RFC 9162 audit path.
+It MAY additionally carry the display path, which is display only and is never an input to anything
+the verifier computes (section 5.2).
 
 A verifier:
 
@@ -645,13 +826,13 @@ JSON Schema: [`schemas/envelope-1.0.json`](../../schemas/envelope-1.0.json).
 ```jsonc
 {
   "canon": "ROAX-CANON/1",          // canonicalization version - BOUND INTO THE ROOT
-  "hashAlg": "SHA-256",             // hash agility - part of the domain string
+  "hashAlg": "SHA-256",             // hash algorithm - in the domain string AND inside the root
   "recordType": "sg.gov.moh.vaccination-healthcert",
   "schemaVersion": "1.0",
   "recordId": "urn:uuid:...",       // in every salt preimage (section 7.1)
 
   "root": "<64 hex chars>",
-  "leafCount": 87,
+  "leafCount": 94,                  // the UNION - record leaves plus reserved leaves (section 3.3)
 
   "issuer": {                       // identity, committed INSIDE the root at reserved paths
     "id": "did:web:example.gov",
@@ -666,34 +847,103 @@ JSON Schema: [`schemas/envelope-1.0.json`](../../schemas/envelope-1.0.json).
   },
 
   "disclosure": { /* present in a DISCLOSED copy only */ },
-  "record":     { /* present in a FULL copy only */ }
+  "record":     { /* present in a FULL copy only */ },
+  "masterSalt": "<64 hex chars>"    // present in a FULL copy only, forbidden in a disclosed one
 }
 ```
 
 The `anchor` values above are illustrative placeholders.
 No chain id, registry address or contract set is treated as permanent by this document.
 
+`leafCount` counts the **union** defined in section 3.3, so it includes the reserved leaves of
+section 11.2 and not only the leaves the record itself produced. The value shown is the 87-leaf
+vaccination record of section 10.3 plus its seven reserved leaves, `issuer.keyId` being present
+here. An implementation that counts the record alone reports a `leafCount` that does not match its
+own root, and every inclusion proof it issues is bound to the wrong tree size.
+
 **Exactly one of `record` and `disclosure` MUST be present.**
 A verifier that sees both MUST reject. The JSON Schema encodes this as two `allOf` clauses, because
 it is the security-relevant invariant and is easy to get wrong when written informally.
+`masterSalt` follows `record`: it is REQUIRED in a full copy and FORBIDDEN in a disclosed one
+(section 7.3).
 
-### 11.2 Reserved paths, and the prefix rule
+### 11.2 Reserved leaves, and the prefix rule
 
-`canon`, `recordType`, `schemaVersion`, `recordId` and the issuer's identity are committed
-**inside** the root as ordinary leaves under the reserved path prefix `roax.`.
+The envelope fields that say what a record **is** are committed **inside** the root as ordinary
+leaves under the reserved first segment `roax`.
 Only genuinely mutable routing hints stay outside.
 
-> **Normative:** no record-supplied path may begin with the reserved prefix `roax.`.
-> The guard is on the **prefix**, not on exact path equality.
+These are ordinary leaves in every respect. They are salted per section 7, hashed per section 8, and
+sorted into the same order as record leaves per section 9. Nothing about them is special-cased
+except where they come from.
 
-The prefix form is adopted from dogtag, which changed to it deliberately and recorded why:
+#### The reserved leaf set
+
+Each reserved path is an ordinary structured path, with **one `KEY` segment per dot component** of
+the name. There is no leaf whose single key contains a dot.
+
+| Reserved leaf | Path segments | Tag | Value | Emitted |
+|---|---|---:|---|---|
+| `roax.canon` | `[KEY("roax"), KEY("canon")]` | 2 STRING | the envelope's `canon` | always |
+| `roax.hashAlg` | `[KEY("roax"), KEY("hashAlg")]` | 2 STRING | the envelope's `hashAlg` | always |
+| `roax.recordType` | `[KEY("roax"), KEY("recordType")]` | 2 STRING | the envelope's `recordType` | always |
+| `roax.schemaVersion` | `[KEY("roax"), KEY("schemaVersion")]` | 2 STRING | the envelope's `schemaVersion` | always |
+| `roax.recordId` | `[KEY("roax"), KEY("recordId")]` | 2 STRING | the envelope's `recordId` | always |
+| `roax.issuer.id` | `[KEY("roax"), KEY("issuer"), KEY("id")]` | 2 STRING | the envelope's `issuer.id` | always |
+| `roax.issuer.keyId` | `[KEY("roax"), KEY("issuer"), KEY("keyId")]` | 2 STRING | the envelope's `issuer.keyId` | only when `issuer.keyId` is present |
+
+Every reserved leaf is a STRING, so every value is normalized to NFC and encoded per section 6.1
+like any other string.
+
+`issuer.keyId` is OPTIONAL in the envelope schema, so it is the one reserved leaf whose presence
+varies. **An absent `issuer.keyId` emits no leaf**; it MUST NOT be emitted as a NULL leaf or as an
+empty string, because those are three different roots and only one of them can be right. The
+reserved leaf count is therefore 6 or 7.
+
+Without this table the specification's headline claim in the preamble does not hold, which is why
+that claim names this section. Under section 5 the name `roax.issuer.id` could otherwise legally
+encode as three segments, as two, or as one key containing dots, and each produces a different root.
+
+These leaves are inputs to sections 8 and 9, so labelling section 11 a strawman does not cover them:
+the envelope's **shape** is unsettled, but the leaves it commits and their encoding are not.
+
+#### The prefix guard, in structured terms
+
+> **Normative:** no record-supplied path may have `KEY("roax")` as its **first segment**.
+> The guard compares decoded segments. It is a guard on the segment sequence, not on a rendered
+> string, and an implementation MUST NOT implement it by string-matching a display path against
+> `"roax."` - section 5.2 forbids reasoning over display paths, and this is the case it forbids it
+> for.
+
+Three consequences worth stating, because they are where a display-string guard and a segment guard
+give different answers:
+
+- A record key literally named `roax` with a scalar value is **rejected**, even though the string
+  `"roax"` has no `roax.` prefix. Its path is `[KEY("roax")]`, whose first segment is the reserved
+  one. This is dogtag's bare-namespace case.
+- A record key named `roaxX` is **accepted**, because `KEY("roaxX")` is simply a different segment
+  from `KEY("roax")`. The adjacent-name squat is a hazard for a guard that compares rendered
+  strings; under segment comparison it collides with nothing, so there is nothing to reject.
+- A record key literally named `roax.recordId`, as a single key containing a dot, is also
+  **accepted**. Its path is `[KEY("roax.recordId")]`, which the length-prefixed encoding of
+  section 5.1 makes provably distinct from the two-segment reserved path, so it cannot collide with
+  the reserved leaf. `docs/conformance-corpus.md` class 15 carries all three, alongside the direct
+  reserved-path collisions the guard exists for.
+
+The guard-by-prefix form is adopted from dogtag, which changed to it deliberately and recorded why:
 its `owner.` namespace is guarded by prefix "vs the old exact-match-only guard" so that "no future
 attribute can be named into ambiguity with an owner-control leaf", and it notes that an exact-match
 guard leaves both a bare-namespace blob leaf and an `owner.identityX` squat reachable
 (`crates/dogtag-standard-rs/src/profile_tree.rs:54-66`).
 
+What transfers is the argument, not the string operation. dogtag reasons over a string path, so its
+prefix guard is a string prefix. ROAX reasons over segments, so the equivalent is a **segment**
+prefix, which here is a single first segment. Guarding only the exact full reserved paths would
+leave `[KEY("roax"), KEY("recordIdX")]` reachable, which is dogtag's point restated in this
+encoding.
+
 This is inference applied to a new case: dogtag's comment establishes that the exact-match guard
-was insufficient in dogtag's namespace, and the same structural argument applies to `roax.`.
+was insufficient in dogtag's namespace, and the same structural argument applies to `roax`.
 It is not a second independently observed failure.
 
 ### 11.3 Anything outside the root is attacker-controlled
@@ -721,18 +971,28 @@ The recommended split above puts identity inside and routing outside. This is de
 
 ## 12. Versioning
 
-Three axes, deliberately not collapsed:
+Four axes, deliberately not collapsed:
 
 | Axis | Field | Changes when | Inside the root? |
 |---|---|---|---|
 | Canonicalization | `canon` | the hashing rules change | **Yes**, via `DOMAIN` in every leaf and every salt |
+| Hash algorithm | `hashAlg` | a record selects a different hash family | **Yes**, twice: via `DOMAIN`, and as the reserved leaf `roax.hashAlg` |
 | Record schema | `recordType` + `schemaVersion` | a profile publishes a new version | **Yes**, as ordinary reserved leaves |
 | Envelope / routing | `anchor` | deployment changes | **No** |
 
-Because `DOMAIN` is folded into every leaf hash (section 8) and every salt (section 7), the
-canonicalization version is **cryptographically bound**. A v2 library reading a v1 record reads
+Because `DOMAIN` is folded into every leaf hash (section 8) and every salt (section 7), and
+`DOMAIN` is `ROAX-CANON/1/` followed by `hashAlg`, both the canonicalization version and the hash
+algorithm are **cryptographically bound**. A v2 library reading a v1 record reads
 `canon: "ROAX-CANON/1"` and must run the v1 rules; it cannot accidentally apply v2 rules and get a
-matching root, and it cannot be tricked into it, because the root commits to the version.
+matching root, and it cannot be tricked into it, because the root commits to the version. The same
+holds for the algorithm: two records with identical content under different `hashAlg` values have
+different roots by construction, and a party cannot assert a different algorithm over the same
+leaves.
+
+The algorithm axis is separate from the canonicalization axis on purpose. Swapping the hash while
+keeping path encoding, type tags, value encoding, leaf composition and tree shape identical is a
+change of `hashAlg`, not of `canon`, and section 7.4 records what still has to be pinned before the
+second algorithm can be used.
 
 **Rule for libraries:** verification code for every published `canon` version is retained forever;
 issuance code exists only for the current one.
@@ -743,10 +1003,15 @@ its artifact axis in separate keyspaces for exactly this reason: an artifact rot
 them back into one version" (`crates/dogtag-standard-rs/src/wrap.rs:30-42`).
 That lesson is why this document does not treat any contract set as permanent.
 
-`hashAlg` is declared but only `SHA-256` is defined for v1. Hash agility is not free: two records
-with identical content and different `hashAlg` have different roots, and every verifier eventually
-implements both. It is designed in now because retrofitting is worse, and it is the escape hatch if
-zero-knowledge proofs become a requirement. This is decision B / D2.
+`hashAlg` is a permanent, per-record selection between a ZK-friendly and a non-ZK hash, and both
+families are first-class. That is decision B in `docs/decisions.md`, and it is **ruled**, which is
+what makes the binding above mandatory rather than tidy: an algorithm identifier that a verifier
+acts on cannot sit outside the root.
+
+Hash agility is not free, and the cost is unchanged by the ruling: two records with identical
+content and different `hashAlg` have different roots, and every verifier eventually implements both.
+Only `SHA-256` has a defined construction in `ROAX-CANON/1`; `Poseidon-BN254` is registered and its
+parameterization is not yet pinned, so it MUST NOT be issued against. See section 7.4.
 
 ---
 
@@ -927,7 +1192,7 @@ assumed. The four profile documents under `docs/profiles/` exist because of it.
 | Decimal trailing zeros stripped | `encode.rs:51-59` pops trailing `0` then a trailing `.` | **DEPARTED**, section 6.2 | `0.010` becomes `0.01`, which FHIR R4 says implementations SHALL NOT do. Correct for a pet's weight, wrong for a lab result. |
 | Empty array, empty object and null collapse to one leaf | `flatten.rs:96-115` maps all three to `TypedScalar::Null` | **DEPARTED**, tags 6 and 7 in section 6.1 | A real collision. In FHIR the difference between "no entries" and "field absent" can be clinically meaningful. |
 | String key path with reserved characters rejected | `flatten.rs:17-20` rejects `.`, `[`, `]` in keys | **DEPARTED**, section 5 | Length-prefixed encoding needs no rejection rule and no escaping. |
-| Poseidon over BN254 | `poseidon.rs`, `field.rs` | **DEPARTED**, SHA-256 | Measured 52-63x slower on real records, no native primitive in Swift, Kotlin or Go. dogtag needs it because it proves consent in zero knowledge; ROAX v1 does not. This is decision B / D2 and it is OPEN. |
+| Poseidon over BN254 | `poseidon.rs`, `field.rs` | **DEPARTED as the only hash**, and registered alongside SHA-256 | Measured 52-63x slower on real records, no native primitive in Swift, Kotlin or Go, so it cannot be the sole hash. Decision B is ruled: both families are first-class and selected per record via `hashAlg`, which is why section 7.4 binds the algorithm identifier into `DOMAIN` and into the root. Only SHA-256 has a defined construction in v1; the Poseidon parameterization is not pinned. |
 | Sorted-by-hash commutative tree with odd promotion | `merkle.rs:22-46` | **DEPARTED**, RFC 9162 | Position-bound, published, and no commutative-fold hazard. |
 | Stored 16-byte salt per leaf inside the document | `wrap.rs` | **DEPARTED**, derived salts, section 7 | Size. But this is decision D4 and dogtag's choice is defensible. |
 | Single hard-coded profile validator | `schema.rs:1-9`, `:159` | **DEPARTED**, per-family profiles | See section 14.1. |
@@ -963,13 +1228,19 @@ This is decision D / D10 and it is OPEN.
 This specification is written on the **recommended** answer to every open decision, so that it is
 concrete and readable. That does not mean the decisions are made.
 
-Four belong to the project owner and have not been ruled on:
+Three of the four that belong to the project owner have not been ruled on:
 
 - **A** - whether roax-lib needs EU recognition, which would mandate SD-JWT VC and ISO mdoc export
   profiles.
-- **B** - SHA-256 with a declared algorithm field, versus ZK-ready Poseidon now.
 - **C** - what happens to the Singapore healthcerts already issued under OpenAttestation.
 - **D** - five independent libraries versus a shared core over a binding layer.
+
+**B is ruled and is no longer open in the "which one" sense.** ZK-friendly and non-ZK hashes are
+both first-class and selectable per record, permanently, via `hashAlg`. That ruling is what makes
+the algorithm binding of section 7.4 mandatory rather than optional. What remains open under B is
+narrower: the exact `Poseidon-BN254` parameterization, which is not pinned by this document and MUST
+be pinned before any record is issued under it, and the cost consequences already tabulated in
+`docs/decisions.md`.
 
 Ten more are recorded alongside them: D3 wire format, D4 salt strategy, D5 leaf ordering,
 D6 absence proofs, D7 unknown paths, D8 what goes inside the root, D9 big blobs, D11 detached

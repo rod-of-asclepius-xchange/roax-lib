@@ -46,9 +46,18 @@ for that reconciliation and its conclusion.
 
 ## What each profile document must declare
 
+**This directory is the `recordType` registry.**
+`schemas/envelope-1.0.json` constrains `recordType` to a lowercase reverse-DNS *form* rather than to
+a closed list, because the list is extensible. It is the registry that closes it: **adding a
+`recordType` value REQUIRES adding a profile document here declaring at least the first three rows
+below**, and a syntactically valid `recordType` with no profile document is not a valid record.
+
+The v1 registry is `sg.gov.moh.vaccination-healthcert`, `sg.gov.moh.pdt-healthcert`,
+`sg.gov.moh.recovery-healthcert` and `hl7.fhir.bundle`.
+
 | Item | Why |
 |---|---|
-| `recordType` and `schemaVersion` values | They are committed inside the root. |
+| `recordType` and `schemaVersion` values | They are committed inside the root as reserved leaves (spec section 11.2). |
 | Type-map scope | Which schema definitions the type map must cover for this family (spec section 4.2). |
 | Non-redactable paths | The minimum-disclosure floor (spec section 10.2). Without it a disclosed copy can hide what the record is. |
 | Blob-bearing fields | Which fields carry base64 and how they are bound (spec section 6.3). |

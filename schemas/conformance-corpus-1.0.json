@@ -13,7 +13,10 @@
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
     },
     "canon": { "const": "ROAX-CANON/1" },
-    "hashAlg": { "enum": ["SHA-256"] },
+    "hashAlg": {
+      "description": "The hash algorithm these vectors were produced under. It is not merely a label: it is appended to the domain string, which is ASCII 'ROAX-CANON/1/' + hashAlg and sits in every salt preimage and every leaf preimage, so every expected hash in this file is specific to it (spec sections 7, 8, 7.4). Matches the envelope enum deliberately. Only SHA-256 has a construction DEFINED by ROAX-CANON/1; Poseidon-BN254 is registered but its parameterization is not yet pinned, so no Poseidon corpus can exist until a revision pins it (spec section 7.4).",
+      "enum": ["SHA-256", "Poseidon-BN254"]
+    },
     "unicodeVersion": {
       "description": "The Unicode version whose NFC tables the expected values were produced under. ROAX-CANON/1 pins 15.1 (spec section 6.1). An implementation running different tables MAY legitimately differ on vectors in the 'unicodeVersion' class, and must say so rather than silently passing.",
       "type": "string",
@@ -187,7 +190,7 @@
     },
 
     "typeMapVector": {
-      "description": "Asserts that a given path under a given type map resolves to a given tag, or fails closed.",
+      "description": "Asserts that a given path under a given type map resolves to a given tag, or fails closed. EXACTLY ONE of expectTag and expectFailClosed is required: with neither the vector asserts nothing, and with both it asserts two contradictory things. Every other vector type in this file requires its assertion, and class 11 is the highest-risk surface in the design (docs/conformance-corpus.md), so a silently vacuous vector is the worst place to allow one.",
       "type": "object",
       "required": ["name", "class", "recordType", "segments"],
       "additionalProperties": false,
@@ -199,22 +202,67 @@
         "jsonKind": { "enum": ["string", "number", "boolean", "null", "object", "array"] },
         "expectTag": { "type": "integer", "minimum": 0, "maximum": 7 },
         "expectFailClosed": { "type": "boolean" }
-      }
+      },
+      "oneOf": [
+        {
+          "description": "Asserts a resolved tag.",
+          "required": ["expectTag"],
+          "properties": { "expectTag": true }
+        },
+        {
+          "description": "Asserts that the path is not covered and the implementation fails closed (spec section 4.2, decision D7).",
+          "required": ["expectFailClosed"],
+          "properties": { "expectFailClosed": true }
+        }
+      ]
     },
 
     "recordVector": {
-      "description": "A whole record with its root. The three real MOH samples are mandatory (class 10). Records are referenced by file rather than inlined, so that no reference schema or sample is copied into this repository.",
+      "description": "A whole record with its root. The three real MOH samples are mandatory (class 10). Records are referenced by file rather than inlined, so that no reference schema or sample is copied into this repository. EVERY input to the root is required here, because the leaf set is the UNION of the record's leaves and the reserved roax.* leaves (spec sections 3.3 and 11.2): recordType, schemaVersion and issuerId are reserved-leaf values and therefore change the root, so a vector omitting any of them is not reproducible and the class-10 assertion would be untestable. The top-level canon and hashAlg supply the rest, via the domain string.",
       "type": "object",
-      "required": ["name", "class", "recordFile", "masterSaltHex", "recordId", "leafCount", "root"],
+      "required": [
+        "name",
+        "class",
+        "recordFile",
+        "masterSaltHex",
+        "recordId",
+        "recordType",
+        "schemaVersion",
+        "issuerId",
+        "leafCount",
+        "root"
+      ],
       "additionalProperties": false,
       "properties": {
         "name": { "$ref": "#/$defs/name" },
         "class": { "$ref": "#/$defs/classRef" },
-        "recordType": { "type": "string" },
+        "recordType": {
+          "description": "Committed as the reserved leaf roax.recordType, so it is an input to the root and not a label.",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "description": "Committed as the reserved leaf roax.schemaVersion. Same two-or-three-component form as the envelope.",
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$"
+        },
+        "issuerId": {
+          "description": "Committed as the reserved leaf roax.issuer.id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "issuerKeyId": {
+          "description": "Committed as the reserved leaf roax.issuer.keyId. OPTIONAL, and its ABSENCE is meaningful rather than a default: an absent issuerKeyId emits NO leaf, which changes both leafCount and root, and it MUST NOT be substituted with a NULL leaf or an empty string (spec section 11.2). A vector that omits this field asserts the no-leaf case.",
+          "type": "string",
+          "minLength": 1
+        },
         "recordFile": { "type": "string" },
         "masterSaltHex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "recordId": { "type": "string" },
-        "leafCount": { "type": "integer", "minimum": 1 },
+        "leafCount": {
+          "description": "The UNION count: the record's own leaves plus the 6 always-emitted reserved leaves, plus 1 when issuerKeyId is present. The floor is 7, because a record contributing zero leaves of its own MUST be rejected at issuance (spec section 3.3).",
+          "type": "integer",
+          "minimum": 7
+        },
         "root": { "$ref": "#/$defs/hex32" }
       }
     },

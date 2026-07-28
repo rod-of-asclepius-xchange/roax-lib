@@ -13,7 +13,7 @@ No library code has been written, deliberately.
 
 | Read | For |
 |---|---|
-| [`docs/decisions.md`](docs/decisions.md) | **The open decisions.** Four are unruled and belong to the project owner. Start here if you are reviewing rather than implementing. |
+| [`docs/decisions.md`](docs/decisions.md) | **The open decisions.** Four belong to the project owner; three of those are still unruled. Start here if you are reviewing rather than implementing. |
 | [`docs/spec/roax-canon-1.md`](docs/spec/roax-canon-1.md) | The protocol. Precise enough to implement from. Section 2 says what it does not solve; section 14 reconciles it against dogtag. |
 | [`docs/profiles/`](docs/profiles/) | One document per record family, because the four families do **not** share one concrete object. |
 | [`docs/conformance-corpus.md`](docs/conformance-corpus.md) | What cross-language agreement has to be proven against, and why that is a release gate rather than decoration. |
@@ -41,16 +41,23 @@ implementing a language-neutral specification. See decision C.
 
 ## What is not decided
 
-Four decisions are open and none of them is quietly settled anywhere in these documents:
+Three of the four decisions that belong to the project owner are open, and none of them is quietly
+settled anywhere in these documents:
 
 - **A** - whether roax-lib needs EU recognition, which would mandate SD-JWT VC and ISO mdoc export
   profiles.
-- **B** - SHA-256 with a declared algorithm field, versus ZK-ready Poseidon now.
 - **C** - what happens to the Singapore healthcerts already issued under OpenAttestation.
 - **D** - five independent libraries versus a shared core over a binding layer.
 
-Ten more are recorded alongside them. The specification is written on the *recommended* answer to
-each so that it reads as a real specification; that is a drafting choice and not a ruling.
+**B - the hash function - has been ruled.** ZK-friendly and non-ZK hashes are both first-class and
+selectable per record, permanently, which is why the algorithm identifier is bound into the domain
+string and committed inside the root rather than merely declared. What remains open under B is the
+`Poseidon-BN254` parameterization, which is not pinned and which no record may be issued against
+until it is.
+
+Ten more decisions are recorded alongside them. The specification is written on the *recommended*
+answer to each open one so that it reads as a real specification; that is a drafting choice and not
+a ruling.
 
 ## Repository layout
 

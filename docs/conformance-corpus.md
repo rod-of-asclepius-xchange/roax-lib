@@ -36,6 +36,24 @@ with the Rust implementation").
 > An independent implementation that is not covered by the corpus **will** drift.
 > There must be no "we will reconcile it later" path.
 
+### 1.1 Precedence: the specification governs
+
+This document and the corpus file it defines are the **executable arbiter** between two
+implementations that disagree, but they are **derived from**
+[`docs/spec/roax-canon-1.md`](spec/roax-canon-1.md) rather than independent of it.
+
+**The specification is normative for meaning. Where the two diverge, the specification governs.**
+
+A divergence is a **release-blocking corpus defect**, and the corpus build MUST report it rather
+than letting an implementation pass against a vector the specification does not support.
+Neither document may be changed alone: a change to a canonicalization rule lands in the same change
+as the corpus vectors that assert it, in both directions.
+
+This is stated because of what section 1 just argued. If the corpus is the entire enforcement
+mechanism, an arbiter that disagrees with the specification it arbitrates is worse than no arbiter:
+it certifies divergence as conformance. The same statement appears as section 1.1 of the
+specification, deliberately, so that a reader arriving at either document finds it.
+
 ## 2. Release gates
 
 These are requirements on the project, not on the file.
@@ -60,13 +78,35 @@ one author cannot catch it.** So gate 3 is a release gate, not a caveat.
 
 ## 3. Mandatory vector classes
 
-Fifteen classes. A class with no vectors is a coverage gap and the corpus build MUST report it
+**Sixteen classes.** A class with no vectors is a coverage gap and the corpus build MUST report it
 rather than passing silently.
+
+The count is stated because a gap check built off it is the intended use, and a stale count means
+the highest-numbered class is skipped silently. `schemas/conformance-corpus-1.0.json` sets the
+`classRef` maximum to 16 to match.
 
 ### Class 1 - FHIR decimals
 
-`0.010` versus `0.01`; `1.50` versus `1.5`; `2.0` versus `2`; `1e2` versus `100` versus `1.0e2`;
-`-0.0`; `0.00000000000000000001`; a 40-digit integer part; a 40-digit fraction.
+`0.010` versus `0.01`; `1.50` versus `1.5`; `2.0` versus `2`; `-0.0`;
+`0.00000000000000000001`; a 40-digit integer part; a 40-digit fraction.
+
+Every pair above MUST produce **different** leaves, which is the point of the class.
+
+**Exponent forms are the exception in this class, and the corpus states which way each goes so it
+cannot be misread.** At a path bound to DECIMAL, under the expansion rule of specification
+section 6.2:
+
+| Vectors | Expected | Why |
+|---|---|---|
+| `1e2`, `1.0e2`, `100` | **All three EQUAL.** Same encoded value `100`, same leaf. | Trailing zeros of the integer part carry no precision in the output grammar and cannot. |
+| `100.0` versus that trio | **DISTINCT.** Encodes `100.0`. | Trailing zeros of the fraction are significant, per FHIR R4 SHALL. |
+| `1.00e1` | `10.0` | `f' = max(0, 2 - 1) = 1`. |
+| `1.5e-2` | `0.015` | `f' = 1 + 2 = 3`. |
+| `0e5` | `0` | Integer part normalizes to a single `0`. |
+
+The INTEGER-versus-DECIMAL distinction is a separate matter and belongs to class 7: `1e2` bound as
+DECIMAL and `100` bound as INTEGER carry different type tags and are different leaves regardless of
+sharing the encoded digits `100`.
 
 This class is the reason the whole scheme exists. See specification section 6.2.
 
@@ -81,6 +121,12 @@ decimal with an empty fraction.
 
 An implementation that accepts any of these is non-conformant even if it produces a "reasonable"
 value.
+
+`1.4e+9999` is the one of these that the input grammar admits, so it needs an explicit rule rather
+than a grammar rejection. Specification section 6.2 supplies it: the expanded positional form MUST
+NOT exceed 1024 total digits, and that bound is a fixed constant rather than an implementation
+choice, for the reason section 13.3 gives against RDFC-1.0. This class MUST also carry a vector just
+inside the bound that is accepted, so an implementation cannot pass by rejecting everything large.
 
 ### Class 4 - Unicode
 
@@ -175,12 +221,28 @@ MUST be rejected - plus one that includes them all and is accepted.
 JSON Schema cannot express this, so it is enforced in code and can only be pinned here. See
 specification section 10.2.
 
-### Class 15 - reserved-prefix guard
+### Class 15 - reserved first-segment guard
 
-A record supplying a path beginning with `roax.` MUST be rejected. Include the two squat forms the
-prefix guard exists to stop, which dogtag records at
-`crates/dogtag-standard-rs/src/profile_tree.rs:54-66`: the bare namespace (`roax`) and the
-adjacent-name squat (`roaxX`).
+The guard is on **decoded segments**, not on a rendered display path: a record-supplied path is
+rejected when its **first segment** is `KEY("roax")` (specification section 11.2). The vectors are
+stated as segments for that reason, and an implementation that passes this class by string-matching
+`"roax."` against a display path is doing the thing specification section 5.2 forbids.
+
+| Vector, as segments | Expected | Why |
+|---|---|---|
+| `[KEY("roax"), KEY("recordId")]` | **Reject** | Collides with a reserved leaf outright. |
+| `[KEY("roax"), KEY("anythingElse")]` | **Reject** | First segment is reserved; the guard is on the segment prefix, not on the exact reserved paths. |
+| `[KEY("roax")]` | **Reject** | The bare namespace. A display-string guard against `"roax."` misses this, which is dogtag's recorded case. |
+| `[KEY("roaxX"), KEY("foo")]` | **Accept** | A different first segment. The adjacent-name squat is a hazard only for a guard comparing rendered strings. |
+| `[KEY("roax.recordId")]` | **Accept** | One key that happens to contain a dot. Length-prefixed encoding makes it provably distinct from the two-segment reserved path (specification section 5.1), so it cannot collide. |
+
+The last two are the vectors that distinguish a correct implementation from one that reconstructed
+the guard over display strings, and they assert **acceptance**, which is why they matter: a
+string-matching implementation that over-rejects passes a corpus containing only rejection vectors.
+
+dogtag's own record of the prefix-versus-exact-match change is at
+`crates/dogtag-standard-rs/src/profile_tree.rs:54-66`. What transfers is the argument, not the
+string operation; specification section 11.2 states that distinction.
 
 ### Class 16 - Unicode version sensitivity (new, and honest about its limits)
 

@@ -20,9 +20,9 @@
     },
 
     "schemaVersion": {
-      "description": "The profile version this map applies to.",
+      "description": "The profile version this map applies to. Matches the envelope's schemaVersion and uses the same two-or-three-component form: the healthcert profiles use two (1.0, 2.0) and hl7.fhir.bundle uses the real FHIR version 4.0.1, which is three.",
       "type": "string",
-      "pattern": "^[0-9]+\\.[0-9]+$"
+      "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$"
     },
 
     "sourceSchemas": {

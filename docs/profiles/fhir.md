@@ -132,7 +132,8 @@ Minimum set for this profile, per specification section 10.2:
 
 | Path | Why |
 |---|---|
-| `roax.canon` | Identifies the hashing rules. |
+| `roax.canon` | Identifies the canonicalization rules. |
+| `roax.hashAlg` | Identifies which hash function a verifier must run. |
 | `roax.recordType` | Identifies which profile is being claimed. |
 | `roax.schemaVersion` | Identifies the profile version. |
 | `roax.recordId` | Identifies the record, and is in every salt preimage. |
@@ -140,7 +141,8 @@ Minimum set for this profile, per specification section 10.2:
 | `resourceType` | Without it a disclosed FHIR resource does not say what kind of resource it is. |
 
 `resourceType` is the FHIR-specific addition. The others are the reserved floor every profile
-carries.
+carries, per specification section 11.2. `roax.issuer.keyId` joins them whenever it is present in
+the envelope.
 
 ## 6. Known defects and cautions
 
@@ -151,6 +153,13 @@ carries.
   `schemaVersion` MUST NOT be copied from it without validation.
 - **The root of `lite-schema.json` constrains nothing** (section 3). Do not use it as a root
   validator.
+- **The identifier `hl7.fhir.bundle` names a resource kind this profile does not require.** Section
+  2 establishes that the payload may be an `Account`, a `Patient`, an `Observation` or anything else
+  in the 146-alternative root union, yet the identifier says `bundle` and is committed inside the
+  root at `roax.recordType`, where it is non-redactable and cannot be corrected for an issued
+  record. A reader who treats the identifier as an assertion that the payload is a `Bundle` is
+  reading more than the profile guarantees. Whether to narrow the profile to genuine Bundles or to
+  rename the identifier is bound up with decision D13, which is OPEN; nothing here settles it.
 
 ## 7. What this profile does NOT enforce
 

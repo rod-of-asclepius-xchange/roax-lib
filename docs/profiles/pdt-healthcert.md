@@ -87,7 +87,7 @@ Two specific hazards:
 
 | Path | Why |
 |---|---|
-| `roax.canon`, `roax.recordType`, `roax.schemaVersion`, `roax.recordId`, `roax.issuer.id` | The reserved floor (spec section 10.2). |
+| `roax.canon`, `roax.hashAlg`, `roax.recordType`, `roax.schemaVersion`, `roax.recordId`, `roax.issuer.id` | The reserved floor (spec section 11.2), which every profile carries. `roax.issuer.keyId` is additionally non-redactable whenever it is present. |
 | `version` | Pins `pdt-healthcert-v2.0`. Without it a disclosed copy does not say which healthcert version it is. |
 | `type` | The test kind. A PDT certificate that does not say whether it was PCR or ART is not a test certificate. |
 | `validFrom` | A validity claim with no start is not checkable. |
