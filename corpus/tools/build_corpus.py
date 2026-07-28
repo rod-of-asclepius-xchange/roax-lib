@@ -24,11 +24,12 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import corpus_plan as plan  # noqa: E402
+import fixture_io  # noqa: E402
 import moh_records  # noqa: E402
 import roax_ref as ref  # noqa: E402
+import synthetic_records  # noqa: E402
 from envelope_fixtures import build_envelope_fixtures  # noqa: E402
 from roax_ref import RoaxError  # noqa: E402
-from synthetic_records import SYNTHETIC_RECORD_VECTORS, TYPE_MAP_VECTORS  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CORPUS_DIR = os.path.dirname(HERE)
@@ -341,15 +342,23 @@ def build_moh_type_map_vectors(notes):
     return out
 
 
-def build(references=None, notes=None):
+def build(references=None, notes=None, check=False):
+    """Build the corpus. In check mode no fixture is written; every one is compared instead.
+
+    The fixtures were built at IMPORT time before, so `--check` had already rewritten all of
+    them by the time it reached its own comparison - it erased the edit it existed to catch and
+    dirtied a clean checkout doing it. Generation is explicit now, and the mode is set first.
+    """
+    fixture_io.set_mode("check" if check else "write")
     notes = notes if notes is not None else []
     trees, inclusions = build_tree_and_inclusion()
 
-    records = list(SYNTHETIC_RECORD_VECTORS)
+    records = list(synthetic_records.build_record_vectors())
     moh, moh_notes = moh_records.build_record_vectors(references)
     records.extend(moh)
     notes.extend(moh_notes)
 
+    type_map_vectors = synthetic_records.build_type_map_vectors()
     envelopes = build_envelope_fixtures(HASH_ALG)
 
     unlinkability = []
@@ -389,7 +398,7 @@ def build(references=None, notes=None):
             "tree": trees,
             "inclusion": inclusions,
             "negativeProof": build_negative_proof(),
-            "typeMap": list(TYPE_MAP_VECTORS) + build_moh_type_map_vectors(notes),
+            "typeMap": type_map_vectors + build_moh_type_map_vectors(notes),
             "record": records,
             "unlinkability": unlinkability,
             "envelope": envelopes,
@@ -472,20 +481,31 @@ def main():
     ap.add_argument("--references", default=os.environ.get("ROAX_REFERENCES"))
     ap.add_argument("--report", action="store_true", help="print per-class coverage")
     ap.add_argument("--check", action="store_true",
-                    help="rebuild and compare against the committed file instead of writing it")
+                    help="rebuild and compare the corpus AND every fixture against the "
+                         "committed files instead of writing them; writes nothing")
     ap.add_argument("--extract-to", default=None,
                     help="also write the extracted MOH samples here, for the runner to read")
     args = ap.parse_args()
 
     notes = []
-    corpus = build(args.references, notes)
+    corpus = build(args.references, notes, check=args.check)
     text = serialize(corpus)
 
     if args.check:
+        # The fixtures first. The corpus vectors reference them by path, so a corpus that
+        # round-trips over a tampered fixture is not a pass.
+        differences = fixture_io.differences()
+        if differences:
+            print(f"MISMATCH: {len(differences)} fixture(s) differ from a fresh build")
+            for path, why in differences:
+                print(f"  {os.path.relpath(path, REPO_ROOT)}: {why}")
+            raise SystemExit(1)
+
         with open(args.out, "r", encoding="utf-8") as handle:
             committed_text = handle.read()
         if committed_text == text:
-            print(f"ok: {args.out} round-trips through implementation A byte for byte")
+            print(f"ok: {args.out} and every fixture round-trip through implementation A "
+                  f"byte for byte")
         else:
             # Class 10 names records that live outside this repository, so without a reference
             # checkout a fresh build legitimately cannot contain them. Compare everything else

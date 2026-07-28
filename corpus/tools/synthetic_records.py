@@ -18,6 +18,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import fixture_io  # noqa: E402
 import roax_ref as ref  # noqa: E402
 from corpus_plan import (  # noqa: E402
     ISSUER_ID,
@@ -193,16 +194,12 @@ SYNTHETIC_FAIL_CLOSED_VECTORS = [
 ]
 
 
-def write_fixtures():
-    """Write the record fixtures. Idempotent; the corpus build calls this first."""
-    os.makedirs(RECORD_DIR, exist_ok=True)
+def emit_fixtures():
+    """Emit the record fixtures. Idempotent; the corpus build calls this first."""
     for name, text in RECORD_FIXTURES.items():
-        with open(os.path.join(RECORD_DIR, name), "w", encoding="utf-8") as handle:
-            handle.write(text)
-    os.makedirs(TYPE_MAP_DIR, exist_ok=True)
-    with open(os.path.join(TYPE_MAP_DIR, SYNTHETIC_RECORD_TYPE + ".json"), "w",
-              encoding="utf-8") as handle:
-        handle.write(json.dumps(SYNTHETIC_TYPE_MAP, indent=2, ensure_ascii=False) + "\n")
+        fixture_io.emit(os.path.join(RECORD_DIR, name), text)
+    fixture_io.emit(os.path.join(TYPE_MAP_DIR, SYNTHETIC_RECORD_TYPE + ".json"),
+                    json.dumps(SYNTHETIC_TYPE_MAP, indent=2, ensure_ascii=False) + "\n")
 
 
 def synthetic_type_map():
@@ -212,11 +209,14 @@ def synthetic_type_map():
 def build_record_vectors():
     import json_literal
 
-    write_fixtures()
+    emit_fixtures()
     type_map = synthetic_type_map()
     out = []
     for name, cls, fixture, key_id in RECORD_VECTOR_PLAN:
-        record, _text = json_literal.load_file(os.path.join(RECORD_DIR, fixture))
+        # Parsed from the text this module holds, never read back from disk. Reading the file
+        # would make a hand-edited fixture agree with itself, which is what check mode exists
+        # to catch.
+        record = json_literal.loads(RECORD_FIXTURES[fixture])
         root, leaves, _salts, _hashes = ref.build_tree(
             "SHA-256", record, type_map, bytes.fromhex(MASTER_SALT_A),
             SYNTHETIC_RECORD_TYPE, SYNTHETIC_SCHEMA_VERSION, RECORD_ID_A, ISSUER_ID, key_id,
@@ -282,7 +282,3 @@ def build_type_map_vectors():
             "expectFailClosed": True,
         })
     return out
-
-
-SYNTHETIC_RECORD_VECTORS = build_record_vectors()
-TYPE_MAP_VECTORS = build_type_map_vectors()

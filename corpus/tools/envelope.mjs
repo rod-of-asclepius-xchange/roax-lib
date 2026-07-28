@@ -14,12 +14,19 @@ import * as ref from "./roax_ref.mjs";
 // committed inside the root but OPTIONAL to disclose and MUST NOT appear here: requiring it
 // would permanently bind an anchored record to the key it was issued under, leaving a holder
 // whose issuer has rotated keys with no path at all (section 12.2).
+//
+// SEGMENTS, not the display notation docs/profiles/ prints. `notarisationMetadata.reference`
+// read as one key is the section 5.2 trap: no record has a leaf keyed on that dotted string, so
+// the floor would match nothing while looking enforced. A reserved path is the one case that is
+// genuinely a single dotted key (section 11.2), and those are added by floorFor.
 export const PROFILE_FLOORS = {
-  "hl7.fhir.bundle": ["resourceType"],
-  "sg.gov.moh.pdt-healthcert": ["version", "type", "validFrom"],
-  "sg.gov.moh.recovery-healthcert": ["version", "type", "validFrom", "validUntil"],
-  "sg.gov.moh.vaccination-healthcert": ["validFrom", "notarisationMetadata.reference"],
-  "org.roax.corpus.synthetic": ["marker"],
+  "hl7.fhir.bundle": [[{ key: "resourceType" }]],
+  "sg.gov.moh.pdt-healthcert": [[{ key: "version" }], [{ key: "type" }], [{ key: "validFrom" }]],
+  "sg.gov.moh.recovery-healthcert": [[{ key: "version" }], [{ key: "type" }],
+    [{ key: "validFrom" }], [{ key: "validUntil" }]],
+  "sg.gov.moh.vaccination-healthcert": [[{ key: "validFrom" }],
+    [{ key: "notarisationMetadata" }, { key: "reference" }]],
+  "org.roax.corpus.synthetic": [[{ key: "marker" }]],
 };
 
 // Section 7.4 H3. A verifier rejects any hashAlg absent from its OWN allow-list. ROAX-CANON/1
@@ -69,7 +76,7 @@ function pathKey(segments) {
 function floorFor(recordType) {
   const profile = PROFILE_FLOORS[recordType];
   if (profile === undefined) return null;
-  return [...RESERVED_FLOOR, ...profile].map((p) => [{ key: p }]);
+  return [...RESERVED_FLOOR.map((p) => [{ key: p }]), ...profile];
 }
 
 export function verify(envelope, typeMaps) {
@@ -115,7 +122,7 @@ function verifyInner(envelope, typeMaps) {
   };
 
   if (hasRecord) return verifyFull(envelope, hashAlg, root, identity, typeMaps);
-  return verifyDisclosed(envelope, hashAlg, root, floor);
+  return verifyDisclosed(envelope, hashAlg, root, floor, identity);
 }
 
 function verifyFull(envelope, hashAlg, root, identity, typeMaps) {
@@ -154,7 +161,7 @@ function verifyFull(envelope, hashAlg, root, identity, typeMaps) {
   return [true, "ok"];
 }
 
-function verifyDisclosed(envelope, hashAlg, root, floor) {
+function verifyDisclosed(envelope, hashAlg, root, floor, identity) {
   // Sections 7.3 and 10.1: `salts` alongside `disclosure` is what would make a withheld leaf's
   // salt representable at all. Reject rather than repair.
   if (has(envelope, "salts")) return [false, "disclosed-copy-carries-salts"];
@@ -167,6 +174,7 @@ function verifyDisclosed(envelope, hashAlg, root, floor) {
   const treeSize = asInt(get(envelope, "leafCount"));
   const seenPaths = new Set();
   const seenIndex = new Set();
+  const revealed = new Map();
 
   for (const entry of leaves) {
     for (const field of ["segments", "index", "tag", "salt", "auditPath"]) {
@@ -198,11 +206,38 @@ function verifyDisclosed(envelope, hashAlg, root, floor) {
     if (!ref.verifyInclusion(hashAlg, leaf, index, treeSize, auditPath, root)) {
       return [false, "inclusion-proof-failed"];
     }
+    // Recorded only after the proof holds: a leaf value is authority once it is committed to
+    // the root, not before.
+    revealed.set(key, value);
   }
 
-  // Section 10.2, the minimum-disclosure floor.
+  // Section 10.2, the minimum-disclosure floor. Run BEFORE the identity binding below so that
+  // an omitted reserved path still reports the floor - they are different failures and the
+  // corpus asserts the reason code, not just the verdict.
   for (const required of floor) {
     if (!seenPaths.has(pathKey(required))) return [false, "minimum-disclosure-floor"];
+  }
+
+  // Section 11.3: a field outside the root is a hint and never authority. The outer recordType
+  // is what selected the floor above, so leaving it unbound lets a holder pick the floor: pdt's
+  // is a strict subset of recovery's, and a recovery copy declaring itself pdt withholds
+  // validUntil with every inclusion proof still verifying against the genuine root. Section
+  // 11.2 commits these four as leaves so that exactly this comparison is possible.
+  const bindings = [
+    [ref.RESERVED.recordType, identity.recordType],
+    [ref.RESERVED.schemaVersion, identity.schemaVersion],
+    [ref.RESERVED.recordId, identity.recordId],
+    [ref.RESERVED.issuerId, identity.issuerId],
+  ];
+  for (const [reserved, outer] of bindings) {
+    const committed = revealed.get(pathKey([{ key: reserved }]));
+    if (typeof committed !== "string" || typeof outer !== "string") {
+      return [false, "outer-identity-mismatch"];
+    }
+    // Normalized on BOTH sides. These leaves are STRINGs, so what the root commits is their NFC
+    // form (section 6.1) - comparing the outer field raw would compare against neither. Same
+    // treatment the segment keys already get. Unobservable here: no corpus identity is non-ASCII.
+    if (ref.nfc(committed) !== ref.nfc(outer)) return [false, "outer-identity-mismatch"];
   }
   return [true, "ok"];
 }

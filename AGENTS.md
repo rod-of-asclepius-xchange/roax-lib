@@ -117,6 +117,24 @@ These are the things a future agent is most likely to get wrong.
   recovery points at PDT's path, and vaccination points at a PDT interim path. A validator that
   registers both by `$id` silently applies the wrong rules. Load by file path.
 
+- **A minimum-disclosure floor is SEGMENTS, never display notation.** This is the section 5.2
+  display-path trap one layer above hashing, and it has already been made once here. The
+  `docs/profiles/` tables print non-redactable paths for humans, so
+  `notarisationMetadata.reference` reads as one token and is **two** segments. A floor holding the
+  dotted string as a single `KEY` asks for a leaf no record has, so it matches nothing and the
+  floor is *silently unenforced* while every fixture built the same way agrees with it. Reserved
+  paths are the one genuine single-dotted-key case (spec section 11.2). Carry a floor as segments
+  so the mistake cannot be written.
+
+- **The envelope's outer identity is not authority and must be bound to the reserved leaves.**
+  Section 11.3 says fields outside the root are hints; section 11.2 commits `recordType`,
+  `schemaVersion`, `recordId` and `issuer.id` as leaves so a disclosed copy can be checked against
+  them. The outer `recordType` is what SELECTS the profile floor, and PDT's floor is a strict
+  subset of recovery's, so an unbound one lets a holder relabel a recovery copy as PDT, withhold
+  `validUntil`, and still have every inclusion proof verify against the genuine root. Compare under
+  NFC on both sides: a STRING leaf commits its normalized form. `roax.issuer.keyId` MUST NOT be
+  bound - it is the conditional leaf.
+
 ## The conformance corpus
 
 `corpus/` holds it. `corpus/README.md` is the operative document: coverage per class, the runner,

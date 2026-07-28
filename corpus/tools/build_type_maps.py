@@ -360,7 +360,7 @@ def main():
     args = ap.parse_args()
     if not args.references:
         raise SystemExit("--references (or ROAX_REFERENCES) is required")
-    build(args.references, None if args.no_write else args.out, report=True or args.report)
+    build(args.references, None if args.no_write else args.out, report=args.report)
 
 
 if __name__ == "__main__":

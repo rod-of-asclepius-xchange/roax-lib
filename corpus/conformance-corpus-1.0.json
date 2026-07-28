@@ -6301,6 +6301,34 @@
         "reason": "minimum-disclosure-floor"
       },
       {
+        "name": "identity-outer-record-type-downgrade",
+        "class": 14,
+        "envelopeFile": "corpus/fixtures/envelopes/identity-outer-record-type-downgrade.json",
+        "expectAccept": false,
+        "reason": "outer-identity-mismatch"
+      },
+      {
+        "name": "identity-outer-schema-version-mismatch",
+        "class": 14,
+        "envelopeFile": "corpus/fixtures/envelopes/identity-outer-schema-version-mismatch.json",
+        "expectAccept": false,
+        "reason": "outer-identity-mismatch"
+      },
+      {
+        "name": "identity-outer-record-id-mismatch",
+        "class": 14,
+        "envelopeFile": "corpus/fixtures/envelopes/identity-outer-record-id-mismatch.json",
+        "expectAccept": false,
+        "reason": "outer-identity-mismatch"
+      },
+      {
+        "name": "identity-outer-issuer-id-mismatch",
+        "class": 14,
+        "envelopeFile": "corpus/fixtures/envelopes/identity-outer-issuer-id-mismatch.json",
+        "expectAccept": false,
+        "reason": "outer-identity-mismatch"
+      },
+      {
         "name": "guard-accept-bare-roax",
         "class": 15,
         "envelopeFile": "corpus/fixtures/envelopes/guard-accept-bare-roax.json",

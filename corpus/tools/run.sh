@@ -42,7 +42,11 @@ ref_args=()
 [ -n "$REFERENCES" ] && ref_args=(--references "$REFERENCES")
 
 echo "=== 1. implementation A (Python) rebuilds and compares"
-python3 "$HERE/build_corpus.py" --check --report --extract-to "$WORK/records" "${ref_args[@]}" || status=1
+# `${a[@]+"${a[@]}"}` rather than `"${ref_args[@]}"`: under `set -u`, bash before 4.4 - which
+# includes the 3.2 that ships with macOS - treats an EMPTY array's expansion as an unbound
+# variable and aborts. That fires on exactly the documented path of running without
+# --references, which the arguments are optional for.
+python3 "$HERE/build_corpus.py" --check --report --extract-to "$WORK/records" ${ref_args[@]+"${ref_args[@]}"} || status=1
 
 echo
 echo "=== 2. implementation B (Node) recomputes every derived value"

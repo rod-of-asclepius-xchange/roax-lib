@@ -187,6 +187,13 @@ export function canonicalDecimal(text) {
   // Shift the point right by `exponent`; `point` counts digits from the left of `digits`.
   const point = intDigits.length + exponent;
 
+  // Section 6.2: the bound is on the expanded positional form, before the normalization below.
+  // Counted arithmetically and thrown BEFORE any padding exists. The input grammar admits any
+  // exponent, so building the padding first makes `1e999999999` a gigabyte string and a larger
+  // exponent a RangeError, in place of the digit-bound-exceeded the reject vectors expect.
+  const expanded = Math.max(point, digits.length) + Math.max(0, -point);
+  if (expanded > MAX_EXPANDED_DIGITS) throw new RoaxError("digit-bound-exceeded", String(expanded));
+
   let intPart;
   let fracPart;
   if (point >= digits.length) {
@@ -198,11 +205,6 @@ export function canonicalDecimal(text) {
   } else {
     intPart = digits.slice(0, point);
     fracPart = digits.slice(point);
-  }
-
-  // Section 6.2: the bound is on the expanded positional form, before the normalization below.
-  if (intPart.length + fracPart.length > MAX_EXPANDED_DIGITS) {
-    throw new RoaxError("digit-bound-exceeded", String(intPart.length + fracPart.length));
   }
 
   intPart = intPart.replace(/^0+/, "");

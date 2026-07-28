@@ -1,6 +1,6 @@
 # The ROAX conformance corpus
 
-**Status:** first cut. 472 vectors, all 17 classes reachable, 15 complete and 2 partial.
+**Status:** first cut. 476 vectors, all 17 classes reachable, 15 complete and 2 partial.
 **Normative definition:** [`docs/conformance-corpus.md`](../docs/conformance-corpus.md).
 **Schema:** [`schemas/conformance-corpus-1.0.json`](../schemas/conformance-corpus-1.0.json).
 **Specification:** [`docs/spec/roax-canon-1.md`](../docs/spec/roax-canon-1.md), which governs where the
@@ -39,12 +39,24 @@ Both arguments are optional and their absence is reported rather than hidden.
 
 `run.sh` does four things, and the third is the one that matters:
 
-1. implementation A rebuilds the corpus and compares it with the committed file;
+1. implementation A rebuilds the corpus **and every fixture** and compares them with the committed
+   files, writing nothing;
 2. implementation B recomputes every derived value in the corpus and rewrites it;
 3. the two files are compared byte for byte;
 4. every artifact is validated against the repository's JSON Schemas.
 
 Step 1 alone would only prove that one program is self-consistent.
+
+Step 1 covers the fixtures because the corpus vectors reference them by path, and a corpus that
+round-trips over a hand-edited fixture is not a pass. The generator builds each fixture's bytes,
+runs the verifier on **those bytes** rather than on the file, and then compares. It used to write
+first and compare afterwards, which erased the edit it existed to catch.
+
+**It does not cover the three derived MOH type maps.** Those are produced by
+`tools/build_type_maps.py`, a separate tool with no check mode, and no step of `run.sh` regenerates
+or compares them; step 4 only validates them against `schemas/type-map-1.0.json`. Regenerate them by
+hand against a reference checkout after touching that tool. The fourth map,
+`org.roax.corpus.synthetic.json`, is authored by the corpus generator and *is* compared by step 1.
 
 ### Checking an implementation that is not one of these two
 
@@ -105,7 +117,7 @@ Counts are vectors in the file, measured by `build_corpus.py --report`.
 | 11 the schema binding | 23 | complete. Includes the three unknown-algorithm and unknown-profile fail-closed vectors: specification section 12.2 calls that "the same rule section 4.2 applies to an unknown path, applied one level up", and section 4.2 is what this class tests. |
 | 12 salt freshness and unlinkability | 9 | complete |
 | 13 reference-schema hazards | 2 | **partial - the `$id` half is inexpressible** |
-| 14 minimum-disclosure floor | 34 | complete |
+| 14 minimum-disclosure floor | 38 | complete. The last four bind the envelope's OUTER identity to the reserved leaves committed inside the root - see below. |
 | 15 reserved-namespace guard | 20 | complete |
 | 16 Unicode version sensitivity | 20 | complete, at the strength class 16 itself states |
 | 17 withheld-leaf salt | 8 | complete |
@@ -132,6 +144,33 @@ vectors, which is a real assertion on real paths, and the roots wait for a rulin
 
 `tools/build_type_maps.py` produces the vectors the moment the bindings exist. Nothing else is
 blocking.
+
+### The floor is over segments, and the outer identity does not select it alone
+
+Two things class 14 asserts that are easy to get wrong in the same place, both of them recorded here
+because a corpus is the only place they can be pinned.
+
+**A floor path is SEGMENTS, never display notation.** `docs/profiles/vaccination-healthcert.md`
+section 4 writes `notarisationMetadata.reference`, and specification section 5.2 is explicit that a
+display path is for humans and is never parsed back. Read as a single key, that floor entry asks for
+a leaf whose key is literally the eighteen-character dotted string. No record has one, so the floor
+matches nothing and is **silently unenforced** while every vector built the same way agrees with it.
+`envelope.py` and `envelope.mjs` therefore carry the floor as segments in both implementations, and
+`floor-sg-gov-moh-vaccination-healthcert-*` reveals two segments.
+
+**The outer `recordType` selects the floor, so it cannot be trusted to.** Specification section 11.3
+states normatively that a field outside the root is a hint and never authority, and section 11.2
+commits `recordType`, `schemaVersion`, `recordId` and `issuer.id` as leaves so a disclosed copy can
+be checked against them. pdt's floor is a strict **subset** of recovery's, which adds `validUntil`,
+so a holder of a recovery copy who relabels the envelope as pdt discloses pdt's floor, withholds the
+expiry, and every inclusion proof still verifies against the genuine recovery root.
+`identity-outer-record-type-downgrade` carries exactly that copy and the other three carry a
+mismatch in each remaining reserved field; all four reject with `outer-identity-mismatch`. Measured:
+with the binding removed, all four are **accepted**.
+
+The binding runs *after* the floor check, so omitting a reserved path still reports
+`minimum-disclosure-floor` - they are different failures and this class asserts the reason code.
+`roax.issuer.keyId` is deliberately not bound, being the one conditional leaf.
 
 ### Class 13 is partial
 
@@ -233,9 +272,12 @@ deliberate: a vector that discriminated would settle the question from inside th
    not `utf8(NFC(recordId))`, while the reserved leaf `roax.recordId` is a STRING and therefore *is*
    normalized. Every corpus record identifier is ASCII, so the two readings agree throughout.
 4. **Type-map matching is not stated to be over normalized keys.** Section 11.2's general rule -
-   "check the bytes you commit, not the bytes you received" - says it should be, and both
-   implementations normalize. The synthetic type map carries the Kelvin key under **both** spellings
-   so that `record-guard-kelvin-key` resolves identically either way.
+   "check the bytes you commit, not the bytes you received" - suggests it should be, but the
+   specification does not say so, and both implementations compare a pattern token against a
+   segment key **raw**, with no `nfc()` on either side (`_match_from`, `roax_ref.py:715`;
+   `matchPattern`, `roax_ref.mjs:564`). The synthetic type map therefore
+   carries the Kelvin key under **both** spellings, so that `record-guard-kelvin-key` resolves
+   identically under either reading and no vector settles the question.
 5. **The type-map `pattern` field is display notation**, so it cannot address a key containing `.`,
    `[` or `]` - keys section 5 deliberately admits with no rejection rule. `a.**` reaches such a key
    without the pattern language growing an escape, and both implementations reject an ambiguous

@@ -227,6 +227,15 @@ def canonical_decimal(text: str) -> str:
     # Shift the decimal point right by `exp` places. `point` counts digits from the left.
     point = len(int_digits) + exp
 
+    # Section 6.2: the bound is on the EXPANDED POSITIONAL FORM, before the output-grammar
+    # normalization below. Counted arithmetically and rejected BEFORE the padding is built: the
+    # input grammar admits any exponent, so materializing the padding first turns `1e999999999`
+    # into a gigabyte allocation and a large enough exponent into a MemoryError instead of the
+    # stable digit-bound-exceeded the reject vectors are built on.
+    expanded = max(point, len(digits)) + max(0, -point)
+    if expanded > MAX_EXPANDED_DIGITS:
+        raise RoaxError("digit-bound-exceeded", str(expanded))
+
     if point >= len(digits):
         int_part = digits + "0" * (point - len(digits))
         frac_part = ""
@@ -236,11 +245,6 @@ def canonical_decimal(text: str) -> str:
     else:
         int_part = digits[:point]
         frac_part = digits[point:]
-
-    # Section 6.2: the bound is on the EXPANDED POSITIONAL FORM, which is this, before the
-    # output-grammar normalization below.
-    if len(int_part) + len(frac_part) > MAX_EXPANDED_DIGITS:
-        raise RoaxError("digit-bound-exceeded", str(len(int_part) + len(frac_part)))
 
     int_part = int_part.lstrip("0")
     if int_part == "":

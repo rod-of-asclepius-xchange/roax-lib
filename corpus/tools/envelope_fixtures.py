@@ -16,6 +16,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import envelope as env  # noqa: E402
+import fixture_io  # noqa: E402
 import roax_ref as ref  # noqa: E402
 import synthetic_records as syn  # noqa: E402
 from corpus_plan import (  # noqa: E402
@@ -23,6 +24,7 @@ from corpus_plan import (  # noqa: E402
     ISSUER_KEY_ID,
     MASTER_SALT_A,
     RECORD_ID_A,
+    RECORD_ID_B,
     SYNTHETIC_RECORD_TYPE,
     SYNTHETIC_SCHEMA_VERSION,
 )
@@ -30,30 +32,59 @@ from corpus_plan import (  # noqa: E402
 HERE = os.path.dirname(os.path.abspath(__file__))
 CORPUS_DIR = os.path.dirname(HERE)
 ENVELOPE_DIR = os.path.join(CORPUS_DIR, "fixtures", "envelopes")
-RECORD_DIR = os.path.join(CORPUS_DIR, "fixtures", "records")
 
 # Profiles class 14 is exercised against, with the schemaVersion each profile document declares
 # and a plausible value for every path in its floor. The values are corpus-authored: nothing
 # here reproduces a reference sample.
+#
+# Each floor path is SEGMENTS, matching `envelope.PROFILE_FLOORS`. The vaccination profile's
+# `notarisationMetadata.reference` is two of them: writing it as one dotted key here is what
+# made the whole family agree with a floor no real record could satisfy.
 FLOOR_PROFILES = [
-    ("hl7.fhir.bundle", "4.0.1", {"resourceType": "Bundle"}),
+    ("hl7.fhir.bundle", "4.0.1",
+     [([{"key": "resourceType"}], "Bundle")]),
     ("sg.gov.moh.pdt-healthcert", "2.0",
-     {"version": "pdt-healthcert-v2.0", "type": "PCR", "validFrom": "2026-07-28T00:00:00Z"}),
+     [([{"key": "version"}], "pdt-healthcert-v2.0"),
+      ([{"key": "type"}], "PCR"),
+      ([{"key": "validFrom"}], "2026-07-28T00:00:00Z")]),
     ("sg.gov.moh.recovery-healthcert", "2.0",
-     {"version": "rec-healthcert-v2.0", "type": "PCR", "validFrom": "2026-07-28T00:00:00Z",
-      "validUntil": "2026-10-28T00:00:00Z"}),
+     [([{"key": "version"}], "rec-healthcert-v2.0"),
+      ([{"key": "type"}], "PCR"),
+      ([{"key": "validFrom"}], "2026-07-28T00:00:00Z"),
+      ([{"key": "validUntil"}], "2026-10-28T00:00:00Z")]),
     ("sg.gov.moh.vaccination-healthcert", "1.0",
-     {"validFrom": "2026-07-28T00:00:00Z", "notarisationMetadata.reference": "urn:uuid:notary-1"}),
+     [([{"key": "validFrom"}], "2026-07-28T00:00:00Z"),
+      ([{"key": "notarisationMetadata"}, {"key": "reference"}], "urn:uuid:notary-1")]),
 ]
 
 # Leaves present in every class 14 tree but never in its floor, so that a disclosed copy is a
 # genuine subset and the withheld ones have something to withhold.
 WITHHELD_LEAVES = [
-    (["id"], "TEST001"),
-    (["fhirVersion"], "4.0.1"),
-    (["patient", "birthDate"], "1965-08-09"),
-    (["patient", "gender"], "female"),
+    ([{"key": "id"}], "TEST001"),
+    ([{"key": "fhirVersion"}], "4.0.1"),
+    ([{"key": "patient"}, {"key": "birthDate"}], "1965-08-09"),
+    ([{"key": "patient"}, {"key": "gender"}], "female"),
 ]
+
+
+def _path_key(segments):
+    """A comparison key over structured segments. Never a rendered display string.
+
+    `display_path` renders KEY("a.b") and KEY("a") -> KEY("b") identically, so an index keyed on
+    it keeps working after the floor is fixed and hides the same bug one layer up (section 5.2).
+    """
+    return tuple(("k", ref.nfc(s["key"])) if "key" in s else ("i", s["index"]) for s in segments)
+
+
+def _slug(segments):
+    """A file-name token for a path. Naming only; nothing is ever resolved back through it."""
+    return "-".join(s["key"].replace(".", "-") if "key" in s else str(s["index"])
+                    for s in segments)
+
+
+def _reserved_floor_paths():
+    """The four reserved paths as segments. Each is ONE key carrying the dotted name (11.2)."""
+    return [[{"key": p}] for p in env.RESERVED_FLOOR]
 
 
 def _identity(record_type, schema_version, key_id):
@@ -66,13 +97,14 @@ def _identity(record_type, schema_version, key_id):
     }
 
 
-def _floor_tree(hash_alg, record_type, schema_version, floor_values, key_id):
-    """Build a tree from an explicit leaf set. Returns ordered leaves, salts, hashes and root."""
+def _floor_tree(hash_alg, record_type, schema_version, floor_entries, key_id):
+    """Build a tree from an explicit leaf set.
+
+    Returns ordered leaves, salts, hashes, root and an index from path key to leaf position.
+    """
     leaves = ref.reserved_leaves(record_type, schema_version, RECORD_ID_A, ISSUER_ID, key_id)
-    for path, value in floor_values.items():
-        leaves.append(ref.Leaf([{"key": path}], ref.TAG_STRING, value))
-    for segments, value in WITHHELD_LEAVES:
-        leaves.append(ref.Leaf([{"key": k} for k in segments], ref.TAG_STRING, value))
+    for segments, value in list(floor_entries) + WITHHELD_LEAVES:
+        leaves.append(ref.Leaf(list(segments), ref.TAG_STRING, value))
 
     encoded = sorted(((ref.encode_path(leaf.segments), leaf) for leaf in leaves),
                      key=lambda pair: pair[0])
@@ -81,7 +113,8 @@ def _floor_tree(hash_alg, record_type, schema_version, floor_values, key_id):
              for leaf in ordered]
     hashes = [ref.leaf_hash(hash_alg, leaf.segments, leaf.tag, leaf.value, salt)
               for leaf, salt in zip(ordered, salts)]
-    return ordered, salts, hashes, ref.mth(hash_alg, hashes)
+    index = {_path_key(leaf.segments): i for i, leaf in enumerate(ordered)}
+    return ordered, salts, hashes, ref.mth(hash_alg, hashes), index
 
 
 def _base_envelope(record_type, schema_version, root, leaf_count, key_id):
@@ -100,7 +133,7 @@ def _base_envelope(record_type, schema_version, root, leaf_count, key_id):
     }
 
 
-def _disclosed_leaf(hash_alg, ordered, salts, index):
+def _disclosed_leaf(hash_alg, ordered, salts, hashes, index):
     leaf = ordered[index]
     entry = {
         "segments": leaf.segments,
@@ -111,27 +144,28 @@ def _disclosed_leaf(hash_alg, ordered, salts, index):
     if leaf.tag not in (ref.TAG_NULL, ref.TAG_EMPTY_ARRAY, ref.TAG_EMPTY_OBJECT):
         entry["value"] = leaf.value
     entry["salt"] = salts[index].hex()
-    entry["auditPath"] = [h.hex() for h in ref.inclusion_path(hash_alg, index, _hashes_cache[id(ordered)])]
+    entry["auditPath"] = [h.hex() for h in ref.inclusion_path(hash_alg, index, hashes)]
     return entry
 
 
-_hashes_cache = {}
+# name -> the exact bytes emitted for that fixture. Every fixture is verified from this, never
+# read back from disk: reading the file would make a hand edit agree with itself and leave check
+# mode unable to fail. See fixture_io.
+_generated = {}
+
+
+def _emit(name, text):
+    fixture_io.emit(os.path.join(ENVELOPE_DIR, name + ".json"), text)
+    _generated[name] = text
+    return "corpus/fixtures/envelopes/" + name + ".json"
 
 
 def _write(name, envelope):
-    os.makedirs(ENVELOPE_DIR, exist_ok=True)
-    path = os.path.join(ENVELOPE_DIR, name + ".json")
-    with open(path, "w", encoding="utf-8") as handle:
-        handle.write(json.dumps(envelope, indent=2, ensure_ascii=False) + "\n")
-    return "corpus/fixtures/envelopes/" + name + ".json"
+    return _emit(name, json.dumps(envelope, indent=2, ensure_ascii=False) + "\n")
 
 
 def _write_text(name, text):
-    os.makedirs(ENVELOPE_DIR, exist_ok=True)
-    path = os.path.join(ENVELOPE_DIR, name + ".json")
-    with open(path, "w", encoding="utf-8") as handle:
-        handle.write(text)
-    return "corpus/fixtures/envelopes/" + name + ".json"
+    return _emit(name, text)
 
 
 def _vector(name, cls, file_path, expect_accept, _intent):
@@ -155,22 +189,21 @@ def _vector(name, cls, file_path, expect_accept, _intent):
 def build_floor_vectors(hash_alg):
     """Class 14. One accept per profile, one accept for the keyId edge, one reject per floor path."""
     out = []
-    for record_type, schema_version, floor_values in FLOOR_PROFILES:
-        ordered, salts, hashes, root = _floor_tree(
-            hash_alg, record_type, schema_version, floor_values, ISSUER_KEY_ID
+    for record_type, schema_version, floor_entries in FLOOR_PROFILES:
+        ordered, salts, hashes, root, by_path = _floor_tree(
+            hash_alg, record_type, schema_version, floor_entries, ISSUER_KEY_ID
         )
-        _hashes_cache[id(ordered)] = hashes
-        by_path = {ref.display_path(leaf.segments): i for i, leaf in enumerate(ordered)}
 
-        floor_paths = list(env.RESERVED_FLOOR) + list(floor_values)
+        floor_paths = _reserved_floor_paths() + [segs for segs, _ in floor_entries]
         # Everything in the floor plus roax.issuer.keyId, which the record committed.
-        full_set = floor_paths + [ref.RESERVED_ISSUER_KEY_ID]
+        full_set = floor_paths + [[{"key": ref.RESERVED_ISSUER_KEY_ID}]]
 
         def make(name, paths, cls, expect, reason, tamper=None):
             envelope = _base_envelope(record_type, schema_version, root, len(ordered), ISSUER_KEY_ID)
             envelope["disclosure"] = {
                 "mode": "selective",
-                "leaves": [_disclosed_leaf(hash_alg, ordered, salts, by_path[p]) for p in paths],
+                "leaves": [_disclosed_leaf(hash_alg, ordered, salts, hashes, by_path[_path_key(p)])
+                           for p in paths],
             }
             if tamper:
                 tamper(envelope)
@@ -193,28 +226,91 @@ def build_floor_vectors(hash_alg):
         for omitted in floor_paths:
             remaining = [p for p in full_set if p != omitted]
             out.append(make(
-                f"floor-{slug}-omits-{omitted.replace('.', '-')}", remaining, 14, False,
-                f"omits the non-redactable path {omitted}",
+                f"floor-{slug}-omits-{_slug(omitted)}", remaining, 14, False,
+                f"omits the non-redactable path {ref.display_path(omitted)}",
             ))
     return out
 
 
+def build_identity_binding_vectors(hash_alg):
+    """Class 14. The outer recordType is what SELECTS the floor, so it cannot select it alone.
+
+    Specification section 11.3 states normatively that a field outside the root is a hint and
+    never authority, and section 11.2 commits recordType, schemaVersion, recordId and issuer.id
+    as leaves so that a disclosed copy can be checked against them. Nothing asserted that until
+    these vectors: a verifier that reads the outer field and stops still passed every other
+    class 14 row, because in those rows the two agree.
+
+    The downgrade is concrete rather than theoretical. pdt's floor - version, type, validFrom -
+    is a strict SUBSET of recovery's, which adds validUntil. So a holder of a recovery copy
+    relabels the envelope as pdt, discloses exactly pdt's floor, and withholds the expiry. Every
+    leaf hash is recomputed from the disclosed fields and every inclusion proof verifies against
+    the genuine recovery root. docs/profiles/recovery-healthcert.md section 4 calls validUntil
+    "the clearest single illustration of why the minimum-disclosure floor exists at all".
+    """
+    record_type, schema_version, floor_entries = FLOOR_PROFILES[2]
+    ordered, salts, hashes, root, by_path = _floor_tree(
+        hash_alg, record_type, schema_version, floor_entries, ISSUER_KEY_ID
+    )
+
+    pdt_type, _pdt_version, pdt_floor = FLOOR_PROFILES[1]
+    pdt_paths = _reserved_floor_paths() + [segs for segs, _ in pdt_floor]
+
+    def disclosed(name, paths, expect, reason, **overrides):
+        envelope = _base_envelope(record_type, schema_version, root, len(ordered), ISSUER_KEY_ID)
+        envelope["disclosure"] = {
+            "mode": "selective",
+            "leaves": [_disclosed_leaf(hash_alg, ordered, salts, hashes, by_path[_path_key(p)])
+                       for p in paths],
+        }
+        envelope.update(overrides)
+        return _vector(name, 14, _write(name, envelope), expect, reason)
+
+    # The whole recovery floor, so that these rows clear the floor and fail ONLY on the binding.
+    # The accept side needs no vector of its own: all eight class 14 accepts already carry an
+    # outer identity that agrees with its leaves, so a binding that over-tightens breaks them.
+    full_set = _reserved_floor_paths() + [segs for segs, _ in floor_entries]
+
+    return [
+        disclosed(
+            "identity-outer-record-type-downgrade", pdt_paths, False,
+            "relabels a recovery copy as pdt to inherit pdt's shorter floor and withhold "
+            "validUntil, with every inclusion proof still verifying against the genuine root",
+            recordType=pdt_type,
+        ),
+        disclosed(
+            "identity-outer-schema-version-mismatch", full_set, False,
+            "an outer schemaVersion that disagrees with the roax.schemaVersion leaf",
+            schemaVersion="9.9",
+        ),
+        disclosed(
+            "identity-outer-record-id-mismatch", full_set, False,
+            "an outer recordId that disagrees with the roax.recordId leaf",
+            recordId=RECORD_ID_B,
+        ),
+        disclosed(
+            "identity-outer-issuer-id-mismatch", full_set, False,
+            "an outer issuer.id that disagrees with the roax.issuer.id leaf",
+            issuer={"id": "did:web:not-the-issuer.invalid", "keyId": ISSUER_KEY_ID},
+        ),
+    ]
+
+
 def build_salt_leak_vectors(hash_alg):
     """Class 17. The violation VERIFIES against the root, so only these rows catch it."""
-    record_type, schema_version, floor_values = FLOOR_PROFILES[2]
-    ordered, salts, hashes, root = _floor_tree(
-        hash_alg, record_type, schema_version, floor_values, ISSUER_KEY_ID
+    record_type, schema_version, floor_entries = FLOOR_PROFILES[2]
+    ordered, salts, hashes, root, by_path = _floor_tree(
+        hash_alg, record_type, schema_version, floor_entries, ISSUER_KEY_ID
     )
-    _hashes_cache[id(ordered)] = hashes
-    by_path = {ref.display_path(leaf.segments): i for i, leaf in enumerate(ordered)}
-    revealed = list(env.RESERVED_FLOOR) + list(floor_values)
-    withheld_index = by_path["patient.birthDate"]
+    revealed = _reserved_floor_paths() + [segs for segs, _ in floor_entries]
+    withheld_index = by_path[_path_key([{"key": "patient"}, {"key": "birthDate"}])]
 
     def disclosed():
         envelope = _base_envelope(record_type, schema_version, root, len(ordered), ISSUER_KEY_ID)
         envelope["disclosure"] = {
             "mode": "selective",
-            "leaves": [_disclosed_leaf(hash_alg, ordered, salts, by_path[p]) for p in revealed],
+            "leaves": [_disclosed_leaf(hash_alg, ordered, salts, hashes, by_path[_path_key(p)])
+                       for p in revealed],
         }
         return envelope
 
@@ -231,7 +327,7 @@ def build_salt_leak_vectors(hash_alg):
     # clothes, and it is the row a naive verifier - one that skips entries with no value - lets
     # through while every other check still passes.
     leaky = disclosed()
-    named_only = _disclosed_leaf(hash_alg, ordered, salts, withheld_index)
+    named_only = _disclosed_leaf(hash_alg, ordered, salts, hashes, withheld_index)
     del named_only["value"]
     leaky["disclosure"]["leaves"].append(named_only)
     out.append(_vector(
@@ -266,7 +362,9 @@ def _full_copy_salt_vectors(hash_alg):
     """The two count relationships JSON Schema cannot express, on a real full copy."""
     type_map = syn.synthetic_type_map()
     import json_literal
-    record, record_text = json_literal.load_file(os.path.join(RECORD_DIR, "typed-scalars.json"))
+    # The fixture text this build produced, not the file on disk. See fixture_io.
+    record_text = syn.RECORD_FIXTURES["typed-scalars.json"]
+    record = json_literal.loads(record_text)
     root, ordered, salts, _hashes = ref.build_tree(
         hash_alg, record, type_map, bytes.fromhex(MASTER_SALT_A),
         SYNTHETIC_RECORD_TYPE, SYNTHETIC_SCHEMA_VERSION, RECORD_ID_A, ISSUER_ID,
@@ -333,7 +431,8 @@ def build_guard_vectors(hash_alg):
          "a record key that IS a reserved path"),
     ]
     for name, fixture, expect, reason in cases:
-        record, record_text = json_literal.load_file(os.path.join(RECORD_DIR, fixture))
+        record_text = syn.RECORD_FIXTURES[fixture]
+        record = json_literal.loads(record_text)
         envelope = {
             "canon": ref.CANON,
             "hashAlg": "SHA-256",
@@ -357,8 +456,8 @@ def build_guard_vectors(hash_alg):
             # A rejected record has no root at all, so the envelope carries a placeholder and
             # the guard must fire before anything is hashed. An implementation that checks the
             # root first reports the wrong reason and fails this vector for the right one.
-            envelope["salts"] = [{"segments": [{"key": p}], "salt": "0" * 32}
-                                 for p in list(env.RESERVED_FLOOR) + ["marker"]]
+            envelope["salts"] = [{"segments": p, "salt": "0" * 32}
+                                 for p in _reserved_floor_paths() + [[{"key": "marker"}]]]
         envelope["record"] = "@@RECORD@@"
         ordered_keys = ["canon", "hashAlg", "recordType", "schemaVersion", "recordId", "root",
                         "leafCount", "issuer", "record", "salts"]
@@ -383,19 +482,18 @@ def build_algorithm_vectors(hash_alg):
     class 14 instead would have inflated the disclosure floor's count with vectors that are not
     about the floor.
     """
-    record_type, schema_version, floor_values = FLOOR_PROFILES[2]
-    ordered, salts, hashes, root = _floor_tree(
-        hash_alg, record_type, schema_version, floor_values, None
+    record_type, schema_version, floor_entries = FLOOR_PROFILES[2]
+    ordered, salts, hashes, root, by_path = _floor_tree(
+        hash_alg, record_type, schema_version, floor_entries, None
     )
-    _hashes_cache[id(ordered)] = hashes
-    by_path = {ref.display_path(leaf.segments): i for i, leaf in enumerate(ordered)}
-    revealed = list(env.RESERVED_FLOOR) + list(floor_values)
+    revealed = _reserved_floor_paths() + [segs for segs, _ in floor_entries]
 
     def disclosed(**overrides):
         envelope = _base_envelope(record_type, schema_version, root, len(ordered), None)
         envelope["disclosure"] = {
             "mode": "selective",
-            "leaves": [_disclosed_leaf(hash_alg, ordered, salts, by_path[p]) for p in revealed],
+            "leaves": [_disclosed_leaf(hash_alg, ordered, salts, hashes, by_path[_path_key(p)])
+                       for p in revealed],
         }
         envelope.update(overrides)
         return envelope
@@ -420,6 +518,7 @@ def build_algorithm_vectors(hash_alg):
 def build_envelope_fixtures(hash_alg):
     out = []
     out.extend(build_floor_vectors(hash_alg))
+    out.extend(build_identity_binding_vectors(hash_alg))
     out.extend(build_guard_vectors(hash_alg))
     out.extend(build_salt_leak_vectors(hash_alg))
     out.extend(build_algorithm_vectors(hash_alg))
@@ -427,12 +526,15 @@ def build_envelope_fixtures(hash_alg):
     # Every fixture is RUN here with implementation A before it reaches the corpus, and the
     # reason code it returns becomes the vector's assertion. A fixture whose verdict does not
     # match its vector is a corpus defect and fails the build.
+    #
+    # What is verified is the bytes this build EMITTED, not the file on disk. Reading the file
+    # back would let a hand-edited fixture be verified against itself and then be compared
+    # against a corpus generated from that same edit, which is how `--check` used to pass on a
+    # tampered fixture.
     type_maps = {SYNTHETIC_RECORD_TYPE: syn.synthetic_type_map()}
     import json_literal
     for vec in out:
-        path = os.path.join(CORPUS_DIR, os.path.relpath(vec["envelopeFile"], "corpus"))
-        with open(path, "r", encoding="utf-8") as handle:
-            envelope = json_literal.loads(handle.read())
+        envelope = json_literal.loads(_generated[vec["name"]])
         accepted, reason = env.verify(envelope, type_maps)
         if accepted != vec["expectAccept"]:
             raise SystemExit(

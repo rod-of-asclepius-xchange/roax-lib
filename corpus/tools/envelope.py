@@ -20,17 +20,27 @@ import roax_ref as ref  # noqa: E402
 # The four reserved paths of section 11.2 are the floor every profile carries; roax.issuer.keyId
 # is committed but OPTIONAL to disclose and MUST NOT be added here, because requiring it would
 # permanently bind an anchored record to the key it was issued under.
+#
+# Every path is written as SEGMENTS, never in the display notation docs/profiles/ prints. The
+# profile documents write `notarisationMetadata.reference`, and reading that as one key is the
+# section 5.2 trap: no real record has a leaf whose key is that dotted string, so the floor
+# would look enforced and match nothing. Segments make the mistake unrepresentable rather than
+# merely corrected. Reserved paths are the one case that IS a single dotted key (section 11.2).
 PROFILE_FLOORS = {
     # docs/profiles/fhir.md section 5
-    "hl7.fhir.bundle": ["resourceType"],
+    "hl7.fhir.bundle": [[{"key": "resourceType"}]],
     # docs/profiles/pdt-healthcert.md section 4
-    "sg.gov.moh.pdt-healthcert": ["version", "type", "validFrom"],
+    "sg.gov.moh.pdt-healthcert": [[{"key": "version"}], [{"key": "type"}],
+                                  [{"key": "validFrom"}]],
     # docs/profiles/recovery-healthcert.md section 4
-    "sg.gov.moh.recovery-healthcert": ["version", "type", "validFrom", "validUntil"],
-    # docs/profiles/vaccination-healthcert.md section 4
-    "sg.gov.moh.vaccination-healthcert": ["validFrom", "notarisationMetadata.reference"],
+    "sg.gov.moh.recovery-healthcert": [[{"key": "version"}], [{"key": "type"}],
+                                       [{"key": "validFrom"}], [{"key": "validUntil"}]],
+    # docs/profiles/vaccination-healthcert.md section 4. `notarisationMetadata.reference` is TWO
+    # segments.
+    "sg.gov.moh.vaccination-healthcert": [[{"key": "validFrom"}],
+                                          [{"key": "notarisationMetadata"}, {"key": "reference"}]],
     # The corpus-only profile. Not in the docs/profiles/ registry; see synthetic_records.py.
-    "org.roax.corpus.synthetic": ["marker"],
+    "org.roax.corpus.synthetic": [[{"key": "marker"}]],
 }
 
 # Section 7.4, H3: a verifier MUST reject any hashAlg absent from its OWN configured allow-list.
@@ -95,23 +105,24 @@ def _floor_for(record_type):
     profile = PROFILE_FLOORS.get(record_type)
     if profile is None:
         return None
-    return [[{"key": p}] for p in RESERVED_FLOOR] + [[{"key": p}] for p in profile]
+    # A reserved path IS a single KEY segment carrying the literal dotted name (section 11.2).
+    # A profile path is already segments.
+    return [[{"key": p}] for p in RESERVED_FLOOR] + [list(p) for p in profile]
 
 
-def verify(envelope, type_maps, record_loader=None):
+def verify(envelope, type_maps):
     """Verify one envelope. Returns (accepted: bool, reason: str).
 
-    `type_maps` maps recordType to a ref.TypeMap; `record_loader` resolves a full copy's record
-    body when the envelope references one by file. A full copy carries its record inline, so the
-    loader is only used by the fixtures that keep the body out of the envelope.
+    `type_maps` maps recordType to a ref.TypeMap. A full copy carries its record body inline, so
+    there is nothing to resolve by reference.
     """
     try:
-        return _verify(envelope, type_maps, record_loader)
+        return _verify(envelope, type_maps)
     except ref.RoaxError as exc:
         return False, exc.code
 
 
-def _verify(envelope, type_maps, record_loader):
+def _verify(envelope, type_maps):
     for field in ("canon", "hashAlg", "recordType", "schemaVersion", "recordId", "root",
                   "leafCount", "issuer"):
         if not _has(envelope, field):
@@ -152,11 +163,11 @@ def _verify(envelope, type_maps, record_loader):
     }
 
     if has_record:
-        return _verify_full(envelope, hash_alg, root, identity, type_maps, record_loader)
-    return _verify_disclosed(envelope, hash_alg, root, floor)
+        return _verify_full(envelope, hash_alg, root, identity, type_maps)
+    return _verify_disclosed(envelope, hash_alg, root, floor, identity)
 
 
-def _verify_full(envelope, hash_alg, root, identity, type_maps, record_loader):
+def _verify_full(envelope, hash_alg, root, identity, type_maps):
     if not _has(envelope, "salts"):
         # Section 7.3 rule 1. Without it a full copy has no route to any leaf hash.
         return False, "full-copy-without-salts"
@@ -166,9 +177,6 @@ def _verify_full(envelope, hash_alg, root, identity, type_maps, record_loader):
         return False, "type-map-missing"
 
     body = _get(envelope, "record")
-    if record_loader is not None and _has(body, "$recordFile"):
-        body = record_loader(_get(body, "$recordFile"))
-
     leaf_count = _int(_get(envelope, "leafCount"))
     salt_entries = _get(envelope, "salts")
 
@@ -215,7 +223,7 @@ def _ordering_only_master_salt():
     return b"\x00" * 32
 
 
-def _verify_disclosed(envelope, hash_alg, root, floor):
+def _verify_disclosed(envelope, hash_alg, root, floor, identity):
     if _has(envelope, "salts"):
         # Section 7.3 and 10.1: `salts` alongside `disclosure` is what would make a withheld
         # leaf's salt representable at all. Reject rather than repair.
@@ -231,6 +239,7 @@ def _verify_disclosed(envelope, hash_alg, root, floor):
     tree_size = _int(_get(envelope, "leafCount"))
     seen_paths = set()
     seen_index = set()
+    revealed = {}
     for entry in leaves:
         for field in ("segments", "index", "tag", "salt", "auditPath"):
             if not _has(entry, field):
@@ -266,9 +275,35 @@ def _verify_disclosed(envelope, hash_alg, root, floor):
         path = [bytes.fromhex(h) for h in _get(entry, "auditPath")]
         if not ref.verify_inclusion(hash_alg, leaf, index, tree_size, path, root):
             return False, "inclusion-proof-failed"
+        # Recorded only once the proof holds. A leaf value is authority when it is committed to
+        # the root and not a moment earlier.
+        revealed[key] = value
 
-    # Section 10.2, the minimum-disclosure floor.
+    # Section 10.2, the minimum-disclosure floor. Checked BEFORE the identity binding below, so
+    # that an omitted reserved path still reports the floor rather than the binding: the two are
+    # different failures and the corpus asserts the reason code, not only the verdict.
     for required in floor:
         if _segments_key(required) not in seen_paths:
             return False, "minimum-disclosure-floor"
+
+    # Section 11.3: fields outside the root are hints and NEVER authority. `recordType` is the
+    # one that selects the floor above, so an unbound outer value picks the floor an attacker
+    # asks for - pdt's floor is a strict subset of recovery's, and a recovery copy that declares
+    # itself pdt withholds `validUntil` while every proof still verifies against the genuine
+    # root. Section 11.2 commits all four of these as leaves precisely so they can be compared.
+    for reserved, outer in (
+        (ref.RESERVED_RECORD_TYPE, identity["record_type"]),
+        (ref.RESERVED_SCHEMA_VERSION, identity["schema_version"]),
+        (ref.RESERVED_RECORD_ID, identity["record_id"]),
+        (ref.RESERVED_ISSUER_ID, identity["issuer_id"]),
+    ):
+        committed = revealed.get(_segments_key([{"key": reserved}]))
+        if not isinstance(committed, str) or not isinstance(outer, str):
+            return False, "outer-identity-mismatch"
+        # NFC on BOTH sides. Each of these leaves is a STRING and is therefore committed
+        # normalized (section 6.1), so the raw outer bytes are not what the root binds - the
+        # same rule the segment keys above are already compared under. No corpus identity value
+        # is non-ASCII, so this is unobservable across the shipped vectors either way.
+        if ref.nfc(committed) != ref.nfc(outer):
+            return False, "outer-identity-mismatch"
     return True, "ok"
