@@ -134,21 +134,28 @@ Minimum set for this profile, per specification section 10.2:
 |---|---|
 | `roax.recordType` | Selects the type map, so verification cannot start without it. |
 | `roax.schemaVersion` | The other half of the type-map lookup key. |
-| `roax.recordId` | In every salt preimage, so no leaf hash can be recomputed without it. |
+| `roax.recordId` | Identifies which record it is. |
 | `roax.issuer.id` | Identifies who issued it. |
 | `resourceType` | Without it a disclosed FHIR resource does not say what kind of resource it is. |
 
 `resourceType` is the FHIR-specific addition. The other four are the reserved floor every profile
 carries, per specification section 11.2.
 
-Two distinctions worth keeping straight. The first three are mandatory **by arithmetic rather than
-by policy**: a verifier without them cannot run the procedure at all, so withholding one yields no
-proof rather than a weaker one. Only `roax.issuer.id` is a policy choice.
+Two distinctions worth keeping straight. The **first two** are mandatory **by arithmetic rather than
+by policy**: a verifier without them cannot select the type map and so cannot run the procedure at
+all, so withholding one yields no proof rather than a weaker one. `roax.recordId` and
+`roax.issuer.id` are policy choices, about a verifier being able to say what it is looking at.
 And `roax.issuer.keyId` is **committed but optional to disclose**, because requiring it would break
 key rotation on an already-anchored record.
 
+**`roax.recordId` was in the arithmetic group until decision D4 was ruled D4b on 2026-07-28.** Under
+the derived-salt construction the specification carried before that ruling, the record identifier was
+inside every salt preimage and a verifier genuinely could not recompute a leaf hash without it.
+Specification section 7 has no preimage now, so nothing a verifier computes consumes it. Its place in
+this table is unchanged; only the reason is.
+
 Neither `roax.canon` nor `roax.hashAlg` appears here, and both absences are deliberate.
-`canon` is already bound into the domain string of every leaf and every salt, so a leaf restating it
+`canon` is already bound into the domain string of every leaf, so a leaf restating it
 would pay bytes on every disclosed copy for a property already held.
 `hashAlg` cannot be bound by a leaf at all, because the leaf would be hashed under the algorithm it
 names; specification section 7.4 gives the three mechanisms that replace it.
@@ -168,7 +175,8 @@ names; specification section 7.4 gives the three mechanisms that replace it.
   root at `roax.recordType`, where it is non-redactable and cannot be corrected for an issued
   record. A reader who treats the identifier as an assertion that the payload is a `Bundle` is
   reading more than the profile guarantees. Whether to narrow the profile to genuine Bundles or to
-  rename the identifier is bound up with decision D13, which is OPEN; nothing here settles it.
+  rename the identifier belongs to the clinical-validation layer that decision D13's ruling puts
+  outside `ROAX-CANON/1` (specification section 2.3); nothing here settles it.
 
 ## 7. What this profile does NOT enforce
 
@@ -177,4 +185,11 @@ clinical resource, has internally consistent references, or means anything at al
 syntactically valid FHIR resource.
 
 If ROAX wants to claim clinical semantics, that requires named implementation profiles above the
-base schema, with profile governance. That is decision D13 and it is OPEN.
+base schema, with profile governance.
+
+**Decision D13 is ruled and the ruling makes that a separate layer rather than a pending question.**
+The protocol layer commits what it is given and asserts nothing clinical, and specification section
+2.3 states normatively that no surface derived from this protocol may claim a clinical fact from root
+validity alone. Named implementation profiles are a separate, independently versioned conformance
+layer a deployment may adopt, kept off the canonicalization critical path so that it can arrive later
+without touching a byte of the digest rule.

@@ -87,7 +87,7 @@ Two specific hazards:
 
 | Path | Why |
 |---|---|
-| `roax.recordType`, `roax.schemaVersion`, `roax.recordId`, `roax.issuer.id` | The reserved floor (spec section 11.2), which every profile carries. The first three are mandatory by arithmetic rather than policy: without them a verifier cannot select the type map or rebuild a salt preimage, so it cannot verify at all. `roax.issuer.keyId` is committed but OPTIONAL to disclose, because requiring it would break key rotation on already-anchored records. |
+| `roax.recordType`, `roax.schemaVersion`, `roax.recordId`, `roax.issuer.id` | The reserved floor (spec section 11.2), which every profile carries. The first two are mandatory by arithmetic rather than policy: they select the type map, so without them a verifier cannot verify at all. `roax.recordId` and `roax.issuer.id` are mandatory by policy, so that a disclosed copy says which record it is and who issued it. `roax.recordId` was arithmetic until decision D4 was ruled D4b on 2026-07-28, which removed the salt preimage it used to be an input to; its place here is unchanged and only its reason moved. `roax.issuer.keyId` is committed but OPTIONAL to disclose, because requiring it would break key rotation on already-anchored records. |
 | `version` | Pins `pdt-healthcert-v2.0`. Without it a disclosed copy does not say which healthcert version it is. |
 | `type` | The test kind. A PDT certificate that does not say whether it was PCR or ART is not a test certificate. |
 | `validFrom` | A validity claim with no start is not checkable. |
@@ -100,14 +100,51 @@ that is the recovery profile.
 The PDT base object **allows additional properties.** So a real PDT record may legitimately carry
 fields the type map has never seen.
 
-Under decision D7 (unknown paths fail closed), such a record is **rejected at issuance** rather than
-being given a guessed type tag. That is the intended behaviour and it is safe, but it means:
+**Decision D7 is ruled D7a - fail closed, permanently** (2026-07-28, `docs/decisions.md`). Such a
+record is **rejected at issuance** rather than being given a guessed type tag. That is the intended
+behaviour and it is safe, and the operational cost of it lands hardest on this profile, so it is
+planned for here rather than absorbed.
 
-> For this profile, the type map must be maintained as an allowlist that issuers can extend, and
-> extending it is a versioned change to the type map (`schemas/type-map-1.0.json`).
+> **For this profile, the type map is an allowlist that issuers extend**, and extending it is a
+> versioned change to `typeMapVersion` in `schemas/type-map-1.0.json`. That is not a workaround. It
+> is the D7a ruling's own consequence: the type map is a **first-class, independently versioned,
+> issuer-extensible artifact with a defined extension path**, not a lookup table shipped once
+> (specification section 4.2).
 
-This is a genuine operational cost of D7 and it lands hardest on PDT. It is recorded in
-`docs/decisions.md` under D7 rather than being smoothed over here.
+**One constraint on that extension path is load-bearing.** An extension MUST be **additive**. Adding
+a binding for a path the map does not cover is safe and is the normal case; retagging a path it
+already covers changes the root of every already-issued record that reaches that path, which
+specification section 12.2 forbids. A correction to an existing binding is therefore a new profile
+version rather than a type-map patch, and any record already anchored under the old binding keeps
+verifying under it.
+
+**Why this matters more here than anywhere else.** PDT already has the most real-world traffic of the
+three healthcert families, and its open-world base object means an unknown path is a routine event
+rather than an anomaly - the opposite of the vaccination profile, whose top-level object closes with
+`additionalProperties: false` (see [`vaccination-healthcert.md`](vaccination-healthcert.md) section
+1). If extending the map is slow or unclear, fail-closed becomes an adoption blocker exactly where it
+can least afford to be, and the pressure to "just default it to STRING for now" will arrive from a
+real issuer with a real record. That is the moment refusing is hardest, which is why the refusal is
+normative in the specification rather than advisory, and why the extension path being fast is a
+deliverable rather than an aspiration.
+
+### 5.1 Blob binding
+
+`logo` and `attachments[].data` are bound as `STRING` over the base64 text (specification section
+6.3), and that is unchanged by decision D9's ruling.
+
+Two things that ruling did change, and neither alters a byte of an existing PDT record:
+
+- **One canonical base64 form is now pinned** - RFC 4648 section 4, standard alphabet, with padding,
+  no line wrapping (specification section 6.3). This governs a `BYTES` binding rather than a `STRING`
+  one, so it does not reach this profile's fields today. It matters here because the PDT schema
+  describes `logo` only as base64 with no encoding pattern (section 6 below), so nothing upstream
+  constrains what an issuer sends.
+- **A content-addressed binding, type tag 8 `BLOB_REF`, is defined and selected by nothing**
+  (specification section 6.5). **This profile does not select it**, and an implementation MUST reject
+  a record that binds any PDT path to tag 8. It exists so that a future record family issuing under
+  Poseidon - where a 14 KB blob costs about 14 ms rather than about 41 microseconds - does not need a
+  second leaf-binding form retrofitted after five implementations already exist.
 
 ## 6. Known defects and cautions
 
@@ -140,4 +177,12 @@ rule is genuinely absent.
 **Consequence for ROAX:** a valid `sg.gov.moh.pdt-healthcert` root proves that a particular typed
 payload was committed by a particular issuer. It does not prove that the payload describes a test,
 still less a negative one. Any product surface that says "negative PDT result" is making a claim the
-protocol layer does not support, and must derive it from the payload itself after disclosure.
+protocol layer does not support, and must derive it from the payload itself after disclosure and
+attribute it to the payload.
+
+**That is now normative rather than advisory.** Decision D13 is ruled, and specification section 2.3
+states that no surface derived from this protocol may assert a clinical fact on the strength of root
+validity alone. Enforcing the rules this section lists as absent - that the Bundle contains an
+Observation, that `type` agrees with the method, that the result is negative - belongs to the
+separate, independently versioned clinical-validation layer that ruling puts outside
+`ROAX-CANON/1`.
