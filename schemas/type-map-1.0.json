@@ -9,7 +9,7 @@
 
   "properties": {
     "typeMapVersion": {
-      "description": "Version of this type map. Changing any entry MUST bump it. A root computed under one type-map version is not reproducible under another if the changed entry was reachable. The three-part semver pattern is KEPT here on purpose, and the distinction is the one spec section 12.1 draws: this is one of ROAX's OWN artifacts, so this project defines the identifier and may legitimately constrain its shape. schemaVersion above is defined elsewhere - by the profile, and beyond it by FHIR or a health authority - and is therefore opaque. Do not 'harmonize' the two; they differ because their owners differ.",
+      "description": "Version of this type map. ADDING an entry MUST bump it; CHANGING one is forbidden, and the difference is normative rather than stylistic. Adding a binding for a path the map does not yet cover is the normal case and is what makes fail-closed workable for an open-world profile like PDT. Retagging a path the map ALREADY covers changes the root of every already-issued record that reaches that path, which spec section 12.2 forbids, so a correction to an existing binding is a new PROFILE version rather than a type-map patch, and records anchored under the old binding keep verifying under it. An earlier version of this description said only that changing any entry must bump the version, which permitted the retag and asked only for a version bump; decision D7's ruling to D7a made the additive constraint explicit (spec section 4.2). A root computed under one type-map version is not reproducible under another if the changed entry was reachable, which is why the distinction matters at all. The three-part semver pattern is KEPT here on purpose, and the distinction is the one spec section 12.1 draws: this is one of ROAX's OWN artifacts, so this project defines the identifier and may legitimately constrain its shape. schemaVersion above is defined elsewhere - by the profile, and beyond it by FHIR or a health authority - and is therefore opaque. Do not 'harmonize' the two; they differ because their owners differ.",
       "type": "string",
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
     },
@@ -64,10 +64,10 @@
           "enum": ["string", "number", "boolean", "null", "object", "array"]
         },
         "tag": {
-          "description": "ROAX type tag: 0 NULL, 1 BOOL, 2 STRING, 3 INTEGER, 4 DECIMAL, 5 BYTES, 6 EMPTY_ARRAY, 7 EMPTY_OBJECT. Tags 6 and 7 are produced by the flattener for empty containers and are not normally asserted here.",
+          "description": "ROAX type tag: 0 NULL, 1 BOOL, 2 STRING, 3 INTEGER, 4 DECIMAL, 5 BYTES, 6 EMPTY_ARRAY, 7 EMPTY_OBJECT, 8 BLOB_REF. Tags 6 and 7 are produced by the flattener for empty containers and are not normally asserted here. Tag 8 selects the content-addressed blob binding, which is REGISTERED and selected by NO version-1 profile: an implementation MUST reject a type map that binds any path to tag 8 until a profile document under docs/profiles/ declares the binding for that path, and that profile MUST also state how the blob is carried out of band (spec section 6.5). It is accepted by this schema for the same reason Poseidon-BN254 is accepted in the envelope's hashAlg enum - so that the form is pinned once now rather than retrofitted after five independent implementations exist, which is the change that splits a library family.",
           "type": "integer",
           "minimum": 0,
-          "maximum": 7
+          "maximum": 8
         },
         "source": {
           "description": "Where this binding came from, so a reviewer can check it. E.g. the FHIR element declaration that says this element is `decimal`.",
@@ -77,5 +77,5 @@
     }
   },
 
-  "$comment": "Unknown paths MUST fail closed (spec section 4.2, decision D7 - OPEN). This schema deliberately provides no default-tag or fallback field: a type map that could express 'anything else is a STRING' would let two libraries with different maps silently agree on a wrong root. If decision D7 is ruled the other way, that fallback belongs here and this comment must be removed."
+  "$comment": "Unknown paths MUST fail closed (spec section 4.2). DECISION D7 IS RULED D7a, permanently, on 2026-07-28. This schema deliberately provides no default-tag or fallback field, and adding one is now a violation rather than a pending question: a type map that could express 'anything else is a STRING' would let two libraries with different maps silently agree on a wrong root, which is the exact failure this project exists to remove. The pressure to add it will arrive from a real issuer with a real record that a PDT type map has not yet been extended to cover, because the PDT base object permits additional properties (docs/profiles/pdt-healthcert.md section 5); the answer is to extend the map and bump typeMapVersion. THAT EXTENSION MUST BE ADDITIVE. An entry that retags a path the map already covers changes the root of every already-issued record reaching that path, which spec section 12.2 forbids."
 }

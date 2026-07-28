@@ -13,7 +13,7 @@ No library code has been written, deliberately.
 
 | Read | For |
 |---|---|
-| [`docs/decisions.md`](docs/decisions.md) | **The open decisions.** Four belong to the project owner; three of those are still unruled. Start here if you are reviewing rather than implementing. |
+| [`docs/decisions.md`](docs/decisions.md) | **The decisions, ruled and open, each with its reasoning.** Three are still open and all three belong to the project owner. Start here if you are reviewing rather than implementing. |
 | [`docs/spec/roax-canon-1.md`](docs/spec/roax-canon-1.md) | The protocol. Precise enough to implement from. Section 2 says what it does not solve; section 14 reconciles it against dogtag. |
 | [`docs/profiles/`](docs/profiles/) | One document per record family, because the four families do **not** share one concrete object. |
 | [`docs/conformance-corpus.md`](docs/conformance-corpus.md) | What cross-language agreement has to be proven against, and why that is a release gate rather than decoration. |
@@ -50,14 +50,19 @@ settled anywhere in these documents:
 - **D** - five independent libraries versus a shared core over a binding layer.
 
 **B - the hash function - has been ruled.** ZK-friendly and non-ZK hashes are both first-class and
-selectable per record, permanently, which is why the algorithm identifier is bound into the domain
-string and committed inside the root rather than merely declared. What remains open under B is the
+selectable per record, permanently, which is why the algorithm identifier is folded into the domain
+string that enters every leaf preimage rather than merely declared in the envelope. It is
+deliberately *not* a leaf: a leaf is hashed under the algorithm it names, so it cannot bind it, and
+authority comes from the anchoring registry instead. What remains open under B is the
 `Poseidon-BN254` parameterization, which is not pinned and which no record may be issued against
 until it is.
 
-Ten more decisions are recorded alongside them. The specification is written on the *recommended*
-answer to each open one so that it reads as a real specification; that is a drafting choice and not
-a ruling.
+**The ten further decisions were ruled on 2026-07-28** and the specification is written on those
+rulings. Eight confirmed what it already recommended. Two changed it: salts are now one independent
+CSPRNG draw per leaf with no master salt and no derivation, and a content-addressed blob binding is
+defined without being selected by any version-1 profile. Specification section 15 tables where each
+ruling lands, and `docs/decisions.md` part 2 gives every one of them with its reasoning, so any of
+them can be overturned on the reasoning rather than on authority.
 
 ## Repository layout
 

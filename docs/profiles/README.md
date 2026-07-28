@@ -60,7 +60,7 @@ The v1 registry is `sg.gov.moh.vaccination-healthcert`, `sg.gov.moh.pdt-healthce
 | `recordType` and `schemaVersion` values | They are committed inside the root as reserved leaves (spec section 11.2). |
 | Type-map scope | Which schema definitions the type map must cover for this family (spec section 4.2). |
 | Non-redactable paths | The minimum-disclosure floor (spec section 10.2). Without it a disclosed copy can hide what the record is. |
-| Blob-bearing fields | Which fields carry base64 and how they are bound (spec section 6.3). |
+| Blob-bearing fields | Which fields carry base64 and how they are bound (spec section 6.3). Every v1 profile binds them as `STRING` over the base64 text. The content-addressed binding, tag 8 `BLOB_REF`, is defined and **selected by none of them**, so a profile that wants it must say so explicitly and must also state how the blob travels out of band (spec section 6.5). |
 | Known schema defects | So an implementer is not surprised by them. |
 | What the schema does NOT enforce | The gap between what the samples show and what the schema requires. This gap is large and is the single most misleading thing about these families. |
 
@@ -77,6 +77,16 @@ the validator.
 So ROAX must not infer clinical guarantees from the fact that a record validates. The protocol layer
 commits what it is given. Whether what it was given is clinically meaningful is a profile question,
 and today the profiles largely do not answer it.
+
+**Decision D13 was ruled on 2026-07-28 and turned that caution into a normative rule.**
+Specification section 2.3 states what a valid root proves - a typed payload committed by an
+identified issuer, and nothing clinical - and forbids any surface derived from this protocol from
+asserting a clinical fact on the strength of root validity alone. Enforcing subject, event,
+cardinality and reference rules is a **separate, independently versioned conformance layer** that a
+deployment may adopt, deliberately kept off the canonicalization critical path so that it can arrive
+later as an additive change. Each of the four documents below records, in its own last section, what
+its family's schema does not enforce; that section is the input to that layer, not a to-do list for
+this one.
 
 ## Provenance
 
