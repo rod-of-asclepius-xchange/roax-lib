@@ -290,7 +290,7 @@
       ]
     },
     {
-      "description": "A FULL copy MUST carry `salts`. Without it there is no route from the record to any leaf hash, because leafHash needs salt(path) and the record body carries no salts (spec section 7.3).",
+      "description": "A FULL copy MUST carry `salts`. Without it there is no route from the record to any leaf hash, because leafHash needs the leaf's salt and the record body carries no salts (spec section 7.3). There is nothing to re-derive it from either: decision D4 is ruled D4b, so each salt is an independent random draw and no path-keyed derivation function exists (spec section 7).",
       "if": { "required": ["record"], "properties": { "record": true } },
       "then": { "required": ["salts"], "properties": { "salts": true } }
     },

@@ -249,7 +249,7 @@ using the `ajv/dist/2020.js` entry point because they are draft 2020-12. Compili
 its own for a conditional - validate instances both ways, since an `if`/`then` that never fires
 compiles perfectly and asserts nothing.
 
-Two things to know if you touch them:
+Four things to know if you touch them:
 
 - Ajv's `strictRequired` rejects `required` inside a `not`/`anyOf` subschema unless the same
   subschema also lists those properties. The schemas carry no-op `"properties": {"x": true}`
@@ -257,3 +257,14 @@ Two things to know if you touch them:
   compilation.
 - Union types (`"type": ["string","boolean"]`) trip `strictTypes`. The envelope pins each value type
   per tag in its `allOf` conditionals instead, which is more precise anyway.
+- **A property is FORBIDDEN inside a branch with the false schema, `"properties": {"x": false}`.**
+  That idiom is used in `recordVector`'s two-branch `oneOf` and in `envelopeVector`'s `else`, and it
+  compiles clean under strict mode. It is shorter than `"not": {"required": ["x"], "properties":
+  {"x": true}}` and needs no `strictRequired` annotation, because it carries no `required`.
+- **A conditional keyed on a vector's `class` needs an instance test on BOTH sides.**
+  `envelopeVector` requires `verifierConfig` at class 18 and forbids it everywhere else. The
+  else-branch is the half a compile check cannot see, and it is the half that was missing when the
+  block was merely optional. Validate a class-18 instance without the block (MUST fail), one with an
+  empty block (MUST fail), and a class-14 instance carrying one (MUST fail). Do the same through a
+  whole corpus document, not only against the `$defs` subschema: compiling proves the `$ref`
+  resolves, and only a root-level instance proves the branch is reached by the path a runner takes.
