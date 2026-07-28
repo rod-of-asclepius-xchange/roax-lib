@@ -952,9 +952,9 @@ Four belong to the project owner and have not been ruled on:
 - **C** - what happens to the Singapore healthcerts already issued under OpenAttestation.
 - **D** - five independent libraries versus a shared core over a binding layer.
 
-Eight more are recorded alongside them: D3 wire format, D4 salt strategy, D5 leaf ordering,
+Ten more are recorded alongside them: D3 wire format, D4 salt strategy, D5 leaf ordering,
 D6 absence proofs, D7 unknown paths, D8 what goes inside the root, D9 big blobs, D11 detached
-signature, D12 normalization.
+signature, D12 normalization, D13 clinical validation level.
 
 **All of them, with alternatives and consequences, are in
 [`docs/decisions.md`](../decisions.md).** Nothing in this document should be read as settling them.

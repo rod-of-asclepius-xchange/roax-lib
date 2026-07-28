@@ -49,7 +49,7 @@ Four decisions are open and none of them is quietly settled anywhere in these do
 - **C** - what happens to the Singapore healthcerts already issued under OpenAttestation.
 - **D** - five independent libraries versus a shared core over a binding layer.
 
-Nine more are recorded alongside them. The specification is written on the *recommended* answer to
+Ten more are recorded alongside them. The specification is written on the *recommended* answer to
 each so that it reads as a real specification; that is a drafting choice and not a ruling.
 
 ## Repository layout
