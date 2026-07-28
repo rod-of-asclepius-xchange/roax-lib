@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://roax.example/schemas/type-map/1.0/schema.json",
+  "title": "ROAX type map v1",
+  "description": "Binds record paths to ROAX type tags. This file is the schema FOR the type map; the type map itself does not exist yet (spec section 4.3) and building it is on the critical path. The type map is NORMATIVE data: two libraries carrying different type maps produce different roots for the same record, which is the highest-risk surface in the design (spec section 4). It is versioned with the specification and is part of the conformance corpus (docs/conformance-corpus.md class 11).",
+  "type": "object",
+  "required": ["typeMapVersion", "recordType", "schemaVersion", "entries"],
+  "additionalProperties": false,
+
+  "properties": {
+    "typeMapVersion": {
+      "description": "Version of this type map. Changing any entry MUST bump it. A root computed under one type-map version is not reproducible under another if the changed entry was reachable. The three-part semver pattern is KEPT here on purpose, and the distinction is the one spec section 12.1 draws: this is one of ROAX's OWN artifacts, so this project defines the identifier and may legitimately constrain its shape. schemaVersion above is defined elsewhere - by the profile, and beyond it by FHIR or a health authority - and is therefore opaque. Do not 'harmonize' the two; they differ because their owners differ.",
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+
+    "recordType": {
+      "description": "The profile this map applies to. Matches the envelope's recordType.",
+      "type": "string"
+    },
+
+    "schemaVersion": {
+      "description": "The profile version this map applies to. OPAQUE TO THE PROTOCOL, exactly as in the envelope, and deliberately carrying no dotted-numeric pattern: the value is never parsed, ordered or range-compared, only matched for equality against the profile registry (spec section 12.1). THIS CONSTRAINT MUST STAY IDENTICAL TO THE ENVELOPE'S. The two fields together form the type-map lookup key, so tightening one alone would make a record that validates as an envelope fail to find its own type map, which is the silent-divergence failure the fail-closed rule exists to prevent.",
+      "type": "string",
+      "minLength": 1
+    },
+
+    "sourceSchemas": {
+      "description": "Provenance: which reference schemas this map was derived from, cited by path and commit. The reference schemata live OUTSIDE this repository by design and are never copied in.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string" },
+          "commit": { "type": "string", "pattern": "^[0-9a-f]{7,40}$" },
+          "note": { "type": "string" }
+        }
+      }
+    },
+
+    "entries": {
+      "description": "Path-pattern to type-tag bindings. Order is significant: the FIRST matching entry wins, so more specific patterns MUST precede more general ones.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "required": ["pattern", "tag"],
+      "additionalProperties": false,
+      "properties": {
+        "pattern": {
+          "description": "Path pattern in display notation, where '*' matches any single array index and '**' matches any run of segments. Example: 'fhirBundle.entry[*].resource.valueQuantity.value'. The pattern addresses the STRUCTURED path (spec section 5); the display form is used here only because it is readable, and an implementation MUST match against decoded segments rather than against a rendered string.",
+          "type": "string",
+          "minLength": 1
+        },
+        "jsonKind": {
+          "description": "Restricts this entry to a particular observed JSON kind at that path. Present because polymorphic fields are real and already in the reference records: in the shipped vaccination sample, fhirBundle.entry[0].identifier[0].type is the string \"PPN\" while identifier[1].type is the object { text: \"NRIC\" }. A map keyed by path alone cannot express that (spec section 4.2). Omit when the path is monomorphic.",
+          "enum": ["string", "number", "boolean", "null", "object", "array"]
+        },
+        "tag": {
+          "description": "ROAX type tag: 0 NULL, 1 BOOL, 2 STRING, 3 INTEGER, 4 DECIMAL, 5 BYTES, 6 EMPTY_ARRAY, 7 EMPTY_OBJECT. Tags 6 and 7 are produced by the flattener for empty containers and are not normally asserted here.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 7
+        },
+        "source": {
+          "description": "Where this binding came from, so a reviewer can check it. E.g. the FHIR element declaration that says this element is `decimal`.",
+          "type": "string"
+        }
+      }
+    }
+  },
+
+  "$comment": "Unknown paths MUST fail closed (spec section 4.2, decision D7 - OPEN). This schema deliberately provides no default-tag or fallback field: a type map that could express 'anything else is a STRING' would let two libraries with different maps silently agree on a wrong root. If decision D7 is ruled the other way, that fallback belongs here and this comment must be removed."
+}

@@ -1,0 +1,318 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://roax.example/schemas/conformance-corpus/1.0/schema.json",
+  "title": "ROAX conformance corpus v1",
+  "description": "Schema for the shared cross-language test-vector file. Because ROAX may ship five independent libraries and cannot lean on a single core behind an FFI layer the way dogtag does (spec section 14.3), this corpus is the entire enforcement mechanism for cross-language agreement, not a safety net. Normative content requirements: docs/conformance-corpus.md. The corpus file itself does not exist yet.",
+  "type": "object",
+  "required": ["corpusVersion", "canon", "hashAlg", "unicodeVersion", "vectors"],
+  "additionalProperties": false,
+
+  "properties": {
+    "corpusVersion": {
+      "description": "Version of this corpus file. The three-part semver pattern is KEPT on purpose: this is one of ROAX's OWN artifacts, so this project defines the identifier and may constrain its shape (spec section 12.1). Every EXTERNALLY defined version in this file is opaque instead - see unicodeVersion below and recordVector.schemaVersion.",
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "canon": { "const": "ROAX-CANON/1" },
+    "hashAlg": {
+      "description": "The hash algorithm these vectors were produced under. It is not merely a label: it is appended to the domain string, which is ASCII 'ROAX-CANON/1/' + hashAlg and sits in every salt preimage and every leaf preimage, so every expected hash in this file is specific to it (spec sections 7, 8, 7.4). Matches the envelope enum deliberately. Only SHA-256 has a construction DEFINED by ROAX-CANON/1; Poseidon-BN254 is registered but its parameterization is not yet pinned, so no Poseidon corpus can exist until a revision pins it (spec section 7.4).",
+      "enum": ["SHA-256", "Poseidon-BN254"]
+    },
+    "unicodeVersion": {
+      "description": "The Unicode version whose NFC tables the expected values were produced under. ROAX-CANON/1 pins 15.1, and '15.1' is the canonical form for this pin (spec section 6.1). An implementation running different tables MAY legitimately differ on vectors in the 'unicodeVersion' class, and must say so rather than silently passing. OPAQUE: the Unicode Consortium defines this identifier, not this project, so it carries no shape constraint (spec section 12.1). The earlier two-part pattern rejected '15.1.0', which is the official Unicode Standard version string for the very release being pinned. Widened rather than made a const, because a const would foreclose a future re-pin and the corpus is versioned independently of the specification.",
+      "type": "string",
+      "minLength": 1
+    },
+    "vectors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "encodePath": { "type": "array", "items": { "$ref": "#/$defs/encodePathVector" } },
+        "encodeValue": { "type": "array", "items": { "$ref": "#/$defs/encodeValueVector" } },
+        "reject": { "type": "array", "items": { "$ref": "#/$defs/rejectVector" } },
+        "salt": { "type": "array", "items": { "$ref": "#/$defs/saltVector" } },
+        "leaf": { "type": "array", "items": { "$ref": "#/$defs/leafVector" } },
+        "tree": { "type": "array", "items": { "$ref": "#/$defs/treeVector" } },
+        "inclusion": { "type": "array", "items": { "$ref": "#/$defs/inclusionVector" } },
+        "negativeProof": { "type": "array", "items": { "$ref": "#/$defs/negativeProofVector" } },
+        "typeMap": { "type": "array", "items": { "$ref": "#/$defs/typeMapVector" } },
+        "record": { "type": "array", "items": { "$ref": "#/$defs/recordVector" } },
+        "unlinkability": { "type": "array", "items": { "$ref": "#/$defs/unlinkabilityVector" } },
+        "envelope": { "type": "array", "items": { "$ref": "#/$defs/envelopeVector" } }
+      }
+    }
+  },
+
+  "$defs": {
+    "hex32": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "name": { "type": "string", "minLength": 1 },
+    "classRef": {
+      "description": "Which numbered class in docs/conformance-corpus.md this vector discharges. Every class must be reachable from at least one vector; a class with no vectors is a coverage gap and the corpus build MUST report it. The maximum tracks the class count stated in section 3 of that document and MUST move with it.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 17
+    },
+
+    "segments": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "type": "object", "required": ["key"], "additionalProperties": false,
+            "properties": { "key": { "type": "string" } } },
+          { "type": "object", "required": ["index"], "additionalProperties": false,
+            "properties": { "index": { "type": "integer", "minimum": 0, "maximum": 4294967295 } } }
+        ]
+      }
+    },
+
+    "encodePathVector": {
+      "type": "object",
+      "required": ["name", "class", "segments", "encodedHex"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "segments": { "$ref": "#/$defs/segments" },
+        "encodedHex": { "type": "string", "pattern": "^([0-9a-f]{2})*$" },
+        "displayPath": { "type": "string", "description": "Display only. Never hashed." }
+      }
+    },
+
+    "encodeValueVector": {
+      "type": "object",
+      "required": ["name", "class", "tag", "encodedHex"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "tag": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "input": { "description": "Input in carrier form. Numbers are STRINGS here; a JSON number in a test vector would be parsed through a float by the very implementations under test." },
+        "encodedHex": { "type": "string", "pattern": "^([0-9a-f]{2})*$" }
+      }
+    },
+
+    "rejectVector": {
+      "description": "MUST error. An implementation that silently canonicalizes any of these is non-conformant.",
+      "type": "object",
+      "required": ["name", "class", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "tag": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "input": {},
+        "segments": { "$ref": "#/$defs/segments" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+
+    "saltVector": {
+      "description": "Asserts that a given (masterSalt, recordId, path) produces a given salt under the spec section 7 derivation. masterSaltHex is REQUIRED here and that is correct: this vector class TESTS the derivation, so masterSalt is its subject rather than an assumption about how salts came to exist. Do not relax it to match recordVector, which is a different case and says so.",
+      "type": "object",
+      "required": ["name", "class", "masterSaltHex", "recordId", "segments", "saltHex"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "masterSaltHex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "recordId": { "type": "string" },
+        "segments": { "$ref": "#/$defs/segments" },
+        "saltHex": { "type": "string", "pattern": "^[0-9a-f]{32}$" }
+      }
+    },
+
+    "leafVector": {
+      "type": "object",
+      "required": ["name", "class", "segments", "tag", "saltHex", "leafHash"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "segments": { "$ref": "#/$defs/segments" },
+        "tag": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "value": {},
+        "saltHex": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "leafHash": { "$ref": "#/$defs/hex32" }
+      }
+    },
+
+    "treeVector": {
+      "description": "RFC 9162 MTH over already-hashed leaves. Leaf counts 1,2,3,5,7,8,9,130 are mandatory (docs/conformance-corpus.md class 8): the RFC split rule is where a hand-rolled tree goes wrong.",
+      "type": "object",
+      "required": ["name", "class", "leafHashes", "root"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "leafHashes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/hex32" } },
+        "root": { "$ref": "#/$defs/hex32" }
+      }
+    },
+
+    "inclusionVector": {
+      "type": "object",
+      "required": ["name", "class", "leafHash", "index", "treeSize", "auditPath", "root", "expect"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "leafHash": { "$ref": "#/$defs/hex32" },
+        "index": { "type": "integer", "minimum": 0 },
+        "treeSize": { "type": "integer", "minimum": 1 },
+        "auditPath": { "type": "array", "items": { "$ref": "#/$defs/hex32" } },
+        "root": { "$ref": "#/$defs/hex32" },
+        "expect": { "type": "boolean" }
+      }
+    },
+
+    "negativeProofVector": {
+      "description": "MUST NOT verify. Includes the internal-node-presented-as-leaf case, which is dogtag's C1 hazard (spec section 9.3); RFC 9162 should reject it structurally and the corpus proves it does.",
+      "type": "object",
+      "required": ["name", "class", "attack", "leafHash", "index", "treeSize", "auditPath", "root"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "attack": {
+          "enum": [
+            "wrong-root",
+            "flipped-sibling",
+            "internal-node-as-leaf",
+            "index-out-of-range",
+            "truncated-audit-path",
+            "extended-audit-path"
+          ]
+        },
+        "leafHash": { "$ref": "#/$defs/hex32" },
+        "index": { "type": "integer", "minimum": 0 },
+        "treeSize": { "type": "integer", "minimum": 1 },
+        "auditPath": { "type": "array", "items": { "$ref": "#/$defs/hex32" } },
+        "root": { "$ref": "#/$defs/hex32" }
+      }
+    },
+
+    "typeMapVector": {
+      "description": "Asserts that a given path under a given type map resolves to a given tag, or fails closed. EXACTLY ONE of expectTag and expectFailClosed is required: with neither the vector asserts nothing, and with both it asserts two contradictory things. Every other vector type in this file requires its assertion, and class 11 is the highest-risk surface in the design (docs/conformance-corpus.md), so a silently vacuous vector is the worst place to allow one.",
+      "type": "object",
+      "required": ["name", "class", "recordType", "segments"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "recordType": { "type": "string" },
+        "segments": { "$ref": "#/$defs/segments" },
+        "jsonKind": { "enum": ["string", "number", "boolean", "null", "object", "array"] },
+        "expectTag": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "expectFailClosed": { "type": "boolean" }
+      },
+      "oneOf": [
+        {
+          "description": "Asserts a resolved tag.",
+          "required": ["expectTag"],
+          "properties": { "expectTag": true }
+        },
+        {
+          "description": "Asserts that the path is not covered and the implementation fails closed (spec section 4.2, decision D7).",
+          "required": ["expectFailClosed"],
+          "properties": { "expectFailClosed": true }
+        }
+      ]
+    },
+
+    "recordVector": {
+      "description": "A whole record with its root. The three real MOH samples are mandatory (class 10). Records are referenced by file rather than inlined, so that no reference schema or sample is copied into this repository. EVERY input to the root that the protocol REQUIRES is required here, because the leaf set is the UNION of the record's leaves and the reserved roax.* leaves (spec sections 3.3 and 11.2): recordType, schemaVersion and issuerId are reserved-leaf values and therefore change the root, so a vector omitting any of them is not reproducible and the class-10 assertion would be untestable. The top-level canon and hashAlg supply the rest, via the domain string. masterSaltHex is deliberately NOT in that list - see its own description, and the standing rule in docs/conformance-corpus.md section 1.2.",
+      "type": "object",
+      "required": [
+        "name",
+        "class",
+        "recordFile",
+        "recordId",
+        "recordType",
+        "schemaVersion",
+        "issuerId",
+        "leafCount",
+        "root"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "recordType": {
+          "description": "Committed as the reserved leaf roax.recordType, so it is an input to the root and not a label.",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "description": "Committed as the reserved leaf roax.schemaVersion. OPAQUE, exactly as in the envelope and for the same reason (spec section 12.1): defined by the profile rather than by this project, so it is matched for equality and never parsed.",
+          "type": "string",
+          "minLength": 1
+        },
+        "issuerId": {
+          "description": "Committed as the reserved leaf roax.issuer.id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "issuerKeyId": {
+          "description": "Committed as the reserved leaf roax.issuer.keyId. OPTIONAL, and its ABSENCE is meaningful rather than a default: an absent issuerKeyId emits NO leaf, which changes both leafCount and root, and it MUST NOT be substituted with a NULL leaf or an empty string (spec section 11.2). A vector that omits this field asserts the no-leaf case.",
+          "type": "string",
+          "minLength": 1
+        },
+        "recordFile": { "type": "string" },
+        "masterSaltHex": {
+          "description": "OPTIONAL, and optional on principle rather than by oversight. Decision D4 is OPEN: under D4a every salt is HMAC-derived from a per-record masterSalt, and under D4b (dogtag's stored per-leaf salts) NO masterSalt EXISTS. Requiring it here would make the three mandatory class-10 vectors inexpressible under D4b and would decide D4 from inside the corpus - the same foreclosure that was removed from the envelope, recurring one file over. See the standing rule in docs/conformance-corpus.md section 1.2. When present it expresses the section 7 derivation compactly; when absent the vector asserts the same root under whatever salt strategy produced it, and the per-leaf salts live in the referenced record file. CONTRAST saltVector.masterSaltHex and unlinkabilitySide.masterSaltHex, which stay REQUIRED: those two TEST the derivation rather than presume it, so masterSalt is their subject and not an assumption.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "recordId": { "type": "string" },
+        "leafCount": {
+          "description": "The UNION count: the record's own leaves plus the 4 always-emitted reserved leaves, plus 1 when issuerKeyId is present. The floor is 5, because a record contributing zero leaves of its own MUST be rejected at issuance (spec section 3.3).",
+          "type": "integer",
+          "minimum": 5
+        },
+        "root": { "$ref": "#/$defs/hex32" }
+      }
+    },
+
+    "unlinkabilityVector": {
+      "description": "Class 12. Two records sharing a path AND a value, built with different masterSalt values, MUST produce different leaf hashes for that path. This is the ONLY vector class that catches an implementation deriving masterSalt deterministically for reproducible reissuance - a violation invisible to every other class, because each record verifies perfectly on its own (spec section 7).",
+      "type": "object",
+      "required": ["name", "class", "segments", "tag", "recordA", "recordB", "expectDistinct"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "segments": { "$ref": "#/$defs/segments" },
+        "tag": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "value": {},
+        "recordA": { "$ref": "#/$defs/unlinkabilitySide" },
+        "recordB": { "$ref": "#/$defs/unlinkabilitySide" },
+        "expectDistinct": { "const": true }
+      }
+    },
+
+    "unlinkabilitySide": {
+      "type": "object",
+      "description": "One side of a class-12 unlinkability pair. masterSaltHex is REQUIRED here and that is correct: class 12 is the class where master-salt FRESHNESS IS the assertion, so the value is the subject of the test rather than an assumption. Do not relax it to match recordVector.",
+      "required": ["masterSaltHex", "recordId", "leafHash"],
+      "additionalProperties": false,
+      "properties": {
+        "masterSaltHex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "recordId": { "type": "string" },
+        "leafHash": { "$ref": "#/$defs/hex32" }
+      }
+    },
+
+    "envelopeVector": {
+      "description": "Classes 13-17: envelope and record-level invariants that JSON Schema alone cannot express, notably the minimum-disclosure floor (class 14), the reserved-namespace guard (class 15, which tests the NFC-normalized key of the FIRST SEGMENT for the prefix 'roax.' and is NOT a display-path test - see spec section 11.2), and the prohibition on a disclosed copy carrying a withheld leaf's salt (class 17).",
+      "type": "object",
+      "required": ["name", "class", "envelopeFile", "expectAccept"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "envelopeFile": { "type": "string" },
+        "expectAccept": { "type": "boolean" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}
