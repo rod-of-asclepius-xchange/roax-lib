@@ -191,8 +191,12 @@ not been changed here because that is a specification decision.
 ## Documentation conventions in force here
 
 - No em dashes. Use a plain hyphen.
-- In long Markdown, put each full sentence on its own line. Every document here follows this, and
-  it keeps diffs readable when a single sentence changes.
+- In long Markdown, put each full sentence on its own line.
+  It keeps diffs readable when a single sentence changes.
+  This is the target rather than a description of the repository as it stands.
+  The files here are currently hard-wrapped at roughly 100 columns and put several sentences on a line, so adoption is incremental.
+  Hold new and substantially rewritten prose to the convention.
+  Do not reflow a file wholesale as a side effect of an unrelated change, because the cosmetic diff buries the real one.
 - **Every normative claim carries a citation:** specification name, version and section for
   standards; file and line for code. Where something is inferred rather than confirmed, the text
   says so in the sentence. Keep this - the documents are written to be checkable rather than
