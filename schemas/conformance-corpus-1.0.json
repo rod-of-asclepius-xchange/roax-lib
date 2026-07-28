@@ -46,10 +46,10 @@
     "hex32": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "name": { "type": "string", "minLength": 1 },
     "classRef": {
-      "description": "Which numbered class in docs/conformance-corpus.md this vector discharges. Every class must be reachable from at least one vector; a class with no vectors is a coverage gap and the corpus build MUST report it.",
+      "description": "Which numbered class in docs/conformance-corpus.md this vector discharges. Every class must be reachable from at least one vector; a class with no vectors is a coverage gap and the corpus build MUST report it. The maximum tracks the class count stated in section 3 of that document and MUST move with it.",
       "type": "integer",
       "minimum": 1,
-      "maximum": 16
+      "maximum": 17
     },
 
     "segments": {
@@ -296,7 +296,7 @@
     },
 
     "envelopeVector": {
-      "description": "Classes 13-16: envelope and record-level invariants that JSON Schema alone cannot express, notably the minimum-disclosure floor (class 14) and the reserved-prefix guard (class 15).",
+      "description": "Classes 13-17: envelope and record-level invariants that JSON Schema alone cannot express, notably the minimum-disclosure floor (class 14), the reserved FIRST-SEGMENT guard (class 15, which is a guard on decoded segments and NOT a display-path prefix test - see spec section 11.2), and the prohibition on a disclosed copy carrying a withheld leaf's salt (class 17).",
       "type": "object",
       "required": ["name", "class", "envelopeFile", "expectAccept"],
       "additionalProperties": false,

@@ -78,12 +78,12 @@ one author cannot catch it.** So gate 3 is a release gate, not a caveat.
 
 ## 3. Mandatory vector classes
 
-**Sixteen classes.** A class with no vectors is a coverage gap and the corpus build MUST report it
+**Seventeen classes.** A class with no vectors is a coverage gap and the corpus build MUST report it
 rather than passing silently.
 
 The count is stated because a gap check built off it is the intended use, and a stale count means
 the highest-numbered class is skipped silently. `schemas/conformance-corpus-1.0.json` sets the
-`classRef` maximum to 16 to match.
+`classRef` maximum to 17 to match.
 
 ### Class 1 - FHIR decimals
 
@@ -154,6 +154,12 @@ MUST be rejected.
 ### Class 7 - type tags
 
 `"5"` versus `5` versus `5.0`; `"true"` versus `true`.
+
+**Plus the vector class 1 delegates here.** `1e2` bound as DECIMAL and `100` bound as INTEGER MUST
+be different leaves, even though both encode to the digits `100`, because the type tag differs and
+the tag is inside the leaf preimage (specification section 8). This is the pair that proves the tag
+is doing work independently of the encoded value, which is why it belongs in this class rather than
+in class 1's equality table. The seed material at section 4 already exercises it.
 
 ### Class 8 - tree shape
 
@@ -259,6 +265,31 @@ whose NFC changed between Unicode versions has been identified and confirmed for
 so is outstanding work, and until it is done this class detects version *mismatch* by declaration
 rather than by demonstration.
 
+### Class 17 - a disclosed copy MUST NOT leak a withheld leaf's salt
+
+A disclosed copy carries the salt of every leaf it reveals and the salt of **no other leaf**
+(specification sections 10 and 10.1).
+
+| Vector | Expected |
+|---|---|
+| A disclosed copy carrying exactly the salts of its revealed leaves | **Accept** |
+| The same copy with one withheld leaf's salt added | **Reject** |
+| A disclosed copy carrying a `salts` array, the full-copy field | **Reject** |
+| A disclosed copy carrying a `masterSalt` field | **Reject** |
+| A full copy whose `salts` array omits one leaf of the union | **Reject** |
+| A full copy whose `salts` array length does not equal `leafCount` | **Reject** |
+
+**This class exists because the violation verifies correctly.** Extra salts do not change any leaf
+hash, so an implementation that ships every salt in a disclosed copy produces an envelope that
+passes the root check, passes the inclusion proofs and passes every other class in this list, while
+leaking every withheld field to a dictionary search. There is no failing assertion anywhere else to
+catch it.
+
+`schemas/envelope-1.0.json` closes most of this structurally by forbidding `salts` alongside
+`disclosure`, which leaves no place to put a withheld leaf's salt. The rows this class still has to
+carry in code are the count relationships in the last two rows, which JSON Schema cannot express
+because they relate `salts.length`, `leafCount` and the actual leaf set to each other.
+
 ## 4. Seed material that already exists
 
 The canonicalization research built a 26-leaf adversarial corpus covering classes 1, 2, 4, 5, 6 and
@@ -288,7 +319,10 @@ Two caveats an implementer must know before treating that work as a corpus:
 2. Those implementations are ~250-350 lines each, with no error taxonomy, no streaming and no schema
    binding. They are specification aids, not libraries.
 
-Classes 3, 8, 9, 10, 11, 12, 13, 14, 15 and 16 are not covered by that seed and are new work.
+Classes 3, 8, 9, 10, 11, 12, 13, 14, 15, 16 and 17 are not covered by that seed and are new work.
+
+The one partial exception is the pair class 1 delegates to class 7, `1e2` as DECIMAL against `100`
+as INTEGER, which the seed already discriminates - see the fourth line of the block above.
 
 ## 5. Appendix - the JCS demonstration script
 

@@ -293,8 +293,22 @@ into the preimage (specification section 7).
 
 | Option | For | Against |
 |---|---|---|
-| **D4a. Derived from one master salt** | Saves about 1.4 KB on an 87-leaf record and far more on a large FHIR bundle. One 32-byte secret instead of 16 bytes per leaf. | Has a sharp failure mode that D4b simply does not have. |
-| **D4b. dogtag's stored 16 bytes per leaf** | No shared secret exists, so there is nothing to reuse and no unlinkability failure mode at all. A holder can disclose a leaf without the issuer regenerating a salt. | Size. |
+| **D4a. Derived from one master salt** | The issuer holds one 32-byte secret per record instead of 16 bytes per leaf, so it stores, backs up and reissues from about 1.4 KB less on an 87-leaf record and far less on a large FHIR bundle. | Has a sharp failure mode that D4b simply does not have. |
+| **D4b. dogtag's stored 16 bytes per leaf** | No shared secret exists, so there is nothing to reuse and no unlinkability failure mode at all. A holder can disclose a leaf without the issuer regenerating a salt. | Issuer-side storage size. |
+
+**The size argument is about issuer storage, not envelope size, and that distinction was sharpened
+while closing a review finding.** Specification section 7.3 requires a **full copy to carry the salt
+of every leaf** under either option, because a full copy is otherwise unverifiable: the verifier
+needs `salt(path)` for each leaf and the record body has none. So a full copy is the same size under
+D4a and D4b, and a disclosed copy is small under both because it carries only the salts of the
+leaves it reveals.
+
+**The envelope format is deliberately agnostic here, so that this decision stays genuinely open.**
+An earlier draft of section 7.3 required a full copy to carry `masterSalt`. That was withdrawn: it
+is unimplementable under D4b, where no `masterSalt` exists, so a schema would have foreclosed this
+decision by accident. Carrying per-leaf salts works under both - HMAC-derived and written out under
+D4a, independently random and written out under D4b - and the envelope bytes are identical either
+way. Nothing in `schemas/envelope-1.0.json` should be read as a ruling on D4.
 
 **The sharp failure mode, stated precisely.** Under D4a, reusing `masterSalt` across two records for
 the same patient makes every shared path with a shared value produce the *same* leaf hash in both, so
