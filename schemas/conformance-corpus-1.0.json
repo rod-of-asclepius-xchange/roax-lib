@@ -221,12 +221,11 @@
     },
 
     "recordVector": {
-      "description": "A whole record with its root. The three real MOH samples are mandatory (class 10). Records are referenced by file rather than inlined, so that no reference schema or sample is copied into this repository. EVERY input to the root that the protocol REQUIRES is required here, because the leaf set is the UNION of the record's leaves and the reserved roax.* leaves (spec sections 3.3 and 11.2): recordType, schemaVersion, recordId and issuerId are reserved-leaf values and therefore change the root, so a vector omitting any of them is not reproducible and the class-10 assertion would be untestable. The top-level canon and hashAlg supply the rest, via the domain string. The per-leaf salts are the remaining input and are not derivable from anything in this vector (spec section 7), so they come from the referenced record or envelope file, or from saltsFile.",
+      "description": "A whole record with its root. The three real MOH samples are mandatory (class 10). Records are referenced by file rather than inlined, so that no reference schema or sample is copied into this repository. EVERY input to the root that the protocol REQUIRES is required here, because the leaf set is the UNION of the record's leaves and the reserved roax.* leaves (spec sections 3.3 and 11.2): recordType, schemaVersion, recordId and issuerId are reserved-leaf values and therefore change the root, so a vector omitting any of them is not reproducible and the class-10 assertion would be untestable. The top-level canon and hashAlg supply the rest, via the domain string. THE PER-LEAF SALTS ARE THE REMAINING INPUT AND THE oneOf BELOW MAKES THEM STRUCTURALLY UNAVOIDABLE: decision D4 is ruled D4b, so every salt is an independent random draw that nothing can re-derive (spec section 7), and a vector that names only a bare record file asserts a root no runner can recompute. Under the deleted D4a construction a masterSaltHex plus recordId sufficed, which is why this used to be expressible as an optional field; it is not any more.",
       "type": "object",
       "required": [
         "name",
         "class",
-        "recordFile",
         "recordId",
         "recordType",
         "schemaVersion",
@@ -257,9 +256,16 @@
           "type": "string",
           "minLength": 1
         },
-        "recordFile": { "type": "string" },
+        "recordFile": {
+          "description": "A BARE record file: the record body alone, carrying no salts. Usable only alongside saltsFile - see the oneOf below.",
+          "type": "string"
+        },
+        "envelopeFile": {
+          "description": "A FULL envelope copy in the shape schemas/envelope-1.0.json defines, which carries the record body and its `salts` array together. A full copy MUST carry the salt of every leaf of the union (spec section 7.3), so this one file is self-sufficient and saltsFile would be a second, contradictable source of the same values.",
+          "type": "string"
+        },
         "saltsFile": {
-          "description": "OPTIONAL. The file carrying the per-leaf salts this vector's root was computed with, one per leaf of the union, in the `salts` shape schemas/envelope-1.0.json defines. Needed to reproduce a root from a bare record file, since decision D4 is ruled D4b and every salt is an independent random draw that nothing can re-derive (spec section 7). Omit when the referenced envelope or record file already carries them. This field replaced masterSaltHex, which expressed a derivation that no longer exists.",
+          "description": "The file carrying the per-leaf salts this vector's root was computed with, one per leaf of the union, in the `salts` shape schemas/envelope-1.0.json defines. REQUIRED alongside recordFile rather than optional, because a bare record file plus a root is not a reproducible assertion: every salt is an independent random draw that nothing can re-derive (spec section 7, decision D4 ruled D4b). This field replaced masterSaltHex, which expressed a derivation that no longer exists.",
           "type": "string"
         },
         "recordId": { "type": "string" },
@@ -269,20 +275,52 @@
           "minimum": 5
         },
         "root": { "$ref": "#/$defs/hex32" }
-      }
+      },
+      "oneOf": [
+        {
+          "description": "A bare record file together with the salt set its root was computed under. Both are required: neither alone determines the root.",
+          "required": ["recordFile", "saltsFile"],
+          "properties": { "recordFile": true, "saltsFile": true, "envelopeFile": false }
+        },
+        {
+          "description": "A full envelope copy, which already carries both. saltsFile is forbidden here rather than merely unnecessary: two carriers of the same salts can disagree, and a runner has no rule for which one the asserted root was computed under.",
+          "required": ["envelopeFile"],
+          "properties": { "envelopeFile": true, "recordFile": false, "saltsFile": false }
+        }
+      ]
     },
 
     "unlinkabilityVector": {
-      "description": "Class 12. Two records for the same subject, sharing a path AND a value at that path, MUST produce DIFFERENT leaf hashes for that path (spec section 7). This is the only vector class that catches an implementation whose salts are not independent, and that violation is invisible to every other class because each record verifies perfectly on its own. It catches three reachable mistakes: a salt derived deterministically so that reissuance reproduces the same root, which reads like a feature; one draw reused across the leaves of a record; and one draw reused across records, which is the patient-linkage failure itself. THIS VECTOR ASSERTS A RELATION RATHER THAN A PINNED VALUE, and that is forced by the ruling rather than a shortcut: decision D4 is ruled D4b, so the salts are independently random and no fixed expectation can exist for what the implementation under test must draw freshly. The runner performs `trials` independent issuances of the same (segments, tag, value) and asserts that all resulting salts differ and all resulting leaf hashes differ. HONEST LIMIT: this detects a DETERMINISTIC or REUSED salt. It does NOT detect a weak or predictable CSPRNG - an implementation drawing 16 bytes from a poorly seeded generator passes every trial while providing far less than the 128 bits spec section 7 requires. No fixed vector file can test a randomness source; that gap belongs to implementation review and is stated in docs/conformance-corpus.md class 12 rather than left for a passing run to imply.",
+      "description": "Class 12. Two records for the same subject, sharing a path AND a value at that path, MUST produce DIFFERENT leaf hashes for that path (spec section 7). This is the only vector class that catches an implementation whose salts are not independent, and that violation is invisible to every other class because each record verifies perfectly on its own. It has to catch three reachable mistakes, and the three assertions below map onto them one for one: a salt derived deterministically so that reissuance reproduces the same root, which reads like a feature; ONE DRAW REUSED ACROSS THE LEAVES OF A RECORD, which needs two paths compared WITHIN a single issuance and is why `leaves` carries at least two entries rather than one `segments`; and one draw reused across records, which is the patient-linkage failure itself. THESE VECTORS ASSERT RELATIONS RATHER THAN PINNED VALUES, and that is forced by the ruling rather than a shortcut: decision D4 is ruled D4b, so the salts are independently random and no fixed expectation can exist for what the implementation under test must draw freshly. HONEST LIMIT: this detects a DETERMINISTIC or REUSED salt. It does NOT detect a weak or predictable CSPRNG - an implementation drawing 16 bytes from a poorly seeded generator passes every trial while providing far less than the 128 bits spec section 7 requires. No fixed vector file can test a randomness source; that gap belongs to implementation review and is stated in docs/conformance-corpus.md class 12 rather than left for a passing run to imply.",
       "type": "object",
-      "required": ["name", "class", "segments", "tag", "trials", "expectDistinctSalts", "expectDistinctLeafHashes"],
+      "required": [
+        "name",
+        "class",
+        "leaves",
+        "trials",
+        "expectDistinctSaltsWithinIssuance",
+        "expectDistinctSaltsAcrossIssuances",
+        "expectDistinctLeafHashesAcrossIssuances"
+      ],
       "additionalProperties": false,
       "properties": {
         "name": { "$ref": "#/$defs/name" },
         "class": { "$ref": "#/$defs/classRef" },
-        "segments": { "$ref": "#/$defs/segments" },
-        "tag": { "$ref": "#/$defs/tagRef" },
-        "value": {},
+        "leaves": {
+          "description": "The leaves to issue in EVERY trial. AT LEAST TWO, at DIFFERENT paths, and that floor is the point of the field: an implementation that draws one salt per RECORD and reuses it across every leaf still produces a different salt at any single path in each trial, so a one-path vector passes it while the unlinkability property decision D4b was chosen for is destroyed. Two paths in one issuance are the smallest shape that observes the difference.",
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["segments", "tag"],
+            "additionalProperties": false,
+            "properties": {
+              "segments": { "$ref": "#/$defs/segments" },
+              "tag": { "$ref": "#/$defs/tagRef" },
+              "value": { "description": "Carrier form, as in encodeValueVector: numbers are STRINGS. Give the SAME value at the same path in every trial, because the class is about two records that share a path and a value." }
+            }
+          }
+        },
         "recordIds": {
           "description": "OPTIONAL. The record identifiers to issue the trials under, when the vector wants to pin that a SHARED identifier still yields different leaf hashes. Under decision D4b the record identifier is not an input to any salt or preimage, so this changes nothing about the expected outcome; it exists so a vector can state that explicitly, because the deleted derived-salt construction did fold it in and a reader who knows that construction would otherwise wonder.",
           "type": "array",
@@ -293,15 +331,25 @@
           "type": "integer",
           "minimum": 2
         },
-        "expectDistinctSalts": { "const": true },
-        "expectDistinctLeafHashes": { "const": true }
+        "expectDistinctSaltsWithinIssuance": {
+          "description": "Within EACH single trial, the salts drawn for the `leaves` entries MUST all differ. This is the assertion that catches one draw reused across the leaves of a record (spec section 7, which requires each salt to be drawn independently and MUST NOT be reused across leaves).",
+          "const": true
+        },
+        "expectDistinctSaltsAcrossIssuances": {
+          "description": "At EACH path, the salt drawn in every trial MUST differ from the salt drawn at that same path in every other trial. This is the assertion that catches a deterministic salt and a salt reused across records.",
+          "const": true
+        },
+        "expectDistinctLeafHashesAcrossIssuances": {
+          "description": "At EACH path, the leaf hash MUST differ across trials. This is the class's stated property expressed on the value a verifier actually sees. THERE IS DELIBERATELY NO within-issuance leaf-hash assertion: two leaves at different paths have different encoded paths inside the leaf preimage (spec section 8), so their hashes differ whether or not the salts do, and asserting it would read as coverage it is not.",
+          "const": true
+        }
       }
     },
 
     "normalizationVector": {
       "description": "Class 19. One record whose string differs before and after NFC, carried in BOTH forms, asserting that the two produce the SAME root (spec section 6.1, decision D12 ruled D12a). Class 4 already asserts NFC against NFD at LEAF level in values and keys; this class asserts the property of the whole pipeline over the union of spec section 3.3, which is where the routes a leaf-level vector misses actually are - a key compared before normalization, a reserved-leaf value written straight from the envelope, a path segment re-encoded from a cached form. THE ASSERTION IS EQUALITY, so the vector is complete without a pinned root: what it fixes is that both forms yield one value and that it is the same one. The optional root pins that value once the corpus file exists, as a regression against normalization silently changing. Use a string whose NFC form is stable across recent Unicode versions - the version pin is class 16's subject, and class 16 is explicit about what it can and cannot demonstrate.",
       "type": "object",
-      "required": ["name", "class", "site", "recordFileNFD", "recordFileNFC", "expectSameRoot"],
+      "required": ["name", "class", "site", "recordFileNFD", "recordFileNFC", "saltsFile", "expectSameRoot"],
       "additionalProperties": false,
       "properties": {
         "name": { "$ref": "#/$defs/name" },
@@ -313,7 +361,7 @@
         "recordFileNFD": { "type": "string" },
         "recordFileNFC": { "type": "string" },
         "saltsFile": {
-          "description": "The per-leaf salts both forms are computed under. REQUIRED IN PRACTICE for this class even though the schema leaves it optional: the two forms must share one salt set, or the roots differ for a reason that has nothing to do with normalization and the vector asserts nothing.",
+          "description": "The per-leaf salts both forms are computed under, in the `salts` shape schemas/envelope-1.0.json defines. REQUIRED, and required structurally rather than as advice, for the same reason recordVector requires a salt source: under decision D4b every salt is an independent random draw (spec section 7), so two issuances of the two forms produce different roots for a reason that has nothing to do with normalization, and expectSameRoot would then assert nothing. The two forms MUST share one salt set.",
           "type": "string"
         },
         "expectSameRoot": { "const": true },
@@ -335,9 +383,10 @@
         "envelopeFile": { "type": "string" },
         "expectAccept": { "type": "boolean" },
         "verifierConfig": {
-          "description": "What the VERIFIER is configured with for this vector. Class 18 vectors are the only ones whose outcome depends on this rather than on the envelope alone, which is the whole point of the class: it fails an implementation that takes authority from a field in the document instead. Without this block the expected outcome of such a vector is not determined by the file. Omit for every other class. Decision D8 is ruled with this class attached to it, because a normative sentence alone was demonstrably not enough - dogtag had the equivalent understanding written down and still shipped the documentStore bug (spec section 11.3).",
+          "description": "What the VERIFIER is configured with for this vector. Class 18 vectors are the only ones whose outcome depends on this rather than on the envelope alone, which is the whole point of the class: it fails an implementation that takes authority from a field in the document instead. Without this block the expected outcome of such a vector is not determined by the file, so the if/then/else on this definition REQUIRES it at class 18 and FORBIDS it everywhere else - it used to be optional with that requirement written only in this sentence, which made the check on the very class added to catch outside-the-root trust one that could not fail. THE FOUR MEMBERS ANY VERIFIER HAS ARE ALL REQUIRED - the anchored root, the anchored algorithm, the allow-list and the configured registry - which guards the same silently-vacuous-vector failure as the neighbouring typeMapVector's three-branch oneOf but more tightly: there the vector needs exactly one of three assertions, whereas a class-18 verifier configuration is under-determined unless every member is stated. The upper-edge ACCEPT vector of docs/conformance-corpus.md class 18 is the proof of that - it accepts only if the anchored pair matches, the algorithm is on the allow-list, and the registry read is the verifier's own, so a partial block would let it pass or fail for a reason the file did not fix. Decision D8 is ruled with this class attached to it, because a normative sentence alone was demonstrably not enough - dogtag had the equivalent understanding written down and still shipped the documentStore bug (spec section 11.3).",
           "type": "object",
           "additionalProperties": false,
+          "required": ["anchoredRoot", "anchoredHashAlg", "hashAlgAllowList", "registryAddress"],
           "properties": {
             "anchoredRoot": {
               "description": "The root the verifier's own anchoring registry records. Authority for the root comes from here, never from the envelope.",
@@ -348,18 +397,37 @@
               "enum": ["SHA-256", "Poseidon-BN254"]
             },
             "hashAlgAllowList": {
-              "description": "The algorithms this verifier is configured to accept. Closes the retired-algorithm case that the registry alone does not (spec section 7.4, H3): a vector whose algorithm is registered but absent from this list MUST be rejected.",
+              "description": "The algorithms this verifier is configured to accept. Closes the retired-algorithm case that the registry alone does not (spec section 7.4, H3): a vector whose algorithm is registered but absent from this list MUST be rejected. A DISCRIMINATING H3 vector sets this to [\"Poseidon-BN254\"] against a SHA-256 envelope, because that is the only shape in which an implementation with no allow-list at all fails; a Poseidon envelope is rejected anyway for having no defined construction (spec section 7.4), so a vector built the other way round records a pass without an allow-list existing. Minimum one entry: a verifier configured with an empty list rejects everything, and every vector run against it would then pass for that reason instead of the one it names.",
               "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
               "items": { "enum": ["SHA-256", "Poseidon-BN254"] }
             },
             "registryAddress": {
               "description": "The anchoring registry the verifier is configured with. An envelope naming a DIFFERENT registry in its anchor block MUST NOT cause the verifier to read that one - this is the dogtag documentStore bug in this design's shape. An absent anchor block MUST NOT make an otherwise verifiable record unverifiable, which is the accept vector at the upper edge of class 18.",
               "type": "string"
             },
-            "registryChainId": { "type": "integer", "minimum": 0 }
+            "registryChainId": {
+              "description": "OPTIONAL, and the one member of this block that is: a registry on a chain without a numeric identifier has none to state, whereas the other four exist for every verifier. The class-18 vector whose envelope names a registry the verifier is not configured with SHOULD state it when the registry has one, because the anchor block carries both an address and a chain identifier and a verifier must ignore both.",
+              "type": "integer",
+              "minimum": 0
+            }
           }
         },
         "reason": { "type": "string" }
+      },
+      "if": {
+        "properties": { "class": { "const": 18 } },
+        "required": ["class"]
+      },
+      "then": {
+        "description": "Class 18 is the outside-the-root authority class, so the verifier's own configuration is half of what determines the outcome and the file must state it.",
+        "required": ["verifierConfig"],
+        "properties": { "verifierConfig": true }
+      },
+      "else": {
+        "description": "Every other class in 13-17 is determined by the envelope alone, so a verifierConfig here would be inert and would suggest the outcome turns on something it does not.",
+        "properties": { "verifierConfig": false }
       }
     }
   }
