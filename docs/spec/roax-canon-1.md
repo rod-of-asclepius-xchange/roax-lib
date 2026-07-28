@@ -112,12 +112,14 @@ carries either form.
   than pretending it is closed here: the registry MUST record the pair `(root, hashAlg)`, and a
   verifier MUST take `hashAlg` from the registry rather than from the envelope.** Section 7.4 shows
   why that is the only one of the three algorithm bindings that actually works.
-- **The type map does not exist yet.** Section 4 establishes that it is REQUIRED and that the
-  design is unsafe without it. Building it is mechanical but it is real work on the critical path,
-  and it is not done. This is the single largest gap between this specification and a working
-  library. Decision D7 is ruled fail-closed, which makes the type map the gate every record passes
-  through rather than a convenience, so section 4.2 states it as a first-class independently
-  versioned issuer-extensible artifact.
+- **Some reference-schema type gaps remain unresolved.** Four base type-map artifacts are published
+  in `type-maps/`, and their exact coverage is reported in `docs/type-maps.md` section 2.
+  The vaccination sample's `dose` and `expiryDateTime`, PDT's 20 endorsed-sample path-kind pairs,
+  FHIR XHTML, FHIR `base64Binary` and null placeholders remain unbound for the reasons documented
+  in `docs/type-maps.md` section 1.
+  Decision D7 requires each of those paths to fail closed rather than receive a syntactic guess, so
+  the affected records remain uncommittable until profile governance or an issuer-scoped extension
+  supplies determining evidence under section 4.2.
 - **No absence proofs, and the capability is deliberately preserved.** Proving "this record asserts
   no allergy" is possible under the leaf ordering chosen in section 9: sorting by encoded path makes
   the tree shape a function of the path set alone, so showing the two adjacent leaves in canonical
@@ -251,12 +253,18 @@ A leaf is produced for every scalar and for every **empty** container.
 
 ```
 flatten(node, path):
-  if node is a map and is empty:        emit (path, EMPTY_OBJECT, -)
+  if node is a map and is empty:        emit (path, typeTag(path, "object"), -)
   if node is a map and is non-empty:    for each key k: flatten(node[k], path ‖ KEY(k))
-  if node is an array and is empty:     emit (path, EMPTY_ARRAY, -)
+  if node is an array and is empty:     emit (path, typeTag(path, "array"), -)
   if node is an array and is non-empty: for each index i: flatten(node[i], path ‖ INDEX(i))
-  otherwise:                            emit (path, typeTag(path, node), node)
+  otherwise:                            emit (path, typeTag(path, jsonKind(node)), node)
 ```
+
+`typeTag` is consulted for every emitted record leaf, including empty containers.
+An object output is tag 7 EMPTY_OBJECT and an array output is tag 6 EMPTY_ARRAY, but only when the
+exact selected map authorizes that structured path and observed kind under section 4.2.
+Assigning tags 6 or 7 before map resolution would let an unknown empty issuer extension bypass
+decision D7's fail-closed rule.
 
 **The leaf set is not the record alone.** It is the union of the reserved leaves and the record
 leaves:
@@ -280,14 +288,14 @@ and it removes the class of bug that OpenAttestation inherits from JavaScript ke
 
 An empty container is a leaf so that removing it changes the root.
 This is a departure from dogtag, which collapses empty array, empty object and explicit null to a
-single leaf (`crates/dogtag-standard-rs/src/flatten.rs:96-115` in the dogtag monorepo - an empty
+single leaf (`dogtag-mono-repo`, `crates/dogtag-standard-rs/src/flatten.rs:96-115` - an empty
 array and an empty object both yield `TypedScalar::Null`, which is also what a genuine null yields).
 Section 14.2 explains why ROAX does not inherit that.
 
 **A record that contributes zero leaves of its own MUST be rejected at issuance rather than
 anchored.** The rejection is on the record's own contribution, because the union above always
-carries the reserved leaves, so the tree itself is never empty: its floor is 5 leaves, being the
-four always-emitted reserved leaves plus at least one from the record. Section 11.2 gives the
+carries the reserved leaves, so the tree itself is never empty: its floor is 6 leaves, being the
+five always-emitted reserved leaves plus at least one from the record. Section 11.2 gives the
 reserved set and states which one is conditional.
 
 ---
@@ -321,33 +329,61 @@ shipped vaccination sample. Under syntactic inference that is INTEGER; an issuer
 
 ### 4.2 Requirements on the type map
 
-- The type map is a **data file**, versioned with this specification and part of the conformance
-  corpus (see `docs/conformance-corpus.md`, class 11).
-- It is keyed by **(path pattern, observed JSON kind)**, not by path alone. Polymorphic fields are
-  already present in the reference records: in the shipped vaccination sample,
-  `fhirBundle.entry[0].identifier[0].type` is the string `"PPN"` while `identifier[1].type` is the
-  object `{ text: "NRIC" }`. A map keyed by path alone cannot express that.
-- It MUST cover the **union of three distinct schema scopes**, not one. The PDT and recovery
-  healthcerts reference the lite FHIR schema for `fhirBundle`; the vaccination healthcert
-  references neither and defines its `fhirBundle` inline against its own seven definitions. The
-  lite schema omits `Immunization` and `ImmunizationRecommendation` entirely while the full schema
-  has them. See `docs/profiles/` for the per-family detail.
-- **Unknown paths MUST fail closed.** A path the type map does not cover is an error, not a guess.
-  Defaulting to STRING or to the observed JSON kind means two libraries with different type-map
-  versions produce different roots silently, which is precisely the failure this project exists to
-  avoid. This is decision D7 and it is **ruled**: fail closed, permanently.
-  `schemas/type-map-1.0.json` therefore provides no default-tag or fallback field, and adding one
-  would be a violation rather than a convenience.
+- The type map is an immutable data artifact in `type-maps/`, with its format defined by
+  `schemas/type-map-artifact-1.0.json` and its exact identities listed in
+  `type-maps/registry-1.0.0.json`.
+- The operative matcher is a structured-path DFA over KEY and INDEX segments, followed by an output
+  selected by observed JSON kind, as defined in `docs/type-maps.md` section 3.
+  It MUST NOT parse or match a display path, because section 5.2 makes that representation
+  non-authoritative.
+- The four base artifacts cover different schema scopes.
+  PDT and recovery include the lite FHIR Bundle reached through their pinned schema files,
+  vaccination preserves its inline flattened pseudo-FHIR definitions, and the FHIR artifact starts
+  at the full reference schema's 146-resource root union, as audited in
+  `docs/type-maps.md` section 2.
+- The exact map is selected by `(recordType, schemaVersion, typeMap.id)`.
+  The first two values MUST equal the artifact fields exactly, and the fetched artifact bytes MUST
+  reproduce `typeMap.id` under the content-ID construction in `docs/type-maps.md` section 2.1.
+  The identified bytes MUST decode as strict UTF-8 and MUST contain neither duplicate JSON object
+  member names nor unpaired surrogate escapes after escape decoding, under section 3.2 and
+  `docs/type-maps.md` section 2.1.
+  `typeMap.version` MUST equal the artifact's `typeMapVersion`, but semver is metadata and MUST NOT
+  be used to choose a latest or compatible artifact, as specified in
+  `docs/type-maps.md` sections 4 and 5.2.
+- **Unknown transitions and missing observed-kind outputs MUST fail closed.**
+  A resolver MUST NOT search another installed map, infer from JSON syntax or apply a fallback tag,
+  under ruled decision D7 and `docs/type-maps.md` section 3.
+- Complete profile-schema validation MUST precede map resolution.
+  The DFA authorizes paths and supplies tags, but it does not replace sibling constraints or
+  resource discriminators in the applicable profile schema, as stated in
+  `docs/type-maps.md` section 3.
 
 #### The type map is an artifact, not a lookup table
 
 Fail-closed makes the type map the gate every record passes through, so its lifecycle is part of the
 design rather than an operational detail.
 
-> **Normative:** the type map is a first-class, independently versioned artifact with a defined
-> extension path. Extending it is a versioned change to `typeMapVersion`, and an extension MUST be
-> **additive**: an entry that retags a path the map already covers changes the root of every
-> already-issued record reaching that path, which section 12.2 forbids.
+> **Normative:** the type map is a first-class, independently versioned artifact with the extension
+> path defined in `docs/type-maps.md` section 5.
+> A child MUST name one exact parent ID, carry the complete effective DFA, narrow scope to named
+> issuer identities, add only selectors with no inherited output under declared extension points, and
+> leave every inherited transition and output logically unchanged.
+> An overlapping or retagging child MUST be rejected, because section 12.2 requires an
+> already-issued record to keep resolving through its original exact artifact forever.
+
+An extension-point prefix names one structured region.
+It permits an exact selector only when the parent has no output for that observed JSON kind, which
+covers both unknown-key subtrees and known but unresolved outputs without permitting an override,
+as defined in `docs/type-maps.md` section 5.
+The added path MUST still pass complete base-profile validation under this section.
+The issuer MUST publish schema or profile evidence that determines each new tag, because permissive
+`additionalProperties` establishes only that a value is allowed and does not determine its semantic
+type under ruled decision D7.
+
+Two issuers may extend independently from the same parent and use the same semver.
+Their content IDs and issuer scopes distinguish the branches, neither version wins, and a conflicting
+pair cannot be merged without a profile-governance ruling, under
+`docs/type-maps.md` sections 5.1 and 5.2.
 
 **The operational cost is real and lands hardest on PDT**, and it is recorded rather than smoothed
 over. The PDT base object permits additional properties, so a legitimate PDT record may carry fields
@@ -360,13 +396,16 @@ advisory.
 
 ### 4.3 Status
 
-**The type map has not been built.** Section 2.2 records this as the largest gap, and the D7 ruling
-makes building it an explicit deliverable rather than a footnote: under fail-closed there is no
-degraded mode in which a library works without one.
-What has been established is that it is necessary (this section), tractable (the lite FHIR schema
-is closed - every one of its 66 `additionalProperties` occurrences is `false`), and roughly sized
-(85 lite definitions, 50 `Extension.value[x]` variants, the vaccination healthcert's own seven
-definitions, plus whatever slice of the 680-definition full schema is in scope).
+**Four base maps are published at `typeMapVersion: 1.0.0`.**
+They contain 3,440 executable DFA states and 3,398 resolved path-kind outputs in total, with
+per-profile counts, source-audit counts and exact content IDs in
+`docs/type-maps.md` section 2.
+
+The gap list remains part of the deliverable rather than a reason to guess.
+The vaccination sample cannot be issued because two paths are unresolved, and the PDT endorsed
+sample cannot be issued against the base map because 20 path-kind pairs are outside the base schema.
+FHIR XHTML, `base64Binary` and null-placeholder semantics also remain unbound as documented in
+`docs/type-maps.md` section 1.
 
 ---
 
@@ -603,9 +642,13 @@ reproducible demonstration.
 `BYTES` carries the bytes themselves.
 Where a record embeds base64 (`logo`, `attachments[].data`), the profile document states whether
 the field is bound as `STRING` over the base64 text or as `BYTES` over the decoded content.
-**Binding it as `STRING` is what every version-1 profile does**, and that is unchanged by the D9
-ruling: the base64 text is normalized to NFC and hashed like any other string, so no base64 rule
-enters the digest at all for a v1 record.
+The explicitly typed healthcert blob fields bind as `STRING`, so their base64 text is normalized to
+NFC and hashed like any other string and no base64 rule enters their digest.
+FHIR `base64Binary` is the version-1 exception: its six full-FHIR and four lite-FHIR source slots
+remain unresolved between STRING over the text and BYTES over the decoded bytes, so no current map
+binds those slots (`docs/type-maps.md` sections 1.3 and 2.2).
+That unresolved choice and the healthcert STRING bindings are unchanged by the D9 ruling, which
+adds BLOB_REF as a carrier selected by no version-1 profile (section 6.5).
 
 `BYTES` and `BLOB_REF` (section 6.5) both have to decode that text, so one base64 form is pinned
 now rather than left to be discovered later.
@@ -786,7 +829,7 @@ same answer for this same reason (section 14.2).
 is no longer an input to anything a verifier computes. `roax.recordId` remains a reserved leaf and
 remains in the minimum-disclosure floor, but it is now mandatory **by policy** rather than **by
 arithmetic**: a verifier that does not receive it can still verify every leaf it did receive.
-Sections 10.2 and 11.2 state which of the four floor paths are which.
+Sections 10.2 and 11.2 state which of the five floor paths are arithmetic and which are policy.
 
 **And one hazard genuinely disappears rather than moving.** Under derivation, a holder given
 `salt(A)` was safe from deriving `salt(B)` only because HMAC is one-way. Under independent salts the
@@ -818,8 +861,8 @@ Worked from `fhirBundle.entry[0].identifier[0].type`, a real path in the vaccina
   total                                          ~153 bytes, of which 96 are path and 32 are salt
 ```
 
-At about 153 bytes an entry, the 92-leaf vaccination envelope of section 11.1 gains roughly
-**13.8 KB**. That is comparable to the same record's own 14,314-byte embedded logo, which
+At about 153 bytes an entry, the 93-leaf vaccination envelope of section 11.1 gains roughly
+**13.9 KB**. That is comparable to the same record's own 14,314-byte embedded logo, which
 `docs/decisions.md` D9 tabulates to the byte, and it is the largest single format cost this
 document imposes.
 
@@ -1027,7 +1070,7 @@ A record that contributes zero leaves of its own MUST be rejected at issuance ra
 
 **`MTH([])` is unreachable in a conforming implementation**, and is stated only so the function is
 total. The leaf set is the union of section 3.3, which always carries the reserved leaves of section
-11.2, so `L` is never empty and its length is never below 5. The branch is kept rather than deleted
+11.2, so `L` is never empty and its length is never below 6. The branch is kept rather than deleted
 because a total function is easier to port than one with an undefined case, and because an
 implementation that reaches it has a defect worth failing loudly on rather than an input worth
 hashing.
@@ -1048,7 +1091,7 @@ A proof is verified against `(leaf hash, leaf index, tree size, audit path, root
   Poseidon3 arity/domain split inside `verify_inclusion`. ROAX gets it from the RFC's own domain
   bytes.
 
-  > **The domain separation is what closes it, and only in combination with section 10 step 1.**
+  > **The domain separation is what closes it, and only in combination with section 10 step 2.**
   > Position-binding alone does not: RFC 9162 section 2.1.3.2 takes the tree size as an input, so a
   > verifier handed both a leaf hash and a tree size by the same party can be walked to the genuine
   > root from an internal node. Section 11.1 records that case with its reproduction. What removes it
@@ -1105,14 +1148,26 @@ the verifier computes (section 5.2).
 > could be obtained, and under section 7 no such value exists (section 7.3, rule 3).
 > Section 10.1 gives the attack this prevents.
 
-A verifier:
+The top-level `typeMap` descriptor is a discovery hint under section 11.3.
+Before resolving a record leaf, a verifier MUST fetch the candidate artifact, reproduce its exact
+content ID and compare its `recordType`, opaque `schemaVersion` and `typeMapVersion` to the envelope
+under section 4.2.
+The verifier MUST first verify all five mandatory reserved leaves using the fixed table in section
+11.2, require `roax.typeMap.id` to equal the candidate ID, and require the disclosed issuer identity
+to be a member of `scope.issuerIds` when the artifact has `scope.kind: "issuers"`.
+Only after those proofs succeed may it apply the profile or issuer-scope authority rules in section
+4.2 and use the candidate map for record leaves.
 
-1. re-encodes the path from the structured segments, recomputes the encoded value, and recomputes
-   `leafHash` per section 8 - it MUST NOT trust a caller-supplied leaf hash;
-2. verifies the audit path against `root` per RFC 9162 section 2.1.3.2;
-3. checks `root` against the anchoring layer.
+For each disclosed leaf, a verifier:
 
-Step 1 is not optional and it is where dogtag's most expensive scar lives.
+1. checks a record leaf's tag against the exact selected map under section 4.2, or checks a reserved
+   leaf against the fixed table in section 11.2;
+2. re-encodes the path from the structured segments, recomputes the encoded value, and recomputes
+   `leafHash` per section 8, without trusting a caller-supplied leaf hash;
+3. verifies the audit path against `root` per RFC 9162 section 2.1.3.2;
+4. checks `root` against the anchoring layer under section 11.3.
+
+The leaf-hash recomputation step is not optional and it is where dogtag's most expensive scar lives.
 dogtag documents `process_proof` as "a fold **primitive**, NOT a membership check. It trusts the
 `leaf_hash` you hand it, so on its own it proves nothing" (`merkle.rs:86-91`), and its
 `check_integrity` rebuilds the whole tree rather than trusting a fold
@@ -1180,19 +1235,21 @@ Neither source research report specifies this; it comes from dogtag.
 
 The per-profile lists live in `docs/profiles/`.
 
-> **Normative:** at minimum every profile MUST include the four reserved paths that section 11.2
-> marks **mandatory** to disclose: `roax.recordType`, `roax.schemaVersion`, `roax.recordId` and
-> `roax.issuer.id`.
+> **Normative:** at minimum every profile MUST include the five reserved paths that section 11.2
+> marks **mandatory** to disclose: `roax.recordType`, `roax.schemaVersion`, `roax.typeMap.id`,
+> `roax.recordId` and `roax.issuer.id`.
 >
 > It MUST NOT extend that minimum to `roax.issuer.keyId`, which section 11.2 marks OPTIONAL to
 > disclose. A profile MAY of course add its own paths on top, as the FHIR profile adds
 > `resourceType`.
 
 **The floor is doing two different jobs, and the distinction is worth keeping visible.**
-`roax.recordType` and `roax.schemaVersion` together select the type map, so those two are mandatory
-**by arithmetic**: a verifier without them cannot run the procedure at all, and withholding one
-yields no proof rather than a weaker one. `roax.recordId` and `roax.issuer.id` are mandatory **by
-policy**, because the paragraph above is about a verifier being able to say what it is looking at.
+`roax.recordType`, `roax.schemaVersion` and `roax.typeMap.id` together select and authenticate the
+exact type map under section 4.2, so those three are mandatory **by arithmetic**.
+A verifier without them cannot run the procedure at all, and withholding one yields no proof rather
+than a weaker one.
+`roax.recordId` and `roax.issuer.id` are mandatory **by policy**, because the paragraph above is
+about a verifier being able to say what it is looking at.
 
 **`roax.recordId` moved from the first group to the second when decision D4 was ruled**, and the move
 is recorded because an earlier draft of this section put it in the first. Under the deleted derived-
@@ -1235,9 +1292,13 @@ JSON Schema: [`schemas/envelope-1.0.json`](../../schemas/envelope-1.0.json).
   "recordType": "sg.gov.moh.vaccination-healthcert",
   "schemaVersion": "1.0",
   "recordId": "urn:uuid:...",       // committed INSIDE the root at roax.recordId
+  "typeMap": {                      // discovery hint whose ID is committed at roax.typeMap.id
+    "id": "sha256:<64 lowercase hex>",
+    "version": "1.0.0"
+  },
 
   "root": "<64 hex chars>",
-  "leafCount": 92,                  // the UNION - record leaves plus reserved leaves (section 3.3)
+  "leafCount": 93,                  // the UNION - record leaves plus reserved leaves (section 3.3)
 
   "issuer": {                       // identity, committed INSIDE the root at reserved paths
     "id": "did:web:example.gov",
@@ -1270,7 +1331,7 @@ No chain id, registry address or contract set is treated as permanent by this do
 
 `leafCount` counts the **union** defined in section 3.3, so it includes the reserved leaves of
 section 11.2 and not only the leaves the record itself produced. The value shown is the 87-leaf
-vaccination record of section 10.3 plus its five reserved leaves, `issuer.keyId` being present
+vaccination record of section 10.3 plus its six reserved leaves, `issuer.keyId` being present
 here. An implementation that counts the record alone reports a `leafCount` that does not match its
 own root, and every inclusion proof it issues is bound to the wrong tree size.
 
@@ -1306,7 +1367,7 @@ node with the honest tree size of 8 fails, and so does an honest leaf's proof un
 which is why a *random* wrong `leafCount` usually is caught and a *chosen* one is not. Being caught
 by accident in the common case is not a binding.
 
-**The defence that does exist is section 10 step 1, and it is already normative.** A verifier
+**The defence that does exist is section 10 step 2, and it is already normative.** A verifier
 recomputes `leafHash` from the disclosed path, tag, value and salt and MUST NOT trust a
 caller-supplied leaf hash. Every leaf hash is `H(0x00 ‖ ...)` and every internal node is
 `H(0x01 ‖ ...)` (sections 8 and 9.1), so a recomputed leaf hash cannot equal an internal node except
@@ -1314,7 +1375,7 @@ by defeating second-preimage resistance. The attack above requires handing the v
 which a conforming verifier never accepts.
 
 **Two consequences follow and both are stated rather than left implicit.** A verifier MUST NOT skip
-step 1 on the grounds that the tree size makes the position unambiguous, because it does not. And
+step 2 on the grounds that the tree size makes the position unambiguous, because it does not. And
 `leafCount` MUST NOT be used as a check on anything, in either copy kind, beyond the full-copy
 equality above where the verifier derives the quantity itself.
 
@@ -1332,7 +1393,7 @@ it is the security-relevant invariant and is easy to get wrong when written info
 ### 11.2 Reserved leaves, and the prefix rule
 
 The envelope fields that say what a record **is** are committed **inside** the root as ordinary
-leaves under the reserved first segment `roax`.
+leaves whose single KEY segment uses the reserved ASCII prefix `roax.`.
 Only genuinely mutable routing hints stay outside.
 
 These are ordinary leaves in every respect. They are salted per section 7, hashed per section 8, and
@@ -1349,6 +1410,7 @@ except where they come from.
 |---|---|---:|---|---|---|
 | `roax.recordType` | `[KEY("roax.recordType")]` | 2 STRING | the envelope's `recordType` | always | mandatory |
 | `roax.schemaVersion` | `[KEY("roax.schemaVersion")]` | 2 STRING | the envelope's `schemaVersion` | always | mandatory |
+| `roax.typeMap.id` | `[KEY("roax.typeMap.id")]` | 2 STRING | the envelope's `typeMap.id` | always | mandatory |
 | `roax.recordId` | `[KEY("roax.recordId")]` | 2 STRING | the envelope's `recordId` | always | mandatory |
 | `roax.issuer.id` | `[KEY("roax.issuer.id")]` | 2 STRING | the envelope's `issuer.id` | always | mandatory |
 | `roax.issuer.keyId` | `[KEY("roax.issuer.keyId")]` | 2 STRING | the envelope's `issuer.keyId` | only when `issuer.keyId` is present | OPTIONAL |
@@ -1366,11 +1428,12 @@ element names do not contain dots. This is also what length-prefixed encoding ma
 the same property section 5.1 already relies on to keep a nested `a.b` and a literal dotted key
 `"a.b"` provably distinct with no rule at all.
 
-**Two of the five are mandatory to disclose by arithmetic, not by policy.** `recordType` and
-`schemaVersion` together select the type map, so a verifier that does not have both cannot run the
-verification procedure at all. Withholding either does not produce a weaker proof; it produces no
-proof. `roax.recordId` and `roax.issuer.id` are policy choices, and both are in the floor because
-section 10.2 requires a disclosed copy to say what it is and who issued it.
+**Three of the five always-emitted leaves are mandatory to disclose by arithmetic, not by policy.**
+`recordType`, `schemaVersion` and `typeMap.id` together select and authenticate the exact map under
+section 4.2, so a verifier that does not have all three cannot run the verification procedure.
+Withholding any one does not produce a weaker proof; it produces no proof.
+`roax.recordId` and `roax.issuer.id` are policy choices, and both are in the floor because section
+10.2 requires a disclosed copy to say what it is and who issued it.
 
 **`roax.recordId` was arithmetic and is now policy.** It was an input to every salt under the
 derived-salt scheme this document carried before decision D4 was ruled D4b; section 7 has no preimage
@@ -1388,12 +1451,12 @@ a different direction.
 commits, so a rule that forced disclosure of the key identifier would leave an already-issued record
 with no rotation path at all, which is the precise shape of foreclosure the future-proofing
 constraint exists to prevent. Section 10.2 therefore narrows the minimum-disclosure floor to the
-four mandatory paths rather than to every reserved path, and says so in the place an editor would
+five mandatory paths rather than to every reserved path, and says so in the place an editor would
 otherwise widen it back.
 
 `issuer.keyId` is also the one reserved leaf whose *presence* varies. **An absent `issuer.keyId`
 emits no leaf**; it MUST NOT be emitted as a NULL leaf or as an empty string, because those are
-three different roots and only one of them can be right. The reserved leaf count is therefore 4 or 5.
+three different roots and only one of them can be right. The reserved leaf count is therefore 5 or 6.
 
 **Two leaves that an earlier draft committed have been removed, and the reasons differ.**
 `roax.hashAlg` was removed because a leaf cannot bind the algorithm it is hashed under at all
@@ -1506,10 +1569,11 @@ prose an implementer disputes.
 
 > **Normative:** the conformance corpus MUST carry vectors that **fail** an implementation which
 > treats an outside-the-root field as authority. `docs/conformance-corpus.md` class 18 defines them,
-> and it covers the three fields where the mistake is reachable: `hashAlg`, which section 7.4 requires
-> a verifier to take from the anchoring registry; `anchor`, which names the registry a naive verifier
-> would read; and the top-level copies of the reserved-leaf values, which a verifier can trust in
-> place of the leaves actually committed inside the root.
+> and it covers the four surfaces where the mistake is reachable: `hashAlg`, which section 7.4
+> requires a verifier to take from the anchoring registry; `anchor`, which names the registry a
+> naive verifier would read; `typeMap`, whose ID is only authoritative after the content-ID and
+> reserved-leaf checks in sections 4.2 and 10; and the other top-level copies of reserved-leaf
+> values, which a verifier can trust in place of the leaves actually committed inside the root.
 
 A test that catches this costs a day. The pillar dogtag needed to compensate for not catching it cost
 far more.
@@ -1518,13 +1582,14 @@ far more.
 
 ## 12. Versioning
 
-Four axes, deliberately not collapsed:
+Five axes, deliberately not collapsed:
 
 | Axis | Field | Changes when | Inside the root? |
 |---|---|---|---|
 | Canonicalization | `canon` | the hashing rules change | **Yes**, via `DOMAIN` in every leaf preimage |
 | Hash algorithm | `hashAlg` | a record selects a different hash family | **Via `DOMAIN` only.** Not a leaf: a leaf cannot bind the algorithm it is hashed under. Authority comes from the anchoring registry (section 7.4) |
 | Record schema | `recordType` + `schemaVersion` | a profile publishes a new version | **Yes**, as ordinary reserved leaves |
+| Type-map artifact | `typeMap.id` + `typeMap.version` | a base map or issuer-scoped additive child is published | **Yes.** The exact ID is an ordinary reserved leaf, and it transitively binds the artifact version (sections 4.2 and 11.2) |
 | Envelope / routing | `anchor` | deployment changes | **No** |
 
 Because `DOMAIN` is folded into every leaf hash (section 8), the
@@ -1562,14 +1627,15 @@ content and different `hashAlg` have different roots, and every verifier eventua
 Only `SHA-256` has a defined construction in `ROAX-CANON/1`; `Poseidon-BN254` is registered and its
 parameterization is not yet pinned, so it MUST NOT be issued against. See section 7.4.
 
-### 12.1 Version identifiers are opaque
+### 12.1 Version identifiers keep their owners' rules
 
-> **Normative:** the protocol never parses, orders or range-compares a version identifier.
-> A version is matched for equality or not at all.
+> **Normative:** `schemaVersion` and `unicodeVersion` are opaque and matched only for equality.
+> ROAX-owned `corpusVersion` and `typeMapVersion` retain three-part semver shape, but a verifier
+> still MUST NOT range-resolve a type map or choose its latest version, under section 4.2.
 
 `schemaVersion` is an **opaque, profile-defined label**. It is validated by exact match against the
 profile registry (`docs/profiles/`), never by shape, and `schemas/envelope-1.0.json` and
-`schemas/type-map-1.0.json` therefore constrain it to a non-empty string and nothing more.
+`schemas/type-map-artifact-1.0.json` therefore constrain it to a non-empty string and nothing more.
 
 **An earlier draft imposed a dotted numeric pattern, and the evidence is that no such pattern can be
 correct.** FHIR's own `CapabilityStatement.fhirVersion` enumeration holds exactly 22 values, of
@@ -1588,10 +1654,11 @@ Two further reasons, both external:
   identifier `vct` is opaque, and an incompatible change means a new `vct` value rather than a
   version bump.
 
-And one internal reason, which is the decisive one: **nothing in this protocol compares versions.**
-The only structural use of `schemaVersion` is exact match, as half the type-map lookup key
-(section 4.2). A constraint that no code path needs is a constraint that can only reject valid
-input.
+And one internal reason, which is the decisive one: **nothing in this protocol orders externally
+owned versions.**
+The only structural use of `schemaVersion` is exact match as one component of the type-map selection
+tuple in section 4.2.
+A shape constraint that no code path needs can only reject valid input.
 
 **The dividing line, stated so it is not re-litigated per field.** A version identifier this project
 **owns** may carry a shape; a version identifier defined **elsewhere** is opaque.
@@ -1599,7 +1666,7 @@ input.
 | Field | Owner | Constraint |
 |---|---|---|
 | `corpusVersion` (`schemas/conformance-corpus-1.0.json`) | ROAX | three-part semver, legitimately |
-| `typeMapVersion` (`schemas/type-map-1.0.json`) | ROAX | three-part semver, legitimately |
+| `typeMapVersion` (`schemas/type-map-artifact-1.0.json`) | ROAX | three-part semver, exact metadata rather than a range selector |
 | `schemaVersion` (envelope and type map) | the profile, and beyond it FHIR or a health authority | opaque, exact match only |
 | `unicodeVersion` (corpus) | the Unicode Consortium | opaque, non-empty; `15.1` is the canonical form for this pin |
 | `canon` | ROAX | a `const` domain string, and not a version field at all |

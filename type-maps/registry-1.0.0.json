@@ -1,0 +1,50 @@
+{
+  "format": "ROAX-TYPE-MAP-REGISTRY/1",
+  "registryVersion": "1.0.0",
+  "idAlgorithm": {
+    "name": "sha256",
+    "preimage": "utf8(\"ROAX-TYPE-MAP/1\\u0000\") || exactArtifactBytes"
+  },
+  "maps": [
+    {
+      "id": "sha256:0e9e642bc89c081e2e6faf651acdc25c46fac83201248ef53a7c812181279807",
+      "path": "type-maps/hl7.fhir.bundle-4.0.1.json",
+      "typeMapVersion": "1.0.0",
+      "recordType": "hl7.fhir.bundle",
+      "schemaVersion": "4.0.1",
+      "scope": {
+        "kind": "profile"
+      }
+    },
+    {
+      "id": "sha256:4f8cecc59c85101b8b567658c90651bcbf8f9d4dc279571aa40a03cf04f434ff",
+      "path": "type-maps/sg.gov.moh.pdt-healthcert-2.0.json",
+      "typeMapVersion": "1.0.0",
+      "recordType": "sg.gov.moh.pdt-healthcert",
+      "schemaVersion": "2.0",
+      "scope": {
+        "kind": "profile"
+      }
+    },
+    {
+      "id": "sha256:db935b67a3a82754921267e3af237b606f7489b46e05aa892d175b8d87504177",
+      "path": "type-maps/sg.gov.moh.recovery-healthcert-2.0.json",
+      "typeMapVersion": "1.0.0",
+      "recordType": "sg.gov.moh.recovery-healthcert",
+      "schemaVersion": "2.0",
+      "scope": {
+        "kind": "profile"
+      }
+    },
+    {
+      "id": "sha256:de7bb92226af5fa5dc5064d9cb203329abc69160f4280fdf739e66e5e0151e93",
+      "path": "type-maps/sg.gov.moh.vaccination-healthcert-1.0.json",
+      "typeMapVersion": "1.0.0",
+      "recordType": "sg.gov.moh.vaccination-healthcert",
+      "schemaVersion": "1.0",
+      "scope": {
+        "kind": "profile"
+      }
+    }
+  ]
+}

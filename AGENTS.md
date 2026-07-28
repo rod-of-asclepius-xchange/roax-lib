@@ -34,10 +34,44 @@ Consequences that have already bitten once during authoring:
 
 These are the things a future agent is most likely to get wrong.
 
-- **The type map does not exist.** The specification requires it (section 4) and the design is
-  unsafe without it, because type tags MUST come from the schema and not from JSON literal syntax.
-  Building it is on the critical path and is the single largest gap. Do not write a library that
-  infers tags syntactically "for now" - that is the exact bug this project exists to remove.
+- **Four base type maps are published in `type-maps/`.** They are generated from the pinned
+  reference checkout by `tools/build-type-maps.mjs`, which loads schemas by file path rather than
+  `$id`. Their exact coverage and unresolved paths are in `docs/type-maps.md`. Do not infer a tag
+  syntactically for any unbound path - decision D7 requires it to fail closed.
+
+- **The operative type-map matcher is a structured-path DFA, not a display-pattern table.**
+  Resolve NFC-normalized KEY and INDEX segments, then select one output by observed JSON kind.
+  A missing transition or output fails closed. The map must authorize a path before the flattener
+  emits EMPTY_ARRAY or EMPTY_OBJECT, or an unknown empty extension bypasses D7.
+
+- **The exact effective type map is committed per record.** The envelope's `typeMap.id` selects
+  immutable artifact bytes and is itself committed at the single-segment reserved path
+  `KEY("roax.typeMap.id")`. The semver is exact metadata, not a latest-version selector. Issuer
+  extensions are materialized, single-parent, issuer-scoped and additive; they never override an
+  inherited transition or output. See specification section 4 and `docs/type-maps.md` sections 3
+  through 5.
+
+- **Issuer extensions need executable validation, not only a carrier schema.**
+  Run `tools/check-type-map-extension.mjs` against the exact parent and child.
+  It checks logical DFA additivity, exact parent identity, issuer scope, extension-point containment,
+  canonical reachability and provenance-reference linkage.
+  Every selector must cite an immutable supplemental source, and its materialized binding must cite
+  every evidence source by `sourceId`.
+  Publication review still retrieves each source and verifies its commit or content digest.
+
+- **The FHIR schemata use object keywords without declaring object type.**
+  The full schema has 659 reached object-applicator source nodes with no `type: "object"`, and the
+  Bundle-reachable lite scope has 65.
+  The maps retain KEY traversal, mark the affected states as non-operative audit gaps, and never
+  infer a scalar, array or null tag from an inapplicable object keyword.
+  See `docs/type-maps.md` section 1.5.
+
+- **The generator deliberately rejects schema intersections and mixed empty-array permission.**
+  Its DFA closure can safely union the pinned `anyOf` and `oneOf` path languages only because
+  complete profile validation runs first.
+  An `allOf` needs intersection-aware compilation, and array branches that disagree on whether
+  empty is admitted need combinator-aware evaluation, so `tools/build-type-maps.mjs` fails instead
+  of publishing a guessed EMPTY_OBJECT or omitting a valid EMPTY_ARRAY.
 
   `corpus/tools/build_type_maps.py` now derives one per healthcert family from the reference
   schemas, and what it found is the sharpest open item in the project:
@@ -73,9 +107,9 @@ These are the things a future agent is most likely to get wrong.
 - **The leaf set is a union, not the record.** Reserved `roax.*` leaves join the record's leaves
   before the sort (spec sections 3.3 and 11.2). A flattener that walks the record only produces a
   different root. Each reserved path is a **single `KEY` segment carrying the literal dotted name**,
-  so `roax.recordType` is one segment `KEY("roax.recordType")` and *not* two. There are four
-  mandatory reserved leaves plus `roax.issuer.keyId`, which is the one conditional leaf: absent
-  means no leaf, not a NULL leaf. The tree floor is therefore 5.
+  so `roax.recordType` is one segment `KEY("roax.recordType")` and *not* two. There are five
+  mandatory reserved leaves, including `roax.typeMap.id`, plus `roax.issuer.keyId`, which is the one
+  conditional leaf: absent means no leaf, not a NULL leaf. The tree floor is therefore 6.
 
 - **The reserved-namespace guard tests the NFC-normalized key of the FIRST segment** for the ASCII
   prefix `roax.` (spec section 11.2). Three ways to get it wrong: reconstructing a display path to
@@ -112,23 +146,25 @@ These are the things a future agent is most likely to get wrong.
   an envelope that still verifies correctly. Rule 3 of that section forbids any seed field, which is
   vacuous today and binds any revision that brings derivation back.
 
-- **`roax.recordId` is mandatory to disclose by policy, not by arithmetic.** Only `roax.recordType`
-  and `roax.schemaVersion` are arithmetic, because they select the type map. This changed with the
-  D4b ruling and several documents said otherwise before it. A verifier that never receives
-  `roax.recordId` can still verify every leaf it did receive.
+- **`roax.recordId` is mandatory to disclose by policy, not by arithmetic.**
+  `roax.recordType`, `roax.schemaVersion` and `roax.typeMap.id` are arithmetic because they select
+  and authenticate the exact map. This changed with the D4b and type-map binding work, and several
+  documents said otherwise before it. A verifier that never receives `roax.recordId` can still
+  verify every leaf it did receive.
 
 - **`leafCount` is NOT authenticated in a disclosed copy**, and the specification claimed otherwise
   until this was measured. RFC 9162 section 2.1.3.2 takes the tree size as an *input*, so an attacker
   supplying both a leaf hash and a tree size can walk an internal node to the genuine root: on an
   8-leaf tree, `MTH(L[0:4])` at index 0 with a forged size of 2 verifies. What actually defends is
-  spec section 10 step 1 - recompute the leaf hash from the disclosed fields, never accept one - plus
+  spec section 10 step 2 - recompute the leaf hash from the disclosed fields, never accept one - plus
   the `0x00` leaf-domain byte. Never add a check that leans on `leafCount` in a disclosed copy.
 
 - **Type tag 8 `BLOB_REF` is defined and selected by nothing.** The schemas accept it so the carrier
   form is pinned once; an implementation MUST reject any record or type map that uses it until a
   profile declares the binding (spec section 6.5). Same treatment as `Poseidon-BN254`: registered,
   forbidden in issuance. Base64 is pinned to RFC 4648 section 4 with padding and no line wrapping,
-  and that governs `BYTES` and `BLOB_REF` rather than the `STRING` bindings every v1 profile uses.
+  and that governs `BYTES` and `BLOB_REF` rather than the explicitly typed healthcert fields bound
+  as STRING. FHIR `base64Binary` remains unresolved between STRING and BYTES.
 
 - **The vaccination healthcert's `fhirBundle.entry[]` is flattened pseudo-FHIR**, not a real FHIR
   Bundle. Normalizing it to the genuine `entry[i].resource` shape changes every path and therefore
@@ -243,8 +279,8 @@ A, C and D sections are the owner's and are not edited by ruling work elsewhere 
 ## Validating the schemas
 
 There is no CI and no package manifest. The JSON Schemas were checked with Ajv 8 in **strict mode**
-plus `ajv-formats`, and all three compile clean. Re-check after any edit: install `ajv` and
-`ajv-formats` outside the tree, then `new Ajv2020({strict: true}).compile()` each of the three files,
+plus `ajv-formats`, and all five compile clean. Re-check after any edit: install `ajv` and
+`ajv-formats` outside the tree, then `new Ajv2020({strict: true}).compile()` each of the five files,
 using the `ajv/dist/2020.js` entry point because they are draft 2020-12. Compiling is not enough on
 its own for a conditional - validate instances both ways, since an `if`/`then` that never fires
 compiles perfectly and asserts nothing.

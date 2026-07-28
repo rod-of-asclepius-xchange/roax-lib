@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://roax.example/schemas/type-map/1.0/schema.json",
-  "title": "ROAX type map v1",
-  "description": "Binds record paths to ROAX type tags. This file is the schema FOR the type map; the type map itself does not exist yet (spec section 4.3) and building it is on the critical path. The type map is NORMATIVE data: two libraries carrying different type maps produce different roots for the same record, which is the highest-risk surface in the design (spec section 4). It is versioned with the specification and is part of the conformance corpus (docs/conformance-corpus.md class 11).",
+  "title": "Superseded draft ROAX display-pattern type map v1",
+  "description": "Retained to identify the earlier review draft. It MUST NOT be used to publish or resolve a type map because its display-pattern and first-match representation conflicts with the structured-path rules in spec sections 4.2 and 5.2. Published artifacts use schemas/type-map-artifact-1.0.json and type-maps/registry-1.0.0.json, with coverage and migration rationale in docs/type-maps.md.",
   "type": "object",
   "required": ["typeMapVersion", "recordType", "schemaVersion", "entries"],
   "additionalProperties": false,
@@ -41,7 +41,7 @@
     },
 
     "entries": {
-      "description": "Path-pattern to type-tag bindings. Order is significant: the FIRST matching entry wins, so more specific patterns MUST precede more general ones.",
+      "description": "Superseded display-pattern bindings. Their order-dependent first-match rule is unsafe for issuer extension composition and is not operative under spec section 4.2.",
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/$defs/entry" }
@@ -77,5 +77,5 @@
     }
   },
 
-  "$comment": "Unknown paths MUST fail closed (spec section 4.2). DECISION D7 IS RULED D7a, permanently, on 2026-07-28. This schema deliberately provides no default-tag or fallback field, and adding one is now a violation rather than a pending question: a type map that could express 'anything else is a STRING' would let two libraries with different maps silently agree on a wrong root, which is the exact failure this project exists to remove. The pressure to add it will arrive from a real issuer with a real record that a PDT type map has not yet been extended to cover, because the PDT base object permits additional properties (docs/profiles/pdt-healthcert.md section 5); the answer is to extend the map and bump typeMapVersion. THAT EXTENSION MUST BE ADDITIVE. An entry that retags a path the map already covers changes the root of every already-issued record reaching that path, which spec section 12.2 forbids."
+  "$comment": "This schema is superseded and non-operative. Unknown paths still fail closed under spec section 4.2 and ruled decision D7. The immutable structured-path DFA artifact, additive issuer extension rules and exact content-ID selection are defined by schemas/type-map-artifact-1.0.json and docs/type-maps.md sections 3 through 5."
 }

@@ -243,7 +243,7 @@ shape that walks an internal node to the genuine root: on an 8-leaf tree, `MTH(L
 the leaf at index 0 with a forged tree size of 2 and the audit path `[MTH(L[4:8])]` verifies. That
 was measured, and reproduced on Node v22.21.0; specification section 11.1 records it in full.
 
-**What actually closes the case is the `0x00` leaf-domain byte plus specification section 10 step 1**,
+**What actually closes the case is the `0x00` leaf-domain byte plus specification section 10 step 2**,
 which requires a verifier to recompute the leaf hash from the disclosed path, tag, value and salt
 rather than accept one. A recomputed leaf hash is `0x00`-domained and an internal node is
 `0x01`-domained, so the substitution needs a second preimage.
@@ -262,11 +262,17 @@ this repository. The reference material lives outside the repository by design.
 
 ### Class 11 - the schema binding itself
 
-The type map is a data file and MUST be in the corpus, with vectors asserting that a given path
-under a given map yields a given tag, and that an uncovered path fails closed.
+The type map is a data file and MUST be in the corpus, with vectors asserting that a given structured path and observed JSON kind under a given map yield a given tag, and that an uncovered path-kind pair fails closed, as required by specification section 4.2.
+Each vector MUST name the exact content ID, semver, `recordType`, opaque `schemaVersion` and `jsonKind` of the artifact lookup under test, as required by specification section 4.2.
 
 This is the highest-risk surface in the design (specification section 4) and also the easiest to
 diff, which is the one piece of good news about it.
+
+At minimum the fail-closed rows MUST cover vaccination `dose` and `expiryDateTime`, PDT
+`$template.name`, FHIR `Narrative.div`, FHIR `base64Binary`, and an unknown empty array and empty
+object, because `docs/type-maps.md` sections 1 and 3 record those as the reachable places where a
+proposal or mechanically known empty-container tag could otherwise be mistaken for an operative
+binding.
 
 **One row was added when decision D9 was ruled:** a type map binding any path to **tag 8 `BLOB_REF`**
 MUST be **rejected**, because the content-addressed binding is defined and selected by no version-1
@@ -335,9 +341,10 @@ property by declaration rather than by demonstration.
 For each profile, a disclosed copy omitting each declared non-redactable path in turn, each of which
 MUST be rejected - plus one that includes them all and is accepted.
 
-**The floor is the four reserved paths specification section 11.2 marks mandatory to disclose**,
-plus whatever the profile adds on top, and this class MUST carry a vector proving where its upper
-edge is: a disclosed copy that **omits `roax.issuer.keyId` MUST be ACCEPTED** when the record
+**The floor is the five reserved paths specification section 11.2 marks mandatory to disclose**,
+including `roax.typeMap.id`, plus whatever the profile adds on top.
+This class MUST carry a vector proving where its upper edge is: a disclosed copy that **omits
+`roax.issuer.keyId` MUST be ACCEPTED** when the record
 committed one. That path is committed inside the root but OPTIONAL to disclose, because requiring
 it would permanently bind an anchored record to the key it was issued under and leave no rotation
 path, which specification section 12.2 rules out. Without that vector, an implementation that
@@ -467,7 +474,9 @@ that takes authority from the root and from its own configured anchoring layer.
 | Vector | Expected | What it catches |
 |---|---|---|
 | A disclosed copy whose top-level `recordType` disagrees with the disclosed `roax.recordType` leaf | **Reject** | A verifier that reads the envelope field instead of the committed leaf. The leaf is inside the root; the field is not. |
-| The same, for `schemaVersion`, `recordId` and `issuer.id` in turn | **Reject** | The same mistake at each of the other three floor paths (specification section 11.2). |
+| The same, for `schemaVersion`, `recordId` and `issuer.id` in turn | **Reject** | The same mistake at the other profile and identity floor paths (specification section 11.2). |
+| A top-level `typeMap.id` that disagrees with the disclosed `roax.typeMap.id` leaf | **Reject before resolving a record leaf** | A verifier selecting a convenient map from the discovery hint instead of the ID committed inside the root (specification sections 4.2, 10 and 11.2). |
+| Candidate type-map bytes whose content ID does not reproduce the committed `roax.typeMap.id`, including a second artifact with the same semver | **Reject** | A verifier selecting by version or locator rather than the exact immutable artifact ID (specification section 4.2 and [`type-maps.md`](type-maps.md) section 4). |
 | An envelope whose `hashAlg` disagrees with the `(root, hashAlg)` pair the verifier's anchoring registry records | **Reject** | A verifier taking the algorithm from the document rather than from the registry. This is exactly what specification section 7.4's H2 requires and what H1 does **not** provide. |
 | An envelope whose `hashAlg` is absent from the verifier's configured allow-list, and present in the registry | **Reject** | The retired-algorithm case, which H2 alone does not close. Specification section 7.4, H3. |
 | An envelope whose `anchor.registry` and `anchor.chainId` name a registry the verifier is not configured with, and which would return a valid pair | **Reject, without reading that registry** | The dogtag `documentStore` bug in this design's shape: an attacker-supplied address that answers "valid". A verifier MUST resolve the anchoring layer from its own configuration. |

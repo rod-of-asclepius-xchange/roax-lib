@@ -1,0 +1,7714 @@
+{
+  "format": "ROAX-TYPE-MAP/1",
+  "typeMapVersion": "1.0.0",
+  "recordType": "sg.gov.moh.recovery-healthcert",
+  "schemaVersion": "2.0",
+  "scope": {
+    "kind": "profile"
+  },
+  "sourceSchemas": [
+    {
+      "sourceId": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json",
+      "kind": "git",
+      "repositoryUri": "https://github.com/Open-Attestation/schemata.git",
+      "path": "src/sg/gov/moh/fhir/4.0.1/lite-schema.json",
+      "commit": "09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa"
+    },
+    {
+      "sourceId": "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json",
+      "kind": "git",
+      "repositoryUri": "https://github.com/Open-Attestation/schemata.git",
+      "path": "src/sg/gov/moh/recovery-healthcert/2.0/schema.json",
+      "commit": "09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa"
+    }
+  ],
+  "extensionPoints": [
+    {
+      "prefix": [],
+      "note": "The recovery root permits additional properties, but each added path still needs an issuer extension with type evidence."
+    }
+  ],
+  "addedSelectors": [],
+  "coverage": {
+    "concretePathCardinality": "infinite",
+    "states": 317,
+    "keyTransitions": 640,
+    "indexTransitions": 159,
+    "resolvedOutputs": 310,
+    "unresolvedOutputStates": 2,
+    "byTag": {
+      "1": 7,
+      "2": 80,
+      "3": 9,
+      "4": 2,
+      "6": 159,
+      "7": 53
+    },
+    "byBasis": {
+      "schema-type": 55,
+      "schema-container-type": 212,
+      "schema-const": 2,
+      "fhir-named-primitive": 4,
+      "schema-enum": 30,
+      "fhir-element-name": 7
+    },
+    "structurallyUntypedObjectSourceNodes": 65,
+    "structurallyUntypedObjectStates": 63,
+    "notes": [
+      "The copied PDT $id is ignored and this schema is loaded by file path.",
+      "The concrete path language is infinite because its lite FHIR Bundle permits recursive resources and extensions."
+    ]
+  },
+  "automaton": {
+    "representation": "structured-path-dfa/1",
+    "start": "s0",
+    "states": [
+      {
+        "id": "s0",
+        "keys": [
+          {
+            "key": "fhirBundle",
+            "to": "s1"
+          },
+          {
+            "key": "fhirVersion",
+            "to": "s2"
+          },
+          {
+            "key": "id",
+            "to": "s3"
+          },
+          {
+            "key": "logo",
+            "to": "s4"
+          },
+          {
+            "key": "type",
+            "to": "s5"
+          },
+          {
+            "key": "validFrom",
+            "to": "s6"
+          },
+          {
+            "key": "validUntil",
+            "to": "s7"
+          },
+          {
+            "key": "version",
+            "to": "s8"
+          }
+        ]
+      },
+      {
+        "id": "s1",
+        "keys": [
+          {
+            "key": "entry",
+            "to": "s9"
+          },
+          {
+            "key": "id",
+            "to": "s10"
+          },
+          {
+            "key": "identifier",
+            "to": "s11"
+          },
+          {
+            "key": "implicitRules",
+            "to": "s12"
+          },
+          {
+            "key": "language",
+            "to": "s13"
+          },
+          {
+            "key": "link",
+            "to": "s14"
+          },
+          {
+            "key": "meta",
+            "to": "s15"
+          },
+          {
+            "key": "resourceType",
+            "to": "s16"
+          },
+          {
+            "key": "signature",
+            "to": "s17"
+          },
+          {
+            "key": "timestamp",
+            "to": "s18"
+          },
+          {
+            "key": "total",
+            "to": "s19"
+          },
+          {
+            "key": "type",
+            "to": "s20"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s2",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json#/properties/fhirVersion"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json#/properties/id"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json#/properties/logo"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s5",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json#/definitions/RecTypes"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s6",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json#/properties/validFrom"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s7",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json#/properties/validUntil"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s8",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json#/properties/version"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s9",
+        "anyIndex": "s21",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle/properties/entry"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s10",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/id"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s11",
+        "keys": [
+          {
+            "key": "assigner",
+            "to": "s22"
+          },
+          {
+            "key": "extension",
+            "to": "s23"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "period",
+            "to": "s25"
+          },
+          {
+            "key": "system",
+            "to": "s12"
+          },
+          {
+            "key": "type",
+            "to": "s26"
+          },
+          {
+            "key": "use",
+            "to": "s27"
+          },
+          {
+            "key": "value",
+            "to": "s24"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Identifier"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s12",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/uri"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s13",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/code"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s14",
+        "anyIndex": "s28",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle/properties/link"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s15",
+        "keys": [
+          {
+            "key": "extension",
+            "to": "s29"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "lastUpdated",
+            "to": "s18"
+          },
+          {
+            "key": "profile",
+            "to": "s30"
+          },
+          {
+            "key": "security",
+            "to": "s31"
+          },
+          {
+            "key": "source",
+            "to": "s12"
+          },
+          {
+            "key": "tag",
+            "to": "s32"
+          },
+          {
+            "key": "versionId",
+            "to": "s10"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Meta"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s16",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-const"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle/properties/resourceType"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s17",
+        "keys": [
+          {
+            "key": "data",
+            "to": "s33"
+          },
+          {
+            "key": "extension",
+            "to": "s34"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "onBehalfOf",
+            "to": "s22"
+          },
+          {
+            "key": "sigFormat",
+            "to": "s13"
+          },
+          {
+            "key": "targetFormat",
+            "to": "s13"
+          },
+          {
+            "key": "type",
+            "to": "s35"
+          },
+          {
+            "key": "when",
+            "to": "s18"
+          },
+          {
+            "key": "who",
+            "to": "s22"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s18",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/instant"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s19",
+        "bindings": [
+          {
+            "jsonKind": "number",
+            "tag": 3,
+            "basis": [
+              "fhir-named-primitive"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/unsignedInt"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s20",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s21",
+        "keys": [
+          {
+            "key": "extension",
+            "to": "s36"
+          },
+          {
+            "key": "fullUrl",
+            "to": "s12"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "link",
+            "to": "s37"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s38"
+          },
+          {
+            "key": "request",
+            "to": "s39"
+          },
+          {
+            "key": "resource",
+            "to": "s40"
+          },
+          {
+            "key": "response",
+            "to": "s41"
+          },
+          {
+            "key": "search",
+            "to": "s42"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Entry"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s22",
+        "keys": [
+          {
+            "key": "display",
+            "to": "s24"
+          },
+          {
+            "key": "extension",
+            "to": "s43"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "identifier",
+            "to": "s11"
+          },
+          {
+            "key": "reference",
+            "to": "s24"
+          },
+          {
+            "key": "type",
+            "to": "s12"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Reference"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s23",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Identifier/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s24",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/string"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s25",
+        "keys": [
+          {
+            "key": "end",
+            "to": "s45"
+          },
+          {
+            "key": "extension",
+            "to": "s46"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "start",
+            "to": "s45"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Period"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s26",
+        "keys": [
+          {
+            "key": "coding",
+            "to": "s47"
+          },
+          {
+            "key": "extension",
+            "to": "s48"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "text",
+            "to": "s24"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/CodeableConcept"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s27",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Identifier/properties/use"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s28",
+        "keys": [
+          {
+            "key": "extension",
+            "to": "s49"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s50"
+          },
+          {
+            "key": "relation",
+            "to": "s24"
+          },
+          {
+            "key": "url",
+            "to": "s12"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Link"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s29",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Meta/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s30",
+        "anyIndex": "s51",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Meta/properties/profile"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s31",
+        "anyIndex": "s52",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Meta/properties/security"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s32",
+        "anyIndex": "s52",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Meta/properties/tag"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s33",
+        "unresolved": [
+          {
+            "jsonKinds": [
+              "string"
+            ],
+            "reason": "FHIR base64Binary does not choose ROAX STRING over the base64 text or BYTES over decoded bytes.",
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/base64Binary"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s34",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Signature/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s35",
+        "anyIndex": "s52",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Signature/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s36",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Entry/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s37",
+        "anyIndex": "s28",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Entry/properties/link"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s38",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Entry/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s39",
+        "keys": [
+          {
+            "key": "extension",
+            "to": "s53"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "ifMatch",
+            "to": "s24"
+          },
+          {
+            "key": "ifModifiedSince",
+            "to": "s18"
+          },
+          {
+            "key": "ifNoneExist",
+            "to": "s24"
+          },
+          {
+            "key": "ifNoneMatch",
+            "to": "s24"
+          },
+          {
+            "key": "method",
+            "to": "s54"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s55"
+          },
+          {
+            "key": "url",
+            "to": "s12"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Request"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s40",
+        "keys": [
+          {
+            "key": "accessionIdentifier",
+            "to": "s11"
+          },
+          {
+            "key": "active",
+            "to": "s56"
+          },
+          {
+            "key": "address",
+            "to": "s57"
+          },
+          {
+            "key": "alias",
+            "to": "s58"
+          },
+          {
+            "key": "basedOn",
+            "to": "s59"
+          },
+          {
+            "key": "birthDate",
+            "to": "s60"
+          },
+          {
+            "key": "bodySite",
+            "to": "s26"
+          },
+          {
+            "key": "category",
+            "to": "s61"
+          },
+          {
+            "key": "code",
+            "to": "s26"
+          },
+          {
+            "key": "collection",
+            "to": "s62"
+          },
+          {
+            "key": "communication",
+            "to": "s63"
+          },
+          {
+            "key": "component",
+            "to": "s64"
+          },
+          {
+            "key": "condition",
+            "to": "s65"
+          },
+          {
+            "key": "contact",
+            "to": "s66"
+          },
+          {
+            "key": "contained",
+            "to": "s67"
+          },
+          {
+            "key": "container",
+            "to": "s68"
+          },
+          {
+            "key": "dataAbsentReason",
+            "to": "s26"
+          },
+          {
+            "key": "deceasedBoolean",
+            "to": "s69"
+          },
+          {
+            "key": "deceasedDateTime",
+            "to": "s70"
+          },
+          {
+            "key": "definition",
+            "to": "s22"
+          },
+          {
+            "key": "derivedFrom",
+            "to": "s71"
+          },
+          {
+            "key": "device",
+            "to": "s22"
+          },
+          {
+            "key": "deviceName",
+            "to": "s72"
+          },
+          {
+            "key": "distinctIdentifier",
+            "to": "s24"
+          },
+          {
+            "key": "effectiveDateTime",
+            "to": "s73"
+          },
+          {
+            "key": "effectiveInstant",
+            "to": "s74"
+          },
+          {
+            "key": "effectivePeriod",
+            "to": "s25"
+          },
+          {
+            "key": "effectiveTiming",
+            "to": "s75"
+          },
+          {
+            "key": "encounter",
+            "to": "s22"
+          },
+          {
+            "key": "endpoint",
+            "to": "s76"
+          },
+          {
+            "key": "entry",
+            "to": "s9"
+          },
+          {
+            "key": "expirationDate",
+            "to": "s45"
+          },
+          {
+            "key": "extension",
+            "to": "s77"
+          },
+          {
+            "key": "focus",
+            "to": "s78"
+          },
+          {
+            "key": "gender",
+            "to": "s79"
+          },
+          {
+            "key": "generalPractitioner",
+            "to": "s80"
+          },
+          {
+            "key": "hasMember",
+            "to": "s81"
+          },
+          {
+            "key": "id",
+            "to": "s10"
+          },
+          {
+            "key": "identifier",
+            "to": "s82"
+          },
+          {
+            "key": "implicitRules",
+            "to": "s12"
+          },
+          {
+            "key": "interpretation",
+            "to": "s83"
+          },
+          {
+            "key": "issued",
+            "to": "s18"
+          },
+          {
+            "key": "language",
+            "to": "s13"
+          },
+          {
+            "key": "link",
+            "to": "s84"
+          },
+          {
+            "key": "location",
+            "to": "s22"
+          },
+          {
+            "key": "lotNumber",
+            "to": "s24"
+          },
+          {
+            "key": "managingOrganization",
+            "to": "s22"
+          },
+          {
+            "key": "manufactureDate",
+            "to": "s45"
+          },
+          {
+            "key": "manufacturer",
+            "to": "s24"
+          },
+          {
+            "key": "maritalStatus",
+            "to": "s26"
+          },
+          {
+            "key": "meta",
+            "to": "s15"
+          },
+          {
+            "key": "method",
+            "to": "s26"
+          },
+          {
+            "key": "modelNumber",
+            "to": "s24"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s85"
+          },
+          {
+            "key": "multipleBirthBoolean",
+            "to": "s86"
+          },
+          {
+            "key": "multipleBirthInteger",
+            "to": "s87"
+          },
+          {
+            "key": "name",
+            "to": "s88"
+          },
+          {
+            "key": "note",
+            "to": "s89"
+          },
+          {
+            "key": "owner",
+            "to": "s22"
+          },
+          {
+            "key": "parent",
+            "to": "s90"
+          },
+          {
+            "key": "partNumber",
+            "to": "s24"
+          },
+          {
+            "key": "partOf",
+            "to": "s91"
+          },
+          {
+            "key": "patient",
+            "to": "s22"
+          },
+          {
+            "key": "performer",
+            "to": "s92"
+          },
+          {
+            "key": "photo",
+            "to": "s93"
+          },
+          {
+            "key": "processing",
+            "to": "s94"
+          },
+          {
+            "key": "property",
+            "to": "s95"
+          },
+          {
+            "key": "qualification",
+            "to": "s96"
+          },
+          {
+            "key": "receivedTime",
+            "to": "s45"
+          },
+          {
+            "key": "referenceRange",
+            "to": "s97"
+          },
+          {
+            "key": "request",
+            "to": "s98"
+          },
+          {
+            "key": "resourceType",
+            "to": "s99"
+          },
+          {
+            "key": "safety",
+            "to": "s100"
+          },
+          {
+            "key": "serialNumber",
+            "to": "s24"
+          },
+          {
+            "key": "signature",
+            "to": "s17"
+          },
+          {
+            "key": "specialization",
+            "to": "s101"
+          },
+          {
+            "key": "specimen",
+            "to": "s22"
+          },
+          {
+            "key": "status",
+            "to": "s102"
+          },
+          {
+            "key": "statusReason",
+            "to": "s103"
+          },
+          {
+            "key": "subject",
+            "to": "s22"
+          },
+          {
+            "key": "telecom",
+            "to": "s104"
+          },
+          {
+            "key": "text",
+            "to": "s105"
+          },
+          {
+            "key": "timestamp",
+            "to": "s18"
+          },
+          {
+            "key": "total",
+            "to": "s19"
+          },
+          {
+            "key": "type",
+            "to": "s106"
+          },
+          {
+            "key": "udiCarrier",
+            "to": "s107"
+          },
+          {
+            "key": "url",
+            "to": "s12"
+          },
+          {
+            "key": "valueBoolean",
+            "to": "s108"
+          },
+          {
+            "key": "valueCodeableConcept",
+            "to": "s26"
+          },
+          {
+            "key": "valueDateTime",
+            "to": "s109"
+          },
+          {
+            "key": "valueInteger",
+            "to": "s110"
+          },
+          {
+            "key": "valuePeriod",
+            "to": "s25"
+          },
+          {
+            "key": "valueQuantity",
+            "to": "s111"
+          },
+          {
+            "key": "valueRange",
+            "to": "s112"
+          },
+          {
+            "key": "valueRatio",
+            "to": "s113"
+          },
+          {
+            "key": "valueSampledData",
+            "to": "s114"
+          },
+          {
+            "key": "valueString",
+            "to": "s115"
+          },
+          {
+            "key": "valueTime",
+            "to": "s116"
+          },
+          {
+            "key": "version",
+            "to": "s117"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s41",
+        "keys": [
+          {
+            "key": "etag",
+            "to": "s24"
+          },
+          {
+            "key": "extension",
+            "to": "s118"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "lastModified",
+            "to": "s18"
+          },
+          {
+            "key": "location",
+            "to": "s12"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s119"
+          },
+          {
+            "key": "outcome",
+            "to": "s40"
+          },
+          {
+            "key": "status",
+            "to": "s24"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Response"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s42",
+        "keys": [
+          {
+            "key": "extension",
+            "to": "s120"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "mode",
+            "to": "s121"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s122"
+          },
+          {
+            "key": "score",
+            "to": "s123"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Search"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s43",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Reference/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s44",
+        "keys": [
+          {
+            "key": "extension",
+            "to": "s124"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "url",
+            "to": "s12"
+          },
+          {
+            "key": "valueAddress",
+            "to": "s125"
+          },
+          {
+            "key": "valueAge",
+            "to": "s126"
+          },
+          {
+            "key": "valueAnnotation",
+            "to": "s127"
+          },
+          {
+            "key": "valueAttachment",
+            "to": "s128"
+          },
+          {
+            "key": "valueBase64Binary",
+            "to": "s129"
+          },
+          {
+            "key": "valueBoolean",
+            "to": "s130"
+          },
+          {
+            "key": "valueCanonical",
+            "to": "s131"
+          },
+          {
+            "key": "valueCode",
+            "to": "s132"
+          },
+          {
+            "key": "valueCodeableConcept",
+            "to": "s26"
+          },
+          {
+            "key": "valueCoding",
+            "to": "s52"
+          },
+          {
+            "key": "valueContactDetail",
+            "to": "s133"
+          },
+          {
+            "key": "valueContactPoint",
+            "to": "s134"
+          },
+          {
+            "key": "valueContributor",
+            "to": "s135"
+          },
+          {
+            "key": "valueCount",
+            "to": "s136"
+          },
+          {
+            "key": "valueDataRequirement",
+            "to": "s137"
+          },
+          {
+            "key": "valueDate",
+            "to": "s138"
+          },
+          {
+            "key": "valueDateTime",
+            "to": "s139"
+          },
+          {
+            "key": "valueDecimal",
+            "to": "s140"
+          },
+          {
+            "key": "valueDistance",
+            "to": "s141"
+          },
+          {
+            "key": "valueDosage",
+            "to": "s142"
+          },
+          {
+            "key": "valueDuration",
+            "to": "s143"
+          },
+          {
+            "key": "valueExpression",
+            "to": "s144"
+          },
+          {
+            "key": "valueHumanName",
+            "to": "s145"
+          },
+          {
+            "key": "valueId",
+            "to": "s146"
+          },
+          {
+            "key": "valueIdentifier",
+            "to": "s11"
+          },
+          {
+            "key": "valueInstant",
+            "to": "s147"
+          },
+          {
+            "key": "valueInteger",
+            "to": "s148"
+          },
+          {
+            "key": "valueMarkdown",
+            "to": "s149"
+          },
+          {
+            "key": "valueMeta",
+            "to": "s15"
+          },
+          {
+            "key": "valueMoney",
+            "to": "s150"
+          },
+          {
+            "key": "valueOid",
+            "to": "s151"
+          },
+          {
+            "key": "valueParameterDefinition",
+            "to": "s152"
+          },
+          {
+            "key": "valuePeriod",
+            "to": "s25"
+          },
+          {
+            "key": "valuePositiveInt",
+            "to": "s153"
+          },
+          {
+            "key": "valueQuantity",
+            "to": "s111"
+          },
+          {
+            "key": "valueRange",
+            "to": "s112"
+          },
+          {
+            "key": "valueRatio",
+            "to": "s113"
+          },
+          {
+            "key": "valueReference",
+            "to": "s22"
+          },
+          {
+            "key": "valueRelatedArtifact",
+            "to": "s154"
+          },
+          {
+            "key": "valueSampledData",
+            "to": "s114"
+          },
+          {
+            "key": "valueSignature",
+            "to": "s17"
+          },
+          {
+            "key": "valueString",
+            "to": "s155"
+          },
+          {
+            "key": "valueTime",
+            "to": "s156"
+          },
+          {
+            "key": "valueTiming",
+            "to": "s75"
+          },
+          {
+            "key": "valueTriggerDefinition",
+            "to": "s157"
+          },
+          {
+            "key": "valueUnsignedInt",
+            "to": "s158"
+          },
+          {
+            "key": "valueUri",
+            "to": "s159"
+          },
+          {
+            "key": "valueUrl",
+            "to": "s160"
+          },
+          {
+            "key": "valueUsageContext",
+            "to": "s161"
+          },
+          {
+            "key": "valueUuid",
+            "to": "s162"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s45",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/dateTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s46",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Period/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s47",
+        "anyIndex": "s52",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/CodeableConcept/properties/coding"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s48",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/CodeableConcept/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s49",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Link/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s50",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Link/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s51",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/canonical"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s52",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s13"
+          },
+          {
+            "key": "display",
+            "to": "s24"
+          },
+          {
+            "key": "extension",
+            "to": "s163"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "system",
+            "to": "s12"
+          },
+          {
+            "key": "userSelected",
+            "to": "s56"
+          },
+          {
+            "key": "version",
+            "to": "s24"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Coding"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s53",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Request/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s54",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Request/properties/method"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s55",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Request/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s56",
+        "bindings": [
+          {
+            "jsonKind": "boolean",
+            "tag": 1,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/boolean"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s57",
+        "anyIndex": "s125",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Organization/properties/address",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/address",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Practitioner/properties/address"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s58",
+        "anyIndex": "s24",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Organization/properties/alias"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s59",
+        "anyIndex": "s22",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/basedOn"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s60",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/date"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s61",
+        "anyIndex": "s26",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/category"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s62",
+        "keys": [
+          {
+            "key": "bodySite",
+            "to": "s26"
+          },
+          {
+            "key": "collectedDateTime",
+            "to": "s164"
+          },
+          {
+            "key": "collectedPeriod",
+            "to": "s25"
+          },
+          {
+            "key": "collector",
+            "to": "s22"
+          },
+          {
+            "key": "duration",
+            "to": "s143"
+          },
+          {
+            "key": "extension",
+            "to": "s165"
+          },
+          {
+            "key": "fastingStatusCodeableConcept",
+            "to": "s26"
+          },
+          {
+            "key": "fastingStatusDuration",
+            "to": "s143"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "method",
+            "to": "s26"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s166"
+          },
+          {
+            "key": "quantity",
+            "to": "s111"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen_Collection"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s63",
+        "anyIndex": "s167",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/communication",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Practitioner/properties/communication"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s64",
+        "anyIndex": "s168",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/component"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s65",
+        "anyIndex": "s26",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen/properties/condition"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s66",
+        "anyIndex": "s169",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device/properties/contact",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Organization/properties/contact",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/contact"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s67",
+        "anyIndex": "s40",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device/properties/contained",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/contained",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Organization/properties/contained",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/contained",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Practitioner/properties/contained",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen/properties/contained"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s68",
+        "anyIndex": "s170",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen/properties/container"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s69",
+        "bindings": [
+          {
+            "jsonKind": "boolean",
+            "tag": 1,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/deceasedBoolean"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s70",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/deceasedDateTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s71",
+        "anyIndex": "s22",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/derivedFrom"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s72",
+        "anyIndex": "s171",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device/properties/deviceName"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s73",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/effectiveDateTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s74",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/effectiveInstant"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s75",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s26"
+          },
+          {
+            "key": "event",
+            "to": "s172"
+          },
+          {
+            "key": "extension",
+            "to": "s173"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s174"
+          },
+          {
+            "key": "repeat",
+            "to": "s175"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Timing"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s76",
+        "anyIndex": "s22",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Organization/properties/endpoint"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s77",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device/properties/extension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/extension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Organization/properties/extension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/extension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Practitioner/properties/extension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s78",
+        "anyIndex": "s22",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/focus"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s79",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/gender",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Practitioner/properties/gender"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s80",
+        "anyIndex": "s22",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/generalPractitioner"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s81",
+        "anyIndex": "s22",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/hasMember"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s82",
+        "keys": [
+          {
+            "key": "assigner",
+            "to": "s22"
+          },
+          {
+            "key": "extension",
+            "to": "s23"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "period",
+            "to": "s25"
+          },
+          {
+            "key": "system",
+            "to": "s12"
+          },
+          {
+            "key": "type",
+            "to": "s26"
+          },
+          {
+            "key": "use",
+            "to": "s27"
+          },
+          {
+            "key": "value",
+            "to": "s24"
+          }
+        ],
+        "anyIndex": "s11",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device/properties/identifier",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/identifier",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Organization/properties/identifier",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/identifier",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Practitioner/properties/identifier",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen/properties/identifier"
+            ]
+          },
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Identifier"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s83",
+        "anyIndex": "s26",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/interpretation"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s84",
+        "anyIndex": "s176",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle/properties/link",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/link"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s85",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device/properties/modifierExtension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/modifierExtension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Organization/properties/modifierExtension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/modifierExtension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Practitioner/properties/modifierExtension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s86",
+        "bindings": [
+          {
+            "jsonKind": "boolean",
+            "tag": 1,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/multipleBirthBoolean"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s87",
+        "bindings": [
+          {
+            "jsonKind": "number",
+            "tag": 3,
+            "basis": [
+              "fhir-element-name"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/multipleBirthInteger"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s88",
+        "anyIndex": "s145",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/name",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Practitioner/properties/name"
+            ]
+          },
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/string"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s89",
+        "anyIndex": "s127",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device/properties/note",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/note",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen/properties/note"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s90",
+        "keys": [
+          {
+            "key": "display",
+            "to": "s24"
+          },
+          {
+            "key": "extension",
+            "to": "s43"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "identifier",
+            "to": "s11"
+          },
+          {
+            "key": "reference",
+            "to": "s24"
+          },
+          {
+            "key": "type",
+            "to": "s12"
+          }
+        ],
+        "anyIndex": "s22",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen/properties/parent"
+            ]
+          },
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Reference"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s91",
+        "keys": [
+          {
+            "key": "display",
+            "to": "s24"
+          },
+          {
+            "key": "extension",
+            "to": "s43"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "identifier",
+            "to": "s11"
+          },
+          {
+            "key": "reference",
+            "to": "s24"
+          },
+          {
+            "key": "type",
+            "to": "s12"
+          }
+        ],
+        "anyIndex": "s22",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/partOf"
+            ]
+          },
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Reference"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s92",
+        "anyIndex": "s22",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/performer"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s93",
+        "anyIndex": "s128",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/photo",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Practitioner/properties/photo"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s94",
+        "anyIndex": "s177",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen/properties/processing"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s95",
+        "anyIndex": "s178",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device/properties/property"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s96",
+        "anyIndex": "s179",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Practitioner/properties/qualification"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s97",
+        "anyIndex": "s180",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/referenceRange"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s98",
+        "anyIndex": "s22",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen/properties/request"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s99",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-const"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle/properties/resourceType",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device/properties/resourceType",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/resourceType",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Organization/properties/resourceType",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/resourceType",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Practitioner/properties/resourceType",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen/properties/resourceType"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s100",
+        "anyIndex": "s26",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device/properties/safety"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s101",
+        "anyIndex": "s181",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device/properties/specialization"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s102",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device/properties/status",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/status",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen/properties/status"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s103",
+        "anyIndex": "s26",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device/properties/statusReason"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s104",
+        "anyIndex": "s134",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Organization/properties/telecom",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient/properties/telecom",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Practitioner/properties/telecom"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s105",
+        "keys": [
+          {
+            "key": "div",
+            "to": "s182"
+          },
+          {
+            "key": "extension",
+            "to": "s183"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "status",
+            "to": "s184"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s106",
+        "keys": [
+          {
+            "key": "coding",
+            "to": "s47"
+          },
+          {
+            "key": "extension",
+            "to": "s48"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "text",
+            "to": "s24"
+          }
+        ],
+        "anyIndex": "s26",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Organization/properties/type"
+            ]
+          },
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/CodeableConcept"
+            ]
+          },
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle/properties/type"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s107",
+        "anyIndex": "s185",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device/properties/udiCarrier"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s108",
+        "bindings": [
+          {
+            "jsonKind": "boolean",
+            "tag": 1,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/valueBoolean"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s109",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/valueDateTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s110",
+        "bindings": [
+          {
+            "jsonKind": "number",
+            "tag": 3,
+            "basis": [
+              "fhir-element-name"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/valueInteger"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s111",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s13"
+          },
+          {
+            "key": "comparator",
+            "to": "s186"
+          },
+          {
+            "key": "extension",
+            "to": "s187"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "system",
+            "to": "s12"
+          },
+          {
+            "key": "unit",
+            "to": "s24"
+          },
+          {
+            "key": "value",
+            "to": "s123"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Quantity"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s112",
+        "keys": [
+          {
+            "key": "extension",
+            "to": "s188"
+          },
+          {
+            "key": "high",
+            "to": "s111"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "low",
+            "to": "s111"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Range"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s113",
+        "keys": [
+          {
+            "key": "denominator",
+            "to": "s111"
+          },
+          {
+            "key": "extension",
+            "to": "s189"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "numerator",
+            "to": "s111"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Ratio"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s114",
+        "keys": [
+          {
+            "key": "data",
+            "to": "s24"
+          },
+          {
+            "key": "dimensions",
+            "to": "s190"
+          },
+          {
+            "key": "extension",
+            "to": "s191"
+          },
+          {
+            "key": "factor",
+            "to": "s123"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "lowerLimit",
+            "to": "s123"
+          },
+          {
+            "key": "origin",
+            "to": "s111"
+          },
+          {
+            "key": "period",
+            "to": "s123"
+          },
+          {
+            "key": "upperLimit",
+            "to": "s123"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s115",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/valueString"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s116",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation/properties/valueTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s117",
+        "anyIndex": "s192",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device/properties/version"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s118",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Response/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s119",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Response/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s120",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Search/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s121",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Search/properties/mode"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s122",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Search/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s123",
+        "bindings": [
+          {
+            "jsonKind": "number",
+            "tag": 4,
+            "basis": [
+              "fhir-named-primitive"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/decimal"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s124",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s125",
+        "keys": [
+          {
+            "key": "city",
+            "to": "s24"
+          },
+          {
+            "key": "country",
+            "to": "s24"
+          },
+          {
+            "key": "district",
+            "to": "s24"
+          },
+          {
+            "key": "extension",
+            "to": "s193"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "line",
+            "to": "s194"
+          },
+          {
+            "key": "period",
+            "to": "s25"
+          },
+          {
+            "key": "postalCode",
+            "to": "s24"
+          },
+          {
+            "key": "state",
+            "to": "s24"
+          },
+          {
+            "key": "text",
+            "to": "s24"
+          },
+          {
+            "key": "type",
+            "to": "s195"
+          },
+          {
+            "key": "use",
+            "to": "s196"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Address"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s126",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s13"
+          },
+          {
+            "key": "comparator",
+            "to": "s197"
+          },
+          {
+            "key": "extension",
+            "to": "s198"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "system",
+            "to": "s12"
+          },
+          {
+            "key": "unit",
+            "to": "s24"
+          },
+          {
+            "key": "value",
+            "to": "s123"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Age"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s127",
+        "keys": [
+          {
+            "key": "authorReference",
+            "to": "s22"
+          },
+          {
+            "key": "authorString",
+            "to": "s199"
+          },
+          {
+            "key": "extension",
+            "to": "s200"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "text",
+            "to": "s201"
+          },
+          {
+            "key": "time",
+            "to": "s45"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Annotation"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s128",
+        "keys": [
+          {
+            "key": "contentType",
+            "to": "s13"
+          },
+          {
+            "key": "creation",
+            "to": "s45"
+          },
+          {
+            "key": "data",
+            "to": "s33"
+          },
+          {
+            "key": "extension",
+            "to": "s202"
+          },
+          {
+            "key": "hash",
+            "to": "s33"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "language",
+            "to": "s13"
+          },
+          {
+            "key": "size",
+            "to": "s19"
+          },
+          {
+            "key": "title",
+            "to": "s24"
+          },
+          {
+            "key": "url",
+            "to": "s203"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Attachment"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s129",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueBase64Binary"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s130",
+        "bindings": [
+          {
+            "jsonKind": "boolean",
+            "tag": 1,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueBoolean"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s131",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueCanonical"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s132",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueCode"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s133",
+        "keys": [
+          {
+            "key": "extension",
+            "to": "s204"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "name",
+            "to": "s24"
+          },
+          {
+            "key": "telecom",
+            "to": "s205"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/ContactDetail"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s134",
+        "keys": [
+          {
+            "key": "extension",
+            "to": "s206"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "period",
+            "to": "s25"
+          },
+          {
+            "key": "rank",
+            "to": "s190"
+          },
+          {
+            "key": "system",
+            "to": "s207"
+          },
+          {
+            "key": "use",
+            "to": "s208"
+          },
+          {
+            "key": "value",
+            "to": "s24"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/ContactPoint"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s135",
+        "keys": [
+          {
+            "key": "contact",
+            "to": "s209"
+          },
+          {
+            "key": "extension",
+            "to": "s210"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "name",
+            "to": "s24"
+          },
+          {
+            "key": "type",
+            "to": "s211"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Contributor"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s136",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s13"
+          },
+          {
+            "key": "comparator",
+            "to": "s212"
+          },
+          {
+            "key": "extension",
+            "to": "s213"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "system",
+            "to": "s12"
+          },
+          {
+            "key": "unit",
+            "to": "s24"
+          },
+          {
+            "key": "value",
+            "to": "s123"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Count"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s137",
+        "keys": [
+          {
+            "key": "codeFilter",
+            "to": "s214"
+          },
+          {
+            "key": "dateFilter",
+            "to": "s215"
+          },
+          {
+            "key": "extension",
+            "to": "s216"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "limit",
+            "to": "s190"
+          },
+          {
+            "key": "mustSupport",
+            "to": "s217"
+          },
+          {
+            "key": "profile",
+            "to": "s218"
+          },
+          {
+            "key": "sort",
+            "to": "s219"
+          },
+          {
+            "key": "subjectCodeableConcept",
+            "to": "s26"
+          },
+          {
+            "key": "subjectReference",
+            "to": "s22"
+          },
+          {
+            "key": "type",
+            "to": "s13"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s138",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueDate"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s139",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueDateTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s140",
+        "bindings": [
+          {
+            "jsonKind": "number",
+            "tag": 4,
+            "basis": [
+              "fhir-element-name"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueDecimal"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s141",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s13"
+          },
+          {
+            "key": "comparator",
+            "to": "s220"
+          },
+          {
+            "key": "extension",
+            "to": "s221"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "system",
+            "to": "s12"
+          },
+          {
+            "key": "unit",
+            "to": "s24"
+          },
+          {
+            "key": "value",
+            "to": "s123"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Distance"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s142",
+        "keys": [
+          {
+            "key": "additionalInstruction",
+            "to": "s222"
+          },
+          {
+            "key": "asNeededBoolean",
+            "to": "s223"
+          },
+          {
+            "key": "asNeededCodeableConcept",
+            "to": "s26"
+          },
+          {
+            "key": "doseAndRate",
+            "to": "s224"
+          },
+          {
+            "key": "extension",
+            "to": "s225"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "maxDosePerAdministration",
+            "to": "s111"
+          },
+          {
+            "key": "maxDosePerLifetime",
+            "to": "s111"
+          },
+          {
+            "key": "maxDosePerPeriod",
+            "to": "s113"
+          },
+          {
+            "key": "method",
+            "to": "s26"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s226"
+          },
+          {
+            "key": "patientInstruction",
+            "to": "s24"
+          },
+          {
+            "key": "route",
+            "to": "s26"
+          },
+          {
+            "key": "sequence",
+            "to": "s227"
+          },
+          {
+            "key": "site",
+            "to": "s26"
+          },
+          {
+            "key": "text",
+            "to": "s24"
+          },
+          {
+            "key": "timing",
+            "to": "s75"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Dosage"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s143",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s13"
+          },
+          {
+            "key": "comparator",
+            "to": "s228"
+          },
+          {
+            "key": "extension",
+            "to": "s229"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "system",
+            "to": "s12"
+          },
+          {
+            "key": "unit",
+            "to": "s24"
+          },
+          {
+            "key": "value",
+            "to": "s123"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Duration"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s144",
+        "keys": [
+          {
+            "key": "description",
+            "to": "s24"
+          },
+          {
+            "key": "expression",
+            "to": "s24"
+          },
+          {
+            "key": "extension",
+            "to": "s230"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "language",
+            "to": "s231"
+          },
+          {
+            "key": "name",
+            "to": "s10"
+          },
+          {
+            "key": "reference",
+            "to": "s12"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Expression"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s145",
+        "keys": [
+          {
+            "key": "extension",
+            "to": "s232"
+          },
+          {
+            "key": "family",
+            "to": "s24"
+          },
+          {
+            "key": "given",
+            "to": "s233"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "period",
+            "to": "s25"
+          },
+          {
+            "key": "prefix",
+            "to": "s234"
+          },
+          {
+            "key": "suffix",
+            "to": "s235"
+          },
+          {
+            "key": "text",
+            "to": "s24"
+          },
+          {
+            "key": "use",
+            "to": "s236"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/HumanName"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s146",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueId"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s147",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueInstant"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s148",
+        "bindings": [
+          {
+            "jsonKind": "number",
+            "tag": 3,
+            "basis": [
+              "fhir-element-name"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueInteger"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s149",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueMarkdown"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s150",
+        "keys": [
+          {
+            "key": "currency",
+            "to": "s13"
+          },
+          {
+            "key": "extension",
+            "to": "s237"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "value",
+            "to": "s123"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Money"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s151",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueOid"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s152",
+        "keys": [
+          {
+            "key": "documentation",
+            "to": "s24"
+          },
+          {
+            "key": "extension",
+            "to": "s238"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "max",
+            "to": "s24"
+          },
+          {
+            "key": "min",
+            "to": "s227"
+          },
+          {
+            "key": "name",
+            "to": "s13"
+          },
+          {
+            "key": "profile",
+            "to": "s51"
+          },
+          {
+            "key": "type",
+            "to": "s13"
+          },
+          {
+            "key": "use",
+            "to": "s13"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/ParameterDefinition"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s153",
+        "bindings": [
+          {
+            "jsonKind": "number",
+            "tag": 3,
+            "basis": [
+              "fhir-element-name"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valuePositiveInt"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s154",
+        "keys": [
+          {
+            "key": "citation",
+            "to": "s201"
+          },
+          {
+            "key": "display",
+            "to": "s24"
+          },
+          {
+            "key": "document",
+            "to": "s128"
+          },
+          {
+            "key": "extension",
+            "to": "s239"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "label",
+            "to": "s24"
+          },
+          {
+            "key": "resource",
+            "to": "s51"
+          },
+          {
+            "key": "type",
+            "to": "s240"
+          },
+          {
+            "key": "url",
+            "to": "s203"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/RelatedArtifact"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s155",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueString"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s156",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s157",
+        "keys": [
+          {
+            "key": "condition",
+            "to": "s144"
+          },
+          {
+            "key": "data",
+            "to": "s241"
+          },
+          {
+            "key": "extension",
+            "to": "s242"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "name",
+            "to": "s24"
+          },
+          {
+            "key": "timingDate",
+            "to": "s243"
+          },
+          {
+            "key": "timingDateTime",
+            "to": "s244"
+          },
+          {
+            "key": "timingReference",
+            "to": "s22"
+          },
+          {
+            "key": "timingTiming",
+            "to": "s75"
+          },
+          {
+            "key": "type",
+            "to": "s245"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/TriggerDefinition"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s158",
+        "bindings": [
+          {
+            "jsonKind": "number",
+            "tag": 3,
+            "basis": [
+              "fhir-element-name"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueUnsignedInt"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s159",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueUri"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s160",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueUrl"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s161",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s52"
+          },
+          {
+            "key": "extension",
+            "to": "s246"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "valueCodeableConcept",
+            "to": "s26"
+          },
+          {
+            "key": "valueQuantity",
+            "to": "s111"
+          },
+          {
+            "key": "valueRange",
+            "to": "s112"
+          },
+          {
+            "key": "valueReference",
+            "to": "s22"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s162",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Extension/properties/valueUuid"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s163",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Coding/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s164",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen_Collection/properties/collectedDateTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s165",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen_Collection/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s166",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen_Collection/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s167",
+        "keys": [
+          {
+            "key": "coding",
+            "to": "s47"
+          },
+          {
+            "key": "extension",
+            "to": "s247"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "language",
+            "to": "s26"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s248"
+          },
+          {
+            "key": "preferred",
+            "to": "s56"
+          },
+          {
+            "key": "text",
+            "to": "s24"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/CodeableConcept"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s168",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s26"
+          },
+          {
+            "key": "dataAbsentReason",
+            "to": "s26"
+          },
+          {
+            "key": "extension",
+            "to": "s249"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "interpretation",
+            "to": "s250"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s251"
+          },
+          {
+            "key": "referenceRange",
+            "to": "s252"
+          },
+          {
+            "key": "valueBoolean",
+            "to": "s253"
+          },
+          {
+            "key": "valueCodeableConcept",
+            "to": "s26"
+          },
+          {
+            "key": "valueDateTime",
+            "to": "s254"
+          },
+          {
+            "key": "valueInteger",
+            "to": "s255"
+          },
+          {
+            "key": "valuePeriod",
+            "to": "s25"
+          },
+          {
+            "key": "valueQuantity",
+            "to": "s111"
+          },
+          {
+            "key": "valueRange",
+            "to": "s112"
+          },
+          {
+            "key": "valueRatio",
+            "to": "s113"
+          },
+          {
+            "key": "valueSampledData",
+            "to": "s114"
+          },
+          {
+            "key": "valueString",
+            "to": "s256"
+          },
+          {
+            "key": "valueTime",
+            "to": "s257"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s169",
+        "keys": [
+          {
+            "key": "address",
+            "to": "s125"
+          },
+          {
+            "key": "extension",
+            "to": "s258"
+          },
+          {
+            "key": "gender",
+            "to": "s259"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s260"
+          },
+          {
+            "key": "name",
+            "to": "s145"
+          },
+          {
+            "key": "organization",
+            "to": "s22"
+          },
+          {
+            "key": "period",
+            "to": "s25"
+          },
+          {
+            "key": "purpose",
+            "to": "s26"
+          },
+          {
+            "key": "rank",
+            "to": "s190"
+          },
+          {
+            "key": "relationship",
+            "to": "s261"
+          },
+          {
+            "key": "system",
+            "to": "s207"
+          },
+          {
+            "key": "telecom",
+            "to": "s262"
+          },
+          {
+            "key": "use",
+            "to": "s208"
+          },
+          {
+            "key": "value",
+            "to": "s24"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/ContactPoint",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Organization_Contact",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient_Contact"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s170",
+        "keys": [
+          {
+            "key": "additiveCodeableConcept",
+            "to": "s26"
+          },
+          {
+            "key": "additiveReference",
+            "to": "s22"
+          },
+          {
+            "key": "capacity",
+            "to": "s111"
+          },
+          {
+            "key": "description",
+            "to": "s24"
+          },
+          {
+            "key": "extension",
+            "to": "s263"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "identifier",
+            "to": "s264"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s265"
+          },
+          {
+            "key": "specimenQuantity",
+            "to": "s111"
+          },
+          {
+            "key": "type",
+            "to": "s26"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen_Container"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s171",
+        "keys": [
+          {
+            "key": "extension",
+            "to": "s266"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s267"
+          },
+          {
+            "key": "name",
+            "to": "s24"
+          },
+          {
+            "key": "type",
+            "to": "s268"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_DeviceName"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s172",
+        "anyIndex": "s45",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Timing/properties/event"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s173",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Timing/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s174",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Timing/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s175",
+        "keys": [
+          {
+            "key": "boundsDuration",
+            "to": "s143"
+          },
+          {
+            "key": "boundsPeriod",
+            "to": "s25"
+          },
+          {
+            "key": "boundsRange",
+            "to": "s112"
+          },
+          {
+            "key": "count",
+            "to": "s190"
+          },
+          {
+            "key": "countMax",
+            "to": "s190"
+          },
+          {
+            "key": "dayOfWeek",
+            "to": "s269"
+          },
+          {
+            "key": "duration",
+            "to": "s123"
+          },
+          {
+            "key": "durationMax",
+            "to": "s123"
+          },
+          {
+            "key": "durationUnit",
+            "to": "s270"
+          },
+          {
+            "key": "extension",
+            "to": "s271"
+          },
+          {
+            "key": "frequency",
+            "to": "s190"
+          },
+          {
+            "key": "frequencyMax",
+            "to": "s190"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s272"
+          },
+          {
+            "key": "offset",
+            "to": "s19"
+          },
+          {
+            "key": "period",
+            "to": "s123"
+          },
+          {
+            "key": "periodMax",
+            "to": "s123"
+          },
+          {
+            "key": "periodUnit",
+            "to": "s273"
+          },
+          {
+            "key": "timeOfDay",
+            "to": "s274"
+          },
+          {
+            "key": "when",
+            "to": "s275"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Timing_Repeat"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s176",
+        "keys": [
+          {
+            "key": "extension",
+            "to": "s276"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s277"
+          },
+          {
+            "key": "other",
+            "to": "s22"
+          },
+          {
+            "key": "relation",
+            "to": "s24"
+          },
+          {
+            "key": "type",
+            "to": "s278"
+          },
+          {
+            "key": "url",
+            "to": "s12"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Link"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s177",
+        "keys": [
+          {
+            "key": "additive",
+            "to": "s279"
+          },
+          {
+            "key": "description",
+            "to": "s24"
+          },
+          {
+            "key": "extension",
+            "to": "s280"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s281"
+          },
+          {
+            "key": "procedure",
+            "to": "s26"
+          },
+          {
+            "key": "timeDateTime",
+            "to": "s282"
+          },
+          {
+            "key": "timePeriod",
+            "to": "s25"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen_Processing"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s178",
+        "keys": [
+          {
+            "key": "extension",
+            "to": "s283"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s284"
+          },
+          {
+            "key": "type",
+            "to": "s26"
+          },
+          {
+            "key": "valueCode",
+            "to": "s285"
+          },
+          {
+            "key": "valueQuantity",
+            "to": "s286"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s179",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s26"
+          },
+          {
+            "key": "extension",
+            "to": "s287"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "identifier",
+            "to": "s288"
+          },
+          {
+            "key": "issuer",
+            "to": "s22"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s289"
+          },
+          {
+            "key": "period",
+            "to": "s25"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s180",
+        "keys": [
+          {
+            "key": "age",
+            "to": "s112"
+          },
+          {
+            "key": "appliesTo",
+            "to": "s290"
+          },
+          {
+            "key": "extension",
+            "to": "s291"
+          },
+          {
+            "key": "high",
+            "to": "s111"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "low",
+            "to": "s111"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s292"
+          },
+          {
+            "key": "text",
+            "to": "s24"
+          },
+          {
+            "key": "type",
+            "to": "s26"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation_ReferenceRange"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s181",
+        "keys": [
+          {
+            "key": "extension",
+            "to": "s293"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s294"
+          },
+          {
+            "key": "systemType",
+            "to": "s26"
+          },
+          {
+            "key": "version",
+            "to": "s24"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s182",
+        "unresolved": [
+          {
+            "jsonKinds": [
+              "array",
+              "boolean",
+              "null",
+              "number",
+              "object",
+              "string"
+            ],
+            "reason": "The schema node has no JSON kind or semantic type constraint.",
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/xhtml"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s183",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Narrative/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s184",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Narrative/properties/status"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s185",
+        "keys": [
+          {
+            "key": "carrierAIDC",
+            "to": "s33"
+          },
+          {
+            "key": "carrierHRF",
+            "to": "s24"
+          },
+          {
+            "key": "deviceIdentifier",
+            "to": "s24"
+          },
+          {
+            "key": "entryType",
+            "to": "s295"
+          },
+          {
+            "key": "extension",
+            "to": "s296"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "issuer",
+            "to": "s12"
+          },
+          {
+            "key": "jurisdiction",
+            "to": "s12"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s297"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_UdiCarrier"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s186",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Quantity/properties/comparator"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s187",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Quantity/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s188",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Range/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s189",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Ratio/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s190",
+        "bindings": [
+          {
+            "jsonKind": "number",
+            "tag": 3,
+            "basis": [
+              "fhir-named-primitive"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/positiveInt"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s191",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/SampledData/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s192",
+        "keys": [
+          {
+            "key": "component",
+            "to": "s11"
+          },
+          {
+            "key": "extension",
+            "to": "s298"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s299"
+          },
+          {
+            "key": "type",
+            "to": "s26"
+          },
+          {
+            "key": "value",
+            "to": "s24"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_Version"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s193",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Address/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s194",
+        "anyIndex": "s24",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Address/properties/line"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s195",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Address/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s196",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Address/properties/use"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s197",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Age/properties/comparator"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s198",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Age/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s199",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Annotation/properties/authorString"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s200",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Annotation/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s201",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/markdown"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s202",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Attachment/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s203",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/url"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s204",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/ContactDetail/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s205",
+        "anyIndex": "s134",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/ContactDetail/properties/telecom"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s206",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/ContactPoint/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s207",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/ContactPoint/properties/system"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s208",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/ContactPoint/properties/use"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s209",
+        "anyIndex": "s133",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Contributor/properties/contact"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s210",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Contributor/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s211",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Contributor/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s212",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Count/properties/comparator"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s213",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Count/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s214",
+        "anyIndex": "s300",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement/properties/codeFilter"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s215",
+        "anyIndex": "s301",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement/properties/dateFilter"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s216",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s217",
+        "anyIndex": "s24",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement/properties/mustSupport"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s218",
+        "anyIndex": "s51",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement/properties/profile"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s219",
+        "anyIndex": "s302",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement/properties/sort"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s220",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Distance/properties/comparator"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s221",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Distance/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s222",
+        "anyIndex": "s26",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Dosage/properties/additionalInstruction"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s223",
+        "bindings": [
+          {
+            "jsonKind": "boolean",
+            "tag": 1,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Dosage/properties/asNeededBoolean"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s224",
+        "anyIndex": "s303",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Dosage/properties/doseAndRate"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s225",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Dosage/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s226",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Dosage/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s227",
+        "bindings": [
+          {
+            "jsonKind": "number",
+            "tag": 3,
+            "basis": [
+              "fhir-named-primitive"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/integer"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s228",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Duration/properties/comparator"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s229",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Duration/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s230",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Expression/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s231",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Expression/properties/language"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s232",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/HumanName/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s233",
+        "anyIndex": "s24",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/HumanName/properties/given"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s234",
+        "anyIndex": "s24",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/HumanName/properties/prefix"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s235",
+        "anyIndex": "s24",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/HumanName/properties/suffix"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s236",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/HumanName/properties/use"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s237",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Money/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s238",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/ParameterDefinition/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s239",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/RelatedArtifact/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s240",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/RelatedArtifact/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s241",
+        "anyIndex": "s137",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/TriggerDefinition/properties/data"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s242",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/TriggerDefinition/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s243",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/TriggerDefinition/properties/timingDate"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s244",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/TriggerDefinition/properties/timingDateTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s245",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/TriggerDefinition/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s246",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/UsageContext/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s247",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/CodeableConcept/properties/extension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient_Communication/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s248",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient_Communication/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s249",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation_Component/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s250",
+        "anyIndex": "s26",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation_Component/properties/interpretation"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s251",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation_Component/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s252",
+        "anyIndex": "s180",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation_Component/properties/referenceRange"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s253",
+        "bindings": [
+          {
+            "jsonKind": "boolean",
+            "tag": 1,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation_Component/properties/valueBoolean"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s254",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation_Component/properties/valueDateTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s255",
+        "bindings": [
+          {
+            "jsonKind": "number",
+            "tag": 3,
+            "basis": [
+              "fhir-element-name"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation_Component/properties/valueInteger"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s256",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation_Component/properties/valueString"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s257",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation_Component/properties/valueTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s258",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/ContactPoint/properties/extension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Organization_Contact/properties/extension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient_Contact/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s259",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient_Contact/properties/gender"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s260",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Organization_Contact/properties/modifierExtension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient_Contact/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s261",
+        "anyIndex": "s26",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient_Contact/properties/relationship"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s262",
+        "anyIndex": "s134",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Organization_Contact/properties/telecom",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient_Contact/properties/telecom"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s263",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen_Container/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s264",
+        "anyIndex": "s11",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen_Container/properties/identifier"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s265",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen_Container/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s266",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_DeviceName/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s267",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_DeviceName/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s268",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_DeviceName/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s269",
+        "anyIndex": "s13",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Timing_Repeat/properties/dayOfWeek"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s270",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Timing_Repeat/properties/durationUnit"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s271",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Timing_Repeat/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s272",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Timing_Repeat/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s273",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Timing_Repeat/properties/periodUnit"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s274",
+        "anyIndex": "s304",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Timing_Repeat/properties/timeOfDay"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s275",
+        "anyIndex": "s305",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Timing_Repeat/properties/when"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s276",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Link/properties/extension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient_Link/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s277",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Bundle_Link/properties/modifierExtension",
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient_Link/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s278",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Patient_Link/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s279",
+        "anyIndex": "s22",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen_Processing/properties/additive"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s280",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen_Processing/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s281",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen_Processing/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s282",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Specimen_Processing/properties/timeDateTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s283",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_Property/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s284",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_Property/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s285",
+        "anyIndex": "s26",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_Property/properties/valueCode"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s286",
+        "anyIndex": "s111",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_Property/properties/valueQuantity"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s287",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Practitioner_Qualification/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s288",
+        "anyIndex": "s11",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Practitioner_Qualification/properties/identifier"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s289",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Practitioner_Qualification/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s290",
+        "anyIndex": "s26",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation_ReferenceRange/properties/appliesTo"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s291",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation_ReferenceRange/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s292",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Observation_ReferenceRange/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s293",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_Specialization/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s294",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_Specialization/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s295",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_UdiCarrier/properties/entryType"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s296",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_UdiCarrier/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s297",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_UdiCarrier/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s298",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_Version/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s299",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Device_Version/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s300",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s306"
+          },
+          {
+            "key": "extension",
+            "to": "s307"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s308"
+          },
+          {
+            "key": "path",
+            "to": "s24"
+          },
+          {
+            "key": "searchParam",
+            "to": "s24"
+          },
+          {
+            "key": "valueSet",
+            "to": "s51"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement_CodeFilter"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s301",
+        "keys": [
+          {
+            "key": "extension",
+            "to": "s309"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s310"
+          },
+          {
+            "key": "path",
+            "to": "s24"
+          },
+          {
+            "key": "searchParam",
+            "to": "s24"
+          },
+          {
+            "key": "valueDateTime",
+            "to": "s311"
+          },
+          {
+            "key": "valueDuration",
+            "to": "s143"
+          },
+          {
+            "key": "valuePeriod",
+            "to": "s25"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement_DateFilter"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s302",
+        "keys": [
+          {
+            "key": "direction",
+            "to": "s312"
+          },
+          {
+            "key": "extension",
+            "to": "s313"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s314"
+          },
+          {
+            "key": "path",
+            "to": "s24"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement_Sort"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s303",
+        "keys": [
+          {
+            "key": "doseQuantity",
+            "to": "s111"
+          },
+          {
+            "key": "doseRange",
+            "to": "s112"
+          },
+          {
+            "key": "extension",
+            "to": "s315"
+          },
+          {
+            "key": "id",
+            "to": "s24"
+          },
+          {
+            "key": "modifierExtension",
+            "to": "s316"
+          },
+          {
+            "key": "rateQuantity",
+            "to": "s111"
+          },
+          {
+            "key": "rateRange",
+            "to": "s112"
+          },
+          {
+            "key": "rateRatio",
+            "to": "s113"
+          },
+          {
+            "key": "type",
+            "to": "s26"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Dosage_DoseAndRate"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s304",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/time"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s305",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Timing_Repeat/properties/when/items"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s306",
+        "anyIndex": "s52",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement_CodeFilter/properties/code"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s307",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement_CodeFilter/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s308",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement_CodeFilter/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s309",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement_DateFilter/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s310",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement_DateFilter/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s311",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement_DateFilter/properties/valueDateTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s312",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement_Sort/properties/direction"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s313",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement_Sort/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s314",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/DataRequirement_Sort/properties/modifierExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s315",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Dosage_DoseAndRate/properties/extension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s316",
+        "anyIndex": "s44",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/Dosage_DoseAndRate/properties/modifierExtension"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

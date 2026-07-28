@@ -31,6 +31,7 @@ Only this:
 protocol version
 canonicalization / hash / tree algorithm identifiers
 schema-or-profile identifier (committed, not merely advisory)
+exact type-map artifact identifier (committed, not merely advisory)
 typed payload tree
 salted commitments and disclosure proofs
 optional anchoring metadata
@@ -57,12 +58,27 @@ The v1 registry is `sg.gov.moh.vaccination-healthcert`, `sg.gov.moh.pdt-healthce
 
 | Item | Why |
 |---|---|
-| `recordType` and `schemaVersion` values | They are committed inside the root as reserved leaves (spec section 11.2). |
-| Type-map scope | Which schema definitions the type map must cover for this family (spec section 4.2). |
+| `recordType`, `schemaVersion` and exact type-map artifact | They are committed inside the root as reserved leaves and are checked together when selecting a map (spec sections 4.2 and 11.2; [`type-maps.md`](../type-maps.md) section 4). |
+| Type-map scope | Which schema definitions the type map covers for this family, including every unresolved path that fails closed (spec section 4.2; [`type-maps.md`](../type-maps.md) sections 1 and 2). |
 | Non-redactable paths | The minimum-disclosure floor (spec section 10.2). Without it a disclosed copy can hide what the record is. |
-| Blob-bearing fields | Which fields carry base64 and how they are bound (spec section 6.3). Every v1 profile binds them as `STRING` over the base64 text. The content-addressed binding, tag 8 `BLOB_REF`, is defined and **selected by none of them**, so a profile that wants it must say so explicitly and must also state how the blob travels out of band (spec section 6.5). |
+| Blob-bearing fields | Which fields carry base64 and how they are bound (spec section 6.3). The healthcert schemas' explicitly typed blob fields bind as `STRING` over the base64 text, while FHIR `base64Binary` remains unresolved between STRING and BYTES ([`type-maps.md`](../type-maps.md) section 1.3). The content-addressed binding, tag 8 `BLOB_REF`, is defined and **selected by none of them**, so a profile that wants it must say so explicitly and must also state how the blob travels out of band (spec section 6.5). |
 | Known schema defects | So an implementer is not surprised by them. |
 | What the schema does NOT enforce | The gap between what the samples show and what the schema requires. This gap is large and is the single most misleading thing about these families. |
+
+## Published type maps
+
+Each row names one exact immutable artifact.
+The artifact ID, `recordType` and `schemaVersion` are checked together, and `typeMapVersion` is equality-only metadata rather than a version range, under [`type-maps.md`](../type-maps.md) sections 4 and 5.2.
+
+| Profile | Published artifact | Exact artifact ID | Fail-closed gaps |
+|---|---|---|---|
+| Full FHIR root union | [`hl7.fhir.bundle-4.0.1.json`](../../type-maps/hl7.fhir.bundle-4.0.1.json) | `sha256:0e9e642bc89c081e2e6faf651acdc25c46fac83201248ef53a7c812181279807` | Six schema-local `base64Binary` slots and `Narrative.div` are unresolved, schema-rejected FHIR null placeholders remain unbound, and 659 object-applicator source nodes omit an object type ([`type-maps.md`](../type-maps.md) sections 1.3, 1.5 and 2.2). |
+| PDT base plus lite FHIR Bundle | [`sg.gov.moh.pdt-healthcert-2.0.json`](../../type-maps/sg.gov.moh.pdt-healthcert-2.0.json) | `sha256:4f8cecc59c85101b8b567658c90651bcbf8f9d4dc279571aa40a03cf04f434ff` | Four lite `base64Binary` slots and `Narrative.div` are unresolved, 65 reached lite object nodes omit an object type, and the 20 endorsed-sample path/kind pairs undeclared by the base schema are intentionally absent ([`type-maps.md`](../type-maps.md) sections 1.2, 1.3 and 1.5). |
+| Recovery plus lite FHIR Bundle | [`sg.gov.moh.recovery-healthcert-2.0.json`](../../type-maps/sg.gov.moh.recovery-healthcert-2.0.json) | `sha256:db935b67a3a82754921267e3af237b606f7489b46e05aa892d175b8d87504177` | Four lite `base64Binary` slots and `Narrative.div` are unresolved, 65 reached lite object nodes omit an object type, and the open root makes issuer-extension coverage unbounded ([`type-maps.md`](../type-maps.md) sections 1.3, 1.5 and 2.2). |
+| Vaccination flattened profile | [`sg.gov.moh.vaccination-healthcert-1.0.json`](../../type-maps/sg.gov.moh.vaccination-healthcert-1.0.json) | `sha256:de7bb92226af5fa5dc5064d9cb203329abc69160f4280fdf739e66e5e0151e93` | `dose` and `expiryDateTime` are unresolved, 26 object-intended schemas leave non-object alternatives unbound, and the shipped sample is therefore uncommittable ([`type-maps.md`](../type-maps.md) sections 1.1 and 1.4). |
+
+The executable artifact format is [`schemas/type-map-artifact-1.0.json`](../../schemas/type-map-artifact-1.0.json).
+Issuer additions use immutable scoped child artifacts rather than defaulting an unknown path from its JSON syntax, as specified in [`type-maps.md`](../type-maps.md) section 5 and ROAX-CANON/1 section 4.2.
 
 ## A caution that applies to all four
 

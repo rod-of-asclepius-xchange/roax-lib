@@ -374,7 +374,7 @@ privacy that is the worst failure available, and it is **silent**: both records 
 
 The specification's defence was to bind `recordId` into every salt preimage, adopted from dogtag,
 which does the same to keep one wallet's two tags mutually unlinkable (`AGENTS.md:1744-1745` in the
-dogtag monorepo). That defence was real, and the specification was honest that it was defence in
+`dogtag-mono-repo`). That defence was real, and the specification was honest that it was defence in
 depth rather than a fix: if `recordId` is content-derived or reused across a reissuance, the linkage
 returns. But "derive the record identifier deterministically so reissuance reproduces the same root"
 is an *attractive-sounding* thing for an implementer to do, and the specification said so itself. A
@@ -401,12 +401,11 @@ same reason.
 - Conformance class 12 keeps its number and its subject and loses its mechanism: it now asserts that
   two records for the same subject sharing a path and a value produce **different** leaf hashes.
 - `DOMAIN` stays algorithm-qualified exactly as it was. This ruling does not touch it.
-- **A consequence the ruling did not enumerate:** `roax.recordId` was mandatory to disclose **by
-  arithmetic**, because a verifier needed it to rebuild a salt preimage. With the preimage gone it is
-  mandatory **by policy** instead, alongside `roax.issuer.id`. Only `roax.recordType` and
-  `roax.schemaVersion` remain arithmetic, because they select the type map. The floor itself is
-  unchanged; only the reason for two of its four entries is. Specification sections 10.2 and 11.2 and
-  the four profile documents were corrected.
+- **A consequence the ruling did not enumerate:** `roax.recordId` was mandatory to disclose **by arithmetic**, because a verifier needed it to rebuild a salt preimage.
+  With the preimage gone it is mandatory **by policy** instead, alongside `roax.issuer.id`.
+  `roax.recordType`, `roax.schemaVersion` and `roax.typeMap.id` are arithmetic because they select and authenticate the exact type-map artifact.
+  The floor now has five entries because the type-map work added `roax.typeMap.id` after the salt ruling.
+  Specification sections 4.2, 10.2 and 11.2 and the four profile documents carry the combined result.
 
 ### D5 - Leaf ordering. **RULED 2026-07-28: D5a, by `encodePath` bytes, as recommended**
 
@@ -487,9 +486,11 @@ already-issued record that reaches it, which specification section 12.2 forbids.
 
 ### D8 - What goes inside the root. **RULED 2026-07-28: as recommended, plus a mandatory corpus vector**
 
-**Written into the spec:** `canon`, `recordType`, `schemaVersion`, `recordId` and issuer identity
-inside as reserved leaves; routing hints outside; and a normative statement that outside-the-root
-fields are hints and never authority (specification sections 11.2 and 11.3).
+**Written into the spec:** `canon` is bound through the domain string in every leaf;
+`roax.recordType`, `roax.schemaVersion`, `roax.typeMap.id`, `roax.recordId` and `roax.issuer.id` are
+the five mandatory reserved leaves; `roax.issuer.keyId` is the conditional reserved leaf; routing
+hints stay outside; and outside-the-root fields are hints and never authority (specification
+sections 8, 11.2 and 11.3).
 
 **The tension is real in both directions and dogtag hit both ends.**
 
@@ -520,10 +521,11 @@ more.
 **This ruling extended the specification.** The specification previously recommended inline only and
 treated content-addressing as a later question.
 
-**Written into the spec:** blobs are hashed inline and bound as `STRING` over the base64 text for
-every version-1 profile (specification section 6.3); the content-addressed binding is **defined** as
-type tag 8 `BLOB_REF` and **selected by no version-1 profile**, so a record that selects it MUST be
-rejected (section 6.5); and one canonical base64 form is pinned (section 6.3).
+**Written into the spec:** explicitly typed healthcert blobs are hashed inline and bound as `STRING`
+over the base64 text, while FHIR `base64Binary` remains unresolved between STRING and BYTES
+(specification section 6.3); the content-addressed binding is **defined** as type tag 8 `BLOB_REF`
+and **selected by no version-1 profile**, so a record that selects it MUST be rejected (section
+6.5); and one canonical base64 form is pinned (section 6.3).
 
 `logo` and `attachments[].data` are **60-70% of all hashed bytes** across the three reference
 records: 14,314 bytes in the vaccination sample, 17,440 in the endorsed PDT, 2,618 in recovery.
@@ -674,7 +676,7 @@ Recorded so that nobody mistakes a gap for a conclusion.
 
 | Gap | Status |
 |---|---|
-| **The type map does not exist.** | Established as necessary, tractable and roughly sized. Not built. On the critical path, and more so since D7 was ruled: fail-closed makes the type map the gate every record passes through, so it is a first-class independently versioned issuer-extensible artifact rather than a lookup table shipped once. |
+| **Some reference-schema paths remain untyped.** | Four executable base maps and their issuer extension mechanism are published. The remaining gap is evidence, not machinery: vaccination `dose` and `expiryDateTime`, PDT's 20 endorsed-sample path-kind pairs, FHIR XHTML, `base64Binary` and null placeholders remain unbound and fail closed. `docs/type-maps.md` sections 1 and 2 give the evidence and exact coverage. |
 | **Kotlin/JVM literal-preserving JSON is unverified.** | Every other target language has a confirmed mechanism. Kotlin was not tested by any research leg. |
 | **The five reference implementations share one author.** | They do not share a JSON parser, number representation, Unicode API, map or sort. They do share one reading of the specification. Hence gate 3 in the corpus. |
 | **No character with version-dependent NFC has been identified.** | The Unicode pin is inferred from dogtag having found it necessary in code, not from an exhibited failing character. Conformance class 16 says so explicitly. |

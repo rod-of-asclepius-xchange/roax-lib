@@ -16,6 +16,7 @@ No library code has been written, deliberately.
 | [`docs/decisions.md`](docs/decisions.md) | **The decisions, ruled and open, each with its reasoning.** Three are still open and all three belong to the project owner. Start here if you are reviewing rather than implementing. |
 | [`docs/spec/roax-canon-1.md`](docs/spec/roax-canon-1.md) | The protocol. Precise enough to implement from. Section 2 says what it does not solve; section 14 reconciles it against dogtag. |
 | [`docs/profiles/`](docs/profiles/) | One document per record family, because the four families do **not** share one concrete object. |
+| [`docs/type-maps.md`](docs/type-maps.md) | The published type-map artifacts, exact coverage, unresolved schema gaps and issuer extension lifecycle. |
 | [`docs/conformance-corpus.md`](docs/conformance-corpus.md) | What cross-language agreement has to be proven against, and why that is a release gate rather than decoration. |
 | [`schemas/`](schemas/) | JSON Schemas for the envelope, the type map and the conformance corpus. |
 
@@ -70,8 +71,11 @@ them can be overturned on the reasoning rather than on authority.
 docs/spec/          the protocol specification
 docs/profiles/      one document per record family
 docs/decisions.md   settled, open, and the reasoning
+docs/type-maps.md   type-map coverage, gaps and issuer extensions
 docs/conformance-corpus.md
 schemas/            JSON Schemas
+type-maps/          immutable generated base maps and their registry
+tools/              type-map reproduction and integrity checks
 ```
 
 Reference material used during design - including third-party schemata - is kept

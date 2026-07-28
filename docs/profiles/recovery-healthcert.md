@@ -2,7 +2,8 @@
 
 **`recordType`:** `sg.gov.moh.recovery-healthcert`
 **`schemaVersion`:** `2.0`
-**Status:** draft. The type map for this profile does not exist.
+**Status:** published as [`type-maps/sg.gov.moh.recovery-healthcert-2.0.json`](../../type-maps/sg.gov.moh.recovery-healthcert-2.0.json) at exact artifact ID `sha256:db935b67a3a82754921267e3af237b606f7489b46e05aa892d175b8d87504177`.
+The lite-FHIR `Narrative.div` and four `base64Binary` slots remain unresolved, null placeholders admitted by FHIR but rejected by the pinned schema fail closed, 65 Bundle-reachable lite-FHIR object nodes omit an object type, and the recovery root remains an issuer extension point, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.3, 1.5, 2 and 5.
 
 Recovery is the closest sibling of PDT and shares most of its shape. This document states what
 differs, and does not restate what is identical.
@@ -53,20 +54,25 @@ refuse to be caught by it.
 
 ## 3. Type-map scope
 
-- The lite FHIR 4.0.1 definitions reachable from `Bundle`, identical to PDT.
-- The recovery envelope fields, with `type` bound as a scalar `STRING` **only**.
-- No OpenAttestation or Notarise composition - recovery has one schema, so there is no clinic or
-  endorsed variant to cover.
+- The lite FHIR 4.0.1 definitions reachable from `Bundle`, identical to PDT and audited in [`fhir.md`](fhir.md) section 4.
+- The recovery envelope fields declared at `references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json`, read at upstream commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`, with `type` bound as scalar STRING only.
+- No OpenAttestation or Notarise composition is included because recovery has one source schema rather than clinic and endorsed variants.
+
+The executable DFA has 317 states, 640 exact KEY transitions, 159 INDEX transitions and 310 resolved outputs, as reported in [`docs/type-maps.md`](../type-maps.md) section 2.3.
+The finite scalar audit counts 331 declared units, of which 319 are confident, seven use an operative FHIR element-name inference and five remain unresolved, as audited in [`docs/type-maps.md`](../type-maps.md) section 2.2.
+Separately, 65 reached lite-FHIR object-applicator source nodes collapse to 63 marked DFA states because those definitions omit `type: "object"`, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.5 and 2.3.
+Its exact artifact ID, `recordType` and `schemaVersion` are checked together when selecting this map, under [`docs/type-maps.md`](../type-maps.md) section 4 and specification section 4.2.
+The open recovery root permits issuer properties but supplies no semantic type for an unknown path, so issuers add such paths only through immutable scoped child artifacts under [`docs/type-maps.md`](../type-maps.md) section 5.
 
 `logo` is present here too and is a base64 blob. In the recovery sample it is 2,618 bytes, much
 smaller than the PDT and vaccination blobs but still the largest single value in that record.
-Bind as `STRING` per specification section 6.3.
+The published map binds it as STRING over its base64 text because the recovery schema declares a string, under specification sections 4.2 and 6.3.
 
 ## 4. Non-redactable paths
 
 | Path | Why |
 |---|---|
-| `roax.recordType`, `roax.schemaVersion`, `roax.recordId`, `roax.issuer.id` | The reserved floor (spec section 11.2), which every profile carries. The first two are mandatory by arithmetic rather than policy: they select the type map, so without them a verifier cannot verify at all. `roax.recordId` and `roax.issuer.id` are mandatory by policy, so that a disclosed copy says which record it is and who issued it. `roax.recordId` was arithmetic until decision D4 was ruled D4b on 2026-07-28, which removed the salt preimage it used to be an input to; its place here is unchanged and only its reason moved. `roax.issuer.keyId` is committed but OPTIONAL to disclose, because requiring it would break key rotation on already-anchored records. |
+| `roax.recordType`, `roax.schemaVersion`, `roax.typeMap.id`, `roax.recordId`, `roax.issuer.id` | The reserved floor (spec section 11.2), which every profile carries. `roax.recordType`, `roax.schemaVersion` and `roax.typeMap.id` are mandatory by arithmetic because the verifier checks the exact artifact ID and its two profile selectors before resolving any disclosed leaf ([`docs/type-maps.md`](../type-maps.md) section 4). `roax.recordId` and `roax.issuer.id` are mandatory by policy, so a disclosed copy says which record it is and who issued it. `roax.recordId` was arithmetic until decision D4 was ruled D4b on 2026-07-28, which removed the salt preimage it used to be an input to. `roax.issuer.keyId` is committed but OPTIONAL to disclose under specification section 11.2, because requiring it would break key rotation on already-anchored records. |
 | `version` | Pins `rec-healthcert-v2.0`. Also the only field that distinguishes this from a PDT record if `recordType` were ever mis-set. |
 | `type` | The test kind. |
 | `validFrom` | Start of the validity interval. |
