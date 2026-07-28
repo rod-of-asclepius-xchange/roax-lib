@@ -344,15 +344,23 @@ its own for a conditional - validate instances both ways, since an `if`/`then` t
 compiles perfectly and asserts nothing.
 
 **The envelope and the corpus vector file each have two live schema versions, and the pair is not a
-leftover.** `schemas/envelope-2.0.json` and `schemas/conformance-corpus-2.0.json` carry the
-type-map binding, the six-leaf floor and the D4b vector shapes, and are what the specification and
-`docs/conformance-corpus.md` describe. `schemas/envelope-1.0.json` and
-`schemas/conformance-corpus-1.0.json` are retained with their meaning unchanged because they, not
-the successors, govern the corpus artifact and the 54 envelope fixtures as committed, which
-`corpus/tools/validate_schemas.mjs` measures. Neither pair may be collapsed by tightening the 1.0
-file: doing that invalidates committed artifacts instead of rebuilding them, and rebuilding them is
-corpus-side work. The schema version is not the canonicalization version - both envelope schemas
-pin `canon` to `ROAX-CANON/1`.
+leftover.** `schemas/envelope-2.0.json` and `schemas/conformance-corpus-2.0.json` carry the type-map
+binding and the six-leaf floor, and are what the specification and `docs/type-maps.md` describe.
+`schemas/envelope-1.0.json` and `schemas/conformance-corpus-1.0.json` govern the corpus artifact and
+the 54 envelope fixtures as committed, which `corpus/tools/validate_schemas.mjs` measures.
+
+**The two files differ in what stayed behind, and the difference is deliberate.**
+`schemas/envelope-1.0.json` is unchanged in meaning: the D4b ruling altered no envelope bytes, so
+only its descriptions moved, and its floor stays at five reserved leaves where the successor's is
+six. `schemas/conformance-corpus-1.0.json` was **migrated in place** instead, because the D4b ruling
+did change the vector shapes: `saltVector`, `unlinkabilitySide` and `recordVector.masterSaltHex` are
+deleted, `saltsFile` and `normalizationVector` are added, and the committed corpus was rebuilt in the
+same change. The same-change rule in specification section 1.1 and `docs/conformance-corpus.md`
+section 1.1 is why: a canonicalization change lands with the vectors that assert it, and leaving the
+deleted derivation expressible in the file that governs the artifact would have left the corpus
+implementing a construction the specification no longer has. Do not tighten the 1.0 files any
+further without rebuilding what they govern in the same change. The schema version is not the
+canonicalization version - both envelope schemas pin `canon` to `ROAX-CANON/1`.
 
 Two things to know if you touch them:
 

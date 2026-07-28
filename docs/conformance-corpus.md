@@ -100,13 +100,15 @@ optional, absent, or expressible both ways through a `oneOf`. The exception is a
 **subject** is the open mechanism, because testing a mechanism is not the same as presuming it.
 **That exception currently has no instance.** The two it used to have, `saltVector` and
 `unlinkabilitySide.masterSaltHex`, both existed to test the derived-salt mechanism and were removed
-with it when D4 was ruled; `saltVector` is gone from
+with it when D4 was ruled.
+`saltVector` is gone from both `schemas/conformance-corpus-1.0.json` and
 `schemas/conformance-corpus-2.0.json` entirely, because under section 7 a salt is an input rather
 than something derived from anything, and `leafVector.saltHex` already carries it.
-Both definitions survive in `schemas/conformance-corpus-1.0.json`, marked superseded, for the
-narrow reason that the committed corpus still carries vectors of both shapes and that file has to
-keep describing what it governs; they are not the design as it now stands. A later editor
-adding such a class should record the distinction on the definition itself, as those two did.
+The deletion reached the 1.0 file rather than the successor alone because section 1.1 above requires
+a canonicalization change to land with the vectors that assert it, and the committed corpus was
+rebuilt in the same change.
+A later editor adding such a class should record the distinction on the definition itself, as those
+two did.
 
 ## 2. Release gates
 
@@ -140,13 +142,11 @@ the highest-numbered class is skipped silently. Both
 `schemas/conformance-corpus-1.0.json` and `schemas/conformance-corpus-2.0.json` set the
 `classRef` maximum to 19 to match.
 
-**Class 19 is expressible only under the successor schema.** Its vector shape is the `normalization`
-group, which `schemas/conformance-corpus-2.0.json` introduces and
-`schemas/conformance-corpus-1.0.json` does not carry, because adding it to the file that governs the
-committed artifact would describe vectors that artifact has no way to hold. Class 18 needs no new
-group and is expressible under both, through `envelopeVector.verifierConfig`. Until the corpus is
-rebuilt against the successor, class 19 has no vectors, and that is a stated gap rather than a
-silent one.
+**Both new classes are expressible under both schema versions.** Class 19's vector shape is the
+`normalization` group, which `schemas/conformance-corpus-1.0.json` carries alongside
+`schemas/conformance-corpus-2.0.json`, because the committed artifact was rebuilt in the same change
+that added the class rather than left to a later migration.
+Class 18 needs no new group and is expressible through `envelopeVector.verifierConfig`.
 
 **Classes 18 and 19 were added, and class 12 was rewritten, when the ten engineering decisions were
 ruled on 2026-07-28.** Class numbers are stable: class 12 kept its number and its subject and lost
