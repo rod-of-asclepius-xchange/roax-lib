@@ -352,11 +352,20 @@ no fixed hexadecimal expectation can exist: a vector file cannot pin what the im
 test is required to draw freshly. An `unlinkabilityVector` therefore describes an issuance to perform
 and the relations the results MUST satisfy.
 
-**The vector carries at least two leaves at different paths, and that floor is what makes the second
-mistake reachable.** Each of the vector's `trials` independent issuances emits every leaf in
-`leaves`, at the same paths with the same values each time, and the runner then asserts three things:
+**The vector carries at least two DISTINCT paths, and that is what makes the second mistake
+reachable.** It names a `paths` array, one `tag` and one `value`, and each of its `trials`
+independent issuances emits a leaf at every one of those paths carrying that same tag and value.
+The runner then asserts three things:
 
-1. **Within each issuance**, the salts of the `leaves` entries are all distinct. This is the only
+**The record and the type map this class issues against are SYNTHETIC, and the corpus build
+constructs both.** No referenced MOH sample is involved, and none could be: the class needs one value
+carried at two paths, and a tag is a property of a path under a type map rather than of a vector,
+with an uncovered path failing closed (specification section 4.2, decision D7 ruled D7a).
+So the build binds every entry in `paths` to the vector's `tag` in a map it makes
+for the purpose, and MUST reject a vector it cannot construct one for. This is stated because the one
+tag shared by two paths is otherwise a claim the vector file cannot make good on by itself.
+
+1. **Within each issuance**, the salts at the `paths` entries are all distinct. This is the only
    assertion in this document that fails an implementation drawing one salt per record and reusing it
    across that record's leaves. A one-path vector cannot see that mistake at all: the single salt
    still differs from trial to trial, so both cross-issuance assertions pass while the unlinkability
@@ -369,6 +378,23 @@ mistake reachable.** Each of the vector's `trials` independent issuances emits e
 different encoded paths inside the leaf preimage (specification section 8), so their hashes differ
 whether or not their salts do, and asserting it would read as coverage it is not. The salts are where
 the property is observable within one record, which is why assertion 1 is stated on salts alone.
+
+**The distinctness of `paths` is enforced by the schema, not asked for in prose, because assertion 1
+is the only guard of its kind in this corpus.** Two entries naming the same path would have it assert
+distinctness over a path a record can hold only once, which switches the guard off while the vector
+still validates, and a guard a malformed vector can disable is not a guard.
+`schemas/conformance-corpus-1.0.json` uses `uniqueItems` on `paths`, and that is exact rather than
+partial here: the array's items are the structured segment lists themselves, and two paths are equal
+exactly when their segment sequences are equal (specification section 5.1). One tag and one value are
+shared by every path for the same reason - it is what lets the entries be bare segment lists that
+`uniqueItems` can compare - and it makes the vector strictly stronger, because two leaves carrying
+the same tag and value at different paths additionally expose a salt derived from record content,
+which per-path values would mask.
+
+**One residue the corpus build must enforce in code**, stated rather than left for a reader to find:
+two keys differing only in Unicode normalization form are unequal as JSON text and equal as paths
+once NFC is applied (specification section 6.1), so the build MUST compare NFC-normalized segments
+and reject such a pair. That is the same kind of check the build already owns for class coverage.
 
 > **The limit, stated rather than left for a reader to discover.** This detects a **deterministic**
 > or **reused** salt, which is the failure that has actually happened in comparable systems. It does
