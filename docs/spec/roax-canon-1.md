@@ -736,7 +736,8 @@ rather than an aspiration.
 > `hashAlg` is a design choice made in this document. The reasoning is that the binding exists to
 > keep a large blob out of an expensive hash, so tying the blob digest to `hashAlg` would make a
 > Poseidon record hash the whole blob through Poseidon and defeat the binding's only purpose; a
-> 40-byte `BLOB_REF` value is then cheap under either algorithm. The consequence to accept knowingly
+> 44-byte `BLOB_REF` value - `u64be` length 8, `u32be` digest length 4, digest 32 - is then cheap
+> under either algorithm. The consequence to accept knowingly
 > is that a `BLOB_REF` leaf depends on SHA-256's collision resistance even inside a record whose tree
 > is not SHA-256. A revision that wants a different blob digest must register it explicitly rather
 > than infer it from `hashAlg`.
@@ -984,8 +985,10 @@ constants and - the part the byte layouts above do not survive without - the enc
 length-prefixed byte string to field elements.
 
 > **Normative:** a record MUST NOT be issued with `hashAlg: "Poseidon-BN254"` until a revision of
-> this specification pins that parameterization. The byte-level preimages in sections 7 and 8 are
-> stated over byte strings and do not transfer to a prime-field permutation unmodified.
+> this specification pins that parameterization. The byte-level preimage in section 8 is
+> stated over byte strings and does not transfer to a prime-field permutation unmodified.
+> Section 7 no longer states a preimage of its own, because decision D4 was ruled D4b and salt
+> derivation is gone; section 8's leaf preimage is the only one left to carry across.
 
 ---
 
@@ -1139,7 +1142,9 @@ it:
 ## 10. Selective disclosure
 
 A disclosed copy carries, for each revealed leaf: its path as **structured segments**, its leaf
-index, its type tag, its value, its `salt(path)`, and its RFC 9162 audit path.
+index, its type tag, its value, **the leaf's own salt**, and its RFC 9162 audit path.
+There is no path-keyed derivation function to look up: since decision D4 was ruled D4b the salt is an
+independent random draw stored alongside the leaf it belongs to (section 7).
 It MAY additionally carry the display path, which is display only and is never an input to anything
 the verifier computes (section 5.2).
 

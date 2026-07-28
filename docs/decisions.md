@@ -172,16 +172,25 @@ description has to come from outside.
 - **The `Poseidon-BN254` parameterization is not pinned**, and no parameterization is invented here.
   The field, the rate and capacity, the round constants, and the encoding from a length-prefixed
   byte string to field elements all have to be pinned before any Poseidon record is issued. The
-  byte-level preimages in specification sections 7 and 8 are stated over byte strings and do **not**
-  transfer to a prime-field permutation unmodified. `ROAX-CANON/1` therefore **defines** the
+  byte-level preimage in specification section 8 is stated over byte strings and does **not**
+  transfer to a prime-field permutation unmodified. Section 7 no longer states a preimage of its own,
+  because D4 was ruled D4b and salt derivation is gone, so section 8's leaf preimage is the only one
+  left to carry across. `ROAX-CANON/1` therefore **defines** the
   construction for `SHA-256` only and **registers** `Poseidon-BN254`, with a normative MUST NOT
   against issuing under it until a revision pins the parameterization.
 - **The cost consequences below are unchanged by the ruling** and still have to be planned for
   rather than discovered. They are what makes selecting Poseidon a deliberate per-record act.
 
-**Written into the spec:** `hashAlg` as an algorithm-qualified domain component and a reserved leaf
-(sections 7, 7.4, 8, 11.2, 12), with the enum in `schemas/envelope-2.0.json` carrying both values
-and the Poseidon caution stated in the schema itself.
+**Written into the spec:** `hashAlg` as an algorithm-qualified domain component and deliberately
+**not** as a reserved leaf (sections 7, 7.4, 8, 11.2, 12), with the enum in
+`schemas/envelope-2.0.json` carrying both values and the Poseidon caution stated in the schema
+itself.
+An earlier version of this line said "and a reserved leaf", which contradicted the paragraph above it:
+`roax.hashAlg` was removed because a leaf is hashed under the algorithm it names and therefore cannot
+bind it, and specification section 11.2 records that removal.
+Section 7 stays in the citation list because it is where `DOMAIN` is stated to be
+algorithm-qualified; sections 7.4 and 8 carry the binding and the leaf preimage, 11.2 records the
+removed leaf, and 12 carries the versioning consequence.
 
 | | **SHA-256** | **Poseidon over BN254** |
 |---|---|---|
@@ -681,6 +690,6 @@ Recorded so that nobody mistakes a gap for a conclusion.
 | **The five reference implementations share one author.** | They do not share a JSON parser, number representation, Unicode API, map or sort. They do share one reading of the specification. Hence gate 3 in the corpus. |
 | **No character with version-dependent NFC has been identified.** | The Unicode pin is inferred from dogtag having found it necessary in code, not from an exhibited failing character. Conformance class 16 says so explicitly. |
 | **The ROAX chain integration is not designed.** | Anchoring registry shape, batching and revocation semantics are a real design space that no research leg covered. |
-| **The `Poseidon-BN254` parameterization is not pinned.** | Decision B is ruled: both hash families are first-class and selectable per record. What is not settled is the parameterization - field, rate and capacity, round constants, and the byte-string-to-field-element encoding, which the byte-level preimages of specification sections 7 and 8 do not survive without. `ROAX-CANON/1` defines SHA-256 only and registers Poseidon-BN254 with a MUST NOT against issuing under it. No parameterization has been invented to fill the gap. |
+| **The `Poseidon-BN254` parameterization is not pinned.** | Decision B is ruled: both hash families are first-class and selectable per record. What is not settled is the parameterization - field, rate and capacity, round constants, and the byte-string-to-field-element encoding, which the byte-level preimage of specification section 8 does not survive without. Section 7 no longer states a preimage, because D4 was ruled D4b. `ROAX-CANON/1` defines SHA-256 only and registers Poseidon-BN254 with a MUST NOT against issuing under it. No parameterization has been invented to fill the gap. |
 | **Which record families will select Poseidon is unknown.** | Blob handling is an optimization for a SHA-256 record and a requirement for a Poseidon one. D9 is ruled and no longer waits on this: the content-addressed binding is **defined** in `ROAX-CANON/1` and **selected by no version-1 profile**, so the answer to this question decides when a profile selects it rather than whether the binding exists. |
 | **The audit's boundary conclusion was reached without consulting dogtag.** | **Closed.** Checked during this work; the conclusion survives, and dogtag's narrower single-profile shape is explained rather than adopted. See specification section 14.1. |
