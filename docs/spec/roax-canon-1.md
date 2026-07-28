@@ -953,8 +953,31 @@ version, its issuer - and the disclosed copy still verifies against a genuine ro
 The verifier then has a cryptographically valid proof of something it cannot identify.
 Neither source research report specifies this; it comes from dogtag.
 
-The per-profile lists live in `docs/profiles/`. At minimum every profile MUST include the reserved
-paths of section 11.2.
+The per-profile lists live in `docs/profiles/`.
+
+> **Normative:** at minimum every profile MUST include the four reserved paths that section 11.2
+> marks **mandatory** to disclose: `roax.recordType`, `roax.schemaVersion`, `roax.recordId` and
+> `roax.issuer.id`.
+>
+> It MUST NOT extend that minimum to `roax.issuer.keyId`, which section 11.2 marks OPTIONAL to
+> disclose. A profile MAY of course add its own paths on top, as the FHIR profile adds
+> `resourceType`.
+
+**The floor is doing two different jobs, and the distinction is worth keeping visible.**
+`roax.recordType` and `roax.schemaVersion` select the type map, and `roax.recordId` is in every
+salt preimage (section 7), so those three are mandatory **by arithmetic**: a verifier without them
+cannot run the procedure at all, and withholding one yields no proof rather than a weaker one.
+`roax.issuer.id` is mandatory **by policy**, because the paragraph above is about a verifier being
+able to say what it is looking at.
+
+**Why `roax.issuer.keyId` is deliberately not in the floor**, stated here because this is the
+section a future editor would edit to put it back. Requiring its disclosure would permanently bind
+an anchored record to the key it was issued under: the root is fixed, so a holder whose issuer has
+since rotated keys would have to reveal a retired key identifier to make an otherwise valid record
+verify, with no path to rotate. That is exactly the foreclosure section 12.2 tells implementers to
+design out, so this is not merely the preservation of an earlier call - it is ruled out by a later
+and more general constraint. Tightening this floor back to "all reserved paths" would silently
+reintroduce it.
 
 ### 10.3 Disclosure size
 
@@ -1089,6 +1112,13 @@ since rotated keys would be forced to reveal a retired key identifier to make an
 record verify. That is the same trap section 11.3 records for mutable routing fields, arriving from
 a different direction.
 
+**This is ruled out by section 12.2, not merely preferred.** An anchored root freezes what it
+commits, so a rule that forced disclosure of the key identifier would leave an already-issued record
+with no rotation path at all, which is the precise shape of foreclosure the future-proofing
+constraint exists to prevent. Section 10.2 therefore narrows the minimum-disclosure floor to the
+four mandatory paths rather than to every reserved path, and says so in the place an editor would
+otherwise widen it back.
+
 `issuer.keyId` is also the one reserved leaf whose *presence* varies. **An absent `issuer.keyId`
 emits no leaf**; it MUST NOT be emitted as a NULL leaf or as an empty string, because those are
 three different roots and only one of them can be right. The reserved leaf count is therefore 4 or 5.
@@ -1124,11 +1154,27 @@ most likely over-implementation and is wrong.
 
 **The guard MUST compare the NFC-normalized key, not the bytes as received.** Section 6.1 normalizes
 keys to NFC before they are encoded and hashed, so a check performed on the raw bytes is checking a
-different string from the one that actually gets committed. That the two differ is easy to
+different string from the one that actually gets committed. That the two differ at all is easy to
 demonstrate: U+212A KELVIN SIGN is the three bytes `e2 84 aa` as received and normalizes under NFC
 to ASCII `K`, the single byte `0x4b` (verified on Node v22.21.0). The rule is the general one -
 **check the bytes you commit, not the bytes you received** - and it applies here because this guard
 and the hashing path must agree about what the key is.
+
+> **Stated at the strength of the evidence: this MUST is currently unobservable at the guard, and
+> that is a fact about today's prefix rather than about the design.**
+> No character normalizes into `roax.`. Scanning every assigned code point on Node v22.21.0 finds no
+> non-ASCII character whose NFC form contains `r`, `o`, `a`, `x` or `.`; the only ASCII letter
+> reachable that way at all is uppercase `K`, from U+212A. So for every input a record can actually
+> supply, checking before or after normalization gives the guard the same verdict, and U+212A above
+> is evidence that NFC can cross into ASCII rather than an instance of this case.
+>
+> The MUST stands anyway, for three reasons. It costs nothing. It keeps this guard and the hashing
+> path reasoning about the same string, which is the property that has to hold rather than the
+> coincidence that currently makes it moot. And the coincidence is not load-bearing by design: a
+> reserved name that later contained a character with a canonical singleton decomposition would make
+> the ordering observable immediately, and the rule needs to be in place before that, not after.
+> `docs/conformance-corpus.md` class 15 records the same limit rather than promising a vector that
+> cannot be built.
 
 Consequences worth stating, because a guard written against the earlier multi-segment model gives
 different answers:

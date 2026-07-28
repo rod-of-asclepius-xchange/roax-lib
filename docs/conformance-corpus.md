@@ -261,8 +261,17 @@ must not be read as making `masterSalt` reuse safe - it is not, and section 7.1 
 For each profile, a disclosed copy omitting each declared non-redactable path in turn, each of which
 MUST be rejected - plus one that includes them all and is accepted.
 
-JSON Schema cannot express this, so it is enforced in code and can only be pinned here. See
-specification section 10.2.
+**The floor is the four reserved paths specification section 11.2 marks mandatory to disclose**,
+plus whatever the profile adds on top, and this class MUST carry a vector proving where its upper
+edge is: a disclosed copy that **omits `roax.issuer.keyId` MUST be ACCEPTED** when the record
+committed one. That path is committed inside the root but OPTIONAL to disclose, because requiring
+it would permanently bind an anchored record to the key it was issued under and leave no rotation
+path, which specification section 12.2 rules out. Without that vector, an implementation that
+over-tightens the floor to every reserved path passes this class while breaking key rotation, and
+nothing else in the corpus would catch it.
+
+JSON Schema cannot express any of this, so it is enforced in code and can only be pinned here. See
+specification sections 10.2 and 11.2.
 
 ### Class 15 - reserved-namespace guard
 
@@ -278,9 +287,9 @@ not on a rendered display path and not on a sequence of segments.
 | `[KEY("roax")]` | **Accept** | An ordinary record field. No reserved path is the bare segment `KEY("roax")`, so it collides with nothing. |
 | `[KEY("roaxX"), KEY("foo")]` | **Accept** | A different key entirely. |
 | `[KEY("a"), KEY("roax.foo")]` | **Accept** | The guard applies to the FIRST segment only. This path differs from every reserved path in segment count and cannot collide with one. |
-| A key that NFC-normalizes into the reserved prefix | **Reject** | The check is on the normalized key, because that is what gets hashed. |
+| `[KEY("Kelvin")]`, which NFC-normalizes to `Kelvin` | **Accept** | A first-segment key that changes under NFC and still does not begin with `roax.`. Pins that the guard normalizes and then compares, rather than over-rejecting anything non-ASCII. |
 
-**Three of these assert acceptance, and that is the point of the class.** A corpus containing only
+**Four of these assert acceptance, and that is the point of the class.** A corpus containing only
 rejection vectors is passed by an implementation that over-rejects, and over-rejection is the more
 likely failure here: it is what a guard written against a display path, or applied to every segment
 instead of the first, actually does.
@@ -292,10 +301,32 @@ rejecting them is over-broad: it would refuse a legitimate record for using a fi
 collides with nothing. That class had been written for a string-path model this specification
 deliberately departed from, and it survived the departure because nobody re-derived it.
 
-The last row is the NFC case, and it is the one an implementation is most likely to get wrong by
-checking too early. Specification section 11.2 gives the demonstration that normalization changes
-bytes: U+212A KELVIN SIGN arrives as `e2 84 aa` and normalizes to ASCII `K`, `0x4b`. A guard that
-runs before normalization is testing a different string from the one that gets committed.
+**The NFC case, stated honestly about its own limit.** An earlier version of this class carried a
+row reading "a key that NFC-normalizes into the reserved prefix, MUST be rejected". **No such key
+exists, so that row promised a vector nobody could build.** Scanning every assigned code point on
+Node v22.21.0 finds no non-ASCII character whose NFC form contains `r`, `o`, `a`, `x` or `.`; the
+only ASCII letter reachable that way at all is uppercase `K`, from U+212A KELVIN SIGN, which is not
+in `roax.`.
+
+So specification section 11.2's MUST that the guard compare the **normalized** key is currently
+**unobservable at the guard**: for every input a record can supply, checking before or after
+normalization gives the same verdict. Section 11.2 states that limit in the same terms and explains
+why the rule stands regardless, which is that it is a fact about today's prefix characters rather
+than about the design.
+
+That is why the row above tests what can actually be demonstrated instead. `[KEY("Kelvin")]`, whose
+first key is `U+212A` followed by `elvin`, is a real key that changes under NFC, and it MUST be
+**accepted**, because its normalized form does not begin with `roax.`. It catches the failure that
+is reachable today, which is a guard that over-rejects anything non-ASCII rather than one that
+under-rejects a crafted collision.
+
+**The demonstrable half of the normalization requirement is class 4**, which already carries NFC
+versus NFD in keys and asserts that the hashing path normalizes. This class does not restate it.
+
+U+212A appears in specification section 11.2 as evidence that NFC can cross into ASCII, and it must
+not be read there or here as an instance of a key that normalizes into the reserved prefix. This
+class follows the same convention as class 16, which says outright when it detects a property by
+declaration rather than by demonstration.
 
 dogtag's own record of the prefix-versus-exact-match change is at
 `crates/dogtag-standard-rs/src/profile_tree.rs:54-66`. What transfers is the argument, not the
