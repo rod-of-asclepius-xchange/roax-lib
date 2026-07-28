@@ -1,0 +1,350 @@
+{
+  "typeMapVersion": "0.1.0",
+  "recordType": "sg.gov.moh.vaccination-healthcert",
+  "schemaVersion": "1.0",
+  "sourceSchemas": [
+    {
+      "path": "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json",
+      "commit": "09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa",
+      "note": "Resolved by file path, never by $id: two reference schemas carry copy-pasted $id values."
+    }
+  ],
+  "entries": [
+    {
+      "pattern": "$template.name",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "$template.type",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "$template.url",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].address.country",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].birthDate",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].extension[*].code.text",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].extension[*].url",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].fullUrl",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].gender",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: string enum"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].id",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].identifier[*].type",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: anyOf, all scalar branches agree (src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string)"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].identifier[*].type.text",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].identifier[*].value",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].location.reference",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].lotNumber",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].name",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].name[*].text",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].occurrenceDateTime",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].patient.reference",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].performer[*].actor.display",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].recommendation[*].dateCriterion[*].code.coding[*].code",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].recommendation[*].dateCriterion[*].code.coding[*].display",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].recommendation[*].dateCriterion[*].code.coding[*].system",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].recommendation[*].dateCriterion[*].value",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].recommendation[*].forecastStatus.coding[*].code",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].recommendation[*].forecastStatus.coding[*].display",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].recommendation[*].forecastStatus.coding[*].system",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].recommendation[*].targetDisease.coding[*].code",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].recommendation[*].targetDisease.coding[*].display",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].recommendation[*].targetDisease.coding[*].system",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resourceType",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].vaccineCode.coding[*].code",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].vaccineCode.coding[*].display",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].vaccineCode.coding[*].system",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.resourceType",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: string const"
+    },
+    {
+      "pattern": "fhirBundle.type",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "fhirVersion",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "id",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "issuers[*].id",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "issuers[*].identityProof.key",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "issuers[*].identityProof.location",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "issuers[*].identityProof.type",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "issuers[*].name",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "issuers[*].revocation.location",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "issuers[*].revocation.type",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "logo",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "name",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "notarisationMetadata.notarisedOn",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/tech/notarise/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "notarisationMetadata.passportNumber",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/tech/notarise/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "notarisationMetadata.reference",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/tech/notarise/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "notarisationMetadata.signedEuHealthCerts[*].appleCovidCardUrl",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/tech/notarise/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "notarisationMetadata.signedEuHealthCerts[*].qr",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/tech/notarise/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "notarisationMetadata.signedEuHealthCerts[*].type",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/tech/notarise/1.0/schema.json: string const"
+    },
+    {
+      "pattern": "notarisationMetadata.signedEuHealthCerts[*].vaccineCode",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/tech/notarise/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "notarisationMetadata.url",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/tech/notarise/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "validFrom",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json: type string"
+    }
+  ]
+}

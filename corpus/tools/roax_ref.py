@@ -1,0 +1,720 @@
+"""ROAX-CANON/1 reference implementation A, in Python.
+
+This is corpus tooling, not roax-lib. It exists to produce and to check the vectors in
+`corpus/conformance-corpus-1.0.json`, and it is deliberately small enough to read against
+`docs/spec/roax-canon-1.md` line by line. It is not a library: no streaming, no error taxonomy
+beyond stable reason codes, no performance work.
+
+Written from the specification text. Implementation B lives in `roax_ref.mjs` and was written
+from the same text rather than ported from this file; `crosscheck.py` asserts the two produce
+byte-identical corpora.
+
+Section references below are to `docs/spec/roax-canon-1.md`.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import hmac
+import re
+import unicodedata
+
+CANON = "ROAX-CANON/1"
+
+# Section 6.1 type tags.
+TAG_NULL = 0
+TAG_BOOL = 1
+TAG_STRING = 2
+TAG_INTEGER = 3
+TAG_DECIMAL = 4
+TAG_BYTES = 5
+TAG_EMPTY_ARRAY = 6
+TAG_EMPTY_OBJECT = 7
+
+TAG_NAMES = {
+    TAG_NULL: "NULL",
+    TAG_BOOL: "BOOL",
+    TAG_STRING: "STRING",
+    TAG_INTEGER: "INTEGER",
+    TAG_DECIMAL: "DECIMAL",
+    TAG_BYTES: "BYTES",
+    TAG_EMPTY_ARRAY: "EMPTY_ARRAY",
+    TAG_EMPTY_OBJECT: "EMPTY_OBJECT",
+}
+
+# Section 6.2, "Bound on expansion". A fixed constant of ROAX-CANON/1, never implementation-chosen.
+MAX_EXPANDED_DIGITS = 1024
+
+# Section 5. An index must be representable in 32 bits.
+MAX_INDEX = 2**32 - 1
+
+# Section 11.2. Each reserved path is a SINGLE KEY segment carrying the literal dotted name.
+RESERVED_PREFIX = "roax."
+RESERVED_RECORD_TYPE = "roax.recordType"
+RESERVED_SCHEMA_VERSION = "roax.schemaVersion"
+RESERVED_RECORD_ID = "roax.recordId"
+RESERVED_ISSUER_ID = "roax.issuer.id"
+RESERVED_ISSUER_KEY_ID = "roax.issuer.keyId"
+
+# Section 10.2. The four reserved paths every profile's disclosure floor must contain.
+# roax.issuer.keyId is deliberately NOT here: it is committed but OPTIONAL to disclose.
+RESERVED_DISCLOSURE_FLOOR = (
+    RESERVED_RECORD_TYPE,
+    RESERVED_SCHEMA_VERSION,
+    RESERVED_RECORD_ID,
+    RESERVED_ISSUER_ID,
+)
+
+# `\Z` and not `$`. Python's `$` also matches immediately before a trailing newline, so `$` here
+# would accept "1.0\n" while JavaScript's `$` - which matches only at end of input - rejects it.
+# That is a two-implementation divergence hiding inside a regex dialect, and
+# `reject-decimal-trailing-newline` in the corpus pins it.
+INTEGER_GRAMMAR = re.compile(r"\A-?(0|[1-9][0-9]*)\Z")
+DECIMAL_INPUT_GRAMMAR = re.compile(
+    r"\A(?P<sign>-?)(?P<int>0|[1-9][0-9]*)(?:\.(?P<frac>[0-9]+))?(?:[eE](?P<exp>[+-]?[0-9]+))?\Z"
+)
+DECIMAL_OUTPUT_GRAMMAR = re.compile(r"\A-?(0|[1-9][0-9]*)(\.[0-9]+)?\Z")
+HEX_BYTES = re.compile(r"\A([0-9a-f]{2})*\Z")
+
+
+class RoaxError(Exception):
+    """A conformance rejection. `code` is stable and is what the corpus records."""
+
+    def __init__(self, code: str, detail: str = "") -> None:
+        super().__init__(f"{code}: {detail}" if detail else code)
+        self.code = code
+        self.detail = detail
+
+
+# --------------------------------------------------------------------------------------------
+# Hash agility (sections 7.4, 8, 9)
+# --------------------------------------------------------------------------------------------
+
+
+def domain(hash_alg: str) -> bytes:
+    """Section 7: DOMAIN is ASCII "ROAX-CANON/1/" followed by hashAlg. Algorithm-qualified."""
+    if hash_alg != "SHA-256":
+        # Poseidon-BN254 is registered in the envelope schema but ROAX-CANON/1 defines no
+        # construction for it: the field, rate and capacity, round constants and the
+        # byte-string-to-field-element encoding are all unpinned (section 7.4).
+        raise RoaxError("hash-alg-not-defined", hash_alg)
+    return (CANON + "/" + hash_alg).encode("ascii")
+
+
+def H(hash_alg: str, data: bytes) -> bytes:
+    """The hash named by hashAlg. ROAX-CANON/1 defines H for SHA-256 only (section 7.4)."""
+    if hash_alg != "SHA-256":
+        raise RoaxError("hash-alg-not-defined", hash_alg)
+    return hashlib.sha256(data).digest()
+
+
+def u32be(n: int) -> bytes:
+    if n < 0 or n > 0xFFFFFFFF:
+        raise RoaxError("u32-out-of-range", str(n))
+    return n.to_bytes(4, "big")
+
+
+def u64be(n: int) -> bytes:
+    if n < 0 or n > 0xFFFFFFFFFFFFFFFF:
+        raise RoaxError("u64-out-of-range", str(n))
+    return n.to_bytes(8, "big")
+
+
+# --------------------------------------------------------------------------------------------
+# Strings (sections 3.2, 6.1)
+# --------------------------------------------------------------------------------------------
+
+
+def reject_unpaired_surrogates(s: str) -> None:
+    """Section 3.2 and 6.1: unpaired surrogates MUST be rejected, before normalization.
+
+    Python `str` can hold lone surrogates exactly as a JavaScript string can, so the rejection
+    has to be explicit here for the same reason dogtag's TypeScript SDK makes it explicit.
+    """
+    for ch in s:
+        if 0xD800 <= ord(ch) <= 0xDFFF:
+            raise RoaxError("unpaired-surrogate", f"U+{ord(ch):04X}")
+
+
+def nfc(s: str) -> str:
+    """Section 6.1. Rejection of unpaired surrogates happens BEFORE normalization."""
+    reject_unpaired_surrogates(s)
+    return unicodedata.normalize("NFC", s)
+
+
+# --------------------------------------------------------------------------------------------
+# Path encoding (section 5)
+# --------------------------------------------------------------------------------------------
+
+
+def encode_path(segments) -> bytes:
+    """Section 5. Length-prefixed, no reserved characters and no escaping.
+
+    A segment is {"key": str} or {"index": int}, matching the corpus and envelope schemas.
+    """
+    out = [u32be(len(segments))]
+    for seg in segments:
+        if "key" in seg:
+            key = nfc(seg["key"])
+            kb = key.encode("utf-8")
+            out.append(b"\x01" + u32be(len(kb)) + kb)
+        elif "index" in seg:
+            idx = seg["index"]
+            if not isinstance(idx, int) or isinstance(idx, bool):
+                raise RoaxError("index-not-integer", repr(idx))
+            if idx < 0:
+                raise RoaxError("index-negative", str(idx))
+            if idx > MAX_INDEX:
+                # Section 5: MUST error rather than truncate.
+                raise RoaxError("index-out-of-32-bit-range", str(idx))
+            out.append(b"\x02" + u32be(idx))
+        else:
+            raise RoaxError("segment-malformed", repr(seg))
+    return b"".join(out)
+
+
+def display_path(segments) -> str:
+    """Section 5.2. Display only. Never hashed, never parsed back into segments."""
+    parts = []
+    for seg in segments:
+        if "key" in seg:
+            parts.append(("." if parts else "") + seg["key"])
+        else:
+            parts.append("[%d]" % seg["index"])
+    return "".join(parts)
+
+
+# --------------------------------------------------------------------------------------------
+# Numbers (section 6.2)
+# --------------------------------------------------------------------------------------------
+
+
+def canonical_integer(text: str) -> str:
+    """Section 6.2 canonical integer. Arbitrary precision, never parsed into a machine integer."""
+    if not isinstance(text, str):
+        raise RoaxError("integer-not-carried-as-string", repr(text))
+    if not INTEGER_GRAMMAR.match(text):
+        raise RoaxError("integer-grammar", text)
+    digits = text[1:] if text.startswith("-") else text
+    if len(digits) > MAX_EXPANDED_DIGITS:
+        # See docs: the 1024-digit bound is stated in the decimal subsection but its own
+        # justification paragraph counts class 2's 40-digit INTEGER against it, so it is applied
+        # to both here. No corpus vector discriminates between the two readings.
+        raise RoaxError("digit-bound-exceeded", str(len(digits)))
+    if text == "-0":
+        return "0"
+    return text
+
+
+def canonical_decimal(text: str) -> str:
+    """Section 6.2 canonical decimal. Arbitrary precision, never parsed into a float.
+
+    Canonicalization does only two things: expand exponent notation into positional notation,
+    and drop the sign of a zero-valued magnitude.
+    """
+    if not isinstance(text, str):
+        raise RoaxError("decimal-not-carried-as-string", repr(text))
+    m = DECIMAL_INPUT_GRAMMAR.match(text)
+    if not m:
+        raise RoaxError("decimal-grammar", text)
+
+    sign = m.group("sign")
+    int_digits = m.group("int")
+    frac_digits = m.group("frac") or ""
+    exp = int(m.group("exp")) if m.group("exp") is not None else 0
+
+    digits = int_digits + frac_digits
+    # Shift the decimal point right by `exp` places. `point` counts digits from the left.
+    point = len(int_digits) + exp
+
+    if point >= len(digits):
+        int_part = digits + "0" * (point - len(digits))
+        frac_part = ""
+    elif point <= 0:
+        int_part = ""
+        frac_part = "0" * (-point) + digits
+    else:
+        int_part = digits[:point]
+        frac_part = digits[point:]
+
+    # Section 6.2: the bound is on the EXPANDED POSITIONAL FORM, which is this, before the
+    # output-grammar normalization below.
+    if len(int_part) + len(frac_part) > MAX_EXPANDED_DIGITS:
+        raise RoaxError("digit-bound-exceeded", str(len(int_part) + len(frac_part)))
+
+    int_part = int_part.lstrip("0")
+    if int_part == "":
+        int_part = "0"
+    # "a fraction of zero digits is dropped along with its `.`" - a fraction with no digits.
+    # A fraction whose digits are all zero is KEPT: -0.00 -> 0.00 keeps its precision.
+    out = int_part + ("." + frac_part if frac_part != "" else "")
+
+    if sign == "-" and set(digits) == {"0"}:
+        # A zero-valued magnitude loses its sign and keeps its fraction digits.
+        pass
+    elif sign == "-":
+        out = "-" + out
+
+    if not DECIMAL_OUTPUT_GRAMMAR.match(out):  # pragma: no cover - defensive
+        raise RoaxError("decimal-output-grammar", out)
+    return out
+
+
+# --------------------------------------------------------------------------------------------
+# Value encoding (section 6)
+# --------------------------------------------------------------------------------------------
+
+
+def encode_value(tag: int, value=None) -> bytes:
+    """Section 6.1. `value` arrives in the corpus carrier form for its tag."""
+    if tag == TAG_NULL:
+        _require_absent(tag, value)
+        return b""
+    if tag == TAG_BOOL:
+        if not isinstance(value, bool):
+            raise RoaxError("bool-carrier", repr(value))
+        return b"\x01" if value else b"\x00"
+    if tag == TAG_STRING:
+        if not isinstance(value, str):
+            raise RoaxError("string-carrier", repr(value))
+        return nfc(value).encode("utf-8")
+    if tag == TAG_INTEGER:
+        return canonical_integer(value).encode("ascii")
+    if tag == TAG_DECIMAL:
+        return canonical_decimal(value).encode("ascii")
+    if tag == TAG_BYTES:
+        if not isinstance(value, str) or not HEX_BYTES.match(value):
+            raise RoaxError("bytes-carrier", repr(value))
+        return bytes.fromhex(value)
+    if tag == TAG_EMPTY_ARRAY or tag == TAG_EMPTY_OBJECT:
+        _require_absent(tag, value)
+        return b""
+    raise RoaxError("tag-unknown", repr(tag))
+
+
+def _require_absent(tag: int, value) -> None:
+    if value is not None:
+        raise RoaxError("value-must-be-absent", f"tag {TAG_NAMES[tag]}")
+
+
+# --------------------------------------------------------------------------------------------
+# Salt derivation (section 7)
+# --------------------------------------------------------------------------------------------
+
+SALT_LABEL = b"/salt"
+
+
+def salt_preimage(hash_alg: str, record_id: str, segments) -> bytes:
+    """Section 7. Every component is length-prefixed, exactly as in section 8.
+
+    Note the specification writes RID as `utf8(recordId)` rather than `utf8(NFC(recordId))`,
+    while the reserved leaf roax.recordId is a STRING and therefore IS normalized. The corpus
+    carries only ASCII record identifiers, so the two readings agree on every vector; the
+    divergence is recorded in corpus/README.md rather than decided by a vector.
+    """
+    dom = domain(hash_alg)
+    rid = record_id.encode("utf-8")
+    p = encode_path(segments)
+    return (
+        u32be(len(dom))
+        + dom
+        + u32be(len(SALT_LABEL))
+        + SALT_LABEL
+        + u32be(len(rid))
+        + rid
+        + u32be(len(p))
+        + p
+    )
+
+
+def derive_salt(hash_alg: str, master_salt: bytes, record_id: str, segments) -> bytes:
+    """Section 7. HMAC-SHA-256 under every hashAlg: a salt is a secret input, not a tree hash."""
+    if len(master_salt) != 32:
+        raise RoaxError("master-salt-length", str(len(master_salt)))
+    mac = hmac.new(master_salt, salt_preimage(hash_alg, record_id, segments), hashlib.sha256)
+    return mac.digest()[:16]
+
+
+# --------------------------------------------------------------------------------------------
+# Leaf construction (section 8)
+# --------------------------------------------------------------------------------------------
+
+
+def leaf_hash(hash_alg: str, segments, tag: int, value, salt: bytes) -> bytes:
+    """Section 8."""
+    if len(salt) != 16:
+        raise RoaxError("salt-length", str(len(salt)))
+    dom = domain(hash_alg)
+    p = encode_path(segments)
+    v = encode_value(tag, value)
+    preimage = (
+        b"\x00"
+        + u32be(len(dom))
+        + dom
+        + u32be(len(p))
+        + p
+        + bytes([tag])
+        + u32be(len(salt))
+        + salt
+        + u64be(len(v))
+        + v
+    )
+    return H(hash_alg, preimage)
+
+
+# --------------------------------------------------------------------------------------------
+# Tree construction (section 9), RFC 9162 section 2.1.1 over already-hashed leaves
+# --------------------------------------------------------------------------------------------
+
+
+def _largest_power_of_two_below(n: int) -> int:
+    """The largest power of two STRICTLY smaller than n. n > 1."""
+    k = 1
+    while k * 2 < n:
+        k *= 2
+    return k
+
+
+def mth(hash_alg: str, leaves) -> bytes:
+    """Section 9.1. The 0x00 leaf-domain byte is already inside leafHash and is NOT reapplied."""
+    n = len(leaves)
+    if n == 0:
+        # Total function only. Unreachable in a conforming implementation: the leaf set is a
+        # union that always carries the reserved leaves, so the floor is 5 (section 9.1).
+        return H(hash_alg, b"")
+    if n == 1:
+        return leaves[0]
+    k = _largest_power_of_two_below(n)
+    return H(hash_alg, b"\x01" + mth(hash_alg, leaves[:k]) + mth(hash_alg, leaves[k:]))
+
+
+def inclusion_path(hash_alg: str, index: int, leaves):
+    """RFC 9162 section 2.1.3 PATH(m, D[n]). Ordered leaf-ward first, root-ward last."""
+    n = len(leaves)
+    if index < 0 or index >= n:
+        raise RoaxError("leaf-index-out-of-range", f"{index} of {n}")
+    if n == 1:
+        return []
+    k = _largest_power_of_two_below(n)
+    if index < k:
+        return inclusion_path(hash_alg, index, leaves[:k]) + [mth(hash_alg, leaves[k:])]
+    return inclusion_path(hash_alg, index - k, leaves[k:]) + [mth(hash_alg, leaves[:k])]
+
+
+def verify_inclusion(hash_alg: str, leaf: bytes, index: int, tree_size: int, path, root: bytes) -> bool:
+    """RFC 9162 section 2.1.3.2, unchanged, over already-hashed leaves."""
+    if tree_size <= 0 or index < 0 or index >= tree_size:
+        return False
+    fn = index
+    sn = tree_size - 1
+    r = leaf
+    for p in path:
+        if len(p) != len(leaf):
+            return False
+        if sn == 0:
+            return False
+        if (fn & 1) == 1 or fn == sn:
+            r = H(hash_alg, b"\x01" + p + r)
+            while (fn & 1) == 0 and fn != 0:
+                fn >>= 1
+                sn >>= 1
+        else:
+            r = H(hash_alg, b"\x01" + r + p)
+        fn >>= 1
+        sn >>= 1
+    return sn == 0 and r == root
+
+
+# --------------------------------------------------------------------------------------------
+# Flattening and the reserved leaf set (sections 3.3, 11.2)
+# --------------------------------------------------------------------------------------------
+
+
+class Leaf:
+    __slots__ = ("segments", "tag", "value")
+
+    def __init__(self, segments, tag, value=None):
+        self.segments = segments
+        self.tag = tag
+        self.value = value
+
+    def __repr__(self):  # pragma: no cover - debugging aid
+        return f"Leaf({display_path(self.segments)!r}, {TAG_NAMES[self.tag]}, {self.value!r})"
+
+
+def check_reserved_namespace(segments) -> None:
+    """Section 11.2 reserved-namespace guard.
+
+    Three ways to get this wrong, all avoided here:
+      - it is not a test against a rendered display path (section 5.2);
+      - it applies to the FIRST segment only, because every reserved path is a single segment;
+      - it compares the NFC-normalized key, not the bytes as received.
+    """
+    if not segments:
+        return
+    first = segments[0]
+    if "key" not in first:
+        return
+    if nfc(first["key"]).startswith(RESERVED_PREFIX):
+        raise RoaxError("reserved-namespace", first["key"])
+
+
+def flatten(node, type_map, segments=None):
+    """Section 3.3. A leaf for every scalar and for every EMPTY container.
+
+    `type_map` supplies the tag for every scalar. The tag MUST come from the schema and never
+    from the JSON literal's syntax (section 4), so there is no syntactic fallback here: an
+    uncovered path raises, which is the fail-closed rule of section 4.2.
+    """
+    segments = segments or []
+    check_reserved_namespace(segments)
+
+    if isinstance(node, RecordMap):
+        if not node.items:
+            return [Leaf(segments, TAG_EMPTY_OBJECT)]
+        out = []
+        seen = set()
+        for k, v in node.items:
+            if k in seen:
+                raise RoaxError("duplicate-key", k)
+            seen.add(k)
+            out.extend(flatten(v, type_map, segments + [{"key": k}]))
+        return out
+    if isinstance(node, list):
+        if not node:
+            return [Leaf(segments, TAG_EMPTY_ARRAY)]
+        out = []
+        for i, v in enumerate(node):
+            out.extend(flatten(v, type_map, segments + [{"index": i}]))
+        return out
+
+    tag = type_map.resolve(segments, json_kind(node))
+    return [Leaf(segments, tag, carrier(tag, node))]
+
+
+class RecordMap:
+    """An ordered map that preserves duplicate keys so the flattener can reject them.
+
+    A plain dict would silently drop a duplicate, which is exactly the OpenAttestation failure
+    section 3.2 requires an implementation to reject rather than inherit.
+    """
+
+    __slots__ = ("items",)
+
+    def __init__(self, items):
+        self.items = list(items)
+
+
+class NumberLiteral:
+    """A JSON number captured as its verbatim source text (section 6.4).
+
+    Never parsed through a float. This type is how a record carries a number from the parser to
+    the canonicalizer without any numeric type touching it.
+    """
+
+    __slots__ = ("text",)
+
+    def __init__(self, text: str):
+        self.text = text
+
+    def __repr__(self):  # pragma: no cover - debugging aid
+        return f"NumberLiteral({self.text!r})"
+
+
+def json_kind(node) -> str:
+    if node is None:
+        return "null"
+    if isinstance(node, bool):
+        return "boolean"
+    if isinstance(node, NumberLiteral):
+        return "number"
+    if isinstance(node, str):
+        return "string"
+    if isinstance(node, list):
+        return "array"
+    if isinstance(node, RecordMap):
+        return "object"
+    raise RoaxError("value-kind-unknown", repr(node))
+
+
+def carrier(tag: int, node):
+    """Convert a parsed record node into the carrier form `encode_value` expects."""
+    if tag in (TAG_NULL, TAG_EMPTY_ARRAY, TAG_EMPTY_OBJECT):
+        if node is not None:
+            raise RoaxError("tag-value-mismatch", f"{TAG_NAMES[tag]} at a non-null value")
+        return None
+    if tag == TAG_BOOL:
+        if not isinstance(node, bool):
+            raise RoaxError("tag-value-mismatch", "BOOL")
+        return node
+    if tag == TAG_STRING:
+        if isinstance(node, NumberLiteral):
+            # A schema-declared string carrying a JSON number literal. Fail closed rather than
+            # coerce: coercion is syntactic inference arriving through the back door.
+            raise RoaxError("tag-value-mismatch", "STRING at a JSON number")
+        if not isinstance(node, str):
+            raise RoaxError("tag-value-mismatch", "STRING")
+        return node
+    if tag in (TAG_INTEGER, TAG_DECIMAL):
+        if isinstance(node, NumberLiteral):
+            return node.text
+        if isinstance(node, str):
+            # A schema-declared numeric element carrying a JSON string. FHIR does this nowhere,
+            # so fail closed rather than guess which the issuer meant.
+            raise RoaxError("tag-value-mismatch", f"{TAG_NAMES[tag]} at a JSON string")
+        raise RoaxError("tag-value-mismatch", TAG_NAMES[tag])
+    if tag == TAG_BYTES:
+        raise RoaxError("bytes-binding-unsupported", "v1 binds base64 fields as STRING")
+    raise RoaxError("tag-unknown", repr(tag))
+
+
+def reserved_leaves(record_type: str, schema_version: str, record_id: str, issuer_id: str,
+                    issuer_key_id=None):
+    """Section 11.2. Four always, plus roax.issuer.keyId only when issuer.keyId is present.
+
+    An absent issuer.keyId emits NO leaf. It MUST NOT become a NULL leaf or an empty string:
+    those are three different roots and only one of them can be right.
+    """
+    out = [
+        Leaf([{"key": RESERVED_RECORD_TYPE}], TAG_STRING, record_type),
+        Leaf([{"key": RESERVED_SCHEMA_VERSION}], TAG_STRING, schema_version),
+        Leaf([{"key": RESERVED_RECORD_ID}], TAG_STRING, record_id),
+        Leaf([{"key": RESERVED_ISSUER_ID}], TAG_STRING, issuer_id),
+    ]
+    if issuer_key_id is not None:
+        out.append(Leaf([{"key": RESERVED_ISSUER_KEY_ID}], TAG_STRING, issuer_key_id))
+    return out
+
+
+def build_tree(hash_alg: str, record, type_map, master_salt: bytes, record_type: str,
+               schema_version: str, record_id: str, issuer_id: str, issuer_key_id=None):
+    """Sections 3.3, 7, 8 and 9. Returns (root, ordered leaves, salts, leaf hashes).
+
+    The leaf set is the UNION of the reserved leaves and the record's own, formed BEFORE the
+    sort, so the two are indistinguishable to the tree function.
+    """
+    record_leaves = flatten(record, type_map)
+    if not record_leaves:
+        # Section 3.3: a record contributing zero leaves of its own MUST be rejected at
+        # issuance rather than anchored. The union is never empty, so this is a check on the
+        # record's own contribution and not on the tree.
+        raise RoaxError("record-contributes-no-leaves", "")
+
+    leaves = reserved_leaves(
+        record_type, schema_version, record_id, issuer_id, issuer_key_id
+    ) + record_leaves
+
+    encoded = [(encode_path(leaf.segments), leaf) for leaf in leaves]
+    paths = [e for e, _ in encoded]
+    if len(set(paths)) != len(paths):
+        raise RoaxError("duplicate-path", "")
+    encoded.sort(key=lambda pair: pair[0])
+    ordered = [leaf for _, leaf in encoded]
+
+    salts = [derive_salt(hash_alg, master_salt, record_id, leaf.segments) for leaf in ordered]
+    hashes = [
+        leaf_hash(hash_alg, leaf.segments, leaf.tag, leaf.value, salt)
+        for leaf, salt in zip(ordered, salts)
+    ]
+    return mth(hash_alg, hashes), ordered, salts, hashes
+
+
+# --------------------------------------------------------------------------------------------
+# Type map (section 4)
+# --------------------------------------------------------------------------------------------
+
+
+class TypeMap:
+    """Section 4. Keyed by (path pattern, observed JSON kind); first matching entry wins.
+
+    Unknown paths fail closed (section 4.2). There is deliberately no default tag and no
+    fallback to the observed JSON kind: either would let two libraries carrying different maps
+    produce different roots silently.
+    """
+
+    def __init__(self, doc):
+        self.doc = doc
+        self.record_type = doc["recordType"]
+        self.schema_version = doc["schemaVersion"]
+        self.version = doc["typeMapVersion"]
+        self.entries = [(parse_pattern(e["pattern"]), e) for e in doc["entries"]]
+
+    def resolve(self, segments, kind: str) -> int:
+        for pattern, entry in self.entries:
+            if "jsonKind" in entry and entry["jsonKind"] != kind:
+                continue
+            if match_pattern(pattern, segments):
+                return entry["tag"]
+        raise RoaxError("type-map-uncovered-path", display_path(segments))
+
+
+def parse_pattern(pattern: str):
+    """Parse a display-notation pattern into segment matchers.
+
+    `*` matches any single array index; `**` matches any run of segments.
+
+    LIMIT, reported rather than papered over: because the pattern is written in display
+    notation, it cannot address a key containing `.`, `[` or `]`, while section 5 deliberately
+    admits such keys. Those are rejected here rather than silently mis-parsed.
+    """
+    out = []
+    i = 0
+    n = len(pattern)
+    while i < n:
+        if pattern[i] == "[":
+            j = pattern.index("]", i)
+            body = pattern[i + 1:j]
+            if body == "*":
+                out.append(("index", None))
+            elif body.isdigit():
+                out.append(("index", int(body)))
+            else:
+                raise RoaxError("type-map-pattern", pattern)
+            i = j + 1
+            if i < n and pattern[i] == ".":
+                i += 1
+            continue
+        j = i
+        while j < n and pattern[j] not in ".[":
+            j += 1
+        token = pattern[i:j]
+        if token == "**":
+            out.append(("any", None))
+        elif token == "":
+            raise RoaxError("type-map-pattern", pattern)
+        else:
+            if "]" in token:
+                raise RoaxError("type-map-pattern", pattern)
+            out.append(("key", token))
+        i = j
+        if i < n and pattern[i] == ".":
+            i += 1
+    return out
+
+
+def match_pattern(pattern, segments) -> bool:
+    return _match_from(pattern, 0, segments, 0)
+
+
+def _match_from(pattern, pi: int, segments, si: int) -> bool:
+    while pi < len(pattern):
+        kind, arg = pattern[pi]
+        if kind == "any":
+            for skip in range(si, len(segments) + 1):
+                if _match_from(pattern, pi + 1, segments, skip):
+                    return True
+            return False
+        if si >= len(segments):
+            return False
+        seg = segments[si]
+        if kind == "key":
+            if "key" not in seg or seg["key"] != arg:
+                return False
+        else:
+            if "index" not in seg:
+                return False
+            if arg is not None and seg["index"] != arg:
+                return False
+        pi += 1
+        si += 1
+    return si == len(segments)

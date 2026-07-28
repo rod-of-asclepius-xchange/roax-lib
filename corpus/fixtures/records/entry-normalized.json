@@ -1,0 +1,14 @@
+{
+  "fhirBundle": {
+    "resourceType": "Bundle",
+    "entry": [
+      {
+        "fullUrl": "urn:uuid:ca6f8564-0529-4454-9b6f-41456d5663c5",
+        "resource": {
+          "resourceType": "Patient",
+          "gender": "female"
+        }
+      }
+    ]
+  }
+}

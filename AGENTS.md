@@ -5,12 +5,18 @@ release, architecture, and sharp-edge notes that should travel with the code.
 
 ## What this repository is right now
 
-Specification and schemas only. **No library code has been written, and that is deliberate.**
-The specifications exist so the design can be reviewed before five language implementations exist to
-be re-litigated.
+Specification, schemas, and the conformance corpus. **No library code has been written, and that is
+deliberate.** The specifications exist so the design can be reviewed before five language
+implementations exist to be re-litigated.
 
 Do not add a Rust crate, TypeScript package, Go module, Swift package or Kotlin library without an
 explicit instruction to do so.
+
+`corpus/tools/` holds two small reference implementations, in Python and in plain `.mjs`. **They are
+corpus tooling and they are not roax-lib.** They exist to generate and check the vectors and they
+are deliberately parser-only, error-code-only and unoptimized. They are also why there is no
+`package.json`: a TypeScript package here would read as the beginning of a library. If you need a
+third implementation for cross-checking, add another single-file one; do not promote these.
 
 ## This repository is PUBLIC
 
@@ -32,6 +38,25 @@ These are the things a future agent is most likely to get wrong.
   unsafe without it, because type tags MUST come from the schema and not from JSON literal syntax.
   Building it is on the critical path and is the single largest gap. Do not write a library that
   infers tags syntactically "for now" - that is the exact bug this project exists to remove.
+
+  `corpus/tools/build_type_maps.py` now derives one per healthcert family from the reference
+  schemas, and what it found is the sharpest open item in the project:
+
+  - **recovery** binds completely, 50 of 50 `(pattern, jsonKind)` pairs.
+  - **vaccination** leaves two unbound. `signedEuHealthCerts[*].dose` is declared `"type": "number"`
+    with no pattern, and ROAX has *two* numeric tags, so JSON Schema `number` chooses neither. FHIR
+    itself distinguishes `integer` from `decimal` by **pattern**, both being `"type": "number"`;
+    the notarise schema carries no pattern. `expiryDateTime` is declared with a `format` and
+    `examples` and **no `type` at all**.
+  - **PDT** leaves twenty unbound. Its root object declares seven members and does not close
+    itself, so `$template`, `attachments`, `issuers` and `notarisationMetadata` - all four in its
+    own shipped sample - are permitted and undeclared.
+
+  **Under the fail-closed rule of specification section 4.2, that makes two of the three real MOH
+  samples uncommittable today.** Binding them needs a ruling, not a resolver improvement, and the
+  ruling must land in `docs/decisions.md` and the type map together. Do NOT quietly bind `number`
+  to a tag to make class 10 green: `docs/conformance-corpus.md` section 1.2 exists because that
+  kind of fix decides an open question from inside a data file.
 
 - **Numbers are never parsed through a float.** Anywhere. This is the whole point of the design;
   see `docs/decisions.md` part 0. In test vectors and JSON Schemas, INTEGER and DECIMAL values are
@@ -91,6 +116,48 @@ These are the things a future agent is most likely to get wrong.
 - **Do not resolve the reference schemas by `$id`.** Two of them carry copy-pasted `$id` values:
   recovery points at PDT's path, and vaccination points at a PDT interim path. A validator that
   registers both by `$id` silently applies the wrong rules. Load by file path.
+
+## The conformance corpus
+
+`corpus/` holds it. `corpus/README.md` is the operative document: coverage per class, the runner,
+the ambiguities found and what was actually measured. Read it before touching a vector.
+
+```sh
+corpus/tools/run.sh --references /path/to/schemata --modules /path/to/node_modules
+```
+
+Both flags are optional and their absence is reported, never hidden. Things to know:
+
+- **A vector is never hand-written.** `corpus/tools/corpus_plan.py` carries INPUTS only; every
+  expected hash, root, audit path, resolved tag and accept/reject verdict is computed. A value
+  typed in by hand would be agreed on by both implementations without either having computed it,
+  which is the whole failure mode the corpus exists to prevent.
+- **The two implementations must stay independent.** `roax_ref.py` and `roax_ref.mjs` were written
+  from the specification separately, and they use deliberately different mechanisms - stdlib JSON
+  hooks against a hand-written scanner, `bytes` against `Buffer`, Unicode 15.1 tables against 16.0.
+  Porting one to the other would make `run.sh` step 3 pass while proving nothing.
+- **Python's `$` also matches before a trailing newline; JavaScript's does not.** Anchor every
+  grammar in section 6.2 with `\A`/`\Z`. The first draft of implementation A accepted `"1.0\n"` and
+  canonicalized it. `reject-decimal-trailing-newline` pins it.
+- **Class 10 is 1 of 3 records** and class 13 is half, both for reasons recorded in
+  `corpus/README.md`. Do not fill either in without reading why they are short.
+- **`org.roax.corpus.synthetic` is a corpus-only `recordType`.** It is not in the `docs/profiles/`
+  registry and must never be issued against. It exists so structural vectors do not borrow a real
+  health authority's identifier and so authored type-map bindings never mix into a map that claims
+  schema provenance.
+
+## A specification claim that measurement contradicts
+
+**Section 11.1 says `leafCount` is self-binding in a disclosed copy. It is not.** RFC 9162 section
+2.1.3.2 takes `tree_size` as an input, so an attacker who controls `leafCount` controls the shape
+the verifier reconstructs. Measured on an 8-leaf tree: the internal node `MTH(L[0:4])` presented as
+a leaf at index 0 fails verification under the true tree size 8 and **succeeds** under a forged tree
+size 2, against the same genuine root.
+
+What actually blocks it is section 10 step 1 - recompute the leaf hash from the disclosed fields
+rather than trust a supplied one - plus second-preimage resistance. That defence is already
+normative. The `leafCount` sentence claims a second one that is not there, and the specification has
+not been changed here because that is a specification decision.
 
 ## Documentation conventions in force here
 
