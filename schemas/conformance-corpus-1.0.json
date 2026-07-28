@@ -15,11 +15,11 @@
     },
     "canon": { "const": "ROAX-CANON/1" },
     "hashAlg": {
-      "description": "The hash algorithm these vectors were produced under. It is not merely a label: it is appended to the domain string, which is ASCII 'ROAX-CANON/1/' + hashAlg and sits in every leaf preimage, so every expected hash in this file is specific to it (spec sections 8 and 7.4). It no longer sits in a salt preimage, because decision D4 was ruled D4b and salt derivation is gone (spec section 7.1); the domain string itself is unchanged. Matches the envelope enum deliberately. Only SHA-256 has a construction DEFINED by ROAX-CANON/1; Poseidon-BN254 is registered but its parameterization is not yet pinned, so no Poseidon corpus can exist until a revision pins it (spec section 7.4).",
+      "description": "The hash algorithm these vectors were produced under. It is not merely a label: it is appended to the domain string, which is ASCII 'ROAX-CANON/1/' + hashAlg and sits in every leaf preimage, so every expected hash in this file is specific to it (spec sections 8 and 7.4). It no longer sits in a salt preimage, because decision D4 was ruled D4b and salt derivation is gone (spec section 7.1); the domain string itself is unchanged. Matches the envelope enum deliberately. Only SHA-256 has a construction DEFINED by ROAX-CANON/1; Poseidon-BN254 is registered but its parameterization is not yet pinned, so no Poseidon corpus can exist until a revision pins it (spec section 7.4). STATED LIMIT: the enum deliberately still accepts Poseidon-BN254, mirroring the envelope, so 'no Poseidon corpus can exist' is enforced by the corpus build refusing to produce one rather than by this keyword. There is nothing to enforce structurally yet, because a Poseidon corpus has no expected values to be wrong about until the parameterization is pinned.",
       "enum": ["SHA-256", "Poseidon-BN254"]
     },
     "unicodeVersion": {
-      "description": "The Unicode version whose NFC tables the expected values were produced under. ROAX-CANON/1 pins 15.1, and '15.1' is the canonical form for this pin (spec section 6.1). An implementation running different tables MAY legitimately differ on vectors in the 'unicodeVersion' class, and must say so rather than silently passing. OPAQUE: the Unicode Consortium defines this identifier, not this project, so it carries no shape constraint (spec section 12.1). The earlier two-part pattern rejected '15.1.0', which is the official Unicode Standard version string for the very release being pinned. Widened rather than made a const, because a const would foreclose a future re-pin and the corpus is versioned independently of the specification.",
+      "description": "The Unicode version whose NFC tables the expected values were produced under. ROAX-CANON/1 pins 15.1, and '15.1' is the canonical form for this pin (spec section 6.1). An implementation running different tables MAY legitimately differ on vectors in the 'unicodeVersion' class, and must say so rather than silently passing. STATED LIMIT: that is an obligation on the implementation's conformance REPORT, not on this file, so nothing here can enforce it; conformance class 16 owns it and is explicit that it detects a version mismatch by declaration rather than by demonstration. OPAQUE: the Unicode Consortium defines this identifier, not this project, so it carries no shape constraint (spec section 12.1). The earlier two-part pattern rejected '15.1.0', which is the official Unicode Standard version string for the very release being pinned. Widened rather than made a const, because a const would foreclose a future re-pin and the corpus is versioned independently of the specification.",
       "type": "string",
       "minLength": 1
     },
@@ -47,7 +47,7 @@
     "hex32": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "name": { "type": "string", "minLength": 1 },
     "classRef": {
-      "description": "Which numbered class in docs/conformance-corpus.md this vector discharges. Every class must be reachable from at least one vector; a class with no vectors is a coverage gap and the corpus build MUST report it. The maximum tracks the class count stated in section 3 of that document and MUST move with it. Raised from 17 to 19 on 2026-07-28 when the ten engineering decisions were ruled: class 18 fails an implementation that treats an outside-the-root field as authority (decision D8) and class 19 asserts NFC end to end with a root (decision D12). Class numbers are stable - class 12 kept its number and its subject when decision D4 was ruled D4b and lost only its mechanism, so nothing renumbered.",
+      "description": "Which numbered class in docs/conformance-corpus.md this vector discharges. Every class must be reachable from at least one vector; a class with no vectors is a coverage gap and the corpus build MUST report it. The maximum tracks the class count stated in section 3 of that document and MUST move with it. Raised from 17 to 19 on 2026-07-28 when the ten engineering decisions were ruled: class 18 fails an implementation that treats an outside-the-root field as authority (decision D8) and class 19 asserts NFC end to end with a root (decision D12). Class numbers are stable - class 12 kept its number and its subject when decision D4 was ruled D4b and lost only its mechanism, so nothing renumbered. THREE DEFINITIONS PIN THEIR CLASS MORE TIGHTLY THAN THIS RANGE, and they are listed here because this is where the coupling note belongs: unlinkabilityVector is const 12, normalizationVector is const 19, and envelopeVector is 13 to 18. Adding a class therefore means checking four places in this file, not one, plus section 3 of docs/conformance-corpus.md. The pins are worth that cost because a mislabelled vector marks the class it names as covered while testing nothing about it, which is the silently-vacuous-vector failure this file guards in several other places.",
       "type": "integer",
       "minimum": 1,
       "maximum": 19
@@ -58,6 +58,23 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 8
+    },
+
+    "carrierValue": {
+      "description": "A record value in CARRIER form, as it is written into a vector file. A JSON NUMBER IS UNREPRESENTABLE HERE, at any depth, and that is the one constraint in this schema that guards the load-bearing invariant of the whole project: a number is never parsed through a float (docs/decisions.md part 0, spec section 6.4). It was prose on two carriers and absent on two others until this was noticed. The failure it prevents is worse than an invalid vector, because it happens before any implementation is involved: a vector written as 0.010 is destroyed by the runner's own JSON parser into 0.01, and the corpus then certifies five independent libraries as agreeing on a DECIMAL trailing-zero premise the file format had already thrown away (spec section 6.2, FHIR R4 SHALL). INTEGER and DECIMAL therefore travel as canonical strings, and so does BLOB_REF's blobByteLength, which is a hash-preimage input for the same reason (spec section 6.5). THIS DUPLICATES NO PER-TAG MAPPING: walking the per-tag allOf conditionals of schemas/envelope-1.0.json shows that no tag carries a JSON number under any of them - BOOL is a boolean, STRING, INTEGER, DECIMAL and BYTES are strings, BLOB_REF is an object of two strings, and NULL, EMPTY_ARRAY and EMPTY_OBJECT carry no value at all - so the rule is uniform across every tag and nothing here can fall out of step with that file. Which type a given tag carries is still pinned there and deliberately not restated here. NOTE THE CONTRAST with schemas/envelope-1.0.json's `record` property, which is NOT constrained this way and MUST NOT BE: a full copy carries the record in its original JSON form, numbers included, and there the parser requirement of spec section 6.4 is what protects the literals rather than the schema.",
+      "not": { "type": "number" },
+      "allOf": [
+        {
+          "description": "Recurse into an array, so a number cannot hide inside one.",
+          "if": { "type": "array" },
+          "then": { "type": "array", "items": { "$ref": "#/$defs/carrierValue" } }
+        },
+        {
+          "description": "Recurse into an object, so a number cannot hide inside one. This is what makes the constraint hold for the BLOB_REF carrier, whose blobByteLength is a nested member.",
+          "if": { "type": "object" },
+          "then": { "type": "object", "additionalProperties": { "$ref": "#/$defs/carrierValue" } }
+        }
+      ]
     },
 
     "segments": {
@@ -81,7 +98,10 @@
         "class": { "$ref": "#/$defs/classRef" },
         "segments": { "$ref": "#/$defs/segments" },
         "encodedHex": { "type": "string", "pattern": "^([0-9a-f]{2})*$" },
-        "displayPath": { "type": "string", "description": "Display only. Never hashed." }
+        "displayPath": {
+          "type": "string",
+          "description": "Display only. Never hashed. STATED LIMIT: that is a rule about what an IMPLEMENTATION does with this string, not a constraint on the string, so no keyword here can express it and the implementation plus conformance class 6 own it. Spec section 5.2 gives the trap in full: reconstructing segments by parsing this form is what the structured encoding exists to make unnecessary."
+        }
       }
     },
 
@@ -93,7 +113,10 @@
         "name": { "$ref": "#/$defs/name" },
         "class": { "$ref": "#/$defs/classRef" },
         "tag": { "$ref": "#/$defs/tagRef" },
-        "input": { "description": "Input in carrier form. Numbers are STRINGS here; a JSON number in a test vector would be parsed through a float by the very implementations under test." },
+        "input": {
+          "description": "Input in carrier form. Numbers are STRINGS here; a JSON number in a test vector would be parsed through a float by the very implementations under test. That is now enforced by the carrierValue reference rather than asserted in this sentence.",
+          "$ref": "#/$defs/carrierValue"
+        },
         "encodedHex": { "type": "string", "pattern": "^([0-9a-f]{2})*$" }
       }
     },
@@ -107,7 +130,10 @@
         "name": { "$ref": "#/$defs/name" },
         "class": { "$ref": "#/$defs/classRef" },
         "tag": { "$ref": "#/$defs/tagRef" },
-        "input": {},
+        "input": {
+          "description": "The input that MUST error, in carrier form. A JSON NUMBER IS NOT A LEGITIMATE REJECTION INPUT, and this was considered rather than inherited: most of the class-3 rejection inputs are not valid JSON numbers in the first place - `01`, `1.`, `.5`, `+1`, `NaN` and `Infinity` cannot be written as JSON number tokens at all (docs/conformance-corpus.md class 3) - and the one that can, `1.4e+9999`, is precisely the case a float-based parser turns into Infinity before the runner ever hands it to the implementation under test, so writing it as a number would delete the vector's own subject. Carrying these as strings is not a workaround: spec section 6.4 requires an implementation to read a number's SOURCE BYTES rather than a parsed value, so the string IS the faithful representation of what the implementation is given.",
+          "$ref": "#/$defs/carrierValue"
+        },
         "segments": { "$ref": "#/$defs/segments" },
         "reason": { "type": "string", "minLength": 1 }
       }
@@ -123,7 +149,10 @@
         "class": { "$ref": "#/$defs/classRef" },
         "segments": { "$ref": "#/$defs/segments" },
         "tag": { "$ref": "#/$defs/tagRef" },
-        "value": {},
+        "value": {
+          "description": "The leaf's value in carrier form. Absent for the tags that carry none - NULL, EMPTY_ARRAY and EMPTY_OBJECT (spec section 6.1).",
+          "$ref": "#/$defs/carrierValue"
+        },
         "saltHex": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
         "leafHash": { "$ref": "#/$defs/hex32" }
       }
@@ -320,7 +349,11 @@
       "additionalProperties": false,
       "properties": {
         "name": { "$ref": "#/$defs/name" },
-        "class": { "$ref": "#/$defs/classRef" },
+        "class": {
+          "description": "Always 12. Pinned rather than left to classRef's 1-to-19 range, because the class number is what the corpus build's coverage check counts: a class-12 vector mislabelled as any other class would mark THAT class covered by a vector testing nothing about it, and leave class 12 reading as a gap. The same silently-vacuous shape this file guards elsewhere, one level up.",
+          "$ref": "#/$defs/classRef",
+          "const": 12
+        },
         "paths": {
           "description": "The paths to issue a leaf at, in EVERY trial. AT LEAST TWO, AND DISTINCT, and both halves are enforced here rather than described: an implementation that draws one salt per RECORD and reuses it across every leaf still produces a different salt at any single path in each trial, so a one-path vector passes while the unlinkability property decision D4b was chosen for is destroyed, and two entries naming the SAME path would let expectDistinctSaltsWithinIssuance assert distinctness over a path a record can hold only once. uniqueItems is EXACT here rather than partial, because the items are the structured segment lists themselves: two paths are equal exactly when their segment sequences are equal (spec section 5.1), and the display path is never involved (spec section 5.2). An earlier shape made these entries objects carrying a per-path tag and value, where uniqueItems compared whole objects and two entries sharing segments with different tags still validated. ONE RESIDUE THE RUNNER MUST ENFORCE IN CODE: two keys differing only in Unicode normalization form are unequal as JSON text and equal as paths once NFC is applied (spec section 6.1), so the corpus build MUST compare NFC-normalized segments and reject such a pair.",
           "type": "array",
@@ -334,7 +367,8 @@
         },
         "value": {
           "description": "The value carried at EVERY path in `paths`, in carrier form as in encodeValueVector: numbers are STRINGS. Absent for the tags that carry no value - NULL, EMPTY_ARRAY and EMPTY_OBJECT (spec section 6.1). Carrying it once is what makes 'the same value at the same path in every trial' structurally true rather than an instruction a vector author could disregard.",
-          "$comment": "No type constraint: the carrier type is pinned per tag by schemas/envelope-1.0.json, and repeating that mapping here would be a second place to keep in step."
+          "$ref": "#/$defs/carrierValue",
+          "$comment": "WHICH type this tag carries is still not restated here, because that mapping is pinned per tag by schemas/envelope-1.0.json and a second copy could fall out of step. The carrierValue reference is a different claim and does not have that problem: no tag carries a JSON number under any of those conditionals, so the rule is uniform and copies no mapping."
         },
         "recordIds": {
           "description": "OPTIONAL. The record identifiers to issue the trials under, when the vector wants to pin that a SHARED identifier still yields different leaf hashes. Under decision D4b the record identifier is not an input to any salt or preimage, so this changes nothing about the expected outcome; it exists so a vector can state that explicitly, because the deleted derived-salt construction did fold it in and a reader who knows that construction would otherwise wonder.",
@@ -368,7 +402,11 @@
       "additionalProperties": false,
       "properties": {
         "name": { "$ref": "#/$defs/name" },
-        "class": { "$ref": "#/$defs/classRef" },
+        "class": {
+          "description": "Always 19, pinned for the reason given on unlinkabilityVector.class.",
+          "$ref": "#/$defs/classRef",
+          "const": 19
+        },
         "site": {
           "description": "Where the differing sequence sits. Both are required by docs/conformance-corpus.md class 19, because an implementation can normalize values and not keys. STATED LIMIT: that is a requirement on the SET of class-19 vectors and not on any one of them, so it is enforced by the corpus build alongside the class-coverage check classRef describes. It is left there rather than expressed as a pair of contains keywords on vectors.normalization, because that would half-enforce it - an absent array escapes entirely - and would make one class of nineteen carry its coverage rule in a different place from the other eighteen.",
           "enum": ["value", "key"]
@@ -394,7 +432,13 @@
       "additionalProperties": false,
       "properties": {
         "name": { "$ref": "#/$defs/name" },
-        "class": { "$ref": "#/$defs/classRef" },
+        "class": {
+          "description": "13 to 18, matching the range this definition's own description states, and pinned for the reason given on unlinkabilityVector.class. The lower bound is where envelope-level invariants begin and the upper bound is class 18; the if/then/else below then splits 18 from 13 to 17.",
+          "$ref": "#/$defs/classRef",
+          "type": "integer",
+          "minimum": 13,
+          "maximum": 18
+        },
         "envelopeFile": { "type": "string" },
         "expectAccept": { "type": "boolean" },
         "verifierConfig": {
