@@ -157,6 +157,10 @@ Four things to know if you touch them:
   compilation.
 - Union types (`"type": ["string","boolean"]`) trip `strictTypes`. The envelope pins each value type
   per tag in its `allOf` conditionals instead, which is more precise anyway.
+- **`strictTypes` also rejects a bare `minimum` (or any type-specific keyword) inside a `then` or
+  `else` branch**, because the branch cannot see the `type` declared on the same property in
+  `properties`. Repeat it: `recordVector`'s `then` writes `{"type": "integer", "minimum": 6}` where
+  the outer property already says `"type": "integer"`. That repetition is required, not redundant.
 - **A property is FORBIDDEN inside a branch with the false schema, `"properties": {"x": false}`.**
   That idiom is used in `recordVector`'s two-branch `oneOf` and in `envelopeVector`'s `else`, and it
   compiles clean under strict mode. It is shorter than `"not": {"required": ["x"], "properties":
