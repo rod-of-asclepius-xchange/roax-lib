@@ -36,7 +36,11 @@ These are the things a future agent is most likely to get wrong.
 - **Numbers are never parsed through a float.** Anywhere. This is the whole point of the design;
   see `docs/decisions.md` part 0. In test vectors and JSON Schemas, INTEGER and DECIMAL values are
   carried as **strings**, because a JSON number in a vector file would be destroyed by the very
-  parser under test.
+  parser under test. Every value carrier in `schemas/conformance-corpus-1.0.json` now `$ref`s
+  `carrierValue`, which makes a JSON number **unrepresentable at any depth** rather than merely
+  discouraged in a description. The one deliberate exception is the envelope's `record` property:
+  a full copy carries the record in its original JSON form, numbers included, so constraining it
+  would be wrong and the spec section 6.4 parser requirement is what protects those literals.
 
 - **Trailing zeros in decimals are significant.** `0.010` is not `0.01`. FHIR R4 says SHALL. dogtag
   strips them (`crates/dogtag-standard-rs/src/encode.rs:51-59`) and ROAX deliberately does not. If
@@ -157,10 +161,12 @@ Four things to know if you touch them:
   compilation.
 - Union types (`"type": ["string","boolean"]`) trip `strictTypes`. The envelope pins each value type
   per tag in its `allOf` conditionals instead, which is more precise anyway.
-- **`strictTypes` also rejects a bare `minimum` (or any type-specific keyword) inside a `then` or
-  `else` branch**, because the branch cannot see the `type` declared on the same property in
-  `properties`. Repeat it: `recordVector`'s `then` writes `{"type": "integer", "minimum": 6}` where
-  the outer property already says `"type": "integer"`. That repetition is required, not redundant.
+- **`strictTypes` rejects any type-specific keyword inside an `if`, `then` or `else` branch unless
+  that branch declares the `type` itself**, because a branch cannot see the `type` on the same
+  property in `properties`. It applies to `minimum`, to `minItems` and to `required` alike, and at
+  every nesting depth: `recordVector`'s `then` writes `{"type": "integer", "minimum": 6}`, and the
+  envelope's `issuer.keyId` conditional writes `{"type": "object", "required": ["keyId"], ...}` on a
+  property one level down. Every one of those repetitions is required, not redundant.
 - **A property is FORBIDDEN inside a branch with the false schema, `"properties": {"x": false}`.**
   That idiom is used in `recordVector`'s two-branch `oneOf` and in `envelopeVector`'s `else`, and it
   compiles clean under strict mode. It is shorter than `"not": {"required": ["x"], "properties":
