@@ -54,6 +54,43 @@ mechanism, an arbiter that disagrees with the specification it arbitrates is wor
 it certifies divergence as conformance. The same statement appears as section 1.1 of the
 specification, deliberately, so that a reader arriving at either document finds it.
 
+### 1.2 The corpus expresses what is REQUIRED, and no more
+
+> **Standing rule, binding on every vector class in this document and on every class added later:**
+>
+> The corpus expresses what is **required** of any conforming implementation, and no more.
+> Anything still open must be **expressible either way, or absent**.
+> A corpus that mandates one side of an open design question has quietly **decided** it, because
+> every implementation built against the corpus inherits that decision as though it were settled.
+
+**Why this is dangerous, and why it is easy to miss.** This is the same class of defect as the
+corpus contradicting the specification (section 1.1), but it is harder to see, because it does not
+look like disagreement. It looks like **completeness**. A required field reads as thoroughness, and
+nothing in the corpus flags that the field presumes an answer to a question `docs/decisions.md`
+records as open. The specification says a decision is open, the corpus quietly says it is not, and
+the corpus is the artifact implementations are actually built against.
+
+**It has already happened twice in this design.** `schemas/envelope-1.0.json` required `masterSalt`
+in every full copy, which is unimplementable under decision D4b where no `masterSalt` exists; that
+was removed and the envelope now carries per-leaf salts, which are expressible under either answer.
+The corpus then still required `masterSaltHex` on every `recordVector`, reproducing the same
+foreclosure one file over. Twice in the same design is a pattern, which is why the rule is written
+down rather than fixed case by case.
+
+**This is a future-proofing constraint, not a tidiness one**, and it connects directly to
+specification section 12.2. A corpus that hard-codes one salt strategy is not upgradeable. If D4 is
+ruled the other way, every implementation that passed such a corpus has already baked in the
+assumption, and reconciling them is not a version bump. It is a fork.
+
+**How to apply it to a new vector class.** For each required field, ask which decision in
+`docs/decisions.md` it presumes. If that decision is open, the field belongs in one of three places:
+optional, absent, or expressible both ways through a `oneOf`. The exception is a vector class whose
+**subject** is the open mechanism: `saltVector` requires `masterSaltHex` because it tests the
+section 7 derivation, and `unlinkabilitySide` requires it because class 12 is where master-salt
+freshness *is* the assertion. Testing a mechanism is not the same as presuming it, and
+`schemas/conformance-corpus-1.0.json` records that distinction on each of those definitions so a
+later editor does not "harmonize" them.
+
 ## 2. Release gates
 
 These are requirements on the project, not on the file.
@@ -227,24 +264,38 @@ MUST be rejected - plus one that includes them all and is accepted.
 JSON Schema cannot express this, so it is enforced in code and can only be pinned here. See
 specification section 10.2.
 
-### Class 15 - reserved first-segment guard
+### Class 15 - reserved-namespace guard
 
-The guard is on **decoded segments**, not on a rendered display path: a record-supplied path is
-rejected when its **first segment** is `KEY("roax")` (specification section 11.2). The vectors are
-stated as segments for that reason, and an implementation that passes this class by string-matching
-`"roax."` against a display path is doing the thing specification section 5.2 forbids.
+A record-supplied path is rejected when its **first segment** is a `KEY` whose **NFC-normalized**
+key begins with the ASCII prefix `roax.` (specification section 11.2). Reserved paths are
+**single segments carrying the literal dotted name**, so this is a test on one key's own characters,
+not on a rendered display path and not on a sequence of segments.
 
 | Vector, as segments | Expected | Why |
 |---|---|---|
-| `[KEY("roax"), KEY("recordId")]` | **Reject** | Collides with a reserved leaf outright. |
-| `[KEY("roax"), KEY("anythingElse")]` | **Reject** | First segment is reserved; the guard is on the segment prefix, not on the exact reserved paths. |
-| `[KEY("roax")]` | **Reject** | The bare namespace. A display-string guard against `"roax."` misses this, which is dogtag's recorded case. |
-| `[KEY("roaxX"), KEY("foo")]` | **Accept** | A different first segment. The adjacent-name squat is a hazard only for a guard comparing rendered strings. |
-| `[KEY("roax.recordId")]` | **Accept** | One key that happens to contain a dot. Length-prefixed encoding makes it provably distinct from the two-segment reserved path (specification section 5.1), so it cannot collide. |
+| `[KEY("roax.recordId")]` | **Reject** | It *is* a reserved path. A direct collision. |
+| `[KEY("roax.anythingElse")]` | **Reject** | The guard is on the `roax.` prefix within the first key, not on the exact reserved names, so a future reserved leaf cannot be squatted before it is defined. |
+| `[KEY("roax")]` | **Accept** | An ordinary record field. No reserved path is the bare segment `KEY("roax")`, so it collides with nothing. |
+| `[KEY("roaxX"), KEY("foo")]` | **Accept** | A different key entirely. |
+| `[KEY("a"), KEY("roax.foo")]` | **Accept** | The guard applies to the FIRST segment only. This path differs from every reserved path in segment count and cannot collide with one. |
+| A key that NFC-normalizes into the reserved prefix | **Reject** | The check is on the normalized key, because that is what gets hashed. |
 
-The last two are the vectors that distinguish a correct implementation from one that reconstructed
-the guard over display strings, and they assert **acceptance**, which is why they matter: a
-string-matching implementation that over-rejects passes a corpus containing only rejection vectors.
+**Three of these assert acceptance, and that is the point of the class.** A corpus containing only
+rejection vectors is passed by an implementation that over-rejects, and over-rejection is the more
+likely failure here: it is what a guard written against a display path, or applied to every segment
+instead of the first, actually does.
+
+**This class was rewritten, and the earlier version was wrong in a way worth recording.** It
+required rejecting the bare namespace `roax` and the adjacent squat `roaxX`. Both are ordinary
+record keys under the single-segment reserved-path model of specification section 11.2, and
+rejecting them is over-broad: it would refuse a legitimate record for using a field name that
+collides with nothing. That class had been written for a string-path model this specification
+deliberately departed from, and it survived the departure because nobody re-derived it.
+
+The last row is the NFC case, and it is the one an implementation is most likely to get wrong by
+checking too early. Specification section 11.2 gives the demonstration that normalization changes
+bytes: U+212A KELVIN SIGN arrives as `e2 84 aa` and normalizes to ASCII `K`, `0x4b`. A guard that
+runs before normalization is testing a different string from the one that gets committed.
 
 dogtag's own record of the prefix-versus-exact-match change is at
 `crates/dogtag-standard-rs/src/profile_tree.rs:54-66`. What transfers is the argument, not the

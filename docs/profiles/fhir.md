@@ -132,17 +132,26 @@ Minimum set for this profile, per specification section 10.2:
 
 | Path | Why |
 |---|---|
-| `roax.canon` | Identifies the canonicalization rules. |
-| `roax.hashAlg` | Identifies which hash function a verifier must run. |
-| `roax.recordType` | Identifies which profile is being claimed. |
-| `roax.schemaVersion` | Identifies the profile version. |
-| `roax.recordId` | Identifies the record, and is in every salt preimage. |
+| `roax.recordType` | Selects the type map, so verification cannot start without it. |
+| `roax.schemaVersion` | The other half of the type-map lookup key. |
+| `roax.recordId` | In every salt preimage, so no leaf hash can be recomputed without it. |
 | `roax.issuer.id` | Identifies who issued it. |
 | `resourceType` | Without it a disclosed FHIR resource does not say what kind of resource it is. |
 
-`resourceType` is the FHIR-specific addition. The others are the reserved floor every profile
-carries, per specification section 11.2. `roax.issuer.keyId` joins them whenever it is present in
-the envelope.
+`resourceType` is the FHIR-specific addition. The other four are the reserved floor every profile
+carries, per specification section 11.2.
+
+Two distinctions worth keeping straight. The first three are mandatory **by arithmetic rather than
+by policy**: a verifier without them cannot run the procedure at all, so withholding one yields no
+proof rather than a weaker one. Only `roax.issuer.id` is a policy choice.
+And `roax.issuer.keyId` is **committed but optional to disclose**, because requiring it would break
+key rotation on an already-anchored record.
+
+Neither `roax.canon` nor `roax.hashAlg` appears here, and both absences are deliberate.
+`canon` is already bound into the domain string of every leaf and every salt, so a leaf restating it
+would pay bytes on every disclosed copy for a property already held.
+`hashAlg` cannot be bound by a leaf at all, because the leaf would be hashed under the algorithm it
+names; specification section 7.4 gives the three mechanisms that replace it.
 
 ## 6. Known defects and cautions
 

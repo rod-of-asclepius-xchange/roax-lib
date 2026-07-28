@@ -119,7 +119,7 @@ attachment it is why blobs are 60-70% of all hashed bytes across the reference r
 
 | Path | Why |
 |---|---|
-| `roax.canon`, `roax.hashAlg`, `roax.recordType`, `roax.schemaVersion`, `roax.recordId`, `roax.issuer.id` | The reserved floor (spec section 11.2), which every profile carries. `roax.issuer.keyId` is additionally non-redactable whenever it is present. |
+| `roax.recordType`, `roax.schemaVersion`, `roax.recordId`, `roax.issuer.id` | The reserved floor (spec section 11.2), which every profile carries. The first three are mandatory by arithmetic rather than policy: without them a verifier cannot select the type map or rebuild a salt preimage, so it cannot verify at all. `roax.issuer.keyId` is committed but OPTIONAL to disclose, because requiring it would break key rotation on already-anchored records. |
 | `validFrom` | A validity claim with no start is not checkable. |
 | `notarisationMetadata.reference` | The notarisation identity. In the sample it equals the outer `id`, though nothing enforces that (section 6). |
 

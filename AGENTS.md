@@ -45,19 +45,33 @@ These are the things a future agent is most likely to get wrong.
 - **The display path is never hashed.** `a.b[0].c` is for humans. Hashing uses the length-prefixed
   structured encoding (spec section 5). Never reconstruct a path by parsing a display string.
 
-- **The leaf set is a union, not the record.** Reserved `roax.*` leaves are ordinary leaves with
-  ordinary structured paths - one `KEY` segment per dot component - and they join the record's
-  leaves before the sort (spec sections 3.3 and 11.2). A flattener that walks the record only
-  produces a different root. `roax.issuer.keyId` is the one conditional leaf: absent means no leaf,
-  not a NULL leaf.
+- **The leaf set is a union, not the record.** Reserved `roax.*` leaves join the record's leaves
+  before the sort (spec sections 3.3 and 11.2). A flattener that walks the record only produces a
+  different root. Each reserved path is a **single `KEY` segment carrying the literal dotted name**,
+  so `roax.recordType` is one segment `KEY("roax.recordType")` and *not* two. There are four
+  mandatory reserved leaves plus `roax.issuer.keyId`, which is the one conditional leaf: absent
+  means no leaf, not a NULL leaf. The tree floor is therefore 5.
 
-- **The reserved-namespace guard is on the first decoded segment**, not on a `"roax."` display-path
-  prefix. So a key named `roax` is rejected and one named `roaxX` is accepted (spec section 11.2).
-  Implementing it as a string match is the section 5.2 trap wearing a different hat.
+- **The reserved-namespace guard tests the NFC-normalized key of the FIRST segment** for the ASCII
+  prefix `roax.` (spec section 11.2). Three ways to get it wrong: reconstructing a display path to
+  run it (the section 5.2 trap), applying it to every segment rather than the first, and checking
+  raw bytes before NFC. A key named `roax` or `roaxX`, with no dot, is **accepted** - it collides
+  with nothing.
 
 - **`DOMAIN` is algorithm-qualified:** `"ROAX-CANON/1/" + hashAlg`, not a bare `"ROAX-CANON/1"`
-  (spec sections 7, 7.4, 8). `hashAlg` is also a reserved leaf. Only SHA-256 has a defined
-  construction; Poseidon-BN254 is registered but unparameterized and MUST NOT be issued against.
+  (spec sections 7, 7.4, 8). But `hashAlg` is **not** a leaf and must never become one: a leaf is
+  hashed under the algorithm it names, so it cannot bind it. Authority comes from the anchoring
+  registry and the verifier's allow-list. Only SHA-256 has a defined construction; Poseidon-BN254
+  is registered but unparameterized and MUST NOT be issued against.
+
+- **Version identifiers defined elsewhere are opaque** and carry no shape constraint: `schemaVersion`
+  and `unicodeVersion` are matched for equality, never parsed or ordered (spec section 12.1). No
+  dotted-numeric pattern accepts even FHIR's own 22 `fhirVersion` values. ROAX's own artifacts,
+  `corpusVersion` and `typeMapVersion`, keep semver. Do not harmonize the two groups.
+
+- **The corpus may not require what the design has not decided.** A required corpus field that
+  presumes one side of an open decision silently rules it (`docs/conformance-corpus.md` section
+  1.2). This has already happened twice with `masterSalt`.
 
 - **`masterSalt` MUST NEVER appear in any envelope**, full or disclosed. What an envelope carries is
   per-leaf salts: a full copy carries the salt of *every* leaf in a `salts` array, a disclosed copy

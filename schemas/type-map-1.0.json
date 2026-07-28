@@ -9,7 +9,7 @@
 
   "properties": {
     "typeMapVersion": {
-      "description": "Version of this type map. Changing any entry MUST bump it. A root computed under one type-map version is not reproducible under another if the changed entry was reachable.",
+      "description": "Version of this type map. Changing any entry MUST bump it. A root computed under one type-map version is not reproducible under another if the changed entry was reachable. The three-part semver pattern is KEPT here on purpose, and the distinction is the one spec section 12.1 draws: this is one of ROAX's OWN artifacts, so this project defines the identifier and may legitimately constrain its shape. schemaVersion above is defined elsewhere - by the profile, and beyond it by FHIR or a health authority - and is therefore opaque. Do not 'harmonize' the two; they differ because their owners differ.",
       "type": "string",
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
     },
@@ -20,9 +20,9 @@
     },
 
     "schemaVersion": {
-      "description": "The profile version this map applies to. Matches the envelope's schemaVersion and uses the same two-or-three-component form: the healthcert profiles use two (1.0, 2.0) and hl7.fhir.bundle uses the real FHIR version 4.0.1, which is three.",
+      "description": "The profile version this map applies to. OPAQUE TO THE PROTOCOL, exactly as in the envelope, and deliberately carrying no dotted-numeric pattern: the value is never parsed, ordered or range-compared, only matched for equality against the profile registry (spec section 12.1). THIS CONSTRAINT MUST STAY IDENTICAL TO THE ENVELOPE'S. The two fields together form the type-map lookup key, so tightening one alone would make a record that validates as an envelope fail to find its own type map, which is the silent-divergence failure the fail-closed rule exists to prevent.",
       "type": "string",
-      "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$"
+      "minLength": 1
     },
 
     "sourceSchemas": {

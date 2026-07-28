@@ -99,7 +99,10 @@ carries either form.
 - **No anchoring registry design.** What the on-chain registry looks like - one root per record
   versus batched roots, and revocation semantics - is not specified here and is not settled.
   A further smart-contract round is expected, so no contract set is treated as permanent by this
-  document.
+  document. **This document does place one requirement on that design, and hands it forward rather
+  than pretending it is closed here: the registry MUST record the pair `(root, hashAlg)`, and a
+  verifier MUST take `hashAlg` from the registry rather than from the envelope.** Section 7.4 shows
+  why that is the only one of the three algorithm bindings that actually works.
 - **The type map does not exist yet.** Section 4 establishes that it is REQUIRED and that the
   design is unsafe without it. Building it is mechanical but it is real work on the critical path,
   and it is not done. This is the single largest gap between this specification and a working
@@ -214,9 +217,9 @@ Section 14.2 explains why ROAX does not inherit that.
 
 **A record that contributes zero leaves of its own MUST be rejected at issuance rather than
 anchored.** The rejection is on the record's own contribution, because the union above always
-carries the reserved leaves, so the tree itself is never empty: its floor is 7 leaves, being the six
-always-emitted reserved leaves plus at least one from the record. Section 11.2 gives the reserved
-set and states which one is conditional.
+carries the reserved leaves, so the tree itself is never empty: its floor is 5 leaves, being the
+four always-emitted reserved leaves plus at least one from the record. Section 11.2 gives the
+reserved set and states which one is conditional.
 
 ---
 
@@ -562,12 +565,15 @@ There is exactly **one** salt-derivation preimage builder in a conforming implem
 > misreading, and an implementer who takes it as an integration requirement would levy real work on
 > issuing institutions for a value the library computes on its own.
 
-**Neither `recordId` nor `hashAlg` is circular, though both look it.** Each is an input to every
-salt (above) and each is also itself committed as a reserved leaf, at `roax.recordId` and
-`roax.hashAlg` (section 11.2). There is no cycle: the preimage consumes both as plain UTF-8 strings
-taken from the envelope, never a leaf hash or a salt. So `salt` for those two reserved paths is
-computed the same way as every other salt, and their leaves are then built from it normally.
+**`recordId` is not circular, though it looks it.** It is an input to every salt (above) and is also
+itself committed as a reserved leaf at `roax.recordId` (section 11.2). There is no cycle: the
+preimage consumes it as a plain UTF-8 string taken from the envelope, never a leaf hash or a salt.
+So `salt(roax.recordId)` is computed the same way as every other salt, and the leaf at
+`roax.recordId` is then built from it normally.
 Implement it in that order and nothing recurses.
+
+`hashAlg` raises no such question, because section 7.4 removes it from the leaf set: it enters the
+domain string only.
 
 ### 7.1 Why the record identifier is in the preimage
 
@@ -602,6 +608,44 @@ ships.** Section 7.3 requires a full copy to carry every leaf's salt under eithe
 decision D4, so a full copy is the same size either way. What derivation avoids is the issuer
 holding, backing up and reissuing from 16 bytes per leaf per record indefinitely. A disclosed copy
 is small under both, because it carries only the salts of the leaves it reveals.
+
+#### What the `salts` array actually costs, in bytes
+
+**Path bytes dominate, not the 16-byte salt.** Each entry repeats the leaf's whole structured path,
+so a reader who budgets 16 bytes per leaf will be wrong by roughly an order of magnitude and will
+optimize the wrong thing.
+
+Worked from `fhirBundle.entry[0].identifier[0].type`, a real path in the vaccination sample
+(section 4.2), serialized as the `salts` entry `schemas/envelope-1.0.json` defines:
+
+```
+  {"segments":[                                    13 bytes of framing
+    {"key":"fhirBundle"},                          20   = 10 + len("fhirBundle")
+    {"key":"entry"},                               15   = 10 + len("entry")
+    {"index":0},                                   11
+    {"key":"identifier"},                          20   = 10 + len("identifier")
+    {"index":0},                                   11
+    {"key":"type"}                                 14   = 10 + len("type")
+  ],"salt":"<32 hex>"}                             10 + 32 + 2
+                                                 + 5 commas between segments
+  total                                          ~153 bytes, of which 96 are path and 32 are salt
+```
+
+At about 153 bytes an entry, the 92-leaf vaccination envelope of section 11.1 gains roughly
+**13.8 KB**. That is comparable to the same record's own 14,314-byte embedded logo, which
+`docs/decisions.md` D9 tabulates to the byte, and it is the largest single format cost this
+document imposes.
+
+Two things that cost is **not**. It is a **full-copy-only** cost: a disclosed copy carries one salt
+per revealed leaf, so the 583-versus-2,720-byte figures in section 10.3 are untouched. And it is
+not a cost derivation can avoid, because it lands identically under D4a and D4b.
+
+**The obvious smaller encoding is rejected on purpose.** A positional array in `encodePath` order
+with the segments dropped would cost 35 bytes an entry instead of 153. It would also make
+salt-to-leaf pairing depend on each implementation reproducing the section 9 sort identically before
+it can even read the salts, which is precisely the cross-implementation divergence this project
+exists to prevent. Explicit segments make the pairing self-describing and independent of the sort,
+and that is worth the bytes.
 
 Disclosing leaf A means disclosing `salt(A)` only. HMAC is one-way, so a verifier holding `salt(A)`
 cannot derive `salt(B)` and therefore cannot brute-force any withheld low-entropy field - which
@@ -676,24 +720,42 @@ record: an implementation that reads a full copy through a float-based JSON pars
 literals it is about to recompute the root from, and will fail to reproduce a root it should have
 matched.
 
-### 7.4 Why the algorithm identifier is inside the domain string
+### 7.4 How the algorithm identifier is bound, and what each binding is worth
 
 `hashAlg` selects which hash function a verifier runs, so it is authority rather than a hint, and
 section 11.3 states normatively that anything outside the root is never authority.
 
-It is therefore bound **twice**, deliberately:
+**A reserved leaf cannot bind the algorithm, and an earlier draft of this document was wrong to try.**
+The leaf would be hashed *with* the algorithm it names. An attacker who computes the whole tree
+under a weak algorithm `W` produces a self-consistent record whose `roax.hashAlg` leaf says `W`,
+whose every other leaf is hashed under `W`, and whose root is the one he was aiming at. He controls
+the root, so committing the field inside it buys nothing at all. The leaf was removed rather than
+kept as belt-and-braces, because a binding that does not bind is worse than none: it invites a
+verifier to rely on it.
 
-1. it is part of `DOMAIN`, so it enters every salt preimage (this section) and every leaf preimage
-   (section 8);
-2. it is committed inside the root as the reserved leaf `roax.hashAlg` (section 11.2).
+Three mechanisms replace it, and they are listed with what each is actually worth:
 
-Either alone would be enough to make substitution detectable. Both are cheap now and neither is
-cheap to retrofit once records exist under a second algorithm, which section 12 records as an
-explicit versioning axis.
+**H1. `hashAlg` is a length-prefixed component of `DOMAIN`**, so it enters every salt preimage (this
+section) and every leaf preimage (section 8). **Stated honestly, this buys almost nothing
+cryptographically**, for the same reason the leaf did not: the attacker computes both records under
+the same domain string. What it does buy is real but narrower. It removes cross-algorithm root
+ambiguity by construction, so the same content under two algorithms cannot collide on a root by
+accident, and it makes the claim in `schemas/envelope-1.0.json` true rather than aspirational.
 
-Without the first, a party could assert a different algorithm over the same leaves and the domain
-string would not notice. Without the second, the field selecting the hash function would sit in the
-region the specification itself declares attacker-controlled.
+**H2. The anchoring registry MUST record the pair `(root, hashAlg)`, and a verifier MUST take
+`hashAlg` from the registry, never from the envelope.** This is the one that works. Authority for
+which hash to run then comes from the same place authority for the root comes from, which section
+11.3 requires of every other authoritative field. This document does not design the anchoring
+registry (section 2.2), so this is recorded as a requirement handed forward to that work rather
+than as something closed here.
+
+**H3. A verifier MUST reject any `hashAlg` that is not on its own configured allow-list.**
+This closes the case H2 does not: an algorithm that was legitimately registered and has since been
+retired. Without H3 a verifier that has retired `W` still runs `W` because the envelope asked it to.
+
+The general shape is worth naming, because it recurs: **a self-describing document cannot
+authenticate its own description.** The description has to come from outside, which here means the
+anchoring layer.
 
 **Which algorithms are defined.** `ROAX-CANON/1` **defines** the construction for `SHA-256` only.
 `Poseidon-BN254` is **registered** in the envelope schema because ZK-friendly and non-ZK hashes are
@@ -711,7 +773,7 @@ length-prefixed byte string to field elements.
 ## 8. Leaf construction
 
 ```
-leafHash(path, tag, value, salt) = SHA-256(
+leafHash(path, tag, value, salt) = H(
       0x00                              // RFC 9162 leaf domain byte
     ‖ u32be(len(DOMAIN)) ‖ DOMAIN       // DOMAIN = "ROAX-CANON/1/" ‖ hashAlg
     ‖ u32be(len(P))      ‖ P            // P = encodePath(path)
@@ -720,6 +782,19 @@ leafHash(path, tag, value, salt) = SHA-256(
     ‖ u64be(len(V))      ‖ V            // V = encoded value bytes (section 6)
 )
 ```
+
+**`H` is the hash function named by the envelope's `hashAlg`**, taken by a verifier from the
+anchoring registry rather than from the envelope (section 7.4, H2). It is written as `H` rather than
+as `SHA-256` because this is a hash-agile specification and naming one algorithm in the construction
+would contradict that; `ROAX-CANON/1` defines `H` for `SHA-256` only, per section 7.4.
+
+**Salt derivation is the deliberate exception and stays `HMAC-SHA-256` under every `hashAlg`**
+(section 7). A salt is a secret *input*, generated once at issuance and never recomputed by a
+verifier or inside a proof circuit, so it gains nothing from being ZK-friendly and would pay the
+full cost of being so. dogtag is the precedent and reached the same split: its tree is Poseidon over
+BN254 while its salts come from a BLAKE-512 KDF (`crates/dogtag-standard-rs/src/profile_tree.rs`
+and `poseidon.rs`). Keeping the salt KDF fixed also means a record's salts do not change meaning
+when the tree algorithm does.
 
 Every variable-length component is length-prefixed, so no two distinct
 `(path, tag, salt, value)` tuples share a preimage.
@@ -752,11 +827,14 @@ itself, to *raw entries*. In this design the `0x00` byte is already applied insi
 ```
 Let L = [ leafHash(...) for each leaf, in encodePath order ]     // each already 0x00-domained
 
-MTH([])      = SHA-256("")                                       // total function only; see below
-MTH([x])     = x                                                 // NOT SHA-256(0x00 ‖ x)
-MTH(L), n>1  = SHA-256(0x01 ‖ MTH(L[0:k]) ‖ MTH(L[k:n]))
+MTH([])      = H("")                                             // total function only; see below
+MTH([x])     = x                                                 // NOT H(0x00 ‖ x)
+MTH(L), n>1  = H(0x01 ‖ MTH(L[0:k]) ‖ MTH(L[k:n]))
                where k is the largest power of two strictly smaller than n
 ```
+
+`H` is the same algorithm-parameterized hash as in section 8, and for the same reason: naming
+`SHA-256` here would hardwire one algorithm into a hash-agile specification.
 
 The composition `leafHash` then `MTH` is therefore bit-identical to RFC 9162's `MTH` over raw
 entries whose entry bytes are everything after the `0x00` in section 8.
@@ -766,7 +844,7 @@ A record that contributes zero leaves of its own MUST be rejected at issuance ra
 
 **`MTH([])` is unreachable in a conforming implementation**, and is stated only so the function is
 total. The leaf set is the union of section 3.3, which always carries the reserved leaves of section
-11.2, so `L` is never empty and its length is never below 7. The branch is kept rather than deleted
+11.2, so `L` is never empty and its length is never below 5. The branch is kept rather than deleted
 because a total function is easier to port than one with an undefined case, and because an
 implementation that reaches it has a defect worth failing loudly on rather than an input worth
 hashing.
@@ -905,7 +983,7 @@ JSON Schema: [`schemas/envelope-1.0.json`](../../schemas/envelope-1.0.json).
   "recordId": "urn:uuid:...",       // in every salt preimage (section 7.1)
 
   "root": "<64 hex chars>",
-  "leafCount": 94,                  // the UNION - record leaves plus reserved leaves (section 3.3)
+  "leafCount": 92,                  // the UNION - record leaves plus reserved leaves (section 3.3)
 
   "issuer": {                       // identity, committed INSIDE the root at reserved paths
     "id": "did:web:example.gov",
@@ -923,7 +1001,7 @@ JSON Schema: [`schemas/envelope-1.0.json`](../../schemas/envelope-1.0.json).
   "record":     { /* present in a FULL copy only */ },
 
   "salts": [                        // present in a FULL copy only, forbidden in a disclosed one
-    { "segments": [ {"key":"roax"}, {"key":"canon"} ], "salt": "<32 hex chars>" }
+    { "segments": [ {"key":"roax.recordId"} ], "salt": "<32 hex chars>" }
     /* ... one entry per leaf of the union, so salts.length == leafCount ... */
   ]
 }
@@ -937,9 +1015,23 @@ No chain id, registry address or contract set is treated as permanent by this do
 
 `leafCount` counts the **union** defined in section 3.3, so it includes the reserved leaves of
 section 11.2 and not only the leaves the record itself produced. The value shown is the 87-leaf
-vaccination record of section 10.3 plus its seven reserved leaves, `issuer.keyId` being present
+vaccination record of section 10.3 plus its five reserved leaves, `issuer.keyId` being present
 here. An implementation that counts the record alone reports a `leafCount` that does not match its
 own root, and every inclusion proof it issues is bound to the wrong tree size.
+
+> **Normative:** `leafCount` is neither a domain component nor a leaf, deliberately. A leaf stating
+> the leaf count would change the leaf count, so there is no fixed point to commit.
+>
+> It is nonetheless checked, and the check differs by copy kind.
+> In a **disclosed copy** it is already bound by the RFC 9162 proof, because tree shape is uniquely
+> determined by the number of leaves (section 9.3), so a wrong `leafCount` makes the audit path fail.
+> In a **full copy** the verifier derives the leaf count itself while rebuilding the tree, and
+> **a derived count that disagrees with the `leafCount` field MUST be a rejection**, not a warning
+> and not a silent preference for either value.
+
+That last MUST is stated because the field is required in every envelope while the full-copy path
+recomputes the same quantity, and a specification that requires a field without saying what a
+disagreement means is inviting two implementations to resolve it differently.
 
 **Exactly one of `record` and `disclosure` MUST be present.**
 A verifier that sees both MUST reject. The JSON Schema encodes this as two `allOf` clauses, because
@@ -959,26 +1051,54 @@ except where they come from.
 
 #### The reserved leaf set
 
-Each reserved path is an ordinary structured path, with **one `KEY` segment per dot component** of
-the name. There is no leaf whose single key contains a dot.
+**Each reserved path is a SINGLE `KEY` segment whose key is the literal dotted string.**
+`roax.recordType` is one segment `KEY("roax.recordType")`, not two segments `KEY("roax")` then
+`KEY("recordType")`.
 
-| Reserved leaf | Path segments | Tag | Value | Emitted |
-|---|---|---:|---|---|
-| `roax.canon` | `[KEY("roax"), KEY("canon")]` | 2 STRING | the envelope's `canon` | always |
-| `roax.hashAlg` | `[KEY("roax"), KEY("hashAlg")]` | 2 STRING | the envelope's `hashAlg` | always |
-| `roax.recordType` | `[KEY("roax"), KEY("recordType")]` | 2 STRING | the envelope's `recordType` | always |
-| `roax.schemaVersion` | `[KEY("roax"), KEY("schemaVersion")]` | 2 STRING | the envelope's `schemaVersion` | always |
-| `roax.recordId` | `[KEY("roax"), KEY("recordId")]` | 2 STRING | the envelope's `recordId` | always |
-| `roax.issuer.id` | `[KEY("roax"), KEY("issuer"), KEY("id")]` | 2 STRING | the envelope's `issuer.id` | always |
-| `roax.issuer.keyId` | `[KEY("roax"), KEY("issuer"), KEY("keyId")]` | 2 STRING | the envelope's `issuer.keyId` | only when `issuer.keyId` is present |
+| Reserved leaf | Path segments | Tag | Value | Emitted | Disclosure |
+|---|---|---:|---|---|---|
+| `roax.recordType` | `[KEY("roax.recordType")]` | 2 STRING | the envelope's `recordType` | always | mandatory |
+| `roax.schemaVersion` | `[KEY("roax.schemaVersion")]` | 2 STRING | the envelope's `schemaVersion` | always | mandatory |
+| `roax.recordId` | `[KEY("roax.recordId")]` | 2 STRING | the envelope's `recordId` | always | mandatory |
+| `roax.issuer.id` | `[KEY("roax.issuer.id")]` | 2 STRING | the envelope's `issuer.id` | always | mandatory |
+| `roax.issuer.keyId` | `[KEY("roax.issuer.keyId")]` | 2 STRING | the envelope's `issuer.keyId` | only when `issuer.keyId` is present | OPTIONAL |
 
 Every reserved leaf is a STRING, so every value is normalized to NFC and encoded per section 6.1
 like any other string.
 
-`issuer.keyId` is OPTIONAL in the envelope schema, so it is the one reserved leaf whose presence
-varies. **An absent `issuer.keyId` emits no leaf**; it MUST NOT be emitted as a NULL leaf or as an
-empty string, because those are three different roots and only one of them can be right. The
-reserved leaf count is therefore 6 or 7.
+**Why single-segment rather than one segment per dot component.** Under the per-component reading, a
+record carrying an ordinary top-level field named `roax` collides with the reserved namespace, and
+that is genuinely reachable rather than hypothetical: these record families already carry
+non-clinical top-level keys such as `$template`, `notarisationMetadata` and `issuers`, so the
+top-level namespace is open-world and belongs to whoever writes the profile. Under the
+single-segment reading a collision needs a record field named literally `roax.recordType`, and FHIR
+element names do not contain dots. This is also what length-prefixed encoding makes natural: it is
+the same property section 5.1 already relies on to keep a nested `a.b` and a literal dotted key
+`"a.b"` provably distinct with no rule at all.
+
+**Three of the five are mandatory by arithmetic, not by policy.** `recordType` and `schemaVersion`
+together select the type map, and `recordId` is in every salt preimage (section 7), so a verifier
+that does not have all three cannot run the verification procedure at all. Withholding one does not
+produce a weaker proof; it produces no proof. Only `roax.issuer.id` is a policy choice, and it is
+included because section 10.2 requires a disclosed copy to say who issued it.
+
+**`roax.issuer.keyId` is committed but OPTIONAL to disclose**, which is the one place this set
+departs from the pattern. Requiring its disclosure would break key rotation on already-anchored
+records: the key that signed an issuance is fixed in the root forever, so a holder whose issuer has
+since rotated keys would be forced to reveal a retired key identifier to make an otherwise valid
+record verify. That is the same trap section 11.3 records for mutable routing fields, arriving from
+a different direction.
+
+`issuer.keyId` is also the one reserved leaf whose *presence* varies. **An absent `issuer.keyId`
+emits no leaf**; it MUST NOT be emitted as a NULL leaf or as an empty string, because those are
+three different roots and only one of them can be right. The reserved leaf count is therefore 4 or 5.
+
+**Two leaves that an earlier draft committed have been removed, and the reasons differ.**
+`roax.hashAlg` was removed because a leaf cannot bind the algorithm it is hashed under at all
+(section 7.4). `roax.canon` was removed because it is redundant rather than wrong: `canon` is
+already inside `DOMAIN` in every leaf and every salt (sections 7 and 8), so a v2 library cannot be
+tricked into applying v2 rules to a v1 record, and the leaf paid roughly 290 bytes on every
+disclosed copy for a property already bought.
 
 Without this table the specification's headline claim in the preamble does not hold, which is why
 that claim names this section. Under section 5 the name `roax.issuer.id` could otherwise legally
@@ -987,43 +1107,55 @@ encode as three segments, as two, or as one key containing dots, and each produc
 These leaves are inputs to sections 8 and 9, so labelling section 11 a strawman does not cover them:
 the envelope's **shape** is unsettled, but the leaves it commits and their encoding are not.
 
-#### The prefix guard, in structured terms
+#### The reserved-namespace guard
 
-> **Normative:** no record-supplied path may have `KEY("roax")` as its **first segment**.
-> The guard compares decoded segments. It is a guard on the segment sequence, not on a rendered
-> string, and an implementation MUST NOT implement it by string-matching a display path against
-> `"roax."` - section 5.2 forbids reasoning over display paths, and this is the case it forbids it
-> for.
+> **Normative:** no record-supplied path may have, as its **first segment**, a `KEY` whose
+> NFC-normalized key begins with the ASCII prefix `roax.`.
+>
+> The guard is applied at the input boundary, to the **decoded, NFC-normalized key of that one
+> segment**. It is not a test against a rendered display path: section 5.2 forbids reasoning over
+> display paths, and an implementation that reconstructs `a.b[0].c` in order to run this check is
+> doing the thing that section forbids.
 
-Three consequences worth stating, because they are where a display-string guard and a segment guard
-give different answers:
+**The guard checks the first segment only**, because every reserved path is a single segment. A path
+like `[KEY("a"), KEY("roax.foo")]` differs from every reserved path in segment count and cannot
+collide with one, so rejecting it would be over-broad. Applying the check to every segment is the
+most likely over-implementation and is wrong.
 
-- A record key literally named `roax` with a scalar value is **rejected**, even though the string
-  `"roax"` has no `roax.` prefix. Its path is `[KEY("roax")]`, whose first segment is the reserved
-  one. This is dogtag's bare-namespace case.
-- A record key named `roaxX` is **accepted**, because `KEY("roaxX")` is simply a different segment
-  from `KEY("roax")`. The adjacent-name squat is a hazard for a guard that compares rendered
-  strings; under segment comparison it collides with nothing, so there is nothing to reject.
-- A record key literally named `roax.recordId`, as a single key containing a dot, is also
-  **accepted**. Its path is `[KEY("roax.recordId")]`, which the length-prefixed encoding of
-  section 5.1 makes provably distinct from the two-segment reserved path, so it cannot collide with
-  the reserved leaf. `docs/conformance-corpus.md` class 15 carries all three, alongside the direct
-  reserved-path collisions the guard exists for.
+**The guard MUST compare the NFC-normalized key, not the bytes as received.** Section 6.1 normalizes
+keys to NFC before they are encoded and hashed, so a check performed on the raw bytes is checking a
+different string from the one that actually gets committed. That the two differ is easy to
+demonstrate: U+212A KELVIN SIGN is the three bytes `e2 84 aa` as received and normalizes under NFC
+to ASCII `K`, the single byte `0x4b` (verified on Node v22.21.0). The rule is the general one -
+**check the bytes you commit, not the bytes you received** - and it applies here because this guard
+and the hashing path must agree about what the key is.
 
-The guard-by-prefix form is adopted from dogtag, which changed to it deliberately and recorded why:
-its `owner.` namespace is guarded by prefix "vs the old exact-match-only guard" so that "no future
-attribute can be named into ambiguity with an owner-control leaf", and it notes that an exact-match
-guard leaves both a bare-namespace blob leaf and an `owner.identityX` squat reachable
-(`crates/dogtag-standard-rs/src/profile_tree.rs:54-66`).
+Consequences worth stating, because a guard written against the earlier multi-segment model gives
+different answers:
 
-What transfers is the argument, not the string operation. dogtag reasons over a string path, so its
-prefix guard is a string prefix. ROAX reasons over segments, so the equivalent is a **segment**
-prefix, which here is a single first segment. Guarding only the exact full reserved paths would
-leave `[KEY("roax"), KEY("recordIdX")]` reachable, which is dogtag's point restated in this
-encoding.
+- A record key literally named `roax.recordType`, or any other reserved name, is **rejected**. It is
+  the reserved path, so this is a direct collision rather than a near miss.
+- A record key named `roax.anythingElse` is **rejected**. The guard is on the `roax.` prefix within
+  that first key, not on the exact reserved names, so a future reserved leaf cannot be squatted
+  before it is defined.
+- A record key literally named `roax`, with no dot, is **accepted**. It is an ordinary record field
+  that collides with nothing, because no reserved path is the single segment `KEY("roax")`.
+- A record key named `roaxX` is **accepted**, for the same reason.
 
-This is inference applied to a new case: dogtag's comment establishes that the exact-match guard
-was insufficient in dogtag's namespace, and the same structural argument applies to `roax`.
+The last two reverse an earlier draft of this document, which rejected both. That draft was written
+against a string-path model this specification deliberately departed from, and rejecting an ordinary
+field named `roax` is over-broad once reserved paths are single dotted segments.
+`docs/conformance-corpus.md` class 15 carries all four cases.
+
+The prefix form of the guard is adopted from dogtag, which changed to it deliberately and recorded
+why: its `owner.` namespace is guarded by prefix "vs the old exact-match-only guard" so that "no
+future attribute can be named into ambiguity with an owner-control leaf"
+(`crates/dogtag-standard-rs/src/profile_tree.rs:54-66`). What transfers is the argument, not the
+string operation. Guarding only the exact reserved names would leave `roax.recordIdX` reachable,
+which is dogtag's point restated in this encoding.
+
+This is inference applied to a new case: dogtag's comment establishes that an exact-match guard was
+insufficient in dogtag's namespace, and the same structural argument applies to `roax.`.
 It is not a second independently observed failure.
 
 ### 11.3 Anything outside the root is attacker-controlled
@@ -1056,18 +1188,20 @@ Four axes, deliberately not collapsed:
 | Axis | Field | Changes when | Inside the root? |
 |---|---|---|---|
 | Canonicalization | `canon` | the hashing rules change | **Yes**, via `DOMAIN` in every leaf and every salt |
-| Hash algorithm | `hashAlg` | a record selects a different hash family | **Yes**, twice: via `DOMAIN`, and as the reserved leaf `roax.hashAlg` |
+| Hash algorithm | `hashAlg` | a record selects a different hash family | **Via `DOMAIN` only.** Not a leaf: a leaf cannot bind the algorithm it is hashed under. Authority comes from the anchoring registry (section 7.4) |
 | Record schema | `recordType` + `schemaVersion` | a profile publishes a new version | **Yes**, as ordinary reserved leaves |
 | Envelope / routing | `anchor` | deployment changes | **No** |
 
-Because `DOMAIN` is folded into every leaf hash (section 8) and every salt (section 7), and
-`DOMAIN` is `ROAX-CANON/1/` followed by `hashAlg`, both the canonicalization version and the hash
-algorithm are **cryptographically bound**. A v2 library reading a v1 record reads
+Because `DOMAIN` is folded into every leaf hash (section 8) and every salt (section 7), the
+canonicalization version is **cryptographically bound**. A v2 library reading a v1 record reads
 `canon: "ROAX-CANON/1"` and must run the v1 rules; it cannot accidentally apply v2 rules and get a
-matching root, and it cannot be tricked into it, because the root commits to the version. The same
-holds for the algorithm: two records with identical content under different `hashAlg` values have
-different roots by construction, and a party cannot assert a different algorithm over the same
-leaves.
+matching root, and it cannot be tricked into it, because the root commits to the version.
+
+**The algorithm axis is weaker and section 7.4 says so precisely.** `DOMAIN` being
+algorithm-qualified removes cross-algorithm root ambiguity by construction, but it does not stop an
+attacker who computes an entire record under a weak algorithm, because he computes the domain string
+under that algorithm too. Authority for `hashAlg` comes from the anchoring registry and from the
+verifier's own allow-list, not from the document.
 
 The algorithm axis is separate from the canonicalization axis on purpose. Swapping the hash while
 keeping path encoding, type tags, value encoding, leaf composition and tree shape identical is a
@@ -1092,6 +1226,83 @@ Hash agility is not free, and the cost is unchanged by the ruling: two records w
 content and different `hashAlg` have different roots, and every verifier eventually implements both.
 Only `SHA-256` has a defined construction in `ROAX-CANON/1`; `Poseidon-BN254` is registered and its
 parameterization is not yet pinned, so it MUST NOT be issued against. See section 7.4.
+
+### 12.1 Version identifiers are opaque
+
+> **Normative:** the protocol never parses, orders or range-compares a version identifier.
+> A version is matched for equality or not at all.
+
+`schemaVersion` is an **opaque, profile-defined label**. It is validated by exact match against the
+profile registry (`docs/profiles/`), never by shape, and `schemas/envelope-1.0.json` and
+`schemas/type-map-1.0.json` therefore constrain it to a non-empty string and nothing more.
+
+**An earlier draft imposed a dotted numeric pattern, and the evidence is that no such pattern can be
+correct.** FHIR's own `CapabilityStatement.fhirVersion` enumeration holds exactly 22 values, of
+which 4 are two-part (`0.01`, `0.05`, `0.06`, `0.11`) and 18 are three-part. A two-part pattern
+admits 4 of 22 and a three-part pattern admits 18 of 22, so there is no dotted numeric pattern that
+accepts FHIR's own version identifiers. The premise that the field has a shape is what was wrong,
+not the choice of shape. Counted by reading the shipped `fhir/4.0.1/schema.json` in place, and
+re-counted on Node v22.21.0.
+
+Two further reasons, both external:
+
+- FHIR states outright that these strings are not orderable: "There is also no expectation that
+  versions can be placed in a lexicographical sequence." That sentence is repeated across 28
+  resource definitions in the shipped schema.
+- SD-JWT VC reached the same design independently. It carries no version field at all: the type
+  identifier `vct` is opaque, and an incompatible change means a new `vct` value rather than a
+  version bump.
+
+And one internal reason, which is the decisive one: **nothing in this protocol compares versions.**
+The only structural use of `schemaVersion` is exact match, as half the type-map lookup key
+(section 4.2). A constraint that no code path needs is a constraint that can only reject valid
+input.
+
+**The dividing line, stated so it is not re-litigated per field.** A version identifier this project
+**owns** may carry a shape; a version identifier defined **elsewhere** is opaque.
+
+| Field | Owner | Constraint |
+|---|---|---|
+| `corpusVersion` (`schemas/conformance-corpus-1.0.json`) | ROAX | three-part semver, legitimately |
+| `typeMapVersion` (`schemas/type-map-1.0.json`) | ROAX | three-part semver, legitimately |
+| `schemaVersion` (envelope and type map) | the profile, and beyond it FHIR or a health authority | opaque, exact match only |
+| `unicodeVersion` (corpus) | the Unicode Consortium | opaque, non-empty; `15.1` is the canonical form for this pin |
+| `canon` | ROAX | a `const` domain string, and not a version field at all |
+
+**The honest cost.** A typo in `schemaVersion` is no longer caught by JSON Schema. It is caught one
+step later and less pleasantly, by type-map lookup failing closed (section 4.2, decision D7). Range
+comparison becomes inexpressible, which costs nothing, because FHIR says these strings are not
+orderable and nothing here compares them.
+
+### 12.2 Future-proofing is a standing constraint, not a section
+
+Every rule in this document is written to be extended without reissuing anything. Stated as
+requirements rather than as intentions:
+
+- **New profiles and new versions arrive by a registry entry, never by editing this specification.**
+  The registry is `docs/profiles/`, one document per `recordType`. This is why
+  `schemas/envelope-1.0.json` constrains `recordType` to a form rather than to a closed list: the
+  registry, not the schema, is the extension point.
+- **The registry is itself versioned**, so that "which profiles existed when this record was issued"
+  is answerable rather than assumed.
+- **An unknown profile MUST fail closed, with a stated reason, and MUST NEVER default to a guess.**
+  A silent default is exactly how two libraries diverge, which is the failure this whole project
+  exists to prevent. This is the same rule section 4.2 applies to an unknown path, applied one level
+  up.
+- **The reserved-leaf set, the algorithm set and the profile set MUST each be extensible without
+  invalidating anything already issued.**
+
+**The honest limit, because a stronger promise would be false.** An anchored root **freezes** the
+content it commits: that is what an anchor is for, and any design that let an issued record's
+committed content change would have destroyed the property being sold. So "future-proof" here can
+only mean one thing, and it is worth saying in full:
+
+> **New records gain capabilities; existing records keep exactly what they were issued with; both
+> remain verifiable.**
+
+An upgrade that required re-anchoring every existing record would not be an upgrade, it would be a
+migration, and this document does not promise to avoid one by fiat. What it promises is that adding
+a profile, an algorithm or a reserved leaf does not force one.
 
 ---
 

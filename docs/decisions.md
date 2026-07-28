@@ -121,22 +121,38 @@ and that neither is provisional.
 
 **What the ruling changed in the specification, and why it is a security matter rather than a
 labelling one.** If both families are permanent then the algorithm identifier is load-bearing:
-`hashAlg` is the field that selects which hash function a verifier runs. Left outside the root it
-would sit in exactly the region specification section 11.3 declares normatively to be
-attacker-controlled and never authority, and nothing would stop a party asserting a different
-algorithm over the same leaves.
+`hashAlg` is the field that selects which hash function a verifier runs. Left as a bare envelope
+field it would sit in exactly the region specification section 11.3 declares normatively to be
+attacker-controlled and never authority.
 
-So the identifier is now bound **twice** (specification section 7.4):
+**The obvious fix does not work, and finding that out changed the answer.** An intermediate draft
+committed `hashAlg` inside the root as a reserved leaf `roax.hashAlg`. That leaf is hashed *under
+the algorithm it names*, so an attacker who computes an entire record under a weak algorithm `W`
+produces a self-consistent record whose `roax.hashAlg` leaf says `W` and whose root is the one he
+was aiming at. Committing a field inside a root the attacker controls buys nothing. The leaf was
+removed rather than kept as belt-and-braces, because a binding that does not bind is worse than
+none: it invites a verifier to rely on it.
 
-1. the domain string is algorithm-qualified - `DOMAIN = ASCII "ROAX-CANON/1/" + hashAlg`, for
-   example `ROAX-CANON/1/SHA-256` - and `DOMAIN` is inside every salt preimage (section 7) and every
-   leaf preimage (section 8);
-2. `hashAlg` is committed inside the root as the reserved leaf `roax.hashAlg` (section 11.2), and
-   appears as its own axis in the versioning table (section 12).
+Three mechanisms replace it (specification section 7.4), and they are recorded with what each is
+actually worth rather than as a list of equals:
 
-Before the ruling the envelope schema **claimed** the first of these while the specification defined
-neither, which is the defect this records the fix for. Binding it is far cheaper before a second
-algorithm exists than after.
+1. **H1.** The domain string is algorithm-qualified - `DOMAIN = ASCII "ROAX-CANON/1/" + hashAlg` -
+   and sits in every salt preimage (section 7) and every leaf preimage (section 8). Honestly, this
+   buys almost nothing cryptographically, for the same reason the leaf did not: the attacker
+   computes both records under the same domain. It removes cross-algorithm root ambiguity by
+   construction and makes the envelope schema's claim true, and that is all.
+2. **H2, the one that matters.** The anchoring registry MUST record the pair `(root, hashAlg)` and
+   a verifier MUST take `hashAlg` from the **registry**, never from the envelope. Authority for the
+   algorithm then comes from the same place authority for the root comes from. This document does
+   not design the anchoring registry, so this is handed forward to that work as a stated
+   requirement (specification section 2.2).
+3. **H3.** A verifier MUST reject any `hashAlg` absent from its own configured allow-list, which is
+   what closes the retired-algorithm case that H2 alone does not.
+
+Before the ruling the envelope schema **claimed** a binding the specification defined nowhere,
+which is the defect this records the fix for. The general shape is worth keeping in mind for any
+future self-describing field: **a document cannot authenticate its own description**, so the
+description has to come from outside.
 
 **What remains open under B.** Two things, and they are narrower than the original question:
 
@@ -474,7 +490,7 @@ These are not open. They are recorded with their reasons so the reasons are audi
 | **S5** | Empty array, empty object and null are **three distinct leaves** | dogtag collapses them; in FHIR the difference between "no entries" and "field absent" can be clinically meaningful. |
 | **S6** | Path encoding is **length-prefixed with no reserved characters** | Removes the need for a rejection rule, and removes the OpenAttestation array-versus-object and empty-key collisions by construction. |
 | **S7** | Each profile declares a **minimum-disclosure floor** | Adopted from dogtag's `NON_OBFUSCATABLE` (`verify.rs:253`). Without it a disclosed copy can withhold what the record is and still verify. |
-| **S8** | Reserved namespaces are guarded by a **segment prefix, not by exact path match** | Under ROAX's structured paths the guard is on the decoded first segment: a record-supplied path whose first segment is `KEY("roax")` is rejected, which also catches the bare namespace `[KEY("roax")]` (specification section 11.2). dogtag changed from exact match to a prefix guard deliberately, recording that exact match left both a bare-namespace blob leaf and an adjacent-name squat reachable (`profile_tree.rs:54-66`). What transfers is the argument, not the string operation: dogtag reasons over a display string so its prefix is a string prefix, and guarding only the exact reserved paths here would leave `[KEY("roax"), KEY("recordIdX")]` reachable. |
+| **S8** | Reserved namespaces are guarded by a **prefix on one key, not by exact name match** | Each reserved path is a SINGLE segment carrying the literal dotted name, so the guard tests the NFC-normalized key of a record path's FIRST segment for the ASCII prefix `roax.` (specification section 11.2). Guarding only the exact reserved names would leave `roax.recordIdX` reachable, which is dogtag's recorded reason for moving off exact match (`profile_tree.rs:54-66`). What transfers is that argument, not the string operation. Two corrections to an earlier draft are folded in here: reserved paths are single dotted segments rather than one segment per dot component, because the per-component reading collides with any record carrying an ordinary top-level field named `roax` and these families already carry non-clinical top-level keys; and consequently an ordinary key named `roax` or `roaxX` is ACCEPTED, where the earlier draft rejected both. |
 | **S9** | The **corpus is a release gate**, including validation by a different author's implementation | [`conformance-corpus.md`](conformance-corpus.md) section 2. |
 | **S10** | **No contract set is permanent** | dogtag keeps its contract-set axis and its artifact axis in separate keyspaces precisely so rotating one does not change what an already-issued record claims (`wrap.rs:30-42`). Another smart-contract round is expected. |
 

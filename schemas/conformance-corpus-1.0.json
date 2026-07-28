@@ -9,6 +9,7 @@
 
   "properties": {
     "corpusVersion": {
+      "description": "Version of this corpus file. The three-part semver pattern is KEPT on purpose: this is one of ROAX's OWN artifacts, so this project defines the identifier and may constrain its shape (spec section 12.1). Every EXTERNALLY defined version in this file is opaque instead - see unicodeVersion below and recordVector.schemaVersion.",
       "type": "string",
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
     },
@@ -18,9 +19,9 @@
       "enum": ["SHA-256", "Poseidon-BN254"]
     },
     "unicodeVersion": {
-      "description": "The Unicode version whose NFC tables the expected values were produced under. ROAX-CANON/1 pins 15.1 (spec section 6.1). An implementation running different tables MAY legitimately differ on vectors in the 'unicodeVersion' class, and must say so rather than silently passing.",
+      "description": "The Unicode version whose NFC tables the expected values were produced under. ROAX-CANON/1 pins 15.1, and '15.1' is the canonical form for this pin (spec section 6.1). An implementation running different tables MAY legitimately differ on vectors in the 'unicodeVersion' class, and must say so rather than silently passing. OPAQUE: the Unicode Consortium defines this identifier, not this project, so it carries no shape constraint (spec section 12.1). The earlier two-part pattern rejected '15.1.0', which is the official Unicode Standard version string for the very release being pinned. Widened rather than made a const, because a const would foreclose a future re-pin and the corpus is versioned independently of the specification.",
       "type": "string",
-      "pattern": "^[0-9]+\\.[0-9]+$"
+      "minLength": 1
     },
     "vectors": {
       "type": "object",
@@ -106,6 +107,7 @@
     },
 
     "saltVector": {
+      "description": "Asserts that a given (masterSalt, recordId, path) produces a given salt under the spec section 7 derivation. masterSaltHex is REQUIRED here and that is correct: this vector class TESTS the derivation, so masterSalt is its subject rather than an assumption about how salts came to exist. Do not relax it to match recordVector, which is a different case and says so.",
       "type": "object",
       "required": ["name", "class", "masterSaltHex", "recordId", "segments", "saltHex"],
       "additionalProperties": false,
@@ -218,13 +220,12 @@
     },
 
     "recordVector": {
-      "description": "A whole record with its root. The three real MOH samples are mandatory (class 10). Records are referenced by file rather than inlined, so that no reference schema or sample is copied into this repository. EVERY input to the root is required here, because the leaf set is the UNION of the record's leaves and the reserved roax.* leaves (spec sections 3.3 and 11.2): recordType, schemaVersion and issuerId are reserved-leaf values and therefore change the root, so a vector omitting any of them is not reproducible and the class-10 assertion would be untestable. The top-level canon and hashAlg supply the rest, via the domain string.",
+      "description": "A whole record with its root. The three real MOH samples are mandatory (class 10). Records are referenced by file rather than inlined, so that no reference schema or sample is copied into this repository. EVERY input to the root that the protocol REQUIRES is required here, because the leaf set is the UNION of the record's leaves and the reserved roax.* leaves (spec sections 3.3 and 11.2): recordType, schemaVersion and issuerId are reserved-leaf values and therefore change the root, so a vector omitting any of them is not reproducible and the class-10 assertion would be untestable. The top-level canon and hashAlg supply the rest, via the domain string. masterSaltHex is deliberately NOT in that list - see its own description, and the standing rule in docs/conformance-corpus.md section 1.2.",
       "type": "object",
       "required": [
         "name",
         "class",
         "recordFile",
-        "masterSaltHex",
         "recordId",
         "recordType",
         "schemaVersion",
@@ -241,9 +242,9 @@
           "type": "string"
         },
         "schemaVersion": {
-          "description": "Committed as the reserved leaf roax.schemaVersion. Same two-or-three-component form as the envelope.",
+          "description": "Committed as the reserved leaf roax.schemaVersion. OPAQUE, exactly as in the envelope and for the same reason (spec section 12.1): defined by the profile rather than by this project, so it is matched for equality and never parsed.",
           "type": "string",
-          "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$"
+          "minLength": 1
         },
         "issuerId": {
           "description": "Committed as the reserved leaf roax.issuer.id.",
@@ -256,12 +257,16 @@
           "minLength": 1
         },
         "recordFile": { "type": "string" },
-        "masterSaltHex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "masterSaltHex": {
+          "description": "OPTIONAL, and optional on principle rather than by oversight. Decision D4 is OPEN: under D4a every salt is HMAC-derived from a per-record masterSalt, and under D4b (dogtag's stored per-leaf salts) NO masterSalt EXISTS. Requiring it here would make the three mandatory class-10 vectors inexpressible under D4b and would decide D4 from inside the corpus - the same foreclosure that was removed from the envelope, recurring one file over. See the standing rule in docs/conformance-corpus.md section 1.2. When present it expresses the section 7 derivation compactly; when absent the vector asserts the same root under whatever salt strategy produced it, and the per-leaf salts live in the referenced record file. CONTRAST saltVector.masterSaltHex and unlinkabilitySide.masterSaltHex, which stay REQUIRED: those two TEST the derivation rather than presume it, so masterSalt is their subject and not an assumption.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
         "recordId": { "type": "string" },
         "leafCount": {
-          "description": "The UNION count: the record's own leaves plus the 6 always-emitted reserved leaves, plus 1 when issuerKeyId is present. The floor is 7, because a record contributing zero leaves of its own MUST be rejected at issuance (spec section 3.3).",
+          "description": "The UNION count: the record's own leaves plus the 4 always-emitted reserved leaves, plus 1 when issuerKeyId is present. The floor is 5, because a record contributing zero leaves of its own MUST be rejected at issuance (spec section 3.3).",
           "type": "integer",
-          "minimum": 7
+          "minimum": 5
         },
         "root": { "$ref": "#/$defs/hex32" }
       }
@@ -286,6 +291,7 @@
 
     "unlinkabilitySide": {
       "type": "object",
+      "description": "One side of a class-12 unlinkability pair. masterSaltHex is REQUIRED here and that is correct: class 12 is the class where master-salt FRESHNESS IS the assertion, so the value is the subject of the test rather than an assumption. Do not relax it to match recordVector.",
       "required": ["masterSaltHex", "recordId", "leafHash"],
       "additionalProperties": false,
       "properties": {
@@ -296,7 +302,7 @@
     },
 
     "envelopeVector": {
-      "description": "Classes 13-17: envelope and record-level invariants that JSON Schema alone cannot express, notably the minimum-disclosure floor (class 14), the reserved FIRST-SEGMENT guard (class 15, which is a guard on decoded segments and NOT a display-path prefix test - see spec section 11.2), and the prohibition on a disclosed copy carrying a withheld leaf's salt (class 17).",
+      "description": "Classes 13-17: envelope and record-level invariants that JSON Schema alone cannot express, notably the minimum-disclosure floor (class 14), the reserved-namespace guard (class 15, which tests the NFC-normalized key of the FIRST SEGMENT for the prefix 'roax.' and is NOT a display-path test - see spec section 11.2), and the prohibition on a disclosed copy carrying a withheld leaf's salt (class 17).",
       "type": "object",
       "required": ["name", "class", "envelopeFile", "expectAccept"],
       "additionalProperties": false,

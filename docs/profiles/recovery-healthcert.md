@@ -66,7 +66,7 @@ Bind as `STRING` per specification section 6.3.
 
 | Path | Why |
 |---|---|
-| `roax.canon`, `roax.hashAlg`, `roax.recordType`, `roax.schemaVersion`, `roax.recordId`, `roax.issuer.id` | The reserved floor (spec section 11.2), which every profile carries. `roax.issuer.keyId` is additionally non-redactable whenever it is present. |
+| `roax.recordType`, `roax.schemaVersion`, `roax.recordId`, `roax.issuer.id` | The reserved floor (spec section 11.2), which every profile carries. The first three are mandatory by arithmetic rather than policy: without them a verifier cannot select the type map or rebuild a salt preimage, so it cannot verify at all. `roax.issuer.keyId` is committed but OPTIONAL to disclose, because requiring it would break key rotation on already-anchored records. |
 | `version` | Pins `rec-healthcert-v2.0`. Also the only field that distinguishes this from a PDT record if `recordType` were ever mis-set. |
 | `type` | The test kind. |
 | `validFrom` | Start of the validity interval. |
