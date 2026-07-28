@@ -196,6 +196,10 @@ SYNTHETIC_FAIL_CLOSED_VECTORS = [
 
 def emit_fixtures():
     """Emit the record fixtures. Idempotent; the corpus build calls this first."""
+    # Every .json under RECORD_DIR comes from RECORD_FIXTURES, so it can be set-compared and an
+    # orphan left by a rename is detectable. TYPE_MAP_DIR is NOT declared: the three derived MOH
+    # maps there belong to build_type_maps.py.
+    fixture_io.owns(RECORD_DIR)
     for name, text in RECORD_FIXTURES.items():
         fixture_io.emit(os.path.join(RECORD_DIR, name), text)
     fixture_io.emit(os.path.join(TYPE_MAP_DIR, SYNTHETIC_RECORD_TYPE + ".json"),

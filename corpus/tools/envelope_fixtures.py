@@ -516,6 +516,9 @@ def build_algorithm_vectors(hash_alg):
 
 
 def build_envelope_fixtures(hash_alg):
+    # Every .json under ENVELOPE_DIR is produced here, so the directory can be set-compared and
+    # a file left behind by a renamed vector is reported rather than sitting unreferenced.
+    fixture_io.owns(ENVELOPE_DIR)
     out = []
     out.extend(build_floor_vectors(hash_alg))
     out.extend(build_identity_binding_vectors(hash_alg))

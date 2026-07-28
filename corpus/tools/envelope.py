@@ -147,9 +147,12 @@ def _verify(envelope, type_maps):
         return False, "neither-record-nor-disclosure"
 
     record_type = _get(envelope, "recordType")
-    floor = _floor_for(record_type)
-    if floor is None:
-        # Section 12.2: an unknown profile MUST fail closed, with a stated reason.
+    if _floor_for(record_type) is None:
+        # Section 12.2: an unknown profile MUST fail closed, with a stated reason. This is the
+        # verifier's OWN allow-list and has the same shape as ALLOWED_HASH_ALGS above: it decides
+        # whether this verifier can proceed at all, not which policy to enforce on a copy it can.
+        # The floor itself is a policy and is selected further down, from the record type the
+        # root commits rather than from this field.
         return False, "profile-unknown"
 
     root = bytes.fromhex(_get(envelope, "root"))
@@ -164,7 +167,7 @@ def _verify(envelope, type_maps):
 
     if has_record:
         return _verify_full(envelope, hash_alg, root, identity, type_maps)
-    return _verify_disclosed(envelope, hash_alg, root, floor, identity)
+    return _verify_disclosed(envelope, hash_alg, root, identity)
 
 
 def _verify_full(envelope, hash_alg, root, identity, type_maps):
@@ -223,7 +226,7 @@ def _ordering_only_master_salt():
     return b"\x00" * 32
 
 
-def _verify_disclosed(envelope, hash_alg, root, floor, identity):
+def _verify_disclosed(envelope, hash_alg, root, identity):
     if _has(envelope, "salts"):
         # Section 7.3 and 10.1: `salts` alongside `disclosure` is what would make a withheld
         # leaf's salt representable at all. Reject rather than repair.
@@ -279,18 +282,13 @@ def _verify_disclosed(envelope, hash_alg, root, floor, identity):
         # the root and not a moment earlier.
         revealed[key] = value
 
-    # Section 10.2, the minimum-disclosure floor. Checked BEFORE the identity binding below, so
-    # that an omitted reserved path still reports the floor rather than the binding: the two are
-    # different failures and the corpus asserts the reason code, not only the verdict.
-    for required in floor:
-        if _segments_key(required) not in seen_paths:
-            return False, "minimum-disclosure-floor"
-
-    # Section 11.3: fields outside the root are hints and NEVER authority. `recordType` is the
-    # one that selects the floor above, so an unbound outer value picks the floor an attacker
-    # asks for - pdt's floor is a strict subset of recovery's, and a recovery copy that declares
-    # itself pdt withholds `validUntil` while every proof still verifies against the genuine
-    # root. Section 11.2 commits all four of these as leaves precisely so they can be compared.
+    # Section 11.3: fields outside the root are hints and NEVER authority. The identity is
+    # therefore established against the leaves section 11.2 commits BEFORE any outer field is
+    # used to select anything. Selecting the floor first and validating the field afterwards is
+    # trust-then-verify - the shape of the dogtag scar section 11.3 records - and it is safe only
+    # by accident of the current rules. pdt's floor is a strict subset of recovery's, so a
+    # recovery copy relabelled pdt withholds `validUntil` with every proof still verifying
+    # against the genuine root; both orders reject it, only this one rejects it by construction.
     for reserved, outer in (
         (ref.RESERVED_RECORD_TYPE, identity["record_type"]),
         (ref.RESERVED_SCHEMA_VERSION, identity["schema_version"]),
@@ -299,6 +297,10 @@ def _verify_disclosed(envelope, hash_alg, root, floor, identity):
     ):
         committed = revealed.get(_segments_key([{"key": reserved}]))
         if not isinstance(committed, str) or not isinstance(outer, str):
+            # A copy withholding one of these has not said what it IS, so no floor can be chosen
+            # for it. That is this code rather than `minimum-disclosure-floor`, which would claim
+            # a floor was selected and then failed. It is why the reserved half of the floor
+            # below is unreachable: absence is caught here first.
             return False, "outer-identity-mismatch"
         # NFC on BOTH sides. Each of these leaves is a STRING and is therefore committed
         # normalized (section 6.1), so the raw outer bytes are not what the root binds - the
@@ -306,4 +308,20 @@ def _verify_disclosed(envelope, hash_alg, root, floor, identity):
         # is non-ASCII, so this is unobservable across the shipped vectors either way.
         if ref.nfc(committed) != ref.nfc(outer):
             return False, "outer-identity-mismatch"
+
+    # Section 10.2, the minimum-disclosure floor, selected from the record type the ROOT commits
+    # and not from the envelope field. The binding above has just proved the two equal, so this
+    # is the same floor either way - taking it from the leaf is what makes that a property of
+    # the code rather than of the order these lines happen to sit in.
+    committed_type = ref.nfc(revealed[_segments_key([{"key": ref.RESERVED_RECORD_TYPE}])])
+    floor = _floor_for(committed_type)
+    if floor is None:
+        # Unreachable today: the gate in `_verify` already rejected an outer type absent from
+        # PROFILE_FLOORS, and the binding proved this leaf NFC-equal to it. It stays because it
+        # is what lets the lookup above read the LEAF; deleting it invites a future reader to
+        # pass the outer field here instead and quietly restore the trust-then-verify shape.
+        return False, "profile-unknown"
+    for required in floor:
+        if _segments_key(required) not in seen_paths:
+            return False, "minimum-disclosure-floor"
     return True, "ok"

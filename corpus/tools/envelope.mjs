@@ -107,9 +107,11 @@ function verifyInner(envelope, typeMaps) {
   if (!hasRecord && !hasDisclosure) return [false, "neither-record-nor-disclosure"];
 
   const recordType = get(envelope, "recordType");
-  const floor = floorFor(recordType);
-  // Section 12.2: an unknown profile fails closed with a stated reason, never a guess.
-  if (floor === null) return [false, "profile-unknown"];
+  // Section 12.2: an unknown profile fails closed with a stated reason, never a guess. This is
+  // the verifier's OWN allow-list, the same shape as ALLOWED_HASH_ALGS above - it settles
+  // whether this verifier can proceed at all, not which policy to apply to a copy it can. The
+  // floor is the policy and is chosen lower down, from the record type committed in the root.
+  if (floorFor(recordType) === null) return [false, "profile-unknown"];
 
   const root = Buffer.from(get(envelope, "root"), "hex");
   const issuer = get(envelope, "issuer");
@@ -122,7 +124,7 @@ function verifyInner(envelope, typeMaps) {
   };
 
   if (hasRecord) return verifyFull(envelope, hashAlg, root, identity, typeMaps);
-  return verifyDisclosed(envelope, hashAlg, root, floor, identity);
+  return verifyDisclosed(envelope, hashAlg, root, identity);
 }
 
 function verifyFull(envelope, hashAlg, root, identity, typeMaps) {
@@ -161,7 +163,7 @@ function verifyFull(envelope, hashAlg, root, identity, typeMaps) {
   return [true, "ok"];
 }
 
-function verifyDisclosed(envelope, hashAlg, root, floor, identity) {
+function verifyDisclosed(envelope, hashAlg, root, identity) {
   // Sections 7.3 and 10.1: `salts` alongside `disclosure` is what would make a withheld leaf's
   // salt representable at all. Reject rather than repair.
   if (has(envelope, "salts")) return [false, "disclosed-copy-carries-salts"];
@@ -211,18 +213,12 @@ function verifyDisclosed(envelope, hashAlg, root, floor, identity) {
     revealed.set(key, value);
   }
 
-  // Section 10.2, the minimum-disclosure floor. Run BEFORE the identity binding below so that
-  // an omitted reserved path still reports the floor - they are different failures and the
-  // corpus asserts the reason code, not just the verdict.
-  for (const required of floor) {
-    if (!seenPaths.has(pathKey(required))) return [false, "minimum-disclosure-floor"];
-  }
-
-  // Section 11.3: a field outside the root is a hint and never authority. The outer recordType
-  // is what selected the floor above, so leaving it unbound lets a holder pick the floor: pdt's
-  // is a strict subset of recovery's, and a recovery copy declaring itself pdt withholds
-  // validUntil with every inclusion proof still verifying against the genuine root. Section
-  // 11.2 commits these four as leaves so that exactly this comparison is possible.
+  // Section 11.3: a field outside the root is a hint and never authority, so the identity is
+  // settled against the leaves section 11.2 commits BEFORE an outer field selects anything.
+  // Choosing the floor first and checking the field afterwards is trust-then-verify, the same
+  // family as the dogtag scar section 11.3 records, and is safe here only by accident of
+  // today's rules: pdt's floor is a strict subset of recovery's, so a recovery copy relabelled
+  // pdt withholds validUntil while every proof still verifies against the genuine root.
   const bindings = [
     [ref.RESERVED.recordType, identity.recordType],
     [ref.RESERVED.schemaVersion, identity.schemaVersion],
@@ -232,12 +228,31 @@ function verifyDisclosed(envelope, hashAlg, root, floor, identity) {
   for (const [reserved, outer] of bindings) {
     const committed = revealed.get(pathKey([{ key: reserved }]));
     if (typeof committed !== "string" || typeof outer !== "string") {
+      // A copy that withholds one of these never said what it IS, so no floor can be chosen for
+      // it - this code, not minimum-disclosure-floor, which would imply a floor was picked and
+      // then missed. It is also why the reserved half of the floor below cannot fire: absence
+      // is caught right here.
       return [false, "outer-identity-mismatch"];
     }
     // Normalized on BOTH sides. These leaves are STRINGs, so what the root commits is their NFC
     // form (section 6.1) - comparing the outer field raw would compare against neither. Same
     // treatment the segment keys already get. Unobservable here: no corpus identity is non-ASCII.
     if (ref.nfc(committed) !== ref.nfc(outer)) return [false, "outer-identity-mismatch"];
+  }
+
+  // Section 10.2, the minimum-disclosure floor, taken from the record type the ROOT commits
+  // rather than from the envelope field. The binding just proved them equal, so the floor is
+  // the same either way; reading it off the leaf is what makes that structural instead of a
+  // consequence of where these lines sit.
+  const committedType = ref.nfc(revealed.get(pathKey([{ key: ref.RESERVED.recordType }])));
+  const floor = floorFor(committedType);
+  // Unreachable as things stand: verifyInner already rejected an outer type that is not in
+  // PROFILE_FLOORS, and the binding showed this leaf NFC-equal to it. Kept because it is what
+  // permits the lookup above to read the LEAF at all - drop it and the obvious next edit is to
+  // pass the outer field here, putting trust-then-verify back.
+  if (floor === null) return [false, "profile-unknown"];
+  for (const required of floor) {
+    if (!seenPaths.has(pathKey(required))) return [false, "minimum-disclosure-floor"];
   }
   return [true, "ok"];
 }

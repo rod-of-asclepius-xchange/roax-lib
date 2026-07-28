@@ -6081,28 +6081,28 @@
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-hl7-fhir-bundle-omits-roax-recordType.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-hl7-fhir-bundle-omits-roax-schemaVersion",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-hl7-fhir-bundle-omits-roax-schemaVersion.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-hl7-fhir-bundle-omits-roax-recordId",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-hl7-fhir-bundle-omits-roax-recordId.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-hl7-fhir-bundle-omits-roax-issuer-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-hl7-fhir-bundle-omits-roax-issuer-id.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-hl7-fhir-bundle-omits-resourceType",
@@ -6130,28 +6130,28 @@
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-pdt-healthcert-omits-roax-recordType.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-sg-gov-moh-pdt-healthcert-omits-roax-schemaVersion",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-pdt-healthcert-omits-roax-schemaVersion.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-sg-gov-moh-pdt-healthcert-omits-roax-recordId",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-pdt-healthcert-omits-roax-recordId.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-sg-gov-moh-pdt-healthcert-omits-roax-issuer-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-pdt-healthcert-omits-roax-issuer-id.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-sg-gov-moh-pdt-healthcert-omits-version",
@@ -6193,28 +6193,28 @@
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-recovery-healthcert-omits-roax-recordType.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-sg-gov-moh-recovery-healthcert-omits-roax-schemaVersion",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-recovery-healthcert-omits-roax-schemaVersion.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-sg-gov-moh-recovery-healthcert-omits-roax-recordId",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-recovery-healthcert-omits-roax-recordId.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-sg-gov-moh-recovery-healthcert-omits-roax-issuer-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-recovery-healthcert-omits-roax-issuer-id.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-sg-gov-moh-recovery-healthcert-omits-version",
@@ -6263,28 +6263,28 @@
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-vaccination-healthcert-omits-roax-recordType.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-sg-gov-moh-vaccination-healthcert-omits-roax-schemaVersion",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-vaccination-healthcert-omits-roax-schemaVersion.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-sg-gov-moh-vaccination-healthcert-omits-roax-recordId",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-vaccination-healthcert-omits-roax-recordId.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-sg-gov-moh-vaccination-healthcert-omits-roax-issuer-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-vaccination-healthcert-omits-roax-issuer-id.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "outer-identity-mismatch"
       },
       {
         "name": "floor-sg-gov-moh-vaccination-healthcert-omits-validFrom",

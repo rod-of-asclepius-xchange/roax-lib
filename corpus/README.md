@@ -52,7 +52,24 @@ round-trips over a hand-edited fixture is not a pass. The generator builds each 
 runs the verifier on **those bytes** rather than on the file, and then compares. It used to write
 first and compare afterwards, which erased the edit it existed to catch.
 
-**It does not cover the three derived MOH type maps.** Those are produced by
+Exactly what step 1 verifies, and nothing more:
+
+| Artifact | Compared byte for byte | Directory scanned for extras |
+|---|---|---|
+| `corpus/conformance-corpus-1.0.json` | yes | n/a |
+| `fixtures/records/*.json` | yes | yes |
+| `fixtures/envelopes/*.json` | yes | yes |
+| `type-maps/org.roax.corpus.synthetic.json` | yes | **no** |
+| `type-maps/sg.gov.moh.*.json` | **no** | **no** |
+
+The two scanned directories are compared as a **set**, because a byte comparison of the files the
+generator produces cannot see an EXTRA one - a renamed vector leaves the old file behind,
+referenced by no vector and reported by nothing. `type-maps/` is not scanned because the generator
+does not own it: it writes the synthetic map, `build_type_maps.py` writes the other three, and a
+set comparison would call those three orphans. Only `.json` is considered, so a gitignored
+`.DS_Store` cannot fail the check.
+
+**Step 1 does not cover the three derived MOH type maps.** Those are produced by
 `tools/build_type_maps.py`, a separate tool with no check mode, and no step of `run.sh` regenerates
 or compares them; step 4 only validates them against `schemas/type-map-1.0.json`. Regenerate them by
 hand against a reference checkout after touching that tool. The fourth map,
@@ -168,8 +185,38 @@ expiry, and every inclusion proof still verifies against the genuine recovery ro
 mismatch in each remaining reserved field; all four reject with `outer-identity-mismatch`. Measured:
 with the binding removed, all four are **accepted**.
 
-The binding runs *after* the floor check, so omitting a reserved path still reports
-`minimum-disclosure-floor` - they are different failures and this class asserts the reason code.
+#### The identity binding runs BEFORE the floor, and that order is required
+
+This is a **stated requirement**, not one of the open ambiguities below, because it is derived
+rather than chosen. Section 11.3 says a field outside the root is never authority; it follows that
+authority has to be established before an outer field is used to **select** anything. Choosing the
+floor from the envelope's `recordType` and validating that field afterwards is trust-then-verify -
+the same shape as the dogtag scar section 11.3 records - and is safe today only by accident of the
+current rules rather than by construction. So a disclosed copy is verified in this order:
+
+1. every disclosed leaf is recomputed and its inclusion proof checked against the root;
+2. the outer `recordType`, `schemaVersion`, `recordId` and `issuer.id` are bound to the reserved
+   leaves the root commits;
+3. the floor is selected from the **committed** `roax.recordType` leaf and enforced.
+
+Two consequences an implementer needs, because both are observable in the vectors:
+
+- **The binding subsumes the reserved half of the floor.** If one of those four reserved leaves is
+  absent the binding fires first, so the floor loop can now only ever reject on a profile-specific
+  path. The 16 `floor-<profile>-omits-roax-*` vectors - four reserved paths across four profiles -
+  therefore assert `outer-identity-mismatch`, not `minimum-disclosure-floor`. An implementation
+  that enforces the floor first fails exactly those 16, and the cause is the ordering, not the
+  floor table. The class 14 requirement is unchanged: each reserved path omitted in turn is still
+  rejected, only the code differs. `_floor_for` still carries the four reserved paths, because
+  `docs/conformance-corpus.md` class 14 defines the floor as those plus what the profile adds and
+  that definition should stay readable in the code.
+- **The reason code is the honest one.** A copy that withholds `roax.recordType` never told the
+  verifier what it is, so no floor could be selected for it; `minimum-disclosure-floor` would claim
+  a floor was chosen and then missed.
+
+`profile-unknown` is unaffected and still fires on the outer `recordType` before any of this. It is
+the verifier's own allow-list - the same shape as the `hashAlg` allow-list of section 7.4 H3 - and
+settles whether this verifier can proceed at all rather than which policy to apply.
 `roax.issuer.keyId` is deliberately not bound, being the one conditional leaf.
 
 ### Class 13 is partial

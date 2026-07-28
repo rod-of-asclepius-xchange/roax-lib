@@ -135,6 +135,17 @@ These are the things a future agent is most likely to get wrong.
   NFC on both sides: a STRING leaf commits its normalized form. `roax.issuer.keyId` MUST NOT be
   bound - it is the conditional leaf.
 
+- **The binding runs BEFORE the minimum-disclosure floor, and the floor is selected from the
+  COMMITTED `roax.recordType` leaf.** Derived from section 11.3, not chosen: authority has to be
+  established before an outer field selects anything, and floor-then-bind is trust-then-verify.
+  The consequence is load-bearing and is pinned by 16 vectors - because absence of a reserved
+  leaf now trips the binding, the reserved half of the floor is unreachable and every
+  `floor-<profile>-omits-roax-*` vector asserts `outer-identity-mismatch` rather than
+  `minimum-disclosure-floor`. Do not "simplify" by enforcing the floor first; do not trim the
+  reserved paths out of the floor table either, since class 14 defines the floor as those four
+  plus the profile's. `profile-unknown` stays ahead of both: it is the verifier's own allow-list,
+  not a policy choice. See `corpus/README.md`.
+
 ## The conformance corpus
 
 `corpus/` holds it. `corpus/README.md` is the operative document: coverage per class, the runner,

@@ -36,10 +36,3 @@ def loads(text: str):
         parse_constant=_reject_constant,
         object_pairs_hook=RecordMap,
     )
-
-
-def load_file(path) -> tuple:
-    """Return (parsed record, original text). The text is what an envelope fixture splices."""
-    with open(path, "r", encoding="utf-8") as handle:
-        text = handle.read()
-    return loads(text), text

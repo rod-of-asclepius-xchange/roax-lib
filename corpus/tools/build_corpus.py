@@ -496,7 +496,8 @@ def main():
         # round-trips over a tampered fixture is not a pass.
         differences = fixture_io.differences()
         if differences:
-            print(f"MISMATCH: {len(differences)} fixture(s) differ from a fresh build")
+            print(f"MISMATCH: {len(differences)} fixture(s) differ from a fresh build "
+                  f"or are not produced by one")
             for path, why in differences:
                 print(f"  {os.path.relpath(path, REPO_ROOT)}: {why}")
             raise SystemExit(1)
@@ -525,6 +526,11 @@ def main():
     else:
         with open(args.out, "w", encoding="utf-8") as handle:
             handle.write(text)
+        # Write mode records no per-fixture difference, so anything here is an orphan - and
+        # write mode is the run that CREATES one, by renaming a vector and leaving the old file.
+        # Reported rather than failed: writing is not a gate.
+        for path, why in fixture_io.differences():
+            notes.append(f"{os.path.relpath(path, REPO_ROOT)}: {why}")
 
     if args.extract_to:
         extract_samples(args.references, args.extract_to, notes)
