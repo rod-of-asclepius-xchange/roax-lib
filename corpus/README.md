@@ -187,10 +187,10 @@ with the binding removed, all four are **accepted**.
 
 #### The identity binding runs BEFORE the floor, and that order is required
 
-This is a **stated requirement**, not one of the open ambiguities below, because it is derived
-rather than chosen. Section 11.3 says a field outside the root is never authority; it follows that
-authority has to be established before an outer field is used to **select** anything. Choosing the
-floor from the envelope's `recordType` and validating that field afterwards is trust-then-verify -
+The **ordering** below is a stated requirement, not one of the open ambiguities, because it is
+derived rather than chosen. Section 11.3 says a field outside the root is never authority; it
+follows that authority is established before an outer field is used to **select** anything.
+Choosing the floor from the envelope's `recordType` and validating it afterwards is trust-then-verify -
 the same shape as the dogtag scar section 11.3 records - and is safe today only by accident of the
 current rules rather than by construction. So a disclosed copy is verified in this order:
 
@@ -199,7 +199,23 @@ current rules rather than by construction. So a disclosed copy is verified in th
    leaves the root commits;
 3. the floor is selected from the **committed** `roax.recordType` leaf and enforced.
 
-Two consequences an implementer needs, because both are observable in the vectors:
+**The step 1-2 ordering is pinned by the vectors. Step 3's source-of-floor is not, and cannot be.**
+Both halves of that are measured, and the difference matters to anyone porting this:
+
+| Deviation | Envelope vectors failed, of 54 |
+|---|---:|
+| enforce the floor before the binding | **16** |
+| keep the ordering, read the floor from the envelope's `recordType` | **0** |
+
+The second is zero *because* step 2 has just proved the outer field NFC-equal to the committed leaf:
+both sources then yield the same floor table, so no vector can tell them apart. Sourcing it from the
+leaf is therefore a **clarity convention** rather than a corpus-enforced requirement - it puts the
+structural claim where a reader of the code can see it, and an implementation that reads the outer
+field instead will pass the corpus. The `profile-unknown` branch that follows the lookup in both
+implementations is unreachable for the same reason, and is kept only so that a later edit cannot
+quietly restore the trust-then-verify shape.
+
+Two consequences an implementer needs, and unlike step 3 both ARE observable in the vectors:
 
 - **The binding subsumes the reserved half of the floor.** If one of those four reserved leaves is
   absent the binding fires first, so the floor loop can now only ever reject on a profile-specific
