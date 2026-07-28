@@ -70,26 +70,33 @@ nothing in the corpus flags that the field presumes an answer to a question `doc
 records as open. The specification says a decision is open, the corpus quietly says it is not, and
 the corpus is the artifact implementations are actually built against.
 
-**It has already happened twice in this design.** `schemas/envelope-1.0.json` required `masterSalt`
-in every full copy, which is unimplementable under decision D4b where no `masterSalt` exists; that
-was removed and the envelope now carries per-leaf salts, which are expressible under either answer.
-The corpus then still required `masterSaltHex` on every `recordVector`, reproducing the same
-foreclosure one file over. Twice in the same design is a pattern, which is why the rule is written
-down rather than fixed case by case.
+**It had already happened twice in this design, and the case is worth keeping now that it is
+closed.** `schemas/envelope-1.0.json` required `masterSalt` in every full copy, which was
+unimplementable under decision D4b where no `masterSalt` exists; that was removed and the envelope
+carries per-leaf salts, which were expressible under either answer. The corpus then still required
+`masterSaltHex` on every `recordVector`, reproducing the same foreclosure one file over. Twice in the
+same design is a pattern, which is why the rule is written down rather than fixed case by case.
+
+**Decision D4 has since been ruled D4b**, so `masterSalt` no longer exists anywhere in the design and
+neither foreclosure is reachable today. That does not retire the rule. It retires this example,
+which is kept because it is the clearest one available and because the rule still binds on decisions
+A, C and D, all of which remain open (`docs/decisions.md` Part 1).
 
 **This is a future-proofing constraint, not a tidiness one**, and it connects directly to
-specification section 12.2. A corpus that hard-codes one salt strategy is not upgradeable. If D4 is
-ruled the other way, every implementation that passed such a corpus has already baked in the
-assumption, and reconciling them is not a version bump. It is a fork.
+specification section 12.2. A corpus that hard-codes one side of an open question is not upgradeable.
+Every implementation that passed such a corpus has already baked in the assumption, and reconciling
+them is not a version bump. It is a fork.
 
 **How to apply it to a new vector class.** For each required field, ask which decision in
 `docs/decisions.md` it presumes. If that decision is open, the field belongs in one of three places:
 optional, absent, or expressible both ways through a `oneOf`. The exception is a vector class whose
-**subject** is the open mechanism: `saltVector` requires `masterSaltHex` because it tests the
-section 7 derivation, and `unlinkabilitySide` requires it because class 12 is where master-salt
-freshness *is* the assertion. Testing a mechanism is not the same as presuming it, and
-`schemas/conformance-corpus-1.0.json` records that distinction on each of those definitions so a
-later editor does not "harmonize" them.
+**subject** is the open mechanism, because testing a mechanism is not the same as presuming it.
+**That exception currently has no instance.** The two it used to have, `saltVector` and
+`unlinkabilitySide.masterSaltHex`, both existed to test the derived-salt mechanism and were removed
+with it when D4 was ruled; `saltVector` is gone from
+`schemas/conformance-corpus-1.0.json` entirely, because under section 7 a salt is an input rather
+than something derived from anything, and `leafVector.saltHex` already carries it. A later editor
+adding such a class should record the distinction on the definition itself, as those two did.
 
 ## 2. Release gates
 
@@ -115,12 +122,23 @@ one author cannot catch it.** So gate 3 is a release gate, not a caveat.
 
 ## 3. Mandatory vector classes
 
-**Seventeen classes.** A class with no vectors is a coverage gap and the corpus build MUST report it
+**Nineteen classes.** A class with no vectors is a coverage gap and the corpus build MUST report it
 rather than passing silently.
 
 The count is stated because a gap check built off it is the intended use, and a stale count means
 the highest-numbered class is skipped silently. `schemas/conformance-corpus-1.0.json` sets the
-`classRef` maximum to 17 to match.
+`classRef` maximum to 19 to match.
+
+**Classes 18 and 19 were added, and class 12 was rewritten, when the ten engineering decisions were
+ruled on 2026-07-28.** Class numbers are stable: class 12 kept its number and its subject and lost
+only its mechanism, so nothing renumbered and every existing citation of classes 13 through 17 in the
+specification and the schemas still points where it did.
+
+**Three of the classes below assert a relation rather than a pinned value**, and that is deliberate
+rather than incomplete. Class 12 asserts two leaf hashes are **different**, class 19 asserts two
+records produce the **same** root, and class 18 asserts accept or reject. Each is fully determined
+without a hexadecimal expected value, and a corpus build that has not yet computed one has not
+therefore left the class under-specified.
 
 ### Class 1 - FHIR decimals
 
@@ -211,11 +229,29 @@ only 8 and 16 proves nothing.
 
 MUST NOT verify: a valid proof against a wrong root; a proof with one sibling flipped; a proof
 presenting an **internal node as a leaf**; an index out of range; a truncated audit path; an
-extended audit path.
+extended audit path; and a proof carrying a **forged tree size** chosen to make an internal node land
+where a leaf should be.
 
 The internal-node case is dogtag's C1 hazard, which it demonstrates in its own test suite at
-`crates/dogtag-standard-rs/src/merkle.rs:196-229`. RFC 9162 should reject it structurally because it
-is position-bound; the corpus proves that it does rather than assuming it.
+`crates/dogtag-standard-rs/src/merkle.rs:196-229`.
+
+**Building this class produced a correction to the specification, and the corrected reasoning is what
+the class now tests.** An earlier version of this document said RFC 9162 rejects the internal-node
+case structurally because it is position-bound. It does not. RFC 9162 section 2.1.3.2 takes the tree
+size as an **input**, so an attacker who supplies both the leaf hash and the tree size can pick a
+shape that walks an internal node to the genuine root: on an 8-leaf tree, `MTH(L[0:4])` presented as
+the leaf at index 0 with a forged tree size of 2 and the audit path `[MTH(L[4:8])]` verifies. That
+was measured, and reproduced on Node v22.21.0; specification section 11.1 records it in full.
+
+**What actually closes the case is the `0x00` leaf-domain byte plus specification section 10 step 1**,
+which requires a verifier to recompute the leaf hash from the disclosed path, tag, value and salt
+rather than accept one. A recomputed leaf hash is `0x00`-domained and an internal node is
+`0x01`-domained, so the substitution needs a second preimage.
+
+**Consequence for how this class is run.** These vectors MUST be driven through the full disclosed-copy
+verification path, not through a bare fold primitive. A runner that hands `verifyInclusion` a leaf
+hash directly is testing the primitive dogtag documents as proving nothing on its own
+(`merkle.rs:86-91`), and it will record a pass for an implementation that has no defence at all.
 
 ### Class 10 - the three real MOH records
 
@@ -232,20 +268,58 @@ under a given map yields a given tag, and that an uncovered path fails closed.
 This is the highest-risk surface in the design (specification section 4) and also the easiest to
 diff, which is the one piece of good news about it.
 
-### Class 12 - salt freshness and cross-record unlinkability
+**One row was added when decision D9 was ruled:** a type map binding any path to **tag 8 `BLOB_REF`**
+MUST be **rejected**, because the content-addressed binding is defined and selected by no version-1
+profile (specification section 6.5). That is a rejection of the map rather than a fail-closed on a
+path, so it is a third outcome and `schemas/conformance-corpus-1.0.json` gives it its own branch.
+Without this vector, "registered but unselected" is a sentence, and the schemas accept tag 8 in order
+to pin its carrier form - which is exactly the combination that lets an implementation quietly honour
+a binding no profile has declared.
 
-Two records sharing a path **and** a value, built with two different `masterSalt` values, MUST
-produce different leaf hashes for that path.
+### Class 12 - cross-record unlinkability under independent per-leaf salts
 
-**This is the only class that catches an implementation which derives `masterSalt` deterministically
-for reproducible reissuance.** That violation is invisible to every other class in this list,
-because each record verifies perfectly on its own. It is also an attractive-sounding thing to build:
-"derive the master salt so reissuance reproduces the same root" reads like a feature.
+**Two records for the same subject, sharing a path and a value at that path, MUST produce different
+leaf hashes for that path.**
 
-Under specification section 7.1 the record identifier is also in the salt preimage, so this class
-gets a second vector: two records with different `recordId` and the **same** `masterSalt` must also
-produce different leaf hashes. That vector documents the defense-in-depth property precisely, and it
-must not be read as making `masterSalt` reuse safe - it is not, and section 7.1 says why.
+This class kept its number and its subject when decision D4 was ruled D4b and lost its mechanism.
+The old version built the two records with two different `masterSalt` values and asserted the same
+outcome. There is no master salt now (specification section 7), so the assertion is made directly
+against the property that matters, which is what the old version was proxying for anyway.
+
+**It is the only class that catches an implementation whose salts are not independent**, and that
+violation is invisible to every other class in this list because each record verifies perfectly on
+its own. The reachable ways to get it wrong are worth naming, because the class has to catch all
+three:
+
+- **A deterministic salt.** Deriving a salt from the path, from the value, or from a content-derived
+  seed, so that reissuing a record reproduces the same root. This reads like a feature -
+  "reissuance is idempotent" - which is exactly why the specification forbids it in section 7 and why
+  a vector rather than a sentence enforces it.
+- **A salt reused across leaves.** One draw per record rather than one per leaf.
+- **A salt reused across records**, which is the patient-linkage failure itself.
+
+#### The shape this class has to take, and its honest limit
+
+**This class asserts a relation between generated values rather than a pinned expected value**, and
+that is forced by the ruling rather than a shortcut. Under D4b the salts are independently random, so
+no fixed hexadecimal expectation can exist: a vector file cannot pin what the implementation under
+test is required to draw freshly. A `class12Vector` therefore describes an issuance to perform and
+the relation the results MUST satisfy.
+
+The runner issues the same `(path, tag, value)` under the vector's `trials` independent issuances,
+and asserts that all of the resulting salts are distinct and all of the resulting leaf hashes are
+distinct.
+
+> **The limit, stated rather than left for a reader to discover.** This detects a **deterministic**
+> or **reused** salt, which is the failure that has actually happened in comparable systems. It does
+> **not** detect a weak or predictable CSPRNG: an implementation drawing 16 bytes from a poorly
+> seeded generator passes every trial while providing much less than the 128 bits specification
+> section 7 requires. No fixed vector file can test a randomness source. That gap belongs to
+> implementation review, and this document states it here rather than letting a passing class read as
+> a guarantee it is not.
+
+This class follows the same convention as classes 15 and 16, which say outright where they detect a
+property by declaration rather than by demonstration.
 
 ### Class 13 - reference-schema hazards
 
@@ -357,9 +431,15 @@ A disclosed copy carries the salt of every leaf it reveals and the salt of **no 
 | A disclosed copy carrying exactly the salts of its revealed leaves | **Accept** |
 | The same copy with one withheld leaf's salt added | **Reject** |
 | A disclosed copy carrying a `salts` array, the full-copy field | **Reject** |
-| A disclosed copy carrying a `masterSalt` field | **Reject** |
+| A disclosed copy carrying any seed field, `masterSalt` or otherwise | **Reject** |
 | A full copy whose `salts` array omits one leaf of the union | **Reject** |
 | A full copy whose `salts` array length does not equal `leafCount` | **Reject** |
+
+**The seed row survives decision D4's ruling on purpose.** There is no `masterSalt` in this design
+any more (specification section 7), and `additionalProperties: false` already rejects an unknown
+field, so the row is cheap. It is retained because specification section 7.3 rule 3 binds any future
+revision that reintroduces a derived salt, and a revision that added a seed to the envelope would
+hand every holder the ability to recompute every withheld leaf's salt in a copy that still verified.
 
 **This class exists because the violation verifies correctly.** Extra salts do not change any leaf
 hash, so an implementation that ships every salt in a disclosed copy produces an envelope that
@@ -371,6 +451,66 @@ catch it.
 `disclosure`, which leaves no place to put a withheld leaf's salt. The rows this class still has to
 carry in code are the count relationships in the last two rows, which JSON Schema cannot express
 because they relate `salts.length`, `leafCount` and the actual leaf set to each other.
+
+### Class 18 - outside-the-root fields are never authority
+
+**This class exists because a normative sentence was demonstrably not enough.** Specification section
+11.3 states that fields outside the root are hints and never authority. dogtag had the equivalent
+understanding written down and still shipped the `documentStore` bug, then needed an entire extra
+mandatory issuer-whitelist pillar that exists only to compensate (`AGENTS.md:333` in the dogtag
+monorepo). An implementer who agrees with the sentence and then reads the convenient field anyway is
+the failure mode, so the corpus has to fail that implementation rather than trust it.
+
+Every vector here **fails an implementation that trusts an outside-the-root field**, and passes one
+that takes authority from the root and from its own configured anchoring layer.
+
+| Vector | Expected | What it catches |
+|---|---|---|
+| A disclosed copy whose top-level `recordType` disagrees with the disclosed `roax.recordType` leaf | **Reject** | A verifier that reads the envelope field instead of the committed leaf. The leaf is inside the root; the field is not. |
+| The same, for `schemaVersion`, `recordId` and `issuer.id` in turn | **Reject** | The same mistake at each of the other three floor paths (specification section 11.2). |
+| An envelope whose `hashAlg` disagrees with the `(root, hashAlg)` pair the verifier's anchoring registry records | **Reject** | A verifier taking the algorithm from the document rather than from the registry. This is exactly what specification section 7.4's H2 requires and what H1 does **not** provide. |
+| An envelope whose `hashAlg` is absent from the verifier's configured allow-list, and present in the registry | **Reject** | The retired-algorithm case, which H2 alone does not close. Specification section 7.4, H3. |
+| An envelope whose `anchor.registry` and `anchor.chainId` name a registry the verifier is not configured with, and which would return a valid pair | **Reject, without reading that registry** | The dogtag `documentStore` bug in this design's shape: an attacker-supplied address that answers "valid". A verifier MUST resolve the anchoring layer from its own configuration. |
+| A well-formed envelope whose `anchor` block is absent entirely, verified against the verifier's own registry | **Accept** | The upper edge. `anchor` is a routing hint, so its absence MUST NOT make a verifiable record unverifiable, and an implementation that hard-requires it has made the field authority in a different way. |
+
+**The last row is the reason this class cannot be only rejections.** A corpus of rejections alone is
+passed by an implementation that rejects everything with an `anchor` mismatch including the case
+where nothing is wrong, and treating a routing hint as required is itself a way of depending on it.
+
+**What a runner needs that no other class needs.** These vectors are the only ones whose outcome
+depends on what the *verifier* is configured with rather than only on the envelope, so
+`envelopeVector` carries an optional `verifierConfig` block stating the anchoring facts and the
+allow-list in force for that vector. Without it the expected outcome is not determined by the file.
+
+### Class 19 - NFC normalization, end to end, with a root
+
+`ROAX-CANON/1` normalizes strings and object keys to NFC before encoding, under Unicode 15.1
+(specification section 6.1, decision D12 ruled D12a).
+
+**This class carries a record whose string differs before and after NFC, in both forms, and asserts
+they produce the same root.**
+
+| Vector | Expected |
+|---|---|
+| A record carrying the NFD form of a string that changes under NFC | root `R` |
+| The identical record carrying that string's NFC form | **the same root `R`** |
+| The same pair with the differing sequence in an **object key** rather than a value | one root, equal across both forms |
+
+Use a string whose NFC form is stable across recent Unicode versions, so that this class tests
+normalization rather than the version pin; class 16 owns the version question and is honest about
+what it can and cannot demonstrate.
+
+**Why this is not covered by class 4.** Class 4 asserts NFC against NFD at **leaf** level, in values
+and in keys. That catches an implementation whose `encodeValue` skips normalization. It does not
+catch one that normalizes in `encodeValue` and then reaches the same string by another route - a key
+compared before normalization, a reserved-leaf value written straight from the envelope, a path
+segment re-encoded from a cached form. Class 19 asserts the property of the whole pipeline, over the
+union of section 3.3, which is where those routes actually are.
+
+**The assertion is equality, so the class is complete without a pinned hexadecimal root.** The value
+of `R` is whatever the corpus build computes; what the vector fixes is that both forms produce one
+value and that it is the same one. A pinned `R` is worth adding once the corpus file exists, as a
+regression against the normalization silently changing, and the vector shape has room for it.
 
 ## 4. Seed material that already exists
 
@@ -401,7 +541,8 @@ Two caveats an implementer must know before treating that work as a corpus:
 2. Those implementations are ~250-350 lines each, with no error taxonomy, no streaming and no schema
    binding. They are specification aids, not libraries.
 
-Classes 3, 8, 9, 10, 11, 12, 13, 14, 15, 16 and 17 are not covered by that seed and are new work.
+Classes 3, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 and 19 are not covered by that seed and are new
+work.
 
 The one partial exception is the pair class 1 delegates to class 7, `1e2` as DECIMAL against `100`
 as INTEGER, which the seed already discriminates - see the fourth line of the block above.

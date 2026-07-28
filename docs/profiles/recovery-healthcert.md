@@ -66,7 +66,7 @@ Bind as `STRING` per specification section 6.3.
 
 | Path | Why |
 |---|---|
-| `roax.recordType`, `roax.schemaVersion`, `roax.recordId`, `roax.issuer.id` | The reserved floor (spec section 11.2), which every profile carries. The first three are mandatory by arithmetic rather than policy: without them a verifier cannot select the type map or rebuild a salt preimage, so it cannot verify at all. `roax.issuer.keyId` is committed but OPTIONAL to disclose, because requiring it would break key rotation on already-anchored records. |
+| `roax.recordType`, `roax.schemaVersion`, `roax.recordId`, `roax.issuer.id` | The reserved floor (spec section 11.2), which every profile carries. The first two are mandatory by arithmetic rather than policy: they select the type map, so without them a verifier cannot verify at all. `roax.recordId` and `roax.issuer.id` are mandatory by policy, so that a disclosed copy says which record it is and who issued it. `roax.recordId` was arithmetic until decision D4 was ruled D4b on 2026-07-28, which removed the salt preimage it used to be an input to; its place here is unchanged and only its reason moved. `roax.issuer.keyId` is committed but OPTIONAL to disclose, because requiring it would break key rotation on already-anchored records. |
 | `version` | Pins `rec-healthcert-v2.0`. Also the only field that distinguishes this from a PDT record if `recordType` were ever mis-set. |
 | `type` | The test kind. |
 | `validFrom` | Start of the validity interval. |
@@ -104,4 +104,9 @@ negative observation validates identically.
 `sg.gov.moh.recovery-healthcert` root proves a typed payload was committed by an issuer. It does not
 prove recovery, does not prove a positive result, and does not prove the validity interval is
 coherent. If ROAX intends to claim recovery semantics, those rules have to be added by this profile
-and enforced above the protocol layer. That is part of decision D13.
+and enforced above the protocol layer.
+
+**Decision D13 is ruled and that makes this normative.** Specification section 2.3 states that no
+surface derived from this protocol may assert a clinical fact from root validity alone, and puts
+clinical validation in a separate, independently versioned layer. "Proof of recovery" on a screen,
+derived from a root that verified, is exactly the claim that section forbids.
