@@ -1,0 +1,86 @@
+# Project agent memory
+
+This file is the project's committed home for project-intrinsic agent knowledge: build, test,
+release, architecture, and sharp-edge notes that should travel with the code.
+
+## What this repository is right now
+
+Specification and schemas only. **No library code has been written, and that is deliberate.**
+The specifications exist so the design can be reviewed before five language implementations exist to
+be re-litigated.
+
+Do not add a Rust crate, TypeScript package, Go module, Swift package or Kotlin library without an
+explicit instruction to do so.
+
+## This repository is PUBLIC
+
+Consequences that have already bitten once during authoring:
+
+- No task identifiers, no internal team vocabulary, no absolute paths into anyone's home directory
+  or into internal working trees.
+- The reference schemata at `references/` are **third-party and must never be committed.**
+  `.gitignore` excludes `references/` and `schemata/`. Cite them by relative path plus the upstream
+  commit; never copy a schema in, not even a fragment.
+- dogtag is an internal repository. Cite it as `dogtag-mono-repo` with file and line, and do not
+  link it.
+
+## Sharp edges in the design itself
+
+These are the things a future agent is most likely to get wrong.
+
+- **The type map does not exist.** The specification requires it (section 4) and the design is
+  unsafe without it, because type tags MUST come from the schema and not from JSON literal syntax.
+  Building it is on the critical path and is the single largest gap. Do not write a library that
+  infers tags syntactically "for now" - that is the exact bug this project exists to remove.
+
+- **Numbers are never parsed through a float.** Anywhere. This is the whole point of the design;
+  see `docs/decisions.md` part 0. In test vectors and JSON Schemas, INTEGER and DECIMAL values are
+  carried as **strings**, because a JSON number in a vector file would be destroyed by the very
+  parser under test.
+
+- **Trailing zeros in decimals are significant.** `0.010` is not `0.01`. FHIR R4 says SHALL. dogtag
+  strips them (`crates/dogtag-standard-rs/src/encode.rs:51-59`) and ROAX deliberately does not. If
+  you port anything from dogtag's `encode.rs`, this is the line to change.
+
+- **The display path is never hashed.** `a.b[0].c` is for humans. Hashing uses the length-prefixed
+  structured encoding (spec section 5). Never reconstruct a path by parsing a display string.
+
+- **The vaccination healthcert's `fhirBundle.entry[]` is flattened pseudo-FHIR**, not a real FHIR
+  Bundle. Normalizing it to the genuine `entry[i].resource` shape changes every path and therefore
+  every root, which silently breaks existing commitments. See
+  `docs/profiles/vaccination-healthcert.md` section 2.1.
+
+- **Do not resolve the reference schemas by `$id`.** Two of them carry copy-pasted `$id` values:
+  recovery points at PDT's path, and vaccination points at a PDT interim path. A validator that
+  registers both by `$id` silently applies the wrong rules. Load by file path.
+
+## Documentation conventions in force here
+
+- No em dashes. Use a plain hyphen.
+- In long Markdown, put each full sentence on its own line. Every document here follows this, and
+  it keeps diffs readable when a single sentence changes.
+- **Every normative claim carries a citation:** specification name, version and section for
+  standards; file and line for code. Where something is inferred rather than confirmed, the text
+  says so in the sentence. Keep this - the documents are written to be checkable rather than
+  trusted, and a reader who spot-checks one uncited claim loses confidence in all of them.
+
+## The open decisions are open on purpose
+
+`docs/decisions.md` holds four unruled decisions (A, B, C, D) plus nine more. The specification is
+written on the *recommended* answer to each so it reads as a real specification.
+
+**Do not resolve any of them in code or prose without an explicit ruling**, and if one is ruled,
+update `docs/decisions.md` in the same change rather than only the specification. A decision that
+looks settled in the spec but is still marked OPEN in the decisions document is worse than either.
+
+## Validating the schemas
+
+There is no CI and no package manifest. The JSON Schemas were checked with Ajv 8 in **strict mode**
+plus `ajv-formats`, and all three compile clean. Two things to know if you touch them:
+
+- Ajv's `strictRequired` rejects `required` inside a `not`/`anyOf` subschema unless the same
+  subschema also lists those properties. The schemas carry no-op `"properties": {"x": true}`
+  annotations for exactly this reason. They are not redundant - removing them breaks strict
+  compilation.
+- Union types (`"type": ["string","boolean"]`) trip `strictTypes`. The envelope pins each value type
+  per tag in its `allOf` conditionals instead, which is more precise anyway.

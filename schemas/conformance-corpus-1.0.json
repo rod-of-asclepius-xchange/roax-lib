@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://roax.example/schemas/conformance-corpus/1.0/schema.json",
+  "title": "ROAX conformance corpus v1",
+  "description": "Schema for the shared cross-language test-vector file. Because ROAX may ship five independent libraries and cannot lean on a single core behind an FFI layer the way dogtag does (spec section 14.3), this corpus is the entire enforcement mechanism for cross-language agreement, not a safety net. Normative content requirements: docs/conformance-corpus.md. The corpus file itself does not exist yet.",
+  "type": "object",
+  "required": ["corpusVersion", "canon", "hashAlg", "unicodeVersion", "vectors"],
+  "additionalProperties": false,
+
+  "properties": {
+    "corpusVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "canon": { "const": "ROAX-CANON/1" },
+    "hashAlg": { "enum": ["SHA-256"] },
+    "unicodeVersion": {
+      "description": "The Unicode version whose NFC tables the expected values were produced under. ROAX-CANON/1 pins 15.1 (spec section 6.1). An implementation running different tables MAY legitimately differ on vectors in the 'unicodeVersion' class, and must say so rather than silently passing.",
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "vectors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "encodePath": { "type": "array", "items": { "$ref": "#/$defs/encodePathVector" } },
+        "encodeValue": { "type": "array", "items": { "$ref": "#/$defs/encodeValueVector" } },
+        "reject": { "type": "array", "items": { "$ref": "#/$defs/rejectVector" } },
+        "salt": { "type": "array", "items": { "$ref": "#/$defs/saltVector" } },
+        "leaf": { "type": "array", "items": { "$ref": "#/$defs/leafVector" } },
+        "tree": { "type": "array", "items": { "$ref": "#/$defs/treeVector" } },
+        "inclusion": { "type": "array", "items": { "$ref": "#/$defs/inclusionVector" } },
+        "negativeProof": { "type": "array", "items": { "$ref": "#/$defs/negativeProofVector" } },
+        "typeMap": { "type": "array", "items": { "$ref": "#/$defs/typeMapVector" } },
+        "record": { "type": "array", "items": { "$ref": "#/$defs/recordVector" } },
+        "unlinkability": { "type": "array", "items": { "$ref": "#/$defs/unlinkabilityVector" } },
+        "envelope": { "type": "array", "items": { "$ref": "#/$defs/envelopeVector" } }
+      }
+    }
+  },
+
+  "$defs": {
+    "hex32": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "name": { "type": "string", "minLength": 1 },
+    "classRef": {
+      "description": "Which numbered class in docs/conformance-corpus.md this vector discharges. Every class must be reachable from at least one vector; a class with no vectors is a coverage gap and the corpus build MUST report it.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    },
+
+    "segments": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "type": "object", "required": ["key"], "additionalProperties": false,
+            "properties": { "key": { "type": "string" } } },
+          { "type": "object", "required": ["index"], "additionalProperties": false,
+            "properties": { "index": { "type": "integer", "minimum": 0, "maximum": 4294967295 } } }
+        ]
+      }
+    },
+
+    "encodePathVector": {
+      "type": "object",
+      "required": ["name", "class", "segments", "encodedHex"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "segments": { "$ref": "#/$defs/segments" },
+        "encodedHex": { "type": "string", "pattern": "^([0-9a-f]{2})*$" },
+        "displayPath": { "type": "string", "description": "Display only. Never hashed." }
+      }
+    },
+
+    "encodeValueVector": {
+      "type": "object",
+      "required": ["name", "class", "tag", "encodedHex"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "tag": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "input": { "description": "Input in carrier form. Numbers are STRINGS here; a JSON number in a test vector would be parsed through a float by the very implementations under test." },
+        "encodedHex": { "type": "string", "pattern": "^([0-9a-f]{2})*$" }
+      }
+    },
+
+    "rejectVector": {
+      "description": "MUST error. An implementation that silently canonicalizes any of these is non-conformant.",
+      "type": "object",
+      "required": ["name", "class", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "tag": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "input": {},
+        "segments": { "$ref": "#/$defs/segments" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+
+    "saltVector": {
+      "type": "object",
+      "required": ["name", "class", "masterSaltHex", "recordId", "segments", "saltHex"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "masterSaltHex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "recordId": { "type": "string" },
+        "segments": { "$ref": "#/$defs/segments" },
+        "saltHex": { "type": "string", "pattern": "^[0-9a-f]{32}$" }
+      }
+    },
+
+    "leafVector": {
+      "type": "object",
+      "required": ["name", "class", "segments", "tag", "saltHex", "leafHash"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "segments": { "$ref": "#/$defs/segments" },
+        "tag": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "value": {},
+        "saltHex": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "leafHash": { "$ref": "#/$defs/hex32" }
+      }
+    },
+
+    "treeVector": {
+      "description": "RFC 9162 MTH over already-hashed leaves. Leaf counts 1,2,3,5,7,8,9,130 are mandatory (docs/conformance-corpus.md class 8): the RFC split rule is where a hand-rolled tree goes wrong.",
+      "type": "object",
+      "required": ["name", "class", "leafHashes", "root"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "leafHashes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/hex32" } },
+        "root": { "$ref": "#/$defs/hex32" }
+      }
+    },
+
+    "inclusionVector": {
+      "type": "object",
+      "required": ["name", "class", "leafHash", "index", "treeSize", "auditPath", "root", "expect"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "leafHash": { "$ref": "#/$defs/hex32" },
+        "index": { "type": "integer", "minimum": 0 },
+        "treeSize": { "type": "integer", "minimum": 1 },
+        "auditPath": { "type": "array", "items": { "$ref": "#/$defs/hex32" } },
+        "root": { "$ref": "#/$defs/hex32" },
+        "expect": { "type": "boolean" }
+      }
+    },
+
+    "negativeProofVector": {
+      "description": "MUST NOT verify. Includes the internal-node-presented-as-leaf case, which is dogtag's C1 hazard (spec section 9.3); RFC 9162 should reject it structurally and the corpus proves it does.",
+      "type": "object",
+      "required": ["name", "class", "attack", "leafHash", "index", "treeSize", "auditPath", "root"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "attack": {
+          "enum": [
+            "wrong-root",
+            "flipped-sibling",
+            "internal-node-as-leaf",
+            "index-out-of-range",
+            "truncated-audit-path",
+            "extended-audit-path"
+          ]
+        },
+        "leafHash": { "$ref": "#/$defs/hex32" },
+        "index": { "type": "integer", "minimum": 0 },
+        "treeSize": { "type": "integer", "minimum": 1 },
+        "auditPath": { "type": "array", "items": { "$ref": "#/$defs/hex32" } },
+        "root": { "$ref": "#/$defs/hex32" }
+      }
+    },
+
+    "typeMapVector": {
+      "description": "Asserts that a given path under a given type map resolves to a given tag, or fails closed.",
+      "type": "object",
+      "required": ["name", "class", "recordType", "segments"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "recordType": { "type": "string" },
+        "segments": { "$ref": "#/$defs/segments" },
+        "jsonKind": { "enum": ["string", "number", "boolean", "null", "object", "array"] },
+        "expectTag": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "expectFailClosed": { "type": "boolean" }
+      }
+    },
+
+    "recordVector": {
+      "description": "A whole record with its root. The three real MOH samples are mandatory (class 10). Records are referenced by file rather than inlined, so that no reference schema or sample is copied into this repository.",
+      "type": "object",
+      "required": ["name", "class", "recordFile", "masterSaltHex", "recordId", "leafCount", "root"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "recordType": { "type": "string" },
+        "recordFile": { "type": "string" },
+        "masterSaltHex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "recordId": { "type": "string" },
+        "leafCount": { "type": "integer", "minimum": 1 },
+        "root": { "$ref": "#/$defs/hex32" }
+      }
+    },
+
+    "unlinkabilityVector": {
+      "description": "Class 12. Two records sharing a path AND a value, built with different masterSalt values, MUST produce different leaf hashes for that path. This is the ONLY vector class that catches an implementation deriving masterSalt deterministically for reproducible reissuance - a violation invisible to every other class, because each record verifies perfectly on its own (spec section 7).",
+      "type": "object",
+      "required": ["name", "class", "segments", "tag", "recordA", "recordB", "expectDistinct"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "segments": { "$ref": "#/$defs/segments" },
+        "tag": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "value": {},
+        "recordA": { "$ref": "#/$defs/unlinkabilitySide" },
+        "recordB": { "$ref": "#/$defs/unlinkabilitySide" },
+        "expectDistinct": { "const": true }
+      }
+    },
+
+    "unlinkabilitySide": {
+      "type": "object",
+      "required": ["masterSaltHex", "recordId", "leafHash"],
+      "additionalProperties": false,
+      "properties": {
+        "masterSaltHex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "recordId": { "type": "string" },
+        "leafHash": { "$ref": "#/$defs/hex32" }
+      }
+    },
+
+    "envelopeVector": {
+      "description": "Classes 13-16: envelope and record-level invariants that JSON Schema alone cannot express, notably the minimum-disclosure floor (class 14) and the reserved-prefix guard (class 15).",
+      "type": "object",
+      "required": ["name", "class", "envelopeFile", "expectAccept"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "envelopeFile": { "type": "string" },
+        "expectAccept": { "type": "boolean" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}

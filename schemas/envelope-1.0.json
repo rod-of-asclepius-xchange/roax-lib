@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://roax.example/schemas/envelope/1.0/schema.json",
+  "title": "ROAX record envelope v1",
+  "description": "Envelope for a record committed under ROAX-CANON/1. Carries EITHER a full record OR a selective disclosure, never both. Normative text: docs/spec/roax-canon-1.md section 11. DRAFT - not frozen.",
+  "type": "object",
+  "required": [
+    "canon",
+    "hashAlg",
+    "recordType",
+    "schemaVersion",
+    "recordId",
+    "root",
+    "leafCount",
+    "issuer"
+  ],
+  "additionalProperties": false,
+
+  "properties": {
+    "canon": {
+      "description": "Canonicalization version. Bound into the Merkle root via the domain string in every leaf and every salt (spec sections 8, 7, 12).",
+      "const": "ROAX-CANON/1"
+    },
+
+    "hashAlg": {
+      "description": "Hash agility. Part of the domain string, so two records with identical content and different hashAlg have different roots. Only SHA-256 is defined for v1. See decision B/D2 - OPEN.",
+      "enum": ["SHA-256"]
+    },
+
+    "recordType": {
+      "description": "Profile identifier. Committed inside the root at a reserved path. One profile document exists per value - see docs/profiles/. This list is extensible by adding a profile document; it is not a closed universe.",
+      "type": "string",
+      "enum": [
+        "sg.gov.moh.vaccination-healthcert",
+        "sg.gov.moh.pdt-healthcert",
+        "sg.gov.moh.recovery-healthcert",
+        "hl7.fhir.bundle"
+      ]
+    },
+
+    "schemaVersion": {
+      "description": "Version of the record profile named by recordType. Committed inside the root.",
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+
+    "recordId": {
+      "description": "Stable identifier for this record. Committed inside the root AND folded into every salt preimage (spec section 7.1). MUST be unique per record. Reusing it across a reissuance weakens cross-record unlinkability - see decision D4.",
+      "type": "string",
+      "minLength": 1
+    },
+
+    "root": {
+      "description": "RFC 9162 Merkle Tree Head over all leaves, lowercase hex, no 0x prefix.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+
+    "leafCount": {
+      "description": "Total number of leaves in the tree. Required to verify an RFC 9162 inclusion proof, which is bound to (index, tree size). A record with zero leaves MUST be rejected at issuance.",
+      "type": "integer",
+      "minimum": 1
+    },
+
+    "issuer": {
+      "description": "Issuer IDENTITY. Committed inside the root at reserved paths (spec section 11.2). Distinct from anchor, which is routing only.",
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "format": "uri" },
+        "keyId": { "type": "string" }
+      }
+    },
+
+    "anchor": {
+      "description": "Routing hint ONLY. NEVER authority. Outside the Merkle root, therefore attacker-controlled (spec section 11.3). A verifier MUST re-derive authority from the anchoring layer it is itself configured with, never from these values. No contract set is permanent; these fields are illustrative.",
+      "type": "object",
+      "required": ["chainId", "registry"],
+      "additionalProperties": false,
+      "properties": {
+        "chainId": { "type": "integer", "minimum": 0 },
+        "registry": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+        "txHash": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+        "anchoredAt": { "type": "string", "format": "date-time" }
+      }
+    },
+
+    "disclosure": {
+      "description": "Present in a DISCLOSED copy only. Mutually exclusive with `record`.",
+      "type": "object",
+      "required": ["mode", "leaves"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "const": "selective" },
+        "leaves": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/disclosedLeaf" }
+        }
+      }
+    },
+
+    "record": {
+      "description": "Present in a FULL copy only. The typed record. A verifier recomputes the root from scratch. Mutually exclusive with `disclosure`.",
+      "type": "object"
+    }
+  },
+
+  "$defs": {
+    "pathSegment": {
+      "description": "One structured path segment. The verifier re-encodes the path from THESE, per spec section 5. The display path is never hashed and MUST NOT be parsed to reconstruct segments.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["key"],
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "description": "Object key. Normalized to NFC before encoding. May be the empty string, which is distinct from an absent segment.",
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["index"],
+          "additionalProperties": false,
+          "properties": {
+            "index": {
+              "description": "0-based array index. MUST be < 2^32; an implementation that cannot represent it MUST error rather than truncate.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            }
+          }
+        }
+      ]
+    },
+
+    "disclosedLeaf": {
+      "type": "object",
+      "required": ["segments", "index", "tag", "salt", "auditPath"],
+      "additionalProperties": false,
+      "properties": {
+        "segments": {
+          "description": "The structured path. Authoritative for hashing.",
+          "type": "array",
+          "minItems": 0,
+          "items": { "$ref": "#/$defs/pathSegment" }
+        },
+        "displayPath": {
+          "description": "Human-readable form such as a.b[0].c. DISPLAY ONLY. Never hashed, never parsed back into segments (spec section 5.2).",
+          "type": "string"
+        },
+        "index": {
+          "description": "Leaf index in encodePath order. Together with the envelope's leafCount this binds the RFC 9162 proof to a position.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "tag": {
+          "description": "ROAX type tag (spec section 6.1). 0 NULL, 1 BOOL, 2 STRING, 3 INTEGER, 4 DECIMAL, 5 BYTES, 6 EMPTY_ARRAY, 7 EMPTY_OBJECT. MUST come from the type map, never from the JSON literal's syntax (spec section 4).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 7
+        },
+        "value": {
+          "description": "The value, in the carrier form for its tag: boolean for BOOL; string for STRING; a canonical numeric STRING for INTEGER and DECIMAL - never a JSON number, because a JSON number would be parsed through a float and destroy precision (spec section 6.4); lowercase hex for BYTES. Absent for NULL, EMPTY_ARRAY and EMPTY_OBJECT. The concrete type is pinned per tag by the allOf conditionals below."
+        },
+        "salt": {
+          "description": "The derived salt for this path, 16 bytes as lowercase hex. Disclosing it reveals nothing about any other leaf's salt, because derivation is HMAC (spec section 7.2). The masterSalt itself MUST NEVER appear in an envelope.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "auditPath": {
+          "description": "RFC 9162 section 2.1.3 audit path, root-ward, lowercase hex.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      },
+
+      "allOf": [
+        {
+          "description": "Tags NULL(0), EMPTY_ARRAY(6) and EMPTY_OBJECT(7) carry no value.",
+          "if": { "properties": { "tag": { "enum": [0, 6, 7] } }, "required": ["tag"] },
+          "then": { "not": { "required": ["value"], "properties": { "value": true } } },
+          "else": { "required": ["value"], "properties": { "value": true } }
+        },
+        {
+          "description": "BOOL(1) carries a JSON boolean.",
+          "if": { "properties": { "tag": { "const": 1 } }, "required": ["tag"] },
+          "then": { "properties": { "value": { "type": "boolean" } } }
+        },
+        {
+          "description": "STRING(2) carries a string.",
+          "if": { "properties": { "tag": { "const": 2 } }, "required": ["tag"] },
+          "then": { "properties": { "value": { "type": "string" } } }
+        },
+        {
+          "description": "INTEGER(3) carries a canonical integer STRING: no leading zeros, -0 normalized to 0 (spec section 6.2).",
+          "if": { "properties": { "tag": { "const": 3 } }, "required": ["tag"] },
+          "then": {
+            "properties": {
+              "value": { "type": "string", "pattern": "^-?(0|[1-9][0-9]*)$" }
+            }
+          }
+        },
+        {
+          "description": "DECIMAL(4) carries a canonical decimal STRING in positional notation. Trailing zeros in the fraction are SIGNIFICANT and preserved: 0.010 is not 0.01 (FHIR R4 SHALL, spec section 6.2). Exponent notation has already been expanded, so it is not accepted here.",
+          "if": { "properties": { "tag": { "const": 4 } }, "required": ["tag"] },
+          "then": {
+            "properties": {
+              "value": { "type": "string", "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$" }
+            }
+          }
+        },
+        {
+          "description": "BYTES(5) carries lowercase hex of even length.",
+          "if": { "properties": { "tag": { "const": 5 } }, "required": ["tag"] },
+          "then": {
+            "properties": {
+              "value": { "type": "string", "pattern": "^([0-9a-f]{2})*$" }
+            }
+          }
+        }
+      ]
+    }
+  },
+
+  "allOf": [
+    {
+      "description": "A full copy and a disclosed copy are mutually exclusive. A verifier that sees both MUST reject.",
+      "not": {
+        "required": ["record", "disclosure"],
+        "properties": { "record": true, "disclosure": true }
+      }
+    },
+    {
+      "description": "Exactly one of them must be present.",
+      "anyOf": [
+        { "required": ["record"], "properties": { "record": true } },
+        { "required": ["disclosure"], "properties": { "disclosure": true } }
+      ]
+    }
+  ],
+
+  "$comment": "This schema cannot express two normative requirements, which therefore MUST be enforced in code and are covered by the conformance corpus: (1) the minimum-disclosure floor - each profile declares non-redactable paths that a disclosed copy MUST contain (spec section 10.2); JSON Schema cannot check set membership of decoded path segments against a per-profile list. (2) the reserved-prefix guard - no record-supplied path may begin with 'roax.' (spec section 11.2). See docs/conformance-corpus.md classes 14 and 15."
+}
