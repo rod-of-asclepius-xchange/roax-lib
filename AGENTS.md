@@ -5,18 +5,24 @@ release, architecture, and sharp-edge notes that should travel with the code.
 
 ## What this repository is right now
 
-Specification, schemas, the conformance corpus, and two of the five ruled libraries: the independent Rust implementation under `rust/` and the independent TypeScript implementation under `src/`.
+Specification, schemas, the conformance corpus, and three of the five ruled libraries: the independent Rust implementation under `rust/`, the independent TypeScript implementation under `src/`, and the independent Python implementation under `python/`.
 Decision D was ruled to five independent, corpus-enforced libraries on 2026-07-29 (`docs/decisions.md`, decision D).
 The specifications came first so the design could be reviewed before five language implementations existed to be re-litigated, and that ordering held.
 `rust/README.md` owns that crate's protocol boundaries, its build, test and lint commands, and the open-decision behaviour it preserves.
 
 Do not add the Go, Swift or Kotlin library without an explicit instruction to do so.
 
+**That ruling carries an obligation on HOW each one is written, and it is the reason the option was worth choosing.**
+An implementation is written from `docs/spec/roax-canon-1.md`, and its author does not read another implementation while writing it.
+The two reference implementations under `corpus/tools/` exist precisely because they were written independently of each other, and their agreement is the only evidence the specification says one thing.
+A library produced by reading an existing one passes the corpus while destroying what a pass means.
+Validate against the corpus AFTER writing a thing, never while writing it.
+
 `corpus/tools/` holds two small reference implementations, in Python and in plain `.mjs`. **They are
 corpus tooling and they are not roax-lib.** They exist to generate and check the vectors and they
-are deliberately parser-only, error-code-only and unoptimized. If you need a further implementation
-for cross-checking, add another single-file one; do not promote these, and do not fold them into
-`src/`.
+are deliberately parser-only, error-code-only and unoptimized. Do not promote them into a library,
+do not import them from one, and do not fold them into `src/`. If you need a further implementation
+for cross-checking, add another single-file one.
 
 ### The TypeScript library
 
@@ -386,6 +392,61 @@ Both flags are optional and their absence is reported, never hidden. Things to k
   registry and must never be issued against. It exists so structural vectors do not borrow a real
   health authority's identifier and so authored type-map bindings never mix into a map that claims
   schema provenance.
+
+## The Python implementation
+
+`python/` holds it. `python/README.md` is the operative document and `python/FINDINGS.md` records
+every place the build disagreed with the corpus or found the specification ambiguous. Standard
+library only, CPython 3.10 or later, no runtime dependencies and there will not be any.
+
+```sh
+python3 python/tools/run_corpus.py                       # 19/19 classes, 738 assertions, no skips
+PYTHONPATH=python/src python3 -m unittest discover -s python/tests -t python
+```
+
+`python/tools/run_corpus.py` is a THIRD runner and is standalone. It does not extend
+`corpus/tools/run.sh`, whose steps 1 through 3 are about the two reference implementations agreeing
+with each other and with the committed bytes. It consumes the vector file, the fixtures and the
+corpus-side type maps, writes nothing, and modifies nothing under `corpus/`.
+
+Things a future agent needs, and would otherwise have to rediscover:
+
+- **The library targets the envelope 1.0 reserved leaf set by default, and that is not a bug.** The
+  committed corpus commits four always-emitted reserved leaves plus the conditional
+  `roax.issuer.keyId`; specification section 11.2 lists five plus the conditional. `RESERVED_V1` and
+  `RESERVED_V2` are both implemented and `RESERVED_V1` is the default, because every committed
+  artifact uses it. Implementing section 11.2 as written and then running the corpus fails EVERY
+  record and envelope vector, on leaf count and on root.
+- **`flatten(..., authorize_empty_containers=...)` is where the one live divergence lives.** The
+  default is the specification section 3.3 rule, under which the selected map must authorize a
+  structured path and observed kind before EMPTY_ARRAY or EMPTY_OBJECT is emitted. The corpus runner
+  passes `False` and prints a notice. Under the specification's rule exactly two vectors fail,
+  `record-structure-empty-array` and `record-structure-empty-object`, both with `type-unresolved`,
+  because `corpus/type-maps/org.roax.corpus.synthetic.json` binds nothing at kind `array` or
+  `object`. **The corpus was rebuilt at `d778726`, after that sentence landed in the specification at
+  `f77386f`, so this is not a stale artifact.** Do not "fix" it by changing the library default;
+  `python/FINDINGS.md` item 1 states the narrow corpus edit that would close it.
+- **The type map is consulted for FULL copies and not for disclosed ones**, and that is derived
+  rather than convenient. Specification section 10 step 1 selects the exact map by
+  `roax.typeMap.id`, which `schemas/envelope-1.0.json` does not carry, and `corpus/type-maps/` has no
+  `hl7.fhir.bundle` map at all while `floor-hl7-fhir-bundle-*` must be accepted. The reserved half of
+  step 1 IS performed: a disclosed leaf at a single `roax.`-prefixed segment must be tag 2 STRING.
+- **`JsonNumber` is a distinct `str` subclass and both halves of that matter.** Subclassing `str`
+  keeps the literal verbatim; being a distinct type is what stops the JSON number `5` and the JSON
+  string `"5"` collapsing, which would resolve the wrong tag because the map is keyed on observed
+  kind. `corpus/fixtures/records/typed-scalars.json` is built to catch exactly that.
+- **Every grammar is anchored `\A` and `\Z`.** Python's `$` also matches before a trailing newline.
+  `str.isdigit`, `isdecimal` and `isnumeric` are never used and `\d` never appears in a grammar,
+  because all three admit non-ASCII digits and `int("１２")` is 12.
+- **CPython 3.13.5 ships Unicode 15.1.0, exactly the pin.** `roax_canon.text.unicode_tables_match_pin()`
+  is what a conformance report reads. CPython ships one table version per build with no way to select
+  another, so this is a property of the interpreter rather than a setting.
+- **The matcher compares raw and must keep doing so.** Decision D14 is open; adding an `nfc()` to
+  `roax_canon.typemap` would rule it silently. Measured from this third matcher: patching NFC onto
+  both sides gives the same 738 passes, so no committed vector depends on the answer.
+- **The published DFA artifacts in `type-maps/` are deliberately not implemented**, along with
+  content-ID reproduction, issuer extensions and any anchoring registry read. No committed vector
+  exercises them. `roax_canon.typemap.TypeResolver` is the seam a DFA resolver drops into unchanged.
 
 ## Documentation conventions in force here
 
