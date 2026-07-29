@@ -121,7 +121,7 @@ export interface VerifierConfig {
    * (specification section 10 step 1).
    *
    * Defaults to `true`. The conformance runner sets it to `false` and reports the fact, because
-   * `corpus/type-maps/` carries no `hl7.fhir.bundle` map and the eight `floor-hl7-fhir-bundle-*`
+   * `corpus/type-maps/` carries no `hl7.fhir.bundle` map and 6 of the 7 `floor-hl7-fhir-bundle-*`
    * fixtures disclose a record leaf. See the findings document.
    */
   readonly requireTypeMapForDisclosedLeaves?: boolean | undefined;

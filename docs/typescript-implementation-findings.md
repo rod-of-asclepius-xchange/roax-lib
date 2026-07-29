@@ -69,12 +69,19 @@ nothing else, and its `a.**` entry is declared for `jsonKind: "string"`.
 So under the specification's rule both records **fail closed and have no root at all**, while
 `record-structure-empty-array` and `record-structure-empty-object` assert one.
 
-**Measured, by running this implementation both ways.**
+**Measured, by running this implementation both ways on a bare checkout**, where class 10 reports
+2 skipped because its records live outside this repository.
+The `mechanical` row is the `npm test` default that section 10 below reports; neither row was run
+against a reference checkout, so no `map-authorized` count with those records is claimed here.
 
 | Empty-container policy | Corpus result |
 |---|---|
-| `mechanical` - tag 6 or 7 from the observed kind, without consulting the map | 617 pass, 0 fail |
-| `map-authorized` - specification section 3.3 | 615 pass, **2 fail**, both class 5 |
+| `mechanical` - tag 6 or 7 from the observed kind, without consulting the map | 680 pass, 0 fail, 2 skipped |
+| `map-authorized` - specification section 3.3 | 676 pass, **2 fail**, both class 5, 2 skipped |
+
+The two rows differ by four assertions where only two vectors flip, which is not a third failure
+hiding somewhere: a record vector asserts `leafCount` and `root` separately, and a throw out of
+`commitRecord` emits one failure in place of both passes (`conformance/run.ts:476-479`).
 
 The two failures are `record-structure-empty-array` and `record-structure-empty-object`, each with
 `type-map-fail-closed: no binding in org.roax.corpus.synthetic for kind array|object at a.b`.
@@ -95,16 +102,27 @@ The code does not silently pick one.
 
 ## 3. Specification section 10 step 1 cannot be discharged for `hl7.fhir.bundle` against this corpus
 
-**Class:** specification-versus-corpus divergence, section 1.1. It affects 8 vectors of class 14.
+**Class:** specification-versus-corpus divergence, section 1.1.
+Measured: 7 vectors of class 14, of which 6 disclose the record leaf whose tag cannot be checked.
 
 Specification section 10 requires that for each disclosed leaf a verifier "checks a record leaf's
 tag against the exact selected map under section 4.2".
 
 `corpus/type-maps/` carries four maps: the synthetic one and the three MOH profiles.
-There is **no `hl7.fhir.bundle` map**, and the eight `floor-hl7-fhir-bundle-*` envelope fixtures
-disclose a `resourceType` record leaf.
-A verifier that hard-requires the tag check therefore rejects all eight, including the two the
-corpus expects to accept.
+There is **no `hl7.fhir.bundle` map**, and 6 of the 7 committed `floor-hl7-fhir-bundle-*` envelope
+fixtures disclose a `resourceType` record leaf.
+A verifier that hard-requires the tag check therefore rejects those 6 with `type-map-fail-closed`,
+including the two the corpus expects to accept.
+The seventh, `floor-hl7-fhir-bundle-omits-resourceType`, discloses no record leaf at all, so the
+check never fires and it is rejected on `minimum-disclosure-floor` whether the requirement is on or
+off.
+
+**7 is the count against the committed corpus and 8 is the count against the class definition**, so
+a reader comparing the two is not looking at a miscount.
+Class 14 defines the floor as five reserved paths plus the profile's, the committed fixtures carry
+four, and the missing `roax.typeMap.id` omission fixture is the eighth.
+Section 9 below records the same difference from the other side, and closing it is corpus-rebuild
+work.
 
 **How this implementation handles it.** `verifyEnvelope` takes an optional resolver per
 `recordType`. When one is available the disclosed record leaves' tags are checked against it; when
@@ -358,7 +376,7 @@ Node v22.21.0, TypeScript 5.9.3, `SHA-256`, corpus `1.0.0`.
 
 **Both were run under `emptyContainerPolicy: 'mechanical'`, which is the corpus's rule and NOT
 specification section 3.3's.** Finding 2 above gives the measurement in full: under section 3.3 the
-same run is 615 passed and 2 failed. A green corpus is therefore evidence of agreement with the
+same run is 676 passed and 2 failed. A green corpus is therefore evidence of agreement with the
 committed vectors and is not, on its own, evidence of conformance to section 3.3 - the two are
 mutually exclusive as things stand.
 

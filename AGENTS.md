@@ -59,7 +59,8 @@ three of them are things a future implementer will hit in any language.**
   under the specification's rule both records fail closed and have no root. Expose both readings
   rather than picking one silently.
 - **Section 10 step 1 cannot be discharged for `hl7.fhir.bundle`**, because `corpus/type-maps/`
-  carries no map for it while eight class-14 fixtures disclose a `resourceType` record leaf.
+  carries no map for it while six of the seven class-14 `floor-hl7-fhir-bundle-*` fixtures disclose
+  a `resourceType` record leaf.
 
 Run it with `npm run conformance`. `ROAX_REFERENCE_RECORDS=<dir>` runs class 10 against records
 extracted from a reference checkout with `corpus/tools/extract_reference_record.py`, which is a
