@@ -14,7 +14,7 @@ the section 5.2 trap is unreachable through this API rather than merely discoura
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Sequence, Union
+from typing import Any, Sequence, Union
 
 from .errors import ErrorCode, PathError
 from .text import nfc, utf8
@@ -107,7 +107,7 @@ def display_path(segments: Sequence[Segment]) -> str:
     return "".join(parts)
 
 
-def segments_from_json(items: Iterable[dict]) -> tuple[Segment, ...]:
+def segments_from_json(items: Any) -> tuple[Segment, ...]:
     """Read the `{"key": ...}` / `{"index": ...}` carrier the envelope and corpus use.
 
     An index arrives as :class:`~roax_canon.jsonio.JsonNumber` when the document was read
@@ -115,8 +115,23 @@ def segments_from_json(items: Iterable[dict]) -> tuple[Segment, ...]:
     ``record`` survives (specification section 7.3).
     An array index is a count rather than a record value, so it is converted here; doing
     it by an explicit call keeps the distinction visible.
+
+    **Every shape here is attacker-controlled** (specification section 11.3), so the
+    carrier is validated rather than trusted: this is the one choke point both an
+    envelope's ``salts`` entries and its disclosed leaves reach, and an unvalidated member
+    that reaches :func:`encode_path` raises out of a verifier instead of rejecting.
+    A `KEY` segment must be a genuine JSON string for the same reason
+    :func:`~roax_canon.jsonio.is_json_string` exists: ``{"key": 5}`` would otherwise carry
+    a :class:`~roax_canon.jsonio.JsonNumber` and encode byte-identically to
+    ``{"key": "5"}``.
     """
-    from .jsonio import as_int
+    from .jsonio import as_int, is_json_string
+
+    if not isinstance(items, (list, tuple)):
+        raise PathError(
+            ErrorCode.ENVELOPE_SHAPE,
+            f"a path is carried as an array of segments, got {type(items).__name__}",
+        )
 
     out: list[Segment] = []
     for raw in items:
@@ -126,6 +141,11 @@ def segments_from_json(items: Iterable[dict]) -> tuple[Segment, ...]:
                 f"path segment must be exactly one of key or index: {raw!r}",
             )
         if "key" in raw:
+            if not is_json_string(raw["key"]):
+                raise PathError(
+                    ErrorCode.ENVELOPE_SHAPE,
+                    f"a KEY segment is carried as a JSON string, got {raw['key']!r}",
+                )
             out.append(Key(raw["key"]))
         elif "index" in raw:
             out.append(Index(as_int(raw["index"], field="path segment index")))

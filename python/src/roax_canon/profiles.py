@@ -140,5 +140,8 @@ DEFAULT_PROFILES = ProfileRegistry(
 #: `org.roax.corpus.synthetic` exists only inside the conformance corpus.
 #: It is syntactically valid under the envelope schema's reverse-DNS pattern and is
 #: deliberately **not** in the `docs/profiles/` registry, so a record MUST NOT be issued
-#: under it. ``issuable=False`` states that in code rather than in a comment.
+#: under it. ``issuable=False`` carries that as **advisory metadata for a caller** and
+#: nothing in this package reads it: :func:`roax_canon.record.issue` takes an identity and
+#: a resolver and never sees a :class:`ProfileRegistry`, so enforcing the flag would be a
+#: signature change rather than a check.
 CORPUS_SYNTHETIC_PROFILE = Profile("org.roax.corpus.synthetic", (), issuable=False)

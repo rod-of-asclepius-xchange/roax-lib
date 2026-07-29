@@ -244,8 +244,10 @@ Unlike the Node reference implementation, which runs Unicode 16.0 tables against
   Content-ID reproduction, issuer extensions and extension-point containment are all absent.
   `roax_canon.typemap.TypeResolver` is the seam a DFA resolver drops into unchanged.
 - **No anchoring registry read.**
-  `VerifierConfig` carries the anchored root, the anchored algorithm and the configured registry address, and compares them, because specification section 7.4 H2 requires authority to come from there.
-  It never reads a chain.
+  `VerifierConfig` carries the anchored root and the anchored algorithm and compares both, because specification section 7.4 H2 requires authority to come from there rather than from the document (`python/src/roax_canon/verify.py`, the `anchored_hash_alg` and `anchored_root` comparisons in `_verify`).
+  It also carries `registry_address` and `registry_chain_id`, and **neither is consulted by any check in the package**.
+  That is the correct behaviour rather than an omission: specification section 11.3 makes an envelope's `anchor` block a routing hint that is never authority, so a mismatch against it is not a rejection and there is nothing to compare.
+  Both fields are carried for a caller that does read a registry; this package reads no chain.
   The registry-dependent half of conformance class 18 is unbuilt in the corpus for the same reason and cannot be run.
 - **`Poseidon-BN254` is registered and unusable**, and `BLOB_REF` is defined and rejected in issuance and in an envelope, per specification sections 7.4 and 6.5.
   Neither is exercised beyond the corpus's fail-closed vectors.

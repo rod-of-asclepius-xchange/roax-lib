@@ -442,6 +442,123 @@ class TestRecordAndEnvelope(unittest.TestCase):
         self.assertEqual(verify_envelope(envelope, hostile).reason, ErrorCode.ROOT_MISMATCH)
 
 
+class TestHostileEnvelopeMembers(unittest.TestCase):
+    """Specification section 11.3 makes everything outside the root attacker-controlled.
+
+    Two properties are pinned here and neither is reachable from the committed corpus,
+    because all 54 envelope fixtures are schema-valid.
+
+    1. A member that is a JSON *number* where the envelope schema requires a JSON string
+       is REJECTED rather than committed. `JsonNumber` subclasses `str` so the literal
+       survives, so `encode_value(STRING, ...)` would encode the two identically and the
+       envelope would verify against a genuine root.
+    2. `verify_envelope` returns a `VerificationResult` for every input. A verifier
+       service handed a hostile envelope must reject it, not crash.
+    """
+
+    def setUp(self):
+        self.record = loads('{"marker": "m", "count": 5, "amount": 0.010, "flag": true}')
+        self.built = issue(self.record, IDENTITY, resolver())
+        self.registry = DEFAULT_PROFILES.with_profile(
+            Profile("org.roax.corpus.synthetic", ((Key("marker"),),))
+        )
+        self.config = VerifierConfig(
+            profiles=self.registry, resolvers={"org.roax.corpus.synthetic": resolver()}
+        )
+
+    def full(self):
+        return full_copy(self.record, IDENTITY, self.built)
+
+    def disclosed(self):
+        floor = self.registry.get("org.roax.corpus.synthetic")
+        reveal = list(floor.floor()) + [(Key("marker"),)]
+        return disclosed_copy(reveal, IDENTITY, self.built, profile=floor)
+
+    def test_a_json_number_identity_member_is_rejected(self):
+        # Without the check this envelope verifies: the reserved `roax.schemaVersion` leaf
+        # is recomputed from JsonNumber("1.0"), which encodes byte-identically to the
+        # string "1.0" the genuine root committed.
+        for envelope in (self.full(), self.disclosed()):
+            hostile = dict(envelope)
+            hostile["schemaVersion"] = JsonNumber("1.0")
+            self.assertEqual(
+                verify_envelope(hostile, self.config).reason, ErrorCode.ENVELOPE_SHAPE
+            )
+
+    def test_every_identity_member_is_checked(self):
+        cases = {
+            "recordId": lambda e: e.update(recordId=JsonNumber("5")),
+            "issuer.id": lambda e: e.update(issuer={**e["issuer"], "id": JsonNumber("5")}),
+            "issuer.keyId": lambda e: e.update(
+                issuer={**e["issuer"], "keyId": JsonNumber("5")}
+            ),
+            "typeMap.id": lambda e: e.update(typeMap={"id": JsonNumber("5")}),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(member=name):
+                hostile = dict(self.full())
+                mutate(hostile)
+                self.assertEqual(
+                    verify_envelope(hostile, self.config).reason, ErrorCode.ENVELOPE_SHAPE
+                )
+        # `recordType` is checked too, but the profile lookup that must fail closed ahead
+        # of everything else reaches a numeric one first, so its reason stays
+        # `profile-unknown`. Either way it is not accepted.
+        hostile = dict(self.full())
+        hostile["recordType"] = JsonNumber("5")
+        self.assertEqual(verify_envelope(hostile, self.config).reason, ErrorCode.PROFILE_UNKNOWN)
+
+    def test_a_json_number_path_key_is_rejected(self):
+        # The same collapse one layer down: {"key": 5} would encode identically to
+        # {"key": "5"} (specification section 5).
+        hostile = dict(self.full())
+        hostile["salts"] = [dict(s) for s in hostile["salts"]]
+        hostile["salts"][0]["segments"] = [{"key": JsonNumber("5")}]
+        self.assertEqual(verify_envelope(hostile, self.config).reason, ErrorCode.ENVELOPE_SHAPE)
+
+    def test_malformed_members_reject_rather_than_raise(self):
+        salt = "00" * 16
+        base = (
+            '{"canon":"ROAX-CANON/1","hashAlg":"SHA-256","recordType":"hl7.fhir.bundle",'
+            '"schemaVersion":"1.0","recordId":"r","root":"' + "00" * 32 + '",'
+            '"leafCount":%s,"issuer":{"id":"i"},%s}'
+        )
+        cases = {
+            "segments is null": base % (1, '"record":{},"salts":[{"segments":null,"salt":"'
+                                        + salt + '"}]'),
+            "segments carries an object key": base % (
+                1, '"record":{},"salts":[{"segments":[{"key":{}}],"salt":"' + salt + '"}]'
+            ),
+            "auditPath is null": base % (
+                1,
+                '"disclosure":{"mode":"selective","leaves":[{"segments":[{"key":"a"}],'
+                '"index":0,"tag":2,"value":"x","salt":"' + salt + '","auditPath":null}]}',
+            ),
+            "typeMap is a string": base % (
+                1,
+                '"typeMap":"oops","record":{},"salts":[{"segments":[{"key":"a"}],"salt":"'
+                + salt + '"}]',
+            ),
+            # CPython 3.11+ caps int(str) at 4300 digits, so an unbounded count raises
+            # ValueError before any rule of this specification applies. Same interpreter
+            # hazard `roax_canon.numbers` already refuses for a decimal exponent.
+            "leafCount has 5000 digits": base % ("9" * 5000, '"record":{},"salts":[]'),
+            "index has 5000 digits": base % (
+                1,
+                '"disclosure":{"mode":"selective","leaves":[{"segments":[{"key":"a"}],'
+                '"index":' + "9" * 5000 + ',"tag":2,"value":"x","salt":"' + salt
+                + '","auditPath":[]}]}',
+            ),
+        }
+        for name, text in cases.items():
+            with self.subTest(case=name):
+                result = verify_envelope(loads(text))
+                self.assertEqual(result.reason, ErrorCode.ENVELOPE_SHAPE)
+                # Each case must be caught by its own explicit check, not by the backstop
+                # in `verify_envelope`; otherwise those checks would be dead code.
+                self.assertNotIn("malformed envelope member", result.detail)
+
+
 class TestSalts(unittest.TestCase):
     def test_independent_per_leaf_draws(self):
         drawn = [draw_salt() for _ in range(64)]
@@ -478,6 +595,21 @@ class TestTypeMapMatcher(unittest.TestCase):
                 {**SYNTHETIC_MAP, "entries": [{"pattern": "blob", "jsonKind": "string", "tag": 8}]}
             )
         self.assertEqual(ctx.exception.code, ErrorCode.TYPE_MAP_REJECTED)
+
+    def test_a_malformed_entry_carries_the_stable_code(self):
+        # The fail-closed artifact-loading surface: a missing or non-string `pattern` and
+        # a non-object entry must reject with `type-map-rejected` like every neighbouring
+        # check, rather than raising KeyError or AttributeError out of `from_file`.
+        for entries in (
+            [{"jsonKind": "string", "tag": 2}],
+            ["not an object"],
+            [{"pattern": None, "tag": 2}],
+            [{"pattern": JsonNumber("5"), "tag": 2}],
+        ):
+            with self.subTest(entries=entries):
+                with self.assertRaises(RoaxError) as ctx:
+                    DisplayPatternTypeMap({**SYNTHETIC_MAP, "entries": entries})
+                self.assertEqual(ctx.exception.code, ErrorCode.TYPE_MAP_REJECTED)
 
     def test_ambiguous_patterns_are_rejected_rather_than_mis_parsed(self):
         for pattern in ("a[b]", "a[", "]a", "", "a.*"):
