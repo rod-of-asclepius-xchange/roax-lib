@@ -1,10 +1,11 @@
 use crate::error::{Error, Result};
 use std::collections::HashSet;
+use std::fmt;
 
 /// Literal-preserving JSON tree used for record data.
 ///
 /// Numeric tokens remain their original source strings.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Eq)]
 pub enum JsonValue {
     Object(Vec<(String, Self)>),
     Array(Vec<Self>),
@@ -12,6 +13,135 @@ pub enum JsonValue {
     Number(String),
     Bool(bool),
     Null,
+}
+
+impl PartialEq for JsonValue {
+    fn eq(&self, other: &Self) -> bool {
+        let mut pending = vec![(self, other)];
+        while let Some((left, right)) = pending.pop() {
+            match (left, right) {
+                (Self::Object(left), Self::Object(right)) => {
+                    if left.len() != right.len() {
+                        return false;
+                    }
+                    for ((left_key, left_value), (right_key, right_value)) in left.iter().zip(right)
+                    {
+                        if left_key != right_key {
+                            return false;
+                        }
+                        pending.push((left_value, right_value));
+                    }
+                }
+                (Self::Array(left), Self::Array(right)) => {
+                    if left.len() != right.len() {
+                        return false;
+                    }
+                    pending.extend(left.iter().zip(right));
+                }
+                (Self::String(left), Self::String(right))
+                | (Self::Number(left), Self::Number(right)) => {
+                    if left != right {
+                        return false;
+                    }
+                }
+                (Self::Bool(left), Self::Bool(right)) => {
+                    if left != right {
+                        return false;
+                    }
+                }
+                (Self::Null, Self::Null) => {}
+                _ => return false,
+            }
+        }
+        true
+    }
+}
+
+impl fmt::Debug for JsonValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut pending = vec![DebugFrame::Value(self)];
+        while let Some(frame) = pending.pop() {
+            frame.write(f, &mut pending)?;
+        }
+        Ok(())
+    }
+}
+
+enum DebugFrame<'a> {
+    Value(&'a JsonValue),
+    Array(&'a [JsonValue], usize),
+    Object(&'a [(String, JsonValue)], usize),
+    Literal(&'static str),
+}
+
+impl<'a> DebugFrame<'a> {
+    fn write(self, f: &mut fmt::Formatter<'_>, pending: &mut Vec<Self>) -> fmt::Result {
+        match self {
+            Self::Value(value) => Self::write_value(value, f, pending),
+            Self::Array(values, index) => Self::write_array(values, index, f, pending),
+            Self::Object(entries, index) => Self::write_object(entries, index, f, pending),
+            Self::Literal(text) => f.write_str(text),
+        }
+    }
+
+    fn write_value(
+        value: &'a JsonValue,
+        f: &mut fmt::Formatter<'_>,
+        pending: &mut Vec<Self>,
+    ) -> fmt::Result {
+        match value {
+            JsonValue::Object(entries) => {
+                f.write_str("Object([")?;
+                pending.push(Self::Object(entries, 0));
+                Ok(())
+            }
+            JsonValue::Array(values) => {
+                f.write_str("Array([")?;
+                pending.push(Self::Array(values, 0));
+                Ok(())
+            }
+            JsonValue::String(value) => write!(f, "String({value:?})"),
+            JsonValue::Number(literal) => write!(f, "Number({literal:?})"),
+            JsonValue::Bool(value) => write!(f, "Bool({value:?})"),
+            JsonValue::Null => f.write_str("Null"),
+        }
+    }
+
+    fn write_array(
+        values: &'a [JsonValue],
+        index: usize,
+        f: &mut fmt::Formatter<'_>,
+        pending: &mut Vec<Self>,
+    ) -> fmt::Result {
+        let Some(value) = values.get(index) else {
+            return f.write_str("])");
+        };
+        if index != 0 {
+            f.write_str(", ")?;
+        }
+        pending.push(Self::Array(values, index + 1));
+        pending.push(Self::Value(value));
+        Ok(())
+    }
+
+    fn write_object(
+        entries: &'a [(String, JsonValue)],
+        index: usize,
+        f: &mut fmt::Formatter<'_>,
+        pending: &mut Vec<Self>,
+    ) -> fmt::Result {
+        let Some((key, value)) = entries.get(index) else {
+            return f.write_str("])");
+        };
+        if index != 0 {
+            f.write_str(", ")?;
+        }
+        write!(f, "({key:?}, ")?;
+        pending.push(Self::Object(entries, index + 1));
+        pending.push(Self::Literal(")"));
+        pending.push(Self::Value(value));
+        Ok(())
+    }
 }
 
 impl Clone for JsonValue {
@@ -655,6 +785,47 @@ mod tests {
 
     const DEEP_ARRAY_NESTING: usize = 20_000;
     const DEEP_OBJECT_NESTING: usize = 10_000;
+
+    #[test]
+    fn debug_renders_every_variant() {
+        let value = JsonValue::Object(vec![
+            (
+                "a".to_owned(),
+                JsonValue::Array(vec![
+                    JsonValue::Null,
+                    JsonValue::Bool(true),
+                    JsonValue::Number("1.0".to_owned()),
+                ]),
+            ),
+            ("b".to_owned(), JsonValue::String("x\"y".to_owned())),
+            ("c".to_owned(), JsonValue::Object(Vec::new())),
+        ]);
+        assert_eq!(
+            format!("{value:?}"),
+            r#"Object([("a", Array([Null, Bool(true), Number("1.0")])), ("b", String("x\"y")), ("c", Object([]))])"#
+        );
+    }
+
+    #[test]
+    fn deeply_nested_values_are_compared_and_formatted_iteratively() {
+        let arrays = format!(
+            "{}0{}",
+            "[".repeat(DEEP_ARRAY_NESTING),
+            "]".repeat(DEEP_ARRAY_NESTING)
+        );
+        let objects = format!(
+            "{}null{}",
+            "{\"key\":".repeat(DEEP_OBJECT_NESTING),
+            "}".repeat(DEEP_OBJECT_NESTING)
+        );
+        for input in [arrays, objects] {
+            let value = JsonValue::from_str(&input).expect("deep input must parse");
+            let cloned = value.clone();
+            assert!(value == cloned);
+            assert!(!format!("{value:?}").is_empty());
+            assert!(value != JsonValue::Null);
+        }
+    }
 
     #[test]
     fn deeply_nested_arrays_parse_serialize_and_drop_iteratively() {

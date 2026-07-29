@@ -63,7 +63,7 @@ These are the things a future agent is most likely to get wrong.
 
 - **The artifact schema's URI format and the executable checker do not accept exactly the same strings.**
   Ajv accepts `https://` under the schema's `format: "uri"`, while the checker rejects it through WHATWG `new URL` (`schemas/type-map-artifact-1.0.json:171-174` and `:203-206`; `tools/check-type-map-extension.mjs:321-328`).
-  The Rust artifact loader follows the executable checker for that demonstrated edge (`rust/src/type_map.rs:1194-1196`; `rust/tests/published_type_maps.rs:518-532`).
+  The Rust artifact loader follows the executable checker for that demonstrated edge (`rust/src/type_map.rs:1200-1202`; `rust/tests/published_type_maps.rs:518-532`).
 
 - **Issuer-scope membership does not state a Unicode comparison rule.**
   The specification requires the disclosed issuer identity to be a member of `scope.issuerIds`, while the executable extension checker compares inherited scope strings byte-for-byte and neither source says whether to NFC-normalize the membership check (`docs/spec/roax-canon-1.md:1162-1164`; `tools/check-type-map-extension.mjs:890-900`).
@@ -172,7 +172,7 @@ These are the things a future agent is most likely to get wrong.
 
 - **The specification does not say whether NFC-colliding sibling keys must be rejected when their descendant leaf paths remain distinct.**
   It requires raw map keys to be unique and normalizes each encoded KEY segment, so `{"é":{"a":1},"é":{"b":2}}` has no duplicate raw key and no duplicate complete encoded leaf path (`docs/spec/roax-canon-1.md` sections 3.2, 3.3 and 5).
-  The Rust implementation rejects duplicate complete encoded leaf paths but accepts this disjoint-descendant shape, and no committed vector distinguishes that reading (`rust/src/commitment.rs:589-609`; `corpus/README.md`, specification ambiguity 6).
+  The Rust implementation rejects duplicate complete encoded leaf paths but accepts this disjoint-descendant shape, and no committed vector distinguishes that reading (`rust/src/commitment.rs:611-619`; `corpus/README.md`, specification ambiguity 6).
 
 - **The leaf set is a union, not the record.** Reserved `roax.*` leaves join the record's leaves
   before the sort (spec sections 3.3 and 11.2). A flattener that walks the record only produces a
@@ -276,7 +276,7 @@ These are the things a future agent is most likely to get wrong.
 
 - **A selective disclosure derives its context from the sealed commitment.**
   Accepting a second caller-supplied context lets safe values from two issuances be mixed into an envelope that its own verifier rejects at outer-identity binding.
-  The Rust `Commitment` therefore retains its exact issuance context and `disclose` accepts no replacement (`rust/src/commitment.rs:236-288`; `rust/src/envelope.rs:402-417`; specification sections 10 and 11.3).
+  The Rust `Commitment` therefore retains its exact issuance context and `disclose` accepts no replacement (`rust/src/commitment.rs:236-288`; `rust/src/envelope.rs:408-423`; specification sections 10 and 11.3).
 
 - **The binding runs BEFORE the minimum-disclosure floor, and the floor is selected from the
   COMMITTED `roax.recordType` leaf.** Derived from section 11.3, not chosen: authority has to be

@@ -171,7 +171,12 @@ impl DfaTypeMap {
         &self.schema_version
     }
 
-    /// Check the exact record, descriptor, and issuer selection tuple.
+    /// Check the exact record and descriptor selection tuple.
+    ///
+    /// Issuer scope is deliberately not checked here: [`Self::from_exact_bytes`]
+    /// rejects every parent-bearing and `scope.kind: "issuers"` artifact, so no
+    /// `scope.issuerIds` list can reach this function. The issuer parameter is
+    /// kept for when issuer-scoped artifacts become loadable.
     pub fn select(
         &self,
         record_type: &str,
@@ -260,11 +265,12 @@ pub fn content_id(bytes: &[u8]) -> String {
 }
 
 fn assert_unicode_version() -> Result<()> {
-    if UNICODE_VERSION == (15, 1, 0) {
+    let expected = crate::REQUIRED_UNICODE_TABLES;
+    if UNICODE_VERSION == expected {
         Ok(())
     } else {
         Err(Error::InvalidTypeMap(format!(
-            "unicode-normalization tables are {UNICODE_VERSION:?}, expected (15, 1, 0)"
+            "unicode-normalization tables are {UNICODE_VERSION:?}, expected {expected:?}"
         )))
     }
 }

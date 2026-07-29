@@ -224,6 +224,12 @@ impl DisclosedLeaf {
         &self.path
     }
 
+    /// Return the sender-supplied `displayPath` hint, when the envelope carried one.
+    ///
+    /// It is never compared against the authoritative `segments` and it survives
+    /// verification unchanged, so it is not evidence of anything: a sender may label a
+    /// genuinely included leaf with any string. Use [`Self::path`] for every decision
+    /// and for any path shown to a person.
     #[must_use]
     pub fn display_path(&self) -> Option<&str> {
         self.display_path.as_deref()
