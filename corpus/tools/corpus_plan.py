@@ -244,41 +244,60 @@ REJECT = [
 ]
 
 # ---------------------------------------------------------------------------------------------
-# Salt derivation (section 7), and class 12
+# Class 12 - cross-record unlinkability under independent per-leaf salts
 # ---------------------------------------------------------------------------------------------
-
-# (name, class, masterSaltHex, recordId, segments)
-SALT = [
-    ("salt-root-path", 12, MASTER_SALT_A, RECORD_ID_A, []),
-    ("salt-value-path", 12, MASTER_SALT_A, RECORD_ID_A, VALUE_PATH),
-    ("salt-reserved-record-id", 12, MASTER_SALT_A, RECORD_ID_A, [{"key": "roax.recordId"}]),
-    ("salt-nested-path", 12, MASTER_SALT_A, RECORD_ID_A,
-     [{"key": "fhirBundle"}, {"key": "entry"}, {"index": 0}, {"key": "resourceType"}]),
-    # Same path and same master salt, different recordId. Section 7.1's defence in depth.
-    ("salt-same-master-other-record-id", 12, MASTER_SALT_A, RECORD_ID_B, VALUE_PATH),
-    # Same path and same recordId, different master salt. The freshness MUST of section 7.
-    ("salt-other-master-same-record-id", 12, MASTER_SALT_B, RECORD_ID_A, VALUE_PATH),
-    ("salt-unicode-path", 12, MASTER_SALT_A, RECORD_ID_A, [{"key": "é"}]),
-]
-
-# (name, class, segments, tag, value, recordA(masterSalt, recordId), recordB(...))
+#
+# THE SALT VECTOR CLASS IS GONE. It asserted that a (masterSalt, recordId, path) triple produced
+# a given salt under the section 7 derivation, and decision D4 is ruled D4b: there is no
+# derivation, no master salt and no preimage, so there is nothing for such a vector to assert
+# (spec section 7.1). `saltVector` was removed from the corpus schema in the same change.
+#
+# What replaces it is behavioural rather than pinned. Salts are independent random draws, so no
+# fixed hexadecimal expectation can exist for what an implementation must draw freshly; the
+# runner performs `trials` independent issuances and asserts relations over the results.
+#
+# (name, class, paths, tag, value, trials, recordIds)
+#
+# `paths` carries AT LEAST TWO DISTINCT paths, and that is the half of this class that catches
+# intra-record reuse: an implementation drawing ONE salt per record and reusing it across every
+# leaf produces a different salt at any single path in each trial, so a single-path vector would
+# pass it. Comparing two paths WITHIN one issuance is what fails it.
 UNLINKABILITY = [
     (
-        "unlinkability-fresh-master-salt", 12,
-        [{"key": "fhirBundle"}, {"key": "entry"}, {"index": 0}, {"key": "birthDate"}],
-        2, "1965-08-09",
-        (MASTER_SALT_A, RECORD_ID_A),
-        (MASTER_SALT_B, RECORD_ID_A),
+        # The three mistakes docs/conformance-corpus.md class 12 names, each caught by a
+        # different assertion: a deterministic salt fails the across-issuance assertions, one
+        # draw per record fails the within-issuance one, and a salt reused across records fails
+        # the across-issuance salt assertion.
+        "unlinkability-independent-per-leaf-salts", 12,
+        [
+            [{"key": "fhirBundle"}, {"key": "entry"}, {"index": 0}, {"key": "birthDate"}],
+            [{"key": "fhirBundle"}, {"key": "entry"}, {"index": 0}, {"key": "gender"}],
+        ],
+        2, "1965-08-09", 4, None,
     ),
     (
-        # The second vector class 12 requires: same master salt, different recordId. It
-        # documents the defence-in-depth property precisely and MUST NOT be read as making
-        # master-salt reuse safe - specification section 7.1 says why it is not.
-        "unlinkability-record-id-binding", 12,
-        [{"key": "fhirBundle"}, {"key": "entry"}, {"index": 0}, {"key": "birthDate"}],
-        2, "1965-08-09",
-        (MASTER_SALT_A, RECORD_ID_A),
-        (MASTER_SALT_A, RECORD_ID_B),
+        # The same subject issued twice under ONE record identifier. Under the deleted D4a
+        # construction the identifier was folded into every salt preimage, so a shared one was
+        # the case that leaked; under D4b it is not an input to anything and the outcome is
+        # unchanged. The vector states that explicitly rather than leaving a reader who knows
+        # the old construction to wonder whether it still matters.
+        "unlinkability-shared-record-id", 12,
+        [
+            [{"key": "fhirBundle"}, {"key": "entry"}, {"index": 0}, {"key": "birthDate"}],
+            [{"key": "roax.recordId"}],
+        ],
+        2, "1965-08-09", 4, [RECORD_ID_A, RECORD_ID_A],
+    ),
+    (
+        # A reserved leaf and a record leaf in one vector. Reserved leaves are ordinary leaves
+        # in every respect (spec section 11.2), so they are salted independently too; an
+        # implementation that special-cased them would pass every other class.
+        "unlinkability-reserved-and-record-leaf", 12,
+        [
+            [{"key": "roax.issuer.id"}],
+            [{"key": "é"}],
+        ],
+        2, "1965-08-09", 4, None,
     ),
 ]
 

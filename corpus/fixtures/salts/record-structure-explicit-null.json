@@ -1,0 +1,56 @@
+{
+  "pairing": "path",
+  "salts": [
+    {
+      "segments": [
+        {
+          "key": "marker"
+        }
+      ],
+      "salt": "95c9784b633c816d9f622f36fe93b860"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.recordId"
+        }
+      ],
+      "salt": "2ed130647e6bbe2bedca8f62db47903d"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.issuer.id"
+        }
+      ],
+      "salt": "21499c239497daef6900ca4c254bfeff"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.recordType"
+        }
+      ],
+      "salt": "2859ded3ca5f270253dc14228de0bccf"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.schemaVersion"
+        }
+      ],
+      "salt": "b6d62fe27684bf2b3b56a09edefa4978"
+    },
+    {
+      "segments": [
+        {
+          "key": "a"
+        },
+        {
+          "key": "b"
+        }
+      ],
+      "salt": "dfa3738c4f39f64be83b95afa16a25bf"
+    }
+  ]
+}

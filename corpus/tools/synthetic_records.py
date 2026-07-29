@@ -19,10 +19,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import fixture_io  # noqa: E402
-import roax_ref as ref  # noqa: E402
+import roax_ref as ref
+import salt_sets  # noqa: E402
 from corpus_plan import (  # noqa: E402
     ISSUER_ID,
-    MASTER_SALT_A,
     RECORD_ID_A,
     SYNTHETIC_RECORD_TYPE,
     SYNTHETIC_SCHEMA_VERSION,
@@ -210,6 +210,13 @@ def synthetic_type_map():
     return ref.TypeMap(SYNTHETIC_TYPE_MAP)
 
 
+def _salt_doc(name, ordered):
+    """Draw under --draw-salts, otherwise read the committed set. Never draw during a build."""
+    if salt_sets.drawing():
+        return salt_sets.draw(name, ordered, "path")
+    return salt_sets.load(name)
+
+
 def build_record_vectors():
     import json_literal
 
@@ -221,9 +228,12 @@ def build_record_vectors():
         # would make a hand-edited fixture agree with itself, which is what check mode exists
         # to catch.
         record = json_literal.loads(RECORD_FIXTURES[fixture])
+        identity = (SYNTHETIC_RECORD_TYPE, SYNTHETIC_SCHEMA_VERSION, RECORD_ID_A, ISSUER_ID, key_id)
+        ordered = ref.ordered_leaves(record, type_map, *identity)
+        salt_doc = _salt_doc(name, ordered)
+        salts = ref.salt_set_from_document(salt_doc, ordered)
         root, leaves, _salts, _hashes = ref.build_tree(
-            "SHA-256", record, type_map, bytes.fromhex(MASTER_SALT_A),
-            SYNTHETIC_RECORD_TYPE, SYNTHETIC_SCHEMA_VERSION, RECORD_ID_A, ISSUER_ID, key_id,
+            "SHA-256", record, type_map, salts, *identity
         )
         vec = {
             "name": name,
@@ -232,7 +242,8 @@ def build_record_vectors():
             "schemaVersion": SYNTHETIC_SCHEMA_VERSION,
             "issuerId": ISSUER_ID,
             "recordFile": "corpus/fixtures/records/" + fixture,
-            "masterSaltHex": MASTER_SALT_A,
+            "saltsFile": salt_sets.reference_for(name),
+            "saltPairing": "path",
             "recordId": RECORD_ID_A,
             "leafCount": len(leaves),
             "root": root.hex(),
