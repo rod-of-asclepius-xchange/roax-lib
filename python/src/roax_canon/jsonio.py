@@ -38,7 +38,7 @@ from typing import Any
 from .errors import ErrorCode, InputError
 from .text import has_unpaired_surrogate
 
-__all__ = ["JsonNumber", "loads", "load_file", "json_kind", "as_int"]
+__all__ = ["JsonNumber", "loads", "load_file", "json_kind", "as_int", "is_json_string"]
 
 
 class JsonNumber(str):
@@ -167,6 +167,31 @@ def json_kind(node: Any) -> str:
     raise InputError(ErrorCode.MALFORMED_JSON, f"not an admissible value: {node!r}")
 
 
+def is_json_string(value: Any) -> bool:
+    """True only for a value that arrived as a JSON *string*.
+
+    :class:`JsonNumber` subclasses :class:`str` so the literal survives verbatim, which
+    means a bare ``isinstance(value, str)`` test also accepts a JSON number.
+    Wherever a member is required to BE a string - an envelope identity field that becomes
+    a reserved STRING leaf (specification section 11.2), a `KEY` path segment
+    (specification section 5), a type-map pattern - that acceptance would collapse the JSON
+    number ``5`` and the JSON string ``"5"`` into the same committed bytes, which is the
+    very collapse :class:`JsonNumber` exists to prevent.
+    """
+    return isinstance(value, str) and not isinstance(value, JsonNumber)
+
+
+#: The most decimal digits :func:`as_int` will convert.
+#: Every field it reads is a count, an index or a tag, and specification section 5 bounds
+#: an array index below 2^32, so a bound at the 20 digits of 2^64 - 1 is generous by
+#: twelve orders of magnitude and still rejects on this specification's own terms.
+#: Without it CPython's 4300-digit :func:`int` conversion cap raises :class:`ValueError`
+#: out of a verifier that promises a result rather than an exception; that is the same
+#: interpreter hazard :mod:`roax_canon.numbers` already refuses for a decimal exponent
+#: (numbers.py, ``_MAX_EXPONENT_DIGITS``), met here at a second site.
+_MAX_INT_DIGITS = 20
+
+
 def as_int(value: Any, *, field: str) -> int:
     """Read an envelope field that is genuinely an integer count or index.
 
@@ -183,5 +208,12 @@ def as_int(value: Any, *, field: str) -> int:
 
         if INTEGER_GRAMMAR.match(value) is None:
             raise InputError(ErrorCode.ENVELOPE_SHAPE, f"{field} must be an integer")
+        digits = value[1:] if value.startswith("-") else value
+        if len(digits) > _MAX_INT_DIGITS:
+            raise InputError(
+                ErrorCode.ENVELOPE_SHAPE,
+                f"{field} carries {len(digits)} digits, past the {_MAX_INT_DIGITS}-digit "
+                f"bound this reader converts",
+            )
         return int(value)
     return value

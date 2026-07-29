@@ -138,8 +138,9 @@ def flatten(
     The corpus predates the type-map artifact work that added that sentence, so the
     divergence is one of vintage rather than of reading, and specification section 1.1
     makes the specification govern.
-    :mod:`roax_canon.corpus` passes ``False`` with that citation attached; every other
-    caller gets the specification's rule.
+    `python/tools/run_corpus.py` is the one caller that passes ``False``, with that
+    citation attached and a printed notice; every other caller gets the specification's
+    rule.
     """
     leaves: list[Leaf] = []
 

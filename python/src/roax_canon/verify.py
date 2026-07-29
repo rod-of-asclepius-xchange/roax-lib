@@ -3,8 +3,14 @@
 **Anything outside the root is attacker-controlled** (specification section 11.3).
 Fields outside the root are hints and never authority.
 :class:`VerifierConfig` is where authority actually lives: the anchored root, the anchored
-algorithm, the algorithm allow-list and the configured registry all come from the
-verifier, never from the document.
+algorithm and the algorithm allow-list all come from the verifier, never from the
+document, and each of the three is compared here.
+The registry it names is carried for a caller and is compared against nothing, because
+this package reads no chain; see :class:`VerifierConfig`.
+
+Attacker control is also why :func:`verify_envelope` returns a result for every input.
+Each member shape it depends on is checked explicitly, and the broad ``except`` there is a
+backstop for a shape nobody anticipated rather than the mechanism.
 
 The order of the disclosed-copy checks is derived rather than chosen, and
 `corpus/README.md` measures both halves of it:
@@ -43,7 +49,7 @@ from typing import Any, Mapping
 
 from .errors import ErrorCode, RoaxError
 from .hashes import DEFAULT_HASH_ALG, get_hash
-from .jsonio import as_int
+from .jsonio import as_int, is_json_string
 from .flatten import RESERVED_KEY_PREFIX
 from .leaf import CANON, SALT_BYTES, leaf_hash
 from .path import Key, Segment, display_path, encode_path, segments_from_json
@@ -127,10 +133,13 @@ class VerifierConfig:
     ``hash_alg_allow_list``, which closes the retired-algorithm case the registry alone
     does not.
 
-    ``registry_address`` is the registry this verifier reads.
-    An envelope naming a different one in its ``anchor`` block MUST NOT cause the verifier
-    to read that one; this package never reads any chain, so the field is carried and
-    compared rather than acted on.
+    ``registry_address`` and ``registry_chain_id`` name the registry this verifier reads.
+    **Neither is consulted by any check in this module**, and both are carried for a caller
+    that does read a registry.
+    Not comparing them is the correct behaviour rather than an omission: specification
+    section 11.3 makes an envelope's ``anchor`` block a routing hint that is never
+    authority, so an envelope naming a different registry is not a rejection - the verifier
+    simply reads its own and never the one the document names.
 
     ``resolvers`` supplies a type map per ``recordType`` for **full copies only**.
     A disclosed copy under `schemas/envelope-1.0.json` cannot select an exact map at all,
@@ -195,6 +204,18 @@ def verify_envelope(
         return _verify(envelope, cfg)
     except RoaxError as exc:
         return _reject(exc.code, exc.detail)
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError) as exc:
+        # A backstop, and deliberately not the mechanism: every member shape this module
+        # depends on is checked explicitly above, and each of those checks carries the
+        # reason code the case is about. This clause exists because specification section
+        # 11.3 makes everything outside the root attacker-controlled, so a shape nobody
+        # anticipated MUST still leave this function returning a result rather than
+        # raising into a verifier service. It is placed after the `RoaxError` clause so a
+        # real rejection keeps its own code.
+        return _reject(
+            ErrorCode.ENVELOPE_SHAPE,
+            f"malformed envelope member ({type(exc).__name__})",
+        )
 
 
 def _verify(env: Mapping[str, Any], cfg: VerifierConfig) -> VerificationResult:
@@ -279,9 +300,35 @@ def _verify(env: Mapping[str, Any], cfg: VerifierConfig) -> VerificationResult:
     if not isinstance(issuer, Mapping) or "id" not in issuer:
         return _reject(ErrorCode.ENVELOPE_SHAPE, "issuer.id is required")
 
+    # The outer identity members become reserved STRING leaves under specification section
+    # 11.2 and are bound to them under section 11.3, so each MUST be a genuine JSON string
+    # before either of those runs. `is_json_string` and not `isinstance(x, str)`, because
+    # `JsonNumber` subclasses `str` so the literal survives, which means the JSON number
+    # 1.0 would otherwise commit a `schemaVersion` leaf byte-identical to the JSON string
+    # "1.0" that `schemas/envelope-1.0.json` requires.
+    #
+    # The site is chosen: after the issuer shape check it covers a full copy and a
+    # disclosed copy at once, and before it would preempt the `canon-mismatch`,
+    # `hash-alg-not-allowed`, `profile-unknown` and `root-mismatch` precedence the corpus
+    # fixtures pin. `recordType` is deliberately still allowed to reach the profile lookup
+    # above first, so `profile-unknown-fails-closed` keeps its reason.
+    for member in ("recordType", "schemaVersion", "recordId"):
+        if not is_json_string(env[member]):
+            return _reject(ErrorCode.ENVELOPE_SHAPE, f"{member} must be a JSON string")
+    if not is_json_string(issuer["id"]):
+        return _reject(ErrorCode.ENVELOPE_SHAPE, "issuer.id must be a JSON string")
+    if "keyId" in issuer and not is_json_string(issuer["keyId"]):
+        return _reject(ErrorCode.ENVELOPE_SHAPE, "issuer.keyId must be a JSON string")
+    type_map = env.get("typeMap")
+    if type_map is not None:
+        if not isinstance(type_map, Mapping):
+            return _reject(ErrorCode.ENVELOPE_SHAPE, "`typeMap` must be an object")
+        if "id" in type_map and not is_json_string(type_map["id"]):
+            return _reject(ErrorCode.ENVELOPE_SHAPE, "typeMap.id must be a JSON string")
+
     if has_record:
         return _verify_full_copy(env, cfg, hasher, root, leaf_count, record_type)
-    return _verify_disclosed_copy(env, cfg, hasher, root, leaf_count, profile)
+    return _verify_disclosed_copy(env, cfg, hasher, root, leaf_count)
 
 
 # ---------------------------------------------------------------------------------
@@ -393,7 +440,15 @@ def _decode_carrier(tag: int, value: Any) -> Any:
     return bytes.fromhex(value)
 
 
-def _verify_disclosed_copy(env, cfg, hasher, root, leaf_count, profile) -> VerificationResult:
+def _verify_disclosed_copy(env, cfg, hasher, root, leaf_count) -> VerificationResult:
+    """Check every disclosed leaf, bind the outer identity, then enforce the floor.
+
+    The profile :func:`_verify` resolved from the outer ``recordType`` is deliberately not
+    a parameter here. That lookup is still needed there, because an unregistered
+    ``recordType`` MUST fail closed ahead of everything else and the corpus pins that
+    precedence, but step 3 below re-derives the profile from the **committed**
+    ``roax.recordType`` leaf and must keep doing so.
+    """
     disclosure = env["disclosure"]
     if not isinstance(disclosure, Mapping) or disclosure.get("mode") != "selective":
         return _reject(ErrorCode.ENVELOPE_SHAPE, "disclosure.mode must be 'selective'")
@@ -457,9 +512,12 @@ def _verify_disclosed_copy(env, cfg, hasher, root, leaf_count, profile) -> Verif
         computed = leaf_hash(segments, tag, value, salt, hasher=hasher)
 
         index = as_int(raw["index"], field="index")
+        audit_path = raw["auditPath"]
+        if not isinstance(audit_path, list):
+            return _reject(ErrorCode.ENVELOPE_SHAPE, "`auditPath` must be an array")
         path = [
             _hexbytes(node, field_name="auditPath entry", size=hasher.digest_size)
-            for node in raw["auditPath"]
+            for node in audit_path
         ]
         if not verify_inclusion(computed, index, leaf_count, path, root, hasher=hasher):
             return _reject(

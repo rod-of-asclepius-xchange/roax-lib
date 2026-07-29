@@ -512,9 +512,12 @@ def main() -> int:
             resolvers[record_type] = maps(record_type)
     config = VerifierConfig(
         profiles=registry,
-        hash_alg_allow_list=(
-            (corpus["hashAlg"],) if corpus["hashAlg"] == "SHA-256" else ("SHA-256",)
-        ),
+        # Specification section 7.4 defines a construction for SHA-256 alone and leaves
+        # `Poseidon-BN254` registered but unparameterized, so a corpus naming any other
+        # algorithm cannot exist yet and a branch for one would be dead either way. The
+        # allow-list is the verifier's own (section 7.4, H3) rather than the document's,
+        # so sourcing it from `corpus["hashAlg"]` would be the wrong shape regardless.
+        hash_alg_allow_list=("SHA-256",),
         resolvers=resolvers,
         authorize_empty_containers=authorize_empty,
     )
