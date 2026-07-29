@@ -102,13 +102,23 @@ These are the things a future agent is most likely to get wrong.
   empty is admitted need combinator-aware evaluation, so `tools/build-type-maps.mjs` fails instead
   of publishing a guessed EMPTY_OBJECT or omitting a valid EMPTY_ARRAY.
   EMPTY_ARRAY and EMPTY_OBJECT are distinct leaves, so a permissive union is silent widening.
-  `--self-test` proves both rejections against constructed schemas and needs no reference checkout.
+  A branch counts as an object branch when it declares `type: "object"` **or** declares
+  `properties`, mirroring the array side's `type: "array"` test. Selecting on `properties` alone
+  drops `{"type": "object", "required": ["x"]}` out of the comparison and lets the surviving
+  permissive branch publish EMPTY_OBJECT unopposed, which is the widening itself.
+  `--self-test` proves both rejections against constructed schemas and needs no reference checkout,
+  and two of its object cases give the empty-forbidding branch no `properties` keyword so that the
+  selection rule is pinned rather than assumed.
 
 - **The object rejection above means the four published artifacts can currently be neither
   regenerated nor `--check`ed, and that is the ruled trade.** `--check` compiles before it
   compares, so it fails on the same states.
   Measured on the pinned checkout, it fires on 34 states: 30 full
-  FHIR, 2 PDT, 2 recovery, 0 vaccination. The first merges `ImplementationGuide_Definition`, which
+  FHIR, 2 PDT, 2 recovery, 0 vaccination. **That count is now a LOWER BOUND**: it was measured
+  under the earlier `properties`-only branch selection, and widening the selection to object-ness
+  can only add branches to a state's comparison, never remove one. It has not been re-measured
+  because `references/` is gitignored, and regeneration is blocked either way.
+  The first merges `ImplementationGuide_Definition`, which
   requires `resource`, with `Reference`, which admits `{}`. Do not "fix" this by restoring the
   permissive union - that ruling was raised with this measurement and reaffirmed. The committed
   artifacts and their content IDs stay authoritative and `tools/check-type-maps.mjs` still passes
@@ -313,11 +323,22 @@ A, C and D sections are the owner's and are not edited by ruling work elsewhere 
 ## Validating the schemas
 
 There is no CI and no package manifest. The JSON Schemas were checked with Ajv 8 in **strict mode**
-plus `ajv-formats`, and all five compile clean. Re-check after any edit: install `ajv` and
-`ajv-formats` outside the tree, then `new Ajv2020({strict: true}).compile()` each of the five files,
+plus `ajv-formats`, and all seven compile clean. Re-check after any edit: install `ajv` and
+`ajv-formats` outside the tree, then `new Ajv2020({strict: true}).compile()` each of the seven files,
 using the `ajv/dist/2020.js` entry point because they are draft 2020-12. Compiling is not enough on
 its own for a conditional - validate instances both ways, since an `if`/`then` that never fires
 compiles perfectly and asserts nothing.
+
+**The envelope and the corpus vector file each have two live schema versions, and the pair is not a
+leftover.** `schemas/envelope-2.0.json` and `schemas/conformance-corpus-2.0.json` carry the
+type-map binding, the six-leaf floor and the D4b vector shapes, and are what the specification and
+`docs/conformance-corpus.md` describe. `schemas/envelope-1.0.json` and
+`schemas/conformance-corpus-1.0.json` are retained with their meaning unchanged because they, not
+the successors, govern the corpus artifact and the 54 envelope fixtures as committed, which
+`corpus/tools/validate_schemas.mjs` measures. Neither pair may be collapsed by tightening the 1.0
+file: doing that invalidates committed artifacts instead of rebuilding them, and rebuilding them is
+corpus-side work. The schema version is not the canonicalization version - both envelope schemas
+pin `canon` to `ROAX-CANON/1`.
 
 Two things to know if you touch them:
 

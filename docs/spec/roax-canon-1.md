@@ -566,7 +566,7 @@ The fraction of the result then has exactly `f'` digits, where:
 The digit sequence is never rounded, extended or truncated to a target precision.
 Shifting pads with `0` where the point runs past the digits that are present.
 The result is then normalized to the output grammar `^-?(0|[1-9][0-9]*)(\.[0-9]+)?$`, which is the
-same grammar `schemas/envelope-1.0.json` pins for a DECIMAL value:
+same grammar `schemas/envelope-2.0.json` pins for a DECIMAL value:
 
 - leading zeros in the integer part are removed, and an emptied integer part becomes a single `0`;
 - a fraction of zero digits is dropped along with its `.`;
@@ -846,7 +846,7 @@ so a reader who budgets 16 bytes per leaf will be wrong by roughly an order of m
 optimize the wrong thing.
 
 Worked from `fhirBundle.entry[0].identifier[0].type`, a real path in the vaccination sample
-(section 4.2), serialized as the `salts` entry `schemas/envelope-1.0.json` defines:
+(section 4.2), serialized as the `salts` entry `schemas/envelope-2.0.json` defines:
 
 ```
   {"segments":[                                    13 bytes of framing
@@ -900,7 +900,7 @@ Three rules, and the third is absolute:
    Under section 7 no such value exists to carry, which is what makes this rule cheap: the salts are
    independent, so there is no master secret, no seed and no derivation key anywhere in the design.
 
-`schemas/envelope-1.0.json` enforces all three structurally. The `salts` array is required alongside
+`schemas/envelope-2.0.json` enforces all three structurally. The `salts` array is required alongside
 `record` and forbidden alongside `disclosure`, the envelope closes with `additionalProperties: false`
 so no seed field can be added by an issuer, and there is no `masterSalt` field to populate because
 `masterSalt` does not exist.
@@ -959,7 +959,7 @@ this buys almost nothing
 cryptographically**, for the same reason the leaf did not: the attacker computes both records under
 the same domain string. What it does buy is real but narrower. It removes cross-algorithm root
 ambiguity by construction, so the same content under two algorithms cannot collide on a root by
-accident, and it makes the claim in `schemas/envelope-1.0.json` true rather than aspirational.
+accident, and it makes the claim in `schemas/envelope-2.0.json` true rather than aspirational.
 
 **H2. The anchoring registry MUST record the pair `(root, hashAlg)`, and a verifier MUST take
 `hashAlg` from the registry, never from the envelope.** This is the one that works. Authority for
@@ -1210,7 +1210,7 @@ change any leaf hash. It would look valid to every check a verifier runs, while 
 withheld field in the record. Nothing about the verification result would indicate a problem.
 
 So the constraint is made structural rather than left to prose. In
-`schemas/envelope-1.0.json` the `salts` array is forbidden alongside `disclosure`, which makes a
+`schemas/envelope-2.0.json` the `salts` array is forbidden alongside `disclosure`, which makes a
 withheld leaf's salt **unrepresentable** in a disclosed copy rather than merely prohibited: with
 that array absent, the per-leaf `salt` field inside `disclosure.leaves` is the only place a salt can
 appear, and every entry there belongs by construction to a leaf being revealed. Adding a `salts`
@@ -1281,7 +1281,14 @@ For an 87-leaf record disclosing 2 fields, that was measured at ~583 bytes versu
 
 The envelope is a strawman for review. It is the least settled part of this document.
 
-JSON Schema: [`schemas/envelope-1.0.json`](../../schemas/envelope-1.0.json).
+JSON Schema: [`schemas/envelope-2.0.json`](../../schemas/envelope-2.0.json).
+
+**Two envelope schema versions exist, and this document describes the second.**
+The type-map binding of section 4.2 is breaking for the envelope document: `typeMap` becomes a required member, `roax.typeMap.id` becomes a mandatory reserved leaf, and the leaf and salt floors rise from 5 to 6 with it (sections 3.3 and 11.2).
+An envelope written before that binding does not validate against `schemas/envelope-2.0.json`, so [`schemas/envelope-1.0.json`](../../schemas/envelope-1.0.json) is retained unchanged in meaning and still governs every envelope issued under it.
+A verifier selects one schema per envelope and MUST NOT merge them.
+The envelope schema version is NOT the canonicalization version and the two MUST NOT be conflated: both files pin `canon` to the `ROAX-CANON/1` const, and the leaf, salt and root constructions of sections 6 through 8 are identical under both.
+The version identifier is one of ROAX's own under section 12.1, so it carries a shape by this project's choice, and the major part moved because documents that validated stopped validating.
 
 ### 11.1 Shape
 
@@ -1634,7 +1641,7 @@ parameterization is not yet pinned, so it MUST NOT be issued against. See sectio
 > still MUST NOT range-resolve a type map or choose its latest version, under section 4.2.
 
 `schemaVersion` is an **opaque, profile-defined label**. It is validated by exact match against the
-profile registry (`docs/profiles/`), never by shape, and `schemas/envelope-1.0.json` and
+profile registry (`docs/profiles/`), never by shape, and `schemas/envelope-2.0.json` and
 `schemas/type-map-artifact-1.0.json` therefore constrain it to a non-empty string and nothing more.
 
 **An earlier draft imposed a dotted numeric pattern, and the evidence is that no such pattern can be
@@ -1665,7 +1672,7 @@ A shape constraint that no code path needs can only reject valid input.
 
 | Field | Owner | Constraint |
 |---|---|---|
-| `corpusVersion` (`schemas/conformance-corpus-1.0.json`) | ROAX | three-part semver, legitimately |
+| `corpusVersion` (`schemas/conformance-corpus-2.0.json`) | ROAX | three-part semver, legitimately |
 | `typeMapVersion` (`schemas/type-map-artifact-1.0.json`) | ROAX | three-part semver, exact metadata rather than a range selector |
 | `schemaVersion` (envelope and type map) | the profile, and beyond it FHIR or a health authority | opaque, exact match only |
 | `unicodeVersion` (corpus) | the Unicode Consortium | opaque, non-empty; `15.1` is the canonical form for this pin |
@@ -1683,7 +1690,7 @@ requirements rather than as intentions:
 
 - **New profiles and new versions arrive by a registry entry, never by editing this specification.**
   The registry is `docs/profiles/`, one document per `recordType`. This is why
-  `schemas/envelope-1.0.json` constrains `recordType` to a form rather than to a closed list: the
+  `schemas/envelope-2.0.json` constrains `recordType` to a form rather than to a closed list: the
   registry, not the schema, is the extension point.
 - **The registry is itself versioned**, so that "which profiles existed when this record was issued"
   is answerable rather than assumed.

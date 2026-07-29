@@ -180,7 +180,7 @@ description has to come from outside.
   rather than discovered. They are what makes selecting Poseidon a deliberate per-record act.
 
 **Written into the spec:** `hashAlg` as an algorithm-qualified domain component and a reserved leaf
-(sections 7, 7.4, 8, 11.2, 12), with the enum in `schemas/envelope-1.0.json` carrying both values
+(sections 7, 7.4, 8, 11.2, 12), with the enum in `schemas/envelope-2.0.json` carrying both values
 and the Poseidon caution stated in the schema itself.
 
 | | **SHA-256** | **Poseidon over BN254** |

@@ -583,7 +583,9 @@ function compileAutomaton(store, rootNode) {
       tags.get(classification.tag).push(classification);
     }
 
-    const objectSchemas = state.filter(([, node]) => node.properties);
+    const objectSchemas = state.filter(
+      ([, node]) => node.type === "object" || node.properties !== undefined,
+    );
     const structurallyUntypedObject = objectSchemas.some(
       ([, node]) => node.type !== "object",
     );
@@ -887,6 +889,22 @@ function selfTest() {
     "object branches disagree through minProperties",
     objectBranches(
       { type: "object", properties: { a: { type: "string" } }, minProperties: 1 },
+      { type: "object", properties: { b: { type: "string" } } },
+    ),
+    /merges object branches that disagree on empty-object admission/,
+  );
+  expectCompileRejects(
+    "object branch forbids empty through required and declares no properties",
+    objectBranches(
+      { type: "object", required: ["a"] },
+      { type: "object", properties: { b: { type: "string" } } },
+    ),
+    /merges object branches that disagree on empty-object admission/,
+  );
+  expectCompileRejects(
+    "object branch forbids empty through minProperties and declares no properties",
+    objectBranches(
+      { type: "object", minProperties: 1 },
       { type: "object", properties: { b: { type: "string" } } },
     ),
     /merges object branches that disagree on empty-object admission/,

@@ -1,7 +1,14 @@
 # The ROAX conformance corpus
 
-**Status:** definition. The corpus file itself does not exist yet.
-**Schema:** [`schemas/conformance-corpus-1.0.json`](../schemas/conformance-corpus-1.0.json)
+**Status:** definition. A corpus artifact exists and is governed by the 1.0 schema below; no artifact
+validates against the successor contract this document defines yet.
+**Schema:** [`schemas/conformance-corpus-2.0.json`](../schemas/conformance-corpus-2.0.json), which is
+the contract this document defines.
+[`schemas/conformance-corpus-1.0.json`](../schemas/conformance-corpus-1.0.json) is retained because
+it, and not the successor, governs the corpus artifact as committed today.
+The successor is a major bump because it deletes definitions the committed artifact still uses, so
+that artifact does not validate against it and has to be rebuilt to it; the requirements below are
+stated against the successor and the gap is named in section 3.
 
 ---
 
@@ -94,8 +101,11 @@ optional, absent, or expressible both ways through a `oneOf`. The exception is a
 **That exception currently has no instance.** The two it used to have, `saltVector` and
 `unlinkabilitySide.masterSaltHex`, both existed to test the derived-salt mechanism and were removed
 with it when D4 was ruled; `saltVector` is gone from
-`schemas/conformance-corpus-1.0.json` entirely, because under section 7 a salt is an input rather
-than something derived from anything, and `leafVector.saltHex` already carries it. A later editor
+`schemas/conformance-corpus-2.0.json` entirely, because under section 7 a salt is an input rather
+than something derived from anything, and `leafVector.saltHex` already carries it.
+Both definitions survive in `schemas/conformance-corpus-1.0.json`, marked superseded, for the
+narrow reason that the committed corpus still carries vectors of both shapes and that file has to
+keep describing what it governs; they are not the design as it now stands. A later editor
 adding such a class should record the distinction on the definition itself, as those two did.
 
 ## 2. Release gates
@@ -126,8 +136,17 @@ one author cannot catch it.** So gate 3 is a release gate, not a caveat.
 rather than passing silently.
 
 The count is stated because a gap check built off it is the intended use, and a stale count means
-the highest-numbered class is skipped silently. `schemas/conformance-corpus-1.0.json` sets the
+the highest-numbered class is skipped silently. Both
+`schemas/conformance-corpus-1.0.json` and `schemas/conformance-corpus-2.0.json` set the
 `classRef` maximum to 19 to match.
+
+**Class 19 is expressible only under the successor schema.** Its vector shape is the `normalization`
+group, which `schemas/conformance-corpus-2.0.json` introduces and
+`schemas/conformance-corpus-1.0.json` does not carry, because adding it to the file that governs the
+committed artifact would describe vectors that artifact has no way to hold. Class 18 needs no new
+group and is expressible under both, through `envelopeVector.verifierConfig`. Until the corpus is
+rebuilt against the successor, class 19 has no vectors, and that is a stated gap rather than a
+silent one.
 
 **Classes 18 and 19 were added, and class 12 was rewritten, when the ten engineering decisions were
 ruled on 2026-07-28.** Class numbers are stable: class 12 kept its number and its subject and lost
@@ -277,7 +296,7 @@ binding.
 **One row was added when decision D9 was ruled:** a type map binding any path to **tag 8 `BLOB_REF`**
 MUST be **rejected**, because the content-addressed binding is defined and selected by no version-1
 profile (specification section 6.5). That is a rejection of the map rather than a fail-closed on a
-path, so it is a third outcome and `schemas/conformance-corpus-1.0.json` gives it its own branch.
+path, so it is a third outcome and both corpus schemas give it its own `oneOf` branch.
 Without this vector, "registered but unselected" is a sentence, and the schemas accept tag 8 in order
 to pin its carrier form - which is exactly the combination that lets an implementation quietly honour
 a binding no profile has declared.
@@ -454,7 +473,7 @@ passes the root check, passes the inclusion proofs and passes every other class 
 leaking every withheld field to a dictionary search. There is no failing assertion anywhere else to
 catch it.
 
-`schemas/envelope-1.0.json` closes most of this structurally by forbidding `salts` alongside
+`schemas/envelope-2.0.json` closes most of this structurally by forbidding `salts` alongside
 `disclosure`, which leaves no place to put a withheld leaf's salt. The rows this class still has to
 carry in code are the count relationships in the last two rows, which JSON Schema cannot express
 because they relate `salts.length`, `leafCount` and the actual leaf set to each other.

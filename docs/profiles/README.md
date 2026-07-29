@@ -48,7 +48,7 @@ for that reconciliation and its conclusion.
 ## What each profile document must declare
 
 **This directory is the `recordType` registry.**
-`schemas/envelope-1.0.json` constrains `recordType` to a lowercase reverse-DNS *form* rather than to
+`schemas/envelope-2.0.json` constrains `recordType` to a lowercase reverse-DNS *form* rather than to
 a closed list, because the list is extensible. It is the registry that closes it: **adding a
 `recordType` value REQUIRES adding a profile document here declaring at least the first three rows
 below**, and a syntactically valid `recordType` with no profile document is not a valid record.
