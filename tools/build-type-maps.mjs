@@ -494,6 +494,10 @@ function admitsEmptyObject(node) {
   );
 }
 
+function admitsEmptyArray(node) {
+  return !Number.isInteger(node.minItems) || node.minItems === 0;
+}
+
 function compileAutomaton(store, rootNode) {
   const close = (input) => {
     const stack = [...input];
@@ -597,12 +601,11 @@ function compileAutomaton(store, rootNode) {
         }
       }
     }
-    const explicitArrays = state.filter(([, node]) => node.type === "array");
-    const arrayEmptyPermissions = new Set(
-      explicitArrays.map(
-        ([, node]) => !Number.isInteger(node.minItems) || node.minItems === 0,
-      ),
+    const arraySchemas = state.filter(
+      ([, node]) => node.type === "array" || node.items !== undefined,
     );
+    const explicitArrays = arraySchemas.filter(([, node]) => node.type === "array");
+    const arrayEmptyPermissions = new Set(arraySchemas.map(([, node]) => admitsEmptyArray(node)));
     if (arrayEmptyPermissions.size > 1) {
       throw new Error(
         `state s${index} merges array branches that disagree on empty-array admission`,
@@ -847,8 +850,12 @@ class FixtureStore {
   }
 }
 
-function objectBranches(first, second) {
+function mergedBranches(first, second) {
   return { properties: { value: { anyOf: [first, second] } } };
+}
+
+function singleBranch(node) {
+  return { properties: { value: node } };
 }
 
 function expectCompileRejects(name, document, pattern) {
@@ -863,12 +870,16 @@ function expectCompileRejects(name, document, pattern) {
   throw new Error(`self-test ${name}: disagreeing branches were accepted`);
 }
 
-function expectCompiles(name, document, expectedTag) {
+function branchStateTags(document) {
   const { automaton } = compileAutomaton(new FixtureStore(document), document);
   const state = automaton.states.find(
     (candidate) => candidate.id === automaton.states[0].keys[0].to,
   );
-  const tags = (state.bindings ?? []).map((binding) => binding.tag);
+  return (state.bindings ?? []).map((binding) => binding.tag);
+}
+
+function expectCompiles(name, document, expectedTag) {
+  const tags = branchStateTags(document);
   if (!tags.includes(expectedTag)) {
     throw new Error(
       `self-test ${name}: expected tag ${expectedTag}, got ${JSON.stringify(tags)}`,
@@ -876,10 +887,19 @@ function expectCompiles(name, document, expectedTag) {
   }
 }
 
+function expectNoTag(name, document, forbiddenTag) {
+  const tags = branchStateTags(document);
+  if (tags.includes(forbiddenTag)) {
+    throw new Error(
+      `self-test ${name}: tag ${forbiddenTag} was bound, got ${JSON.stringify(tags)}`,
+    );
+  }
+}
+
 function selfTest() {
   expectCompileRejects(
     "object branches disagree on empty admission",
-    objectBranches(
+    mergedBranches(
       { type: "object", properties: { a: { type: "string" } }, required: ["a"] },
       { type: "object", properties: { b: { type: "string" } } },
     ),
@@ -887,7 +907,7 @@ function selfTest() {
   );
   expectCompileRejects(
     "object branches disagree through minProperties",
-    objectBranches(
+    mergedBranches(
       { type: "object", properties: { a: { type: "string" } }, minProperties: 1 },
       { type: "object", properties: { b: { type: "string" } } },
     ),
@@ -895,7 +915,7 @@ function selfTest() {
   );
   expectCompileRejects(
     "object branch forbids empty through required and declares no properties",
-    objectBranches(
+    mergedBranches(
       { type: "object", required: ["a"] },
       { type: "object", properties: { b: { type: "string" } } },
     ),
@@ -903,7 +923,7 @@ function selfTest() {
   );
   expectCompileRejects(
     "object branch forbids empty through minProperties and declares no properties",
-    objectBranches(
+    mergedBranches(
       { type: "object", minProperties: 1 },
       { type: "object", properties: { b: { type: "string" } } },
     ),
@@ -911,25 +931,48 @@ function selfTest() {
   );
   expectCompileRejects(
     "array branches disagree on empty admission",
-    {
-      properties: {
-        value: {
-          anyOf: [
-            { type: "array", items: { type: "string" } },
-            { type: "array", minItems: 1, items: { type: "string" } },
-          ],
-        },
-      },
-    },
+    mergedBranches(
+      { type: "array", items: { type: "string" } },
+      { type: "array", minItems: 1, items: { type: "string" } },
+    ),
+    /merges array branches that disagree on empty-array admission/,
+  );
+  expectCompileRejects(
+    "array branch forbids empty through minItems and declares no type",
+    mergedBranches(
+      { items: { type: "string" }, minItems: 1 },
+      { type: "array", items: { type: "string" } },
+    ),
+    /merges array branches that disagree on empty-array admission/,
+  );
+  expectCompileRejects(
+    "array branch admits empty and declares no type",
+    mergedBranches(
+      { items: { type: "string" } },
+      { type: "array", items: { type: "string" }, minItems: 1 },
+    ),
     /merges array branches that disagree on empty-array admission/,
   );
   expectCompiles(
     "object branches agree that empty is admitted",
-    objectBranches(
+    mergedBranches(
       { type: "object", properties: { a: { type: "string" } } },
       { type: "object", properties: { b: { type: "string" } } },
     ),
     TAG.EMPTY_OBJECT,
+  );
+  expectCompiles(
+    "array branches agree that empty is admitted",
+    mergedBranches(
+      { type: "array", items: { type: "string" } },
+      { type: "array", items: { type: "integer" } },
+    ),
+    TAG.EMPTY_ARRAY,
+  );
+  expectNoTag(
+    "an items keyword alone does not declare the instance an array",
+    singleBranch({ items: { type: "string" } }),
+    TAG.EMPTY_ARRAY,
   );
   process.stdout.write("validated type-map generator self-tests\n");
 }

@@ -102,21 +102,32 @@ These are the things a future agent is most likely to get wrong.
   empty is admitted need combinator-aware evaluation, so `tools/build-type-maps.mjs` fails instead
   of publishing a guessed EMPTY_OBJECT or omitting a valid EMPTY_ARRAY.
   EMPTY_ARRAY and EMPTY_OBJECT are distinct leaves, so a permissive union is silent widening.
-  A branch counts as an object branch when it declares `type: "object"` **or** declares
-  `properties`, mirroring the array side's `type: "array"` test. Selecting on `properties` alone
-  drops `{"type": "object", "required": ["x"]}` out of the comparison and lets the surviving
-  permissive branch publish EMPTY_OBJECT unopposed, which is the widening itself.
+  **Both comparisons select a branch by container-ness, which is the declared type OR the
+  applicable applicator keyword**: `type: "object"` or `properties` on the object side,
+  `type: "array"` or `items` on the array side, which is the same test `classifyNode` already
+  applies when it declines to tag a container. Selecting on the declared type alone drops
+  `{"items": {...}, "minItems": 1}` out of the comparison, and selecting on the applicator alone
+  drops `{"type": "object", "required": ["x"]}`; either way the surviving permissive branch
+  publishes an empty-container leaf unopposed, which is the widening itself.
+  **Comparison is widened; evidence and traversal are not.** An EMPTY_ARRAY binding still cites
+  only `type: "array"` branches and `anyIndex` still comes only from their `items`, because an
+  `items` keyword on an untyped node constrains arrays without asserting the instance is one, and
+  inferring a tag from an inapplicable keyword is what section 1.5 of `docs/type-maps.md` forbids.
+  The object side already behaves this way: `keyGroups` skips a selected branch that declares no
+  `properties`. `expectNoTag` pins it.
   `--self-test` proves both rejections against constructed schemas and needs no reference checkout,
-  and two of its object cases give the empty-forbidding branch no `properties` keyword so that the
-  selection rule is pinned rather than assumed.
+  and on each side the empty-forbidding branch of one case carries no applicator and of another
+  carries no declared type, so the selection rule is pinned rather than assumed.
 
 - **The object rejection above means the four published artifacts can currently be neither
   regenerated nor `--check`ed, and that is the ruled trade.** `--check` compiles before it
   compares, so it fails on the same states.
   Measured on the pinned checkout, it fires on 34 states: 30 full
   FHIR, 2 PDT, 2 recovery, 0 vaccination. **That count is now a LOWER BOUND**: it was measured
-  under the earlier `properties`-only branch selection, and widening the selection to object-ness
-  can only add branches to a state's comparison, never remove one. It has not been re-measured
+  under the earlier declared-type-only and `properties`-only branch selections, and widening both
+  to container-ness can only add branches to a state's comparison, never remove one. The array
+  comparison was widened after that measurement too, so the bound now covers array states as well.
+  It has not been re-measured
   because `references/` is gitignored, and regeneration is blocked either way.
   The first merges `ImplementationGuide_Definition`, which
   requires `resource`, with `Reference`, which admits `{}`. Do not "fix" this by restoring the

@@ -428,11 +428,21 @@ The first is the state that merges `#/definitions/ImplementationGuide_Definition
 Resolving those states needs combinator-aware evaluation, which the DFA closure has discarded by the time a state is merged, so it is an open ruling rather than a mechanical fix.
 The committed artifacts, their content IDs and the section 2.1 table remain authoritative and are still checked in full by `tools/check-type-maps.mjs`; only regeneration is blocked.
 
-**Which branches the object rejection compares.**
-A branch is an object branch when it declares `type: "object"` **or** declares `properties`, which is the same object-ness test the array side applies with `type: "array"`.
-Selecting on `properties` alone would drop an empty-forbidding branch shaped `{"type": "object", "required": ["x"]}` out of the comparison and let the surviving permissive branch decide the state on its own, which is the silent widening the rejection exists to prevent.
-**The 34-state count above was taken under that narrower `properties`-only selection and is therefore a LOWER BOUND rather than an exact count.**
-Widening the selection can only add branches to the set whose empty-admission answers are compared, so every state that fired still fires and further states may join them; it cannot remove one.
+**Which branches each rejection compares.**
+Both sides select a branch by container-ness, which is the declared type **or** the applicable applicator keyword: a branch is an object branch when it declares `type: "object"` or declares `properties`, and an array branch when it declares `type: "array"` or declares `items`.
+That is the same test `classifyNode` already applies when it declines to assign a scalar tag to a container.
+Selecting on the applicator alone would drop an empty-forbidding branch shaped `{"type": "object", "required": ["x"]}`, and selecting on the declared type alone would drop one shaped `{"items": {...}, "minItems": 1}`.
+Either omission lets the surviving permissive branch decide the state on its own, which is the silent widening the rejection exists to prevent.
+
+**The comparison is widened; the evidence and the traversal are not, and the difference is deliberate.**
+An EMPTY_ARRAY binding still cites only branches declaring `type: "array"`, and `anyIndex` is still derived only from their `items`.
+An `items` keyword on a node with no declared type constrains the instance *if* it is an array without asserting that it is one, so treating it as evidence of array-ness would infer a tag from an inapplicable keyword, which is exactly what section 1.5 rules out for the object side.
+The object side already draws the same line: a selected branch that declares no `properties` contributes no KEY transition.
+`--self-test` pins this with a case asserting that `{"items": {...}}` alone binds no EMPTY_ARRAY.
+
+**The 34-state count above was taken under the narrower `properties`-only and `type: "array"`-only selections and is therefore a LOWER BOUND rather than an exact count.**
+Widening a selection can only add branches to the set whose empty-admission answers are compared, so every state that fired still fires and further states may join them; it cannot remove one.
+The array comparison was widened after that measurement as well, so the bound now covers array states and not only object ones.
 The count has not been re-measured, because `.gitignore` excludes the reference checkout, and regeneration is blocked either way.
 
 The generator's own rejections are provable without any reference checkout:
@@ -441,8 +451,10 @@ The generator's own rejections are provable without any reference checkout:
 node tools/build-type-maps.mjs --self-test
 ```
 
-It compiles constructed schemas whose merged object branches disagree through `required` and through `minProperties`, and whose merged array branches disagree through `minItems`, asserts that each is rejected, and asserts that agreeing object branches still yield EMPTY_OBJECT.
-Two of the object cases give the empty-forbidding branch no `properties` keyword at all, so they are the regression that pins the object-ness selection stated just above: under a `properties`-only selection that branch is invisible, the state resolves to a single permissive answer, and an EMPTY_OBJECT binding is published for a state one reachable branch rejects.
+It compiles constructed schemas whose merged object branches disagree through `required` and through `minProperties`, and whose merged array branches disagree through `minItems`, asserts that each is rejected, and asserts that agreeing branches still yield EMPTY_OBJECT and EMPTY_ARRAY respectively.
+Two of the object cases give the empty-forbidding branch no `properties` keyword at all, and two of the array cases give the branch on one side of the disagreement no declared type at all, so together they are the regression that pins the container-ness selection stated just above.
+Under the narrower selection each of those branches is invisible, the state resolves to a single permissive answer, and an empty-container binding is published for a state one reachable branch rejects.
+A final case asserts the other half of the rule, that an `items` keyword on an untyped node binds no EMPTY_ARRAY on its own.
 
 The reference checkout MUST be at Open-Attestation/schemata commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`, as recorded in every artifact.
 The generator resolves cross-file references by file path and does not inspect `$id`.
