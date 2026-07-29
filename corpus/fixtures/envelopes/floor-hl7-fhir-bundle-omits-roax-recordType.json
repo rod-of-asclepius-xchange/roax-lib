@@ -4,7 +4,7 @@
   "recordType": "hl7.fhir.bundle",
   "schemaVersion": "4.0.1",
   "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-  "root": "79e4981b8e1e21b3e1d7a99346e7846d33f137f6ac684fec2c7d672e51b6f503",
+  "root": "2a584300bc12ab1c15ff35fc38a9ebb3dfcdd71de2a089bbfee631ee4919dd03",
   "leafCount": 10,
   "issuer": {
     "id": "did:web:corpus.roax.invalid",
@@ -23,12 +23,12 @@
         "index": 7,
         "tag": 2,
         "value": "4.0.1",
-        "salt": "dde8c29a376074d7043fc68d7c15061e",
+        "salt": "aa223a40a590b19df42d3ce39c073ec9",
         "auditPath": [
-          "7339ae575cff53b25a97a6ce33c052fc4bc49ce9d082e94e9535f4283a7f4f19",
-          "ac3014c3627de9d2333f0d9761bc1ec4cce88b3d3fee48f91fed5957c632a9ea",
-          "a013f61aecfc4ba9caa2a5df435aece68561a4ac9cc9a287ab41cd8c977e6a81",
-          "a96f392c63b63d23ed810e581e01182b01cf63e4da622bdfa3bad77a0ef0fdcc"
+          "fc82ffd55127c7e5efbcd001acf4be728190689e5a0bf2ef20e0d2400fa93a94",
+          "842f9c497c0b1004c8bf0cdfa16e56ff64db2f9e19fe879343e5943a458ffcd6",
+          "99bf499cca0dd5bfb9197706e15f2b9877eb87364fa08ffbd4f236aecf502776",
+          "ff638096a9e4b2a04cf50ba48c0b68217eff7d9b8e8750efc724ad7388d762b5"
         ]
       },
       {
@@ -41,12 +41,12 @@
         "index": 3,
         "tag": 2,
         "value": "urn:uuid:11111111-1111-4111-8111-111111111111",
-        "salt": "312b7634d0bbc798038f1516776c403b",
+        "salt": "df6cd4924ef5919aa39b753990c9e8bb",
         "auditPath": [
-          "0b1f7597b586d90430a397858817437708ab9781eb9e49653a5fce244caeb70f",
-          "11c52c0aec8379719433ec142d2cfa9efed7d1f36a82c0f0ebc3249e56e8c2a7",
-          "6452173bfe0fdd3daaf2d3330a1cc61b66b2f7af3e124db30403e79f9838a780",
-          "a96f392c63b63d23ed810e581e01182b01cf63e4da622bdfa3bad77a0ef0fdcc"
+          "ef643885c21b4da8daa9d2c880d8bb01c2aed17f9d5866daa89f3310e48fd721",
+          "c8a4286fc34101cd5e5a79936e6b19c0be01feca5ef7950eae3b391cb08d0e74",
+          "c42fded28036d7f61d3c5ac07cc3b101ff65d6a50f7cc10bb02c6785405cbe0b",
+          "ff638096a9e4b2a04cf50ba48c0b68217eff7d9b8e8750efc724ad7388d762b5"
         ]
       },
       {
@@ -59,12 +59,12 @@
         "index": 4,
         "tag": 2,
         "value": "did:web:corpus.roax.invalid",
-        "salt": "81b4daf535d4f8dbc2a121bc2f4e92a7",
+        "salt": "af8721479c4cd0d02a7743905a2b1beb",
         "auditPath": [
-          "9adcc7349988ab3de46ad35ae28c9fb2c3990cc4994662861eb3ba83064e5f39",
-          "4444bbc570e18c209081a9690f8142c4d055ba256084f2b6e277034fb26c2e6b",
-          "a013f61aecfc4ba9caa2a5df435aece68561a4ac9cc9a287ab41cd8c977e6a81",
-          "a96f392c63b63d23ed810e581e01182b01cf63e4da622bdfa3bad77a0ef0fdcc"
+          "7ceb4980b84d545f50d338ffb84676a4509f932b033654fae2b8048bb5502cf2",
+          "fea51bc17ae5c2c437df6342915c7ef9c052c7e63b2ad67ce37198b52ae4f0d2",
+          "99bf499cca0dd5bfb9197706e15f2b9877eb87364fa08ffbd4f236aecf502776",
+          "ff638096a9e4b2a04cf50ba48c0b68217eff7d9b8e8750efc724ad7388d762b5"
         ]
       },
       {
@@ -77,12 +77,12 @@
         "index": 2,
         "tag": 2,
         "value": "Bundle",
-        "salt": "00f4e0a514611735c5afbc3f4ee07267",
+        "salt": "0021776173feeefb6ac485fc8e18c126",
         "auditPath": [
-          "095f0c4e5e01a4463870530f37dd1ba49eee664cf157789aa8ce44180cfe2909",
-          "11c52c0aec8379719433ec142d2cfa9efed7d1f36a82c0f0ebc3249e56e8c2a7",
-          "6452173bfe0fdd3daaf2d3330a1cc61b66b2f7af3e124db30403e79f9838a780",
-          "a96f392c63b63d23ed810e581e01182b01cf63e4da622bdfa3bad77a0ef0fdcc"
+          "3f293ed1b3f8a7a26fa981483f8eaa9e912ffdecbeab423f47ade573d22461c9",
+          "c8a4286fc34101cd5e5a79936e6b19c0be01feca5ef7950eae3b391cb08d0e74",
+          "c42fded28036d7f61d3c5ac07cc3b101ff65d6a50f7cc10bb02c6785405cbe0b",
+          "ff638096a9e4b2a04cf50ba48c0b68217eff7d9b8e8750efc724ad7388d762b5"
         ]
       },
       {
@@ -95,12 +95,12 @@
         "index": 6,
         "tag": 2,
         "value": "did:web:corpus.roax.invalid#key-1",
-        "salt": "2a485e75eaf030468968581cc7ee3b3e",
+        "salt": "52ba6ab668471b4f5ff7a3256bfa568a",
         "auditPath": [
-          "6d3ad240b0cc1af03406e025664b0e3c2f68b089f2b6ca215aaa6b873a4e55e9",
-          "ac3014c3627de9d2333f0d9761bc1ec4cce88b3d3fee48f91fed5957c632a9ea",
-          "a013f61aecfc4ba9caa2a5df435aece68561a4ac9cc9a287ab41cd8c977e6a81",
-          "a96f392c63b63d23ed810e581e01182b01cf63e4da622bdfa3bad77a0ef0fdcc"
+          "46a1857c0ec2835f8d170c3f922bf226b2fe47c368d70aaff879e48508e838f6",
+          "842f9c497c0b1004c8bf0cdfa16e56ff64db2f9e19fe879343e5943a458ffcd6",
+          "99bf499cca0dd5bfb9197706e15f2b9877eb87364fa08ffbd4f236aecf502776",
+          "ff638096a9e4b2a04cf50ba48c0b68217eff7d9b8e8750efc724ad7388d762b5"
         ]
       }
     ]

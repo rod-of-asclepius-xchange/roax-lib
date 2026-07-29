@@ -20,7 +20,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import build_type_maps  # noqa: E402
 import roax_ref as ref  # noqa: E402
-from corpus_plan import ISSUER_ID, ISSUER_KEY_ID, MASTER_SALT_A  # noqa: E402
+from corpus_plan import ISSUER_ID, ISSUER_KEY_ID  # noqa: E402
+import salt_sets  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CORPUS_DIR = os.path.dirname(HERE)
@@ -51,6 +52,19 @@ def load_type_map(record_type):
         return None
     with open(path, "r", encoding="utf-8") as handle:
         return ref.TypeMap(json.load(handle))
+
+
+def _salt_doc(name, ordered):
+    """Draw under --draw-salts, otherwise read the committed set.
+
+    POSITIONAL for this class, and that is the point rather than an economy: these are the
+    genuine third-party MOH reference samples, so a path-keyed set would enumerate every path of
+    a shipped sample into this public repository. See salt_sets and docs/conformance-corpus.md
+    class 10.
+    """
+    if salt_sets.drawing():
+        return salt_sets.draw(name, ordered, "positional")
+    return salt_sets.load(name)
 
 
 def build_record_vectors(references):
@@ -93,10 +107,13 @@ def build_record_vectors(references):
         record_id = RECORD_IDS[record_type]
         record_file = "references/schemata/src/" + profile["module"] + "#" + profile["export"]
 
+        name_no_key = f"record-{record_type}-no-key-id"
         try:
+            identity = (record_type, profile["schemaVersion"], record_id, ISSUER_ID)
+            ordered = ref.ordered_leaves(record, type_map, *identity)
+            salts = ref.salt_set_from_document(_salt_doc(name_no_key, ordered), ordered)
             root, leaves, _salts, _hashes = ref.build_tree(
-                "SHA-256", record, type_map, bytes.fromhex(MASTER_SALT_A),
-                record_type, profile["schemaVersion"], record_id, ISSUER_ID,
+                "SHA-256", record, type_map, salts, *identity
             )
         except ref.RoaxError as exc:
             # The honest outcome for a profile whose reference schema does not determine a tag
@@ -109,13 +126,14 @@ def build_record_vectors(references):
             continue
 
         vectors.append({
-            "name": f"record-{record_type}-no-key-id",
+            "name": name_no_key,
             "class": 10,
             "recordType": record_type,
             "schemaVersion": profile["schemaVersion"],
             "issuerId": ISSUER_ID,
             "recordFile": record_file,
-            "masterSaltHex": MASTER_SALT_A,
+            "saltsFile": salt_sets.reference_for(name_no_key),
+            "saltPairing": "positional",
             "recordId": record_id,
             "leafCount": len(leaves),
             "root": root.hex(),
@@ -125,21 +143,25 @@ def build_record_vectors(references):
         # NO leaf, so the two vectors differ by exactly one leaf and by their whole root. An
         # implementation that emits a NULL leaf or an empty string for the absent case matches
         # neither.
+        name_with_key = f"record-{record_type}-with-key-id"
+        identity2 = (record_type, profile["schemaVersion"], record_id, ISSUER_ID, ISSUER_KEY_ID)
+        ordered2 = ref.ordered_leaves(record, type_map, *identity2)
+        salts2 = ref.salt_set_from_document(_salt_doc(name_with_key, ordered2), ordered2)
         root2, leaves2, _s2, _h2 = ref.build_tree(
-            "SHA-256", record, type_map, bytes.fromhex(MASTER_SALT_A),
-            record_type, profile["schemaVersion"], record_id, ISSUER_ID, ISSUER_KEY_ID,
+            "SHA-256", record, type_map, salts2, *identity2
         )
         if len(leaves2) != len(leaves) + 1 or root2 == root:
             raise SystemExit(f"corpus defect: issuer.keyId did not add exactly one leaf for {record_type}")
         vectors.append({
-            "name": f"record-{record_type}-with-key-id",
+            "name": name_with_key,
             "class": 10,
             "recordType": record_type,
             "schemaVersion": profile["schemaVersion"],
             "issuerId": ISSUER_ID,
             "issuerKeyId": ISSUER_KEY_ID,
             "recordFile": record_file,
-            "masterSaltHex": MASTER_SALT_A,
+            "saltsFile": salt_sets.reference_for(name_with_key),
+            "saltPairing": "positional",
             "recordId": record_id,
             "leafCount": len(leaves2),
             "root": root2.hex(),

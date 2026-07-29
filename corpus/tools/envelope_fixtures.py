@@ -17,12 +17,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import envelope as env  # noqa: E402
 import fixture_io  # noqa: E402
-import roax_ref as ref  # noqa: E402
+import roax_ref as ref
+import salt_sets  # noqa: E402
 import synthetic_records as syn  # noqa: E402
 from corpus_plan import (  # noqa: E402
     ISSUER_ID,
     ISSUER_KEY_ID,
-    MASTER_SALT_A,
     RECORD_ID_A,
     RECORD_ID_B,
     SYNTHETIC_RECORD_TYPE,
@@ -97,6 +97,22 @@ def _identity(record_type, schema_version, key_id):
     }
 
 
+def _salts_for(name, ordered):
+    """Draw under --draw-salts, otherwise read the committed set.
+
+    Envelope fixtures CARRY their salts, and fixture_io compares a fixture byte for byte against
+    the committed file, so these values have to be stable across builds. Under decision D4b they
+    cannot be recomputed (spec section 7), so they are drawn once and committed exactly like
+    every other salt set. Path-keyed: these records are hand-authored, so nothing third-party is
+    enumerated and the self-describing carrier is the right one.
+    """
+    if salt_sets.drawing():
+        doc = salt_sets.draw(name, ordered, "path")
+    else:
+        doc = salt_sets.load(name)
+    return ref.salt_set_from_document(doc, ordered)
+
+
 def _floor_tree(hash_alg, record_type, schema_version, floor_entries, key_id):
     """Build a tree from an explicit leaf set.
 
@@ -109,8 +125,14 @@ def _floor_tree(hash_alg, record_type, schema_version, floor_entries, key_id):
     encoded = sorted(((ref.encode_path(leaf.segments), leaf) for leaf in leaves),
                      key=lambda pair: pair[0])
     ordered = [leaf for _, leaf in encoded]
-    salts = [ref.derive_salt(hash_alg, bytes.fromhex(MASTER_SALT_A), RECORD_ID_A, leaf.segments)
-             for leaf in ordered]
+    # Named from what determines the leaf set, so two fixtures with different shapes never
+    # share a set. A collision that slipped through anyway fails loudly at load with
+    # salt-missing rather than pairing the wrong salt to a leaf.
+    salt_name = "envelope-floor-%s-%s-%d" % (
+        record_type, "with-key-id" if key_id is not None else "no-key-id", len(ordered)
+    )
+    salt_set = _salts_for(salt_name, ordered)
+    salts = [salt_set.for_leaf(leaf.segments) for leaf in ordered]
     hashes = [ref.leaf_hash(hash_alg, leaf.segments, leaf.tag, leaf.value, salt)
               for leaf, salt in zip(ordered, salts)]
     index = {_path_key(leaf.segments): i for i, leaf in enumerate(ordered)}
@@ -347,7 +369,7 @@ def build_salt_leak_vectors(hash_alg):
     ))
 
     with_master = disclosed()
-    with_master["masterSalt"] = MASTER_SALT_A
+    with_master["masterSalt"] = "00" * 32  # any value; the field must not exist at all
     out.append(_vector(
         "salt-leak-disclosed-copy-with-master-salt", 17,
         _write("salt-leak-disclosed-copy-with-master-salt", with_master), False,
@@ -365,9 +387,11 @@ def _full_copy_salt_vectors(hash_alg):
     # The fixture text this build produced, not the file on disk. See fixture_io.
     record_text = syn.RECORD_FIXTURES["typed-scalars.json"]
     record = json_literal.loads(record_text)
+    _identity = (SYNTHETIC_RECORD_TYPE, SYNTHETIC_SCHEMA_VERSION, RECORD_ID_A, ISSUER_ID)
+    _ordered0 = ref.ordered_leaves(record, type_map, *_identity)
     root, ordered, salts, _hashes = ref.build_tree(
-        hash_alg, record, type_map, bytes.fromhex(MASTER_SALT_A),
-        SYNTHETIC_RECORD_TYPE, SYNTHETIC_SCHEMA_VERSION, RECORD_ID_A, ISSUER_ID,
+        hash_alg, record, type_map, _salts_for("envelope-full-copy-typed-scalars", _ordered0),
+        *_identity,
     )
     salt_entries = [{"segments": leaf.segments, "salt": salt.hex()}
                     for leaf, salt in zip(ordered, salts)]
@@ -444,9 +468,10 @@ def build_guard_vectors(hash_alg):
             "issuer": {"id": ISSUER_ID},
         }
         if expect:
+            _id2 = (SYNTHETIC_RECORD_TYPE, SYNTHETIC_SCHEMA_VERSION, RECORD_ID_A, ISSUER_ID)
+            _ord2 = ref.ordered_leaves(record, type_map, *_id2)
             root, ordered, salts, _h = ref.build_tree(
-                hash_alg, record, type_map, bytes.fromhex(MASTER_SALT_A),
-                SYNTHETIC_RECORD_TYPE, SYNTHETIC_SCHEMA_VERSION, RECORD_ID_A, ISSUER_ID,
+                hash_alg, record, type_map, _salts_for("envelope-guard-" + name, _ord2), *_id2,
             )
             envelope["root"] = root.hex()
             envelope["leafCount"] = len(ordered)

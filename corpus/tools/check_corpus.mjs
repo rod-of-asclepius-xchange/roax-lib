@@ -19,6 +19,7 @@
 // `--records` points at a directory holding the MOH samples already extracted to JSON text by
 // `extract_reference_record.py`. Without it, class 10 reports SKIPPED.
 
+import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -116,11 +117,6 @@ function runReject(v) {
     return;
   }
   ref.encodeValue(v.tag, resolved);
-}
-
-for (const v of V.salt ?? []) {
-  const salt = ref.deriveSalt(HASH_ALG, Buffer.from(v.masterSaltHex, "hex"), v.recordId, v.segments);
-  check(v, "saltHex", salt.toString("hex"), v.saltHex);
 }
 
 for (const v of V.leaf ?? []) {
@@ -237,8 +233,18 @@ for (const v of V.record ?? []) {
     issuerId: v.issuerId,
     issuerKeyId: v.issuerKeyId,
   };
-  const { root, leaves } = ref.buildTree(HASH_ALG, loaded, map,
-    Buffer.from(v.masterSaltHex, "hex"), identity);
+  // Under decision D4b a salt is an independent random draw that nothing can re-derive
+  // (spec section 7), so the salts come from the committed set the vector names. The pairing
+  // is declared rather than sniffed: guessing wrong would pair a real salt with the wrong leaf
+  // and yield a plausible wrong root instead of an error.
+  const ordered = ref.orderedLeaves(loaded, map, identity);
+  const saltDoc = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, v.saltsFile), "utf8"));
+  if (saltDoc.pairing !== v.saltPairing) {
+    note(v.class, `record ${v.name}: saltPairing ${v.saltPairing} but the set says ${saltDoc.pairing}`);
+    continue;
+  }
+  const salts = ref.saltSetFromDocument(saltDoc, ordered);
+  const { root, leaves } = ref.buildTree(HASH_ALG, loaded, map, salts, identity);
   check(v, "leafCount", leaves.length, v.leafCount);
   check(v, "root", root.toString("hex"), v.root);
 }
@@ -262,14 +268,49 @@ function loadRecord(v) {
   return parseRecord(fs.readFileSync(file, "utf8"));
 }
 
+// Class 12 ASSERTS RATHER THAN COMPARES. Under decision D4b salts are independent random draws,
+// so there is no pinned value for a runner to reproduce: it performs the issuances the vector
+// describes, with its OWN generator, and checks the relations. That is also why these vectors
+// contribute no bytes to --emit - there is nothing derived to write back.
+//
+// The within-issuance assertion is the one that catches an implementation drawing ONE salt per
+// record and reusing it across that record's leaves; a single-path vector cannot see that,
+// because such an implementation still varies the path's salt between trials.
+//
+// There is deliberately no within-issuance LEAF HASH check: two different paths carry different
+// encoded paths into the section 8 preimage, so their hashes differ whatever the salts do.
 for (const v of V.unlinkability ?? []) {
-  for (const side of ["recordA", "recordB"]) {
-    const s = v[side];
-    const salt = ref.deriveSalt(HASH_ALG, Buffer.from(s.masterSaltHex, "hex"), s.recordId, v.segments);
-    const h = ref.leafHash(HASH_ALG, v.segments, v.tag, v.value, salt);
-    check(v, `${side}.leafHash`, h.toString("hex"), s.leafHash);
+  const saltsSeen = new Map();
+  const hashesSeen = new Map();
+  let withinOk = true;
+  let acrossSaltsOk = true;
+  let acrossHashesOk = true;
+
+  for (let trial = 0; trial < v.trials; trial++) {
+    const drawn = v.paths.map(() => randomBytes(ref.SALT_BYTES));
+    if (new Set(drawn.map((b) => b.toString("hex"))).size !== drawn.length) withinOk = false;
+
+    v.paths.forEach((segments, i) => {
+      const pathKey = ref.encodePath(segments).toString("hex");
+      const saltHex = drawn[i].toString("hex");
+      const hashHex = ref.leafHash(HASH_ALG, segments, v.tag, v.value ?? null, drawn[i]).toString("hex");
+
+      const salts = saltsSeen.get(pathKey) ?? new Set();
+      if (salts.has(saltHex)) acrossSaltsOk = false;
+      salts.add(saltHex);
+      saltsSeen.set(pathKey, salts);
+
+      const hashes = hashesSeen.get(pathKey) ?? new Set();
+      if (hashes.has(hashHex)) acrossHashesOk = false;
+      hashes.add(hashHex);
+      hashesSeen.set(pathKey, hashes);
+    });
   }
-  check(v, "expectDistinct", v.recordA.leafHash !== v.recordB.leafHash, true);
+
+  check(v, "expectDistinctSaltsWithinIssuance", withinOk, v.expectDistinctSaltsWithinIssuance);
+  check(v, "expectDistinctSaltsAcrossIssuances", acrossSaltsOk, v.expectDistinctSaltsAcrossIssuances);
+  check(v, "expectDistinctLeafHashesAcrossIssuances", acrossHashesOk,
+    v.expectDistinctLeafHashesAcrossIssuances);
 }
 
 for (const v of V.envelope ?? []) {
@@ -288,7 +329,7 @@ for (const v of V.envelope ?? []) {
 // Reporting
 // ---------------------------------------------------------------------------------------------
 
-const CLASS_COUNT = 17;
+const CLASS_COUNT = 19;
 const byClass = new Map();
 for (const r of results) {
   const bucket = byClass.get(r.cls) ?? { pass: 0, fail: 0, failures: [] };
