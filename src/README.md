@@ -39,8 +39,26 @@ problem and NOT the duplicate-key problem: by the time a reviver sees an object,
 are already gone, and specification section 3.2 requires them rejected.
 Solving both at once is what forces a scanner.
 
-Nothing in `src/` calls `JSON.parse`, `Number()`, `parseInt`, `parseFloat` or arithmetic on a
-numeric literal. `BigInt` appears only where it is exact.
+**Nothing in `src/` calls `JSON.parse`, `parseInt` or `parseFloat`, and no numeric literal OF A
+RECORD is ever converted to a machine number.**
+A record's numeric literal reaches `encodeValue` as the verbatim source text and is canonicalized
+by string and `BigInt` operations over digit sequences, so no float exists anywhere on the path
+from input text to hash preimage.
+
+That statement is deliberately narrower than "nothing calls `Number()`", because three calls remain
+and a claim that a reader can falsify by grepping for one is worth less than a claim that survives
+the grep.
+All three are listed here, and each is exact rather than approximate.
+
+| Site | What it converts | Why it is exact |
+|---|---|---|
+| `numbers.ts`, the decimal exponent | a `BigInt` | Reached only after the digit bound has proved `\|e\| <= 1024`. The exponent LITERAL is read with `BigInt` for the opposite reason: a large one would saturate to `Infinity` and turn a rejection into an unbounded allocation. |
+| `bytes.ts`, `u64be` | a `BigInt` masked to one byte | A value in `0..255` is exactly representable. The value arrived as a `bigint` and never stopped being one. |
+| `envelope.ts`, `structuralInteger` | a validated integer literal, through `BigInt` | A count, an index, a chain identifier or a type tag - structural rather than a record value. The literal is checked against `^(0\|[1-9][0-9]*)$`, converted with `BigInt`, and range-checked BEFORE it is narrowed, so no rounding can precede the check. **Two of the four are themselves committed** - the tag byte enters the leaf preimage and an INDEX segment enters `encodePath` - so this is not "uncommitted, therefore harmless": the guarantee is that the byte written is the one the literal named. |
+
+`BigInt` appears only where it is exact, and hexadecimal is decoded by table lookup rather than by
+`parseInt`, so no text in this package reaches a machine number through a general-purpose numeric
+parser.
 
 ## Running it
 

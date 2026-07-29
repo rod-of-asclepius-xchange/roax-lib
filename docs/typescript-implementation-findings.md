@@ -237,11 +237,23 @@ reads as a guard against a reachable state.
 
 Recorded so a passing run does not read as coverage it does not have.
 
-- **Tag 8 `BLOB_REF` map rejection.** Specification section 6.5 requires an implementation to
-  reject a type map binding any path to tag 8, and `docs/conformance-corpus.md` class 11 mandates
-  a row for it. No committed `typeMapVector` carries `expectMapRejected`, so the `oneOf` branch
-  that exists for it is unreached. This implementation performs the rejection at map-compile time
-  and it is covered by a unit test rather than by a vector.
+- **Tag 8 `BLOB_REF`, and it is TWO rejections rather than one.** Specification section 6.5 reads:
+  "An implementation MUST reject a record whose type map binds any path to tag 8, and MUST reject
+  an envelope carrying a tag-8 leaf."
+  `docs/conformance-corpus.md` class 11 mandates a row for the first half.
+  No committed `typeMapVector` carries `expectMapRejected` and no committed envelope fixture
+  carries a tag-8 leaf, so neither half is reached by a vector.
+  The record half is unit-tested; **the envelope half is currently asserted by neither a vector nor
+  a unit test**, and is recorded here rather than left to read as covered.
+  The two need separate code, which is the part that is easy to miss: the record half also covers
+  a FULL copy transitively, because re-flattening one reaches `carrierFromJson`, but a disclosed
+  copy is never re-flattened.
+  Its leaves are taken as given, so a tag-8 leaf would pass the named-without-value check, skip the
+  map check - `observedKindForTag` returns nothing for tag 8, since the tag implies no observed
+  JSON kind - reach `encodeValue`, and verify against the root.
+  The rejection is therefore the first check in the per-leaf loop of `verifyDisclosedCopy`, ahead
+  of the named-without-value check, so that a tag-8 leaf carrying no value still reports
+  `blob-ref-not-selectable` rather than a reason naming a different defect.
 - **The full-copy `leafCount` disagreement rule.** Specification section 11.1 requires that in a
   full copy "a derived count that disagrees with the `leafCount` field MUST be a rejection". The
   nearest committed vector, `full-copy-salts-length-not-leaf-count`, is caught one step earlier by
@@ -254,7 +266,67 @@ Recorded so a passing run does not read as coverage it does not have.
 
 ---
 
-## 9. What was measured
+## 9. The envelope carries no schema-version discriminator, so one binding is waivable by deletion
+
+**Closed in code as far as the envelope shape allows, with a residue that cannot be closed there.**
+
+Specification section 11.2 marks `roax.typeMap.id` mandatory to disclose and says that withholding
+a mandatory reserved leaf "does not produce a weaker proof; it produces no proof".
+`schemas/envelope-2.0.json` makes the outer `typeMap` member required for the same reason.
+The verifier in `src/envelope.ts` originally took the MEMBERSHIP of that binding, and with it the
+reserved half of the minimum-disclosure floor, from the outer `typeMap` member alone.
+
+That was an asymmetry inside one function rather than a missing feature.
+The same function selects the floor TABLE from the COMMITTED `roax.recordType` leaf specifically so
+that no outer field selects anything before it has been authenticated, and then let an outer field
+decide whether a binding applied at all.
+The sequence it admitted: a holder of an envelope-2.0 disclosed copy deletes the top-level
+`typeMap` member and withholds the `roax.typeMap.id` leaf.
+Nothing then binds it, `mandatoryReservedPaths` omits it from the floor, and the copy verifies.
+
+**What this was not.** It was not forgeable against a genuine root.
+The resolved tag is inside the leaf preimage, so a copy verified under the wrong map fails rather
+than passing - the exposure was that a stated MUST became waivable by editing an unauthenticated
+field, not that a wrong answer could be produced.
+
+**What is now closed.** The identity is decided from the committed side in both directions.
+An outer `typeMap.id` with no committed leaf is `outer-identity-mismatch`, as before.
+A committed `roax.typeMap.id` leaf with no outer member is now `outer-identity-mismatch` too,
+which is the half that was missing.
+Because those two directions settle the member against the root, the reserved half of the floor is
+now selected from an authenticated fact rather than from a hint.
+
+**The residue, stated at the strength of the evidence.** The remaining case is both halves absent
+at once, and it cannot be separated from a conforming `schemas/envelope-1.0.json` copy, which
+predates the binding and is legitimately verifiable.
+The envelope shape of specification section 11.1 carries no discriminator for which envelope schema
+version a document was issued under.
+This was checked rather than assumed: `canon` is `const: "ROAX-CANON/1"` in
+`schemas/envelope-1.0.json` and in `schemas/envelope-2.0.json` alike, and the outer `schemaVersion`
+is the RECORD profile's version, which `schemas/envelope-2.0.json` describes as opaque to the
+protocol.
+
+So the residue is reported rather than waived.
+A disclosed copy carrying neither half adds an `undischarged` entry naming both readings, on every
+such verification, which is the same treatment findings 3 and 5 give their gaps.
+A deployment that issues and accepts only envelope-2.0 documents closes it outright by setting
+`requireTypeMapIdentity` on its verifier configuration.
+That knob defaults to permissive, and the default is a statement about envelope-1.0 rather than
+about the binding: failing closed by default would reject conforming documents rather than forged
+ones, and `src/envelope.ts` reads both schema versions deliberately.
+
+All 54 committed envelope fixtures carry no `typeMap` member and no `roax.typeMap.id` leaf, so what
+the corpus exercises today is the residue rather than either closed direction, and **neither closed
+direction is asserted by a vector.**
+The round trip through `issueFullCopy` and `discloseFrom` in `test/unit.ts` does commit and
+disclose the leaf, so the both-present direction is exercised there incidentally; the leaf-without-
+member direction is not exercised anywhere and is recorded here for that reason.
+Closing the corpus difference is corpus-rebuild work: class 14 now defines five reserved paths
+where the committed fixtures carry four.
+
+---
+
+## 10. What was measured
 
 Node v22.21.0, TypeScript 5.9.3, `SHA-256`, corpus `1.0.0`.
 

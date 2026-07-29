@@ -22,7 +22,7 @@
 
 import { fail } from './errors.js';
 import { toHex } from './bytes.js';
-import { encodePath, displayPath, type Path } from './path.js';
+import { compareBytes, encodePath, displayPath, type Path } from './path.js';
 import { assertRecordPathAllowed, reservedLeaves, type RecordIdentity } from './reserved.js';
 import { carrierFromJson, TypeTag, type CarrierValue, type TypeTagValue } from './value.js';
 import type { JsonValue } from './json.js';
@@ -189,16 +189,4 @@ export function leafSet(
     ordered.push({ ...entry.leaf, encodedPath: entry.encodedPath, index: i });
   }
   return ordered;
-}
-
-function compareBytes(a: Uint8Array, b: Uint8Array): number {
-  const n = Math.min(a.length, b.length);
-  for (let i = 0; i < n; i += 1) {
-    const x = a[i] as number;
-    const y = b[i] as number;
-    if (x !== y) {
-      return x < y ? -1 : 1;
-    }
-  }
-  return a.length === b.length ? 0 : a.length < b.length ? -1 : 1;
 }

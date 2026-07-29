@@ -2,9 +2,15 @@
  * Canonical numbers (specification section 6.2).
  *
  * Arbitrary precision, held as strings, never parsed into a machine integer and never through a
- * float. Nothing in this module calls `Number()`, `parseInt`, `parseFloat` or performs arithmetic
- * on a numeric literal: every operation is a string or `BigInt` operation over digit sequences.
- * `BigInt` appears only for exponent bookkeeping, where it is exact.
+ * float. No digit of a record value is ever converted to a machine number here: every operation is
+ * a string or `BigInt` operation over digit sequences, and `BigInt` appears only for exponent
+ * bookkeeping, where it is exact.
+ *
+ * **There is exactly one `Number()` in this module and it converts no literal.** It narrows the
+ * already-computed `BigInt` exponent AFTER the digit bound has proved `|e| <= 1024`, which makes
+ * the narrowing exact; the comment at that line states the proof. Converting the exponent literal
+ * directly would be the unsafe thing, for the reason given where it is parsed - a large exponent
+ * saturates to `Infinity` and turns a rejection into an unbounded allocation.
  */
 
 import { fail } from './errors.js';
