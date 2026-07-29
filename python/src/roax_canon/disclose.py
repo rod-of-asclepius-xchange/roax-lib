@@ -26,9 +26,11 @@ from typing import Any, Mapping, Sequence
 from .errors import ErrorCode, RoaxError
 from .hashes import DEFAULT_HASH_ALG, get_hash
 from .leaf import CANON
+from .numbers import canonical_decimal, canonical_integer
 from .path import Segment, display_path, encode_path, segments_to_json
 from .profiles import Profile
 from .record import RESERVED_V1, BuiltRecord, RecordIdentity
+from .text import nfc
 from .tree import audit_path
 from .value import BYTES, DECIMAL, INTEGER, STRING, VALUELESS_TAGS
 
@@ -61,30 +63,55 @@ def _envelope_head(
 def _carrier_value(tag: int, value: Any) -> Any:
     """The envelope's carrier form for a leaf value.
 
-    `BYTES` travels as lowercase hex in the envelope, which is what
-    `schemas/envelope-1.0.json` pins, and is distinct from the RFC 4648 base64 the
-    *record* carries for the same field (specification section 6.3).
+    **The rule is uniform across every tag: the envelope carries the value the leaf hash
+    COMMITTED, never the record's original literal.**
+    It is the emitting half of the principle specification section 11.2 states for the
+    receiving side, checking the bytes you commit rather than the bytes you received, and
+    it is what keeps a disclosed copy self-consistent: a reader comparing the carrier
+    against the proof accompanying it is then looking at one value rather than at two
+    spellings of one.
 
-    `STRING`, `INTEGER` and `DECIMAL` travel as a plain :class:`str`, and that conversion
-    is not cosmetic.
-    A record leaf at tag 3 or 4 holds a :class:`~roax_canon.jsonio.JsonNumber`, whose
-    purpose is to keep the literal verbatim, and `schemas/envelope-1.0.json` pins this
-    carrier to ``"type": "string"`` because a JSON number here would be read back through
-    a float by any ordinary consumer and ``0.010`` would become ``0.01`` (specification
-    section 6.4).
-    The emitted **bytes** are unchanged either way, since `JsonNumber` subclasses
-    :class:`str` and therefore already serializes as a JSON string; what this closes is
-    the in-memory hand-off, where the carrier would otherwise still be a `JsonNumber` and
-    :func:`roax_canon.verify.verify_envelope` would reject an envelope this module had
-    just built.
-    The value has already passed :func:`roax_canon.value.encode_value` at these tags by
-    the time a :class:`~roax_canon.record.BuiltRecord` exists, so it is a string here.
+    * `STRING` travels as its NFC form, because that is what the leaf commits
+      (specification section 6.1).
+    * `INTEGER` and `DECIMAL` travel canonicalized (specification section 6.2). A record
+      may carry ``-0``, ``1e2`` or ``1.0e2``, which commit as ``0``, ``100`` and ``100``,
+      and `schemas/envelope-1.0.json` pins the DECIMAL carrier to
+      ``^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$`` with its own description recording that exponent
+      notation has already been expanded. Emitting the raw literal therefore writes an
+      envelope this library verifies and its own schema rejects, because
+      :func:`~roax_canon.numbers.canonical_decimal` re-expands it on the way back in.
+    * `BYTES` travels as lowercase hex of the committed bytes, which is what
+      `schemas/envelope-1.0.json` pins and is a different carrier from the RFC 4648 base64
+      the *record* uses for the same field (specification section 6.3).
+    * `BOOL` is a JSON boolean, tags 0, 6 and 7 carry no value, and tag 8 `BLOB_REF` never
+      reaches an envelope at all (specification section 6.5), so none is converted.
+
+    :func:`~roax_canon.numbers.canonical_integer`,
+    :func:`~roax_canon.numbers.canonical_decimal` and :func:`~roax_canon.text.nfc` are
+    reused rather than reimplemented, because they are the same three functions
+    :func:`roax_canon.value.encode_value` hashes through and a second preimage builder is
+    the drift specification section 8 exists to prevent.
+    All three are idempotent on an already-canonical value, so this is a no-op on the
+    common case.
+
+    The trailing :class:`str` is load-bearing rather than cosmetic.
+    :func:`~roax_canon.numbers.canonical_integer` and :func:`~roax_canon.text.nfc` return
+    their argument unchanged when it is already canonical, so a record's
+    :class:`~roax_canon.jsonio.JsonNumber` would survive into the carrier; `JsonNumber`
+    subclasses :class:`str`, so the result would still be a JSON-number carrier, which is
+    what specification section 6.4 forbids there.
     """
     if tag == BYTES:
         return bytes(value).hex()
-    if tag in (STRING, INTEGER, DECIMAL):
-        return str(value)
-    return value
+    if tag == STRING:
+        committed: Any = nfc(value, where="disclosed STRING leaf value")
+    elif tag == INTEGER:
+        committed = canonical_integer(value)
+    elif tag == DECIMAL:
+        committed = canonical_decimal(value)
+    else:
+        return value
+    return str(committed)
 
 
 def full_copy(
