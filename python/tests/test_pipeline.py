@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import re
 import sys
+import unicodedata
 import unittest
 
 from roax_canon import (
@@ -440,6 +442,67 @@ class TestRecordAndEnvelope(unittest.TestCase):
             anchored_root=bytes(32),
         )
         self.assertEqual(verify_envelope(envelope, hostile).reason, ErrorCode.ROOT_MISMATCH)
+
+
+class TestDisclosedCarrierIsTheCommittedValue(unittest.TestCase):
+    """A disclosed copy carries what the leaf hash committed, not the record's literal.
+
+    `python/tools/run_corpus.py` never calls :func:`disclosed_copy`, so the emitter has no
+    corpus exposure at all and these tests are the only thing holding this.
+
+    The two patterns below are the ones `schemas/envelope-1.0.json` pins on a disclosed
+    leaf's ``value`` at tags 3 and 4; the DECIMAL one is written there with its own note
+    that exponent notation has already been expanded.
+    """
+
+    INTEGER_CARRIER = re.compile(r"\A-?(0|[1-9][0-9]*)\Z")
+    DECIMAL_CARRIER = re.compile(r"\A-?(0|[1-9][0-9]*)(\.[0-9]+)?\Z")
+
+    def setUp(self):
+        self.profile = Profile("org.roax.corpus.synthetic", ((Key("marker"),),))
+        self.config = VerifierConfig(
+            profiles=DEFAULT_PROFILES.with_profile(self.profile),
+            resolvers={"org.roax.corpus.synthetic": resolver()},
+        )
+
+    def emit(self, body, path):
+        record = loads(body)
+        built = issue(record, IDENTITY, resolver())
+        reveal = list(self.profile.floor()) + [(Key(key),) for key in record]
+        envelope = disclosed_copy(reveal, IDENTITY, built, profile=self.profile)
+        result = verify_envelope(envelope, self.config)
+        self.assertTrue(result.accepted, f"{result.reason}: {result.detail}")
+        return next(
+            leaf for leaf in envelope["disclosure"]["leaves"] if leaf["displayPath"] == path
+        )["value"]
+
+    def test_decimal_exponent_notation_is_expanded(self):
+        for literal in ("1e2", "1.0e2"):
+            with self.subTest(literal=literal):
+                emitted = self.emit('{"marker": "m", "amount": %s}' % literal, "amount")
+                self.assertEqual(emitted, "100")
+                self.assertIsNotNone(self.DECIMAL_CARRIER.match(emitted))
+                self.assertNotIsInstance(emitted, JsonNumber)
+
+    def test_decimal_trailing_zeros_still_survive(self):
+        # Canonicalizing the carrier must not become a licence to strip precision:
+        # `0.010` is not `0.01` and FHIR R4 says SHALL.
+        emitted = self.emit('{"marker": "m", "amount": 0.010}', "amount")
+        self.assertEqual(emitted, "0.010")
+        self.assertIsNotNone(self.DECIMAL_CARRIER.match(emitted))
+
+    def test_negative_zero_integer_is_normalized(self):
+        emitted = self.emit('{"marker": "m", "count": -0}', "count")
+        self.assertEqual(emitted, "0")
+        self.assertIsNotNone(self.INTEGER_CARRIER.match(emitted))
+        self.assertNotIsInstance(emitted, JsonNumber)
+
+    def test_string_travels_as_its_nfc_form(self):
+        # U+0065 U+0301 commits as U+00E9 (specification section 6.1), so that is what the
+        # carrier must say.
+        emitted = self.emit('{"marker": "e\\u0301"}', "marker")
+        self.assertEqual(emitted, "é")
+        self.assertEqual(emitted, unicodedata.normalize("NFC", emitted))
 
 
 class TestHostileEnvelopeMembers(unittest.TestCase):
