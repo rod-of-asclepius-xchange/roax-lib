@@ -223,6 +223,7 @@ These are the things a future agent is most likely to get wrong.
   8-leaf tree, `MTH(L[0:4])` at index 0 with a forged size of 2 verifies. What actually defends is
   spec section 10 step 2 - recompute the leaf hash from the disclosed fields, never accept one - plus
   the `0x00` leaf-domain byte. Never add a check that leans on `leafCount` in a disclosed copy.
+  Spec section 11.1 owns the full measurement and correction.
 
 - **Type tag 8 `BLOB_REF` is defined and selected by nothing.** The schemas accept it so the carrier
   form is pinned once; an implementation MUST reject any record or type map that uses it until a
@@ -251,9 +252,10 @@ These are the things a future agent is most likely to get wrong.
 
 - **The envelope's outer identity is not authority and must be bound to the reserved leaves.**
   Section 11.3 says fields outside the root are hints; section 11.2 commits `recordType`,
-  `schemaVersion`, `recordId` and `issuer.id` as leaves so a disclosed copy can be checked against
-  them. The outer `recordType` is what SELECTS the profile floor, and PDT's floor is a strict
-  subset of recovery's, so an unbound one lets a holder relabel a recovery copy as PDT, withhold
+  `schemaVersion`, `typeMap.id`, `recordId` and `issuer.id` as leaves so a disclosed copy can be
+  checked against them.
+  The outer `recordType` is what SELECTS the profile floor, and PDT's floor is a strict subset of
+  recovery's, so an unbound one lets a holder relabel a recovery copy as PDT, withhold
   `validUntil`, and still have every inclusion proof verify against the genuine root. Compare under
   NFC on both sides: a STRING leaf commits its normalized form. `roax.issuer.keyId` MUST NOT be
   bound - it is the conditional leaf.
@@ -261,13 +263,17 @@ These are the things a future agent is most likely to get wrong.
 - **The binding runs BEFORE the minimum-disclosure floor, and the floor is selected from the
   COMMITTED `roax.recordType` leaf.** Derived from section 11.3, not chosen: authority has to be
   established before an outer field selects anything, and floor-then-bind is trust-then-verify.
-  The consequence is load-bearing and is pinned by 16 vectors - because absence of a reserved
-  leaf now trips the binding, the reserved half of the floor is unreachable and every
-  `floor-<profile>-omits-roax-*` vector asserts `outer-identity-mismatch` rather than
+  The consequence is load-bearing and is pinned by 16 vectors of the committed corpus - because
+  absence of a reserved leaf now trips the binding, the reserved half of the floor is unreachable
+  and every `floor-<profile>-omits-roax-*` vector asserts `outer-identity-mismatch` rather than
   `minimum-disclosure-floor`. Do not "simplify" by enforcing the floor first; do not trim the
-  reserved paths out of the floor table either, since class 14 defines the floor as those four
-  plus the profile's. `profile-unknown` stays ahead of both: it is the verifier's own allow-list,
-  not a policy choice. See `corpus/README.md`.
+  reserved paths out of the floor table either, since class 14 defines the floor as the reserved
+  paths plus the profile's.
+  Those 16 are four reserved paths across four profiles because the committed corpus predates
+  `roax.typeMap.id`, while class 14 now defines five reserved paths; closing that difference is
+  corpus-rebuild work and not a reason to trim the table.
+  `profile-unknown` stays ahead of both: it is the verifier's own allow-list, not a policy choice.
+  See `corpus/README.md`.
 
 ## The conformance corpus
 
@@ -297,19 +303,6 @@ Both flags are optional and their absence is reported, never hidden. Things to k
   registry and must never be issued against. It exists so structural vectors do not borrow a real
   health authority's identifier and so authored type-map bindings never mix into a map that claims
   schema provenance.
-
-## A specification claim that measurement contradicts
-
-**Section 11.1 says `leafCount` is self-binding in a disclosed copy. It is not.** RFC 9162 section
-2.1.3.2 takes `tree_size` as an input, so an attacker who controls `leafCount` controls the shape
-the verifier reconstructs. Measured on an 8-leaf tree: the internal node `MTH(L[0:4])` presented as
-a leaf at index 0 fails verification under the true tree size 8 and **succeeds** under a forged tree
-size 2, against the same genuine root.
-
-What actually blocks it is section 10 step 1 - recompute the leaf hash from the disclosed fields
-rather than trust a supplied one - plus second-preimage resistance. That defence is already
-normative. The `leafCount` sentence claims a second one that is not there, and the specification has
-not been changed here because that is a specification decision.
 
 ## Documentation conventions in force here
 
