@@ -1,6 +1,9 @@
 # ROAX-CANON/1 - canonical serialization, commitment and selective disclosure
 
-**Status:** draft for review. Not frozen. No library code exists yet.
+**Status:** draft for review. Not frozen.
+One implementation now exists, in TypeScript, at `src/`; it was written from this document alone and
+its disagreements with the conformance corpus are recorded in
+`docs/typescript-implementation-findings.md`.
 **Version string:** `ROAX-CANON/1`
 **Date:** 2026-07-28
 

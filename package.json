@@ -1,0 +1,32 @@
+{
+  "name": "@roax/canon",
+  "version": "0.1.0",
+  "description": "TypeScript implementation of ROAX-CANON/1: canonical serialization, commitment and selective disclosure for health records.",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "files": [
+    "dist/src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node dist/test/unit.js && node dist/conformance/run.js",
+    "conformance": "npm run build && node dist/conformance/run.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "^5.9.3"
+  }
+}

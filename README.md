@@ -6,13 +6,17 @@ The goal is a language-neutral way to canonically serialize, merklize, anchor an
 selectively disclose real health records - FHIR, and Singapore MOH's PDT, recovery
 and vaccination healthcerts - integrating with ROAX.
 
-Status: **design phase.** Specifications and schemas are drafted for review.
-No library code has been written, deliberately.
+Status: **design reviewed, first library building.**
+The specifications and schemas were drafted and reviewed before any library existed, deliberately,
+so that the design could be settled before five implementations existed to re-litigate it.
+The first of those five, in TypeScript, is now in [`src/`](src/).
 
 ## Start here
 
 | Read | For |
 |---|---|
+| [`src/README.md`](src/README.md) | The TypeScript library: what it is, how to run it, and the four traps JavaScript sets for this design. |
+| [`docs/typescript-implementation-findings.md`](docs/typescript-implementation-findings.md) | **Where that independent build disagreed with the corpus, and where the specification admitted two honest readings.** Worth more than the code. |
 | [`docs/decisions.md`](docs/decisions.md) | **The decisions, ruled and open, each with its reasoning.** Four are still open: three belong to the project owner, and D14 was identified afterwards while building a conformance vector. Start here if you are reviewing rather than implementing. |
 | [`docs/spec/roax-canon-1.md`](docs/spec/roax-canon-1.md) | The protocol. Precise enough to implement from. Section 2 says what it does not solve; section 14 reconciles it against dogtag. |
 | [`docs/profiles/`](docs/profiles/) | One document per record family, because the four families do **not** share one concrete object. |
