@@ -258,7 +258,7 @@
       "additionalProperties": false,
       "properties": {
         "prefix": {
-          "description": "Structured prefix of the region in which an exact child selector may be added. The selector either extends the prefix with a segment the parent does not declare at that state, and may then descend inside that otherwise untyped subtree, or names a direct child of the prefix that the parent declares but leaves unresolved for the observed kind. Complete profile validation still applies. An extension validator enforces both shapes.",
+          "description": "Structured prefix of the region in which an exact child selector may be added. The selector either extends the prefix with a segment the parent does not declare at that state, and may then descend inside that otherwise untyped subtree, or names a direct child of the prefix exactly one segment deeper at which the parent has no binding for the observed kind and carries an explicit unresolved row naming that kind. A declared path with neither a binding nor such a row is not extensible. Complete profile validation still applies. An extension validator enforces both shapes.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/segmentPattern"
@@ -371,7 +371,7 @@
       }
     },
     "unresolved": {
-      "description": "Non-operative audit evidence. No resolver output is supplied for these kinds.",
+      "description": "Declared gap for the listed kinds. A resolver supplies no output for them and MUST fail closed, but these rows are operative for the extension lifecycle: an issuer child may bind a direct child of an extension point only where such a row already names the observed kind, and a child MUST carry every inherited row unchanged except for kinds it resolves with a binding. See docs/type-maps.md sections 3 and 5.",
       "type": "object",
       "required": ["jsonKinds", "reason", "sources"],
       "additionalProperties": false,

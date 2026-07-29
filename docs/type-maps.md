@@ -242,6 +242,7 @@ Each state has at most one output for an observed JSON kind, and generation fail
 A resolver MUST read outputs only from `automaton.states[*].bindings`, under ROAX-CANON/1 section 4.2 and the artifact schema.
 The state-level `unresolved` rows and `structurallyUntypedObject` markers and the top-level `extensionPoints`, `addedSelectors` and `coverage` fields are audit or lifecycle metadata and never supply a tag.
 A path represented only by that metadata remains unknown and fails closed.
+An `unresolved` row is nevertheless operative for the extension lifecycle rather than purely descriptive: section 5 admits a shape-2 issuer selector only where such a row already names the observed kind, so removing or inventing one changes which paths an issuer may bind.
 
 The type map does not replace complete profile validation.
 For example, the full FHIR union may admit a path under one resource branch even when a sibling `resourceType` value names another branch.
@@ -358,7 +359,11 @@ Each prefix defines a structured region in which an issuer child may add an exac
 A prefix admits exactly two selector shapes, and `tools/check-type-map-extension.mjs` enforces both:
 
 1. The selector extends the prefix with a segment that the base map does not declare at that prefix state, and may then descend as deep as the issuer needs inside that otherwise untyped subtree.
-2. The selector names a direct child of the prefix that the base map declares but leaves unresolved for the observed JSON kind, such as vaccination `dose`.
+2. The selector names a direct child of the prefix, exactly one segment deeper, at which the base map has no binding for the observed JSON kind **and** carries an explicit `unresolved` row listing that kind, such as vaccination `dose`.
+
+Silence is not eligibility under shape 2.
+A declared path that has neither a binding nor an `unresolved` row for the observed kind is not extensible: the PDT path `type` has no `array` binding and no `unresolved` row, so no issuer may bind EMPTY_ARRAY there, and only a base-map revision can.
+The `unresolved` rows are therefore operative for extension admission even though they never supply a tag, and a child MUST carry each inherited row unchanged except for the kinds it resolves with a binding, under section 5.1.
 
 A prefix therefore never reaches a descendant of a path the base map already declares.
 The PDT and recovery root prefixes admit undeclared root properties and their subtrees, which is what their open `additionalProperties` root actually permits.
@@ -379,6 +384,8 @@ Changing or removing a parent binding is a replacement base-map revision, not an
 | One effective artifact has two outputs for the same path language and observed kind | Reject the artifact. |
 | A child overlaps an inherited selector | Reject the child, even if the proposed tag is the same. |
 | A child binds a descendant of a path the base map already declares | Reject the child; only a base-map revision may type that subtree. |
+| A child adds an `unresolved` row the parent does not carry | Reject the child; parent silence may not be promoted to an extensible gap. |
+| A child drops an inherited `unresolved` kind without binding it | Reject the child; a documented gap is erased only by resolving it. |
 | Two artifacts carry the same semver | Their content IDs distinguish them, and no verifier chooses by version ordering. |
 | Another installed map covers a path missing from the selected map | Fail closed and do not search the other map. |
 
@@ -413,6 +420,21 @@ node tools/build-type-maps.mjs \
   --references references/schemata \
   --out type-maps
 ```
+
+**That command currently fails, and the four published artifacts cannot be regenerated from the pinned checkout.**
+The generator refuses to guess an empty-container tag when merged branches disagree about admitting the empty value, and that refusal now covers objects as well as arrays, because EMPTY_OBJECT is a distinct leaf under ROAX-CANON/1 section 6.1 and a permissive union silently widens the map.
+Measured against commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`, the object rejection fires on 34 states: 30 in full FHIR, 2 in PDT, 2 in recovery and none in vaccination.
+The first is the state that merges `#/definitions/ImplementationGuide_Definition`, which requires `resource`, with `#/definitions/Reference`, which admits `{}`.
+Resolving those states needs combinator-aware evaluation, which the DFA closure has discarded by the time a state is merged, so it is an open ruling rather than a mechanical fix.
+The committed artifacts, their content IDs and the section 2.1 table remain authoritative and are still checked in full by `tools/check-type-maps.mjs`; only regeneration is blocked.
+
+The generator's own rejections are provable without any reference checkout:
+
+```sh
+node tools/build-type-maps.mjs --self-test
+```
+
+It compiles constructed schemas whose merged object branches disagree through `required` and through `minProperties`, and whose merged array branches disagree through `minItems`, asserts that each is rejected, and asserts that agreeing object branches still yield EMPTY_OBJECT.
 
 The reference checkout MUST be at Open-Attestation/schemata commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`, as recorded in every artifact.
 The generator resolves cross-file references by file path and does not inspect `$id`.

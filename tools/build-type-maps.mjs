@@ -151,7 +151,8 @@ function parseArgs(argv) {
       args.check = true;
     } else if (arg === "--help") {
       process.stdout.write(
-        "Usage: node tools/build-type-maps.mjs --references references/schemata [--out type-maps] [--check]\n",
+        "Usage: node tools/build-type-maps.mjs --references references/schemata [--out type-maps] [--check]\n" +
+          "       node tools/build-type-maps.mjs --self-test\n",
       );
       process.exit(0);
     } else {
@@ -482,6 +483,13 @@ function classifyNode(store, node) {
   };
 }
 
+function admitsEmptyObject(node) {
+  return (
+    (!Array.isArray(node.required) || node.required.length === 0) &&
+    (!Number.isInteger(node.minProperties) || node.minProperties === 0)
+  );
+}
+
 function compileAutomaton(store, rootNode) {
   const close = (input) => {
     const stack = [...input];
@@ -594,11 +602,13 @@ function compileAutomaton(store, rootNode) {
         `state s${index} merges array branches that disagree on empty-array admission`,
       );
     }
-    const emptyObjectSchemas = objectSchemas.filter(
-      ([, node]) =>
-        (!Array.isArray(node.required) || node.required.length === 0) &&
-        (!Number.isInteger(node.minProperties) || node.minProperties === 0),
-    );
+    const objectEmptyPermissions = new Set(objectSchemas.map(([, node]) => admitsEmptyObject(node)));
+    if (objectEmptyPermissions.size > 1) {
+      throw new Error(
+        `state s${index} merges object branches that disagree on empty-object admission`,
+      );
+    }
+    const emptyObjectSchemas = objectSchemas.filter(([, node]) => admitsEmptyObject(node));
     const objectAllowsEmpty = emptyObjectSchemas.length > 0;
     const arrayAllowsEmpty =
       explicitArrays.length > 0 &&
@@ -795,6 +805,115 @@ function buildProfile(referenceCheckout, config) {
   return { artifact, output: config.output };
 }
 
+class FixtureStore {
+  constructor(document) {
+    this.pointers = new WeakMap();
+    const visit = (node, pointer) => {
+      if (node === null || typeof node !== "object") {
+        return;
+      }
+      if (Array.isArray(node)) {
+        node.forEach((item, index) => visit(item, `${pointer}/${index}`));
+        return;
+      }
+      if (!this.pointers.has(node)) {
+        this.pointers.set(node, pointer);
+      }
+      for (const key of Object.keys(node)) {
+        visit(node[key], `${pointer}/${escapePointerPart(key)}`);
+      }
+    };
+    visit(document, "#");
+  }
+
+  location(node) {
+    const pointer = this.pointers.get(node);
+    if (pointer === undefined) {
+      throw new Error("fixture node has no registered location");
+    }
+    return { absolute: "fixture", pointer };
+  }
+
+  relativeSource(absolute, pointer = "") {
+    return `${absolute}${pointer === "#" ? "" : pointer}`;
+  }
+
+  resolveRef() {
+    throw new Error("fixture schemas do not use $ref");
+  }
+}
+
+function objectBranches(first, second) {
+  return { properties: { value: { anyOf: [first, second] } } };
+}
+
+function expectCompileRejects(name, document, pattern) {
+  try {
+    compileAutomaton(new FixtureStore(document), document);
+  } catch (error) {
+    if (!pattern.test(error.message)) {
+      throw new Error(`self-test ${name}: unexpected rejection: ${error.message}`);
+    }
+    return;
+  }
+  throw new Error(`self-test ${name}: disagreeing branches were accepted`);
+}
+
+function expectCompiles(name, document, expectedTag) {
+  const { automaton } = compileAutomaton(new FixtureStore(document), document);
+  const state = automaton.states.find(
+    (candidate) => candidate.id === automaton.states[0].keys[0].to,
+  );
+  const tags = (state.bindings ?? []).map((binding) => binding.tag);
+  if (!tags.includes(expectedTag)) {
+    throw new Error(
+      `self-test ${name}: expected tag ${expectedTag}, got ${JSON.stringify(tags)}`,
+    );
+  }
+}
+
+function selfTest() {
+  expectCompileRejects(
+    "object branches disagree on empty admission",
+    objectBranches(
+      { type: "object", properties: { a: { type: "string" } }, required: ["a"] },
+      { type: "object", properties: { b: { type: "string" } } },
+    ),
+    /merges object branches that disagree on empty-object admission/,
+  );
+  expectCompileRejects(
+    "object branches disagree through minProperties",
+    objectBranches(
+      { type: "object", properties: { a: { type: "string" } }, minProperties: 1 },
+      { type: "object", properties: { b: { type: "string" } } },
+    ),
+    /merges object branches that disagree on empty-object admission/,
+  );
+  expectCompileRejects(
+    "array branches disagree on empty admission",
+    {
+      properties: {
+        value: {
+          anyOf: [
+            { type: "array", items: { type: "string" } },
+            { type: "array", minItems: 1, items: { type: "string" } },
+          ],
+        },
+      },
+    },
+    /merges array branches that disagree on empty-array admission/,
+  );
+  expectCompiles(
+    "object branches agree that empty is admitted",
+    objectBranches(
+      { type: "object", properties: { a: { type: "string" } } },
+      { type: "object", properties: { b: { type: "string" } } },
+    ),
+    TAG.EMPTY_OBJECT,
+  );
+  process.stdout.write("validated type-map generator self-tests\n");
+}
+
 function compareOrWrite(path, bytes, check) {
   if (check) {
     if (!existsSync(path)) {
@@ -811,7 +930,12 @@ function compareOrWrite(path, bytes, check) {
 }
 
 function main() {
-  const args = parseArgs(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  if (argv.length === 1 && argv[0] === "--self-test") {
+    selfTest();
+    return;
+  }
+  const args = parseArgs(argv);
   const outputRoot = resolve(args.out);
   const registryRows = [];
 

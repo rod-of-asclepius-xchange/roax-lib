@@ -62,11 +62,18 @@ These are the things a future agent is most likely to get wrong.
 
 - **An extension point does not open the whole subtree beneath it.** A `prefix` admits only two
   selector shapes: a segment the base map does not declare at that prefix state, and then anything
-  below that untyped subtree; or a direct child of the prefix that the base map declares but leaves
-  unresolved for the observed kind, such as vaccination `dose`. So the PDT and recovery empty root
-  prefixes reach undeclared root properties, not the shared lite FHIR Bundle, and no issuer can
-  privately bind `base64Binary` or `Narrative.div`. Rebinding a declared path is a base-map
-  revision. See `docs/type-maps.md` section 5.
+  below that untyped subtree; or a direct child of the prefix, exactly one segment deeper, that has
+  no binding for the observed kind **and carries an explicit `unresolved` row naming that kind**,
+  such as vaccination `dose`. So the PDT and recovery empty root prefixes reach undeclared root
+  properties, not the shared lite FHIR Bundle, and no issuer can privately bind `base64Binary` or
+  `Narrative.div`. Rebinding a declared path is a base-map revision. See `docs/type-maps.md`
+  section 5.
+
+- **`unresolved` rows are operative for the extension lifecycle, not just audit prose.** They gate
+  shape 2 above, so silence is not eligibility: PDT `type` has no `array` binding and no row, and is
+  therefore not extensible. A child must carry every inherited row unchanged except for kinds it
+  resolves with a binding - it may not invent a row, restate one with its own evidence, or drop one
+  it did not resolve. Do not describe them as purely non-operative anywhere.
 
 - **`tools/check-type-maps.mjs` is the only checker that runs against the committed tree.**
   `build-type-maps.mjs --check` needs the gitignored reference checkout; this one does not.
@@ -84,21 +91,25 @@ These are the things a future agent is most likely to get wrong.
   infer a scalar, array or null tag from an inapplicable object keyword.
   See `docs/type-maps.md` section 1.5.
 
-- **The generator deliberately rejects schema intersections and mixed empty-array permission.**
-  Its DFA closure can safely union the pinned `anyOf` and `oneOf` path languages only because
-  complete profile validation runs first.
-  An `allOf` needs intersection-aware compilation, and array branches that disagree on whether
+- **The generator rejects schema intersections and mixed empty-container permission, for objects
+  and arrays alike.** Its DFA closure can safely union the pinned `anyOf` and `oneOf` path
+  languages only because complete profile validation runs first.
+  An `allOf` needs intersection-aware compilation, and container branches that disagree on whether
   empty is admitted need combinator-aware evaluation, so `tools/build-type-maps.mjs` fails instead
   of publishing a guessed EMPTY_OBJECT or omitting a valid EMPTY_ARRAY.
+  EMPTY_ARRAY and EMPTY_OBJECT are distinct leaves, so a permissive union is silent widening.
+  `--self-test` proves both rejections against constructed schemas and needs no reference checkout.
 
-- **Do not make the object branch throw on disagreement to match the array branch.** It was tried
-  and measured: the symmetric throw fires on 34 states of the pinned checkout (30 full FHIR, 2 PDT,
-  2 recovery) and leaves all four published artifacts unbuildable. The condition it detects is also
-  the wrong one. When one branch permits `{}` and another requires a member, `{}` validates under
-  `anyOf` and satisfies exactly one branch under `oneOf`, so the permissive union is correct there.
-  The genuinely `oneOf`-unsound case is the opposite: two or more branches that all permit `{}`.
-  Detecting that needs combinator-aware evaluation, which the closure has discarded by then, so it
-  is an open ruling for the project owner rather than a mechanical fix.
+- **The object rejection above means the four published artifacts cannot currently be regenerated,
+  and that is the ruled trade.** Measured on the pinned checkout, it fires on 34 states: 30 full
+  FHIR, 2 PDT, 2 recovery, 0 vaccination. The first merges `ImplementationGuide_Definition`, which
+  requires `resource`, with `Reference`, which admits `{}`. Do not "fix" this by restoring the
+  permissive union - that ruling was raised with this measurement and reaffirmed. The committed
+  artifacts and their content IDs stay authoritative and `tools/check-type-maps.mjs` still passes
+  on them; what is open is how to evaluate those 34 merged states combinator-aware so regeneration
+  works again. Note the detected condition is broader than the strictly `oneOf`-unsound one: with
+  one permitting and one requiring branch, `{}` is valid under both combinators, whereas two or
+  more branches all permitting `{}` is the case `oneOf` actually rejects.
 
 - **Numbers are never parsed through a float.** Anywhere. This is the whole point of the design;
   see `docs/decisions.md` part 0. In test vectors and JSON Schemas, INTEGER and DECIMAL values are

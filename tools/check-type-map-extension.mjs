@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual, TextDecoder } from "node:util";
@@ -921,6 +921,20 @@ function bindingMap(state) {
   return new Map((state.bindings ?? []).map((binding) => [binding.jsonKind, binding]));
 }
 
+function unresolvedKindsByRow(state) {
+  const rows = new Map();
+  for (const row of state?.unresolved ?? []) {
+    const rowKey = `${row.reason}\n${row.sources.join(",")}`;
+    if (!rows.has(rowKey)) {
+      rows.set(rowKey, new Set());
+    }
+    for (const jsonKind of row.jsonKinds) {
+      rows.get(rowKey).add(jsonKind);
+    }
+  }
+  return rows;
+}
+
 function bindingEvidenceIds(binding) {
   return new Set(binding.sources.map((reference) => sourceIdFromReference(reference, "binding")));
 }
@@ -980,6 +994,25 @@ function validateLogicalAdditivity(
         isDeepStrictEqual(childBindings.get(jsonKind), parentBinding),
         `child: inherited ${jsonKind} binding changed at logical state ${item.parentId}`,
       );
+    }
+
+    const parentUnresolved = unresolvedKindsByRow(parentState);
+    const childUnresolved = unresolvedKindsByRow(childState);
+    for (const [rowKey, jsonKinds] of childUnresolved) {
+      for (const jsonKind of jsonKinds) {
+        ensure(
+          parentUnresolved.get(rowKey)?.has(jsonKind) === true,
+          `child: unresolved ${jsonKind} row is not inherited at child state ${item.childId}`,
+        );
+      }
+    }
+    for (const [rowKey, jsonKinds] of parentUnresolved) {
+      for (const jsonKind of jsonKinds) {
+        ensure(
+          childUnresolved.get(rowKey)?.has(jsonKind) === true || childBindings.has(jsonKind),
+          `child: inherited unresolved ${jsonKind} row is dropped without a binding at logical state ${item.parentId}`,
+        );
+      }
     }
 
     for (const [jsonKind, childBinding] of childBindings) {
@@ -1479,6 +1512,67 @@ function selfTest() {
       parent.coverage.structurallyUntypedObjectSourceNodes = 1;
     },
   );
+  expectReject(
+    "unresolved row added at an inherited state",
+    /unresolved boolean row is not inherited/,
+    (_parent, child) => {
+      child.automaton.states[2].unresolved = [
+        {
+          jsonKinds: ["boolean"],
+          reason: "The issuer asserts a further gap.",
+          sources: ["supplement"],
+        },
+      ];
+      refreshCoverage(child);
+      child.coverage.structurallyUntypedObjectSourceNodes = 1;
+    },
+  );
+  expectReject(
+    "unresolved row added in an issuer-introduced subtree",
+    /unresolved boolean row is not inherited/,
+    (_parent, child) => {
+      child.automaton.states[1].unresolved = [
+        {
+          jsonKinds: ["boolean"],
+          reason: "The issuer asserts a further gap.",
+          sources: ["supplement"],
+        },
+      ];
+      refreshCoverage(child);
+      child.coverage.structurallyUntypedObjectSourceNodes = 1;
+    },
+  );
+  expectReject(
+    "inherited unresolved row restated with issuer evidence",
+    /unresolved number row is not inherited/,
+    (_parent, child) => {
+      child.automaton.states[2].bindings = [
+        structuredClone(child.automaton.states[2].bindings[1]),
+      ];
+      child.automaton.states[2].unresolved = [
+        {
+          jsonKinds: ["number"],
+          reason: "The base schema does not choose one numeric ROAX tag.",
+          sources: ["supplement"],
+        },
+      ];
+      child.addedSelectors = child.addedSelectors.slice(0, 1);
+      refreshCoverage(child);
+      child.coverage.structurallyUntypedObjectSourceNodes = 1;
+    },
+  );
+  expectReject(
+    "inherited unresolved row dropped without a binding",
+    /inherited unresolved number row is dropped without a binding/,
+    (_parent, child) => {
+      child.automaton.states[2].bindings = [
+        structuredClone(child.automaton.states[2].bindings[1]),
+      ];
+      child.addedSelectors = child.addedSelectors.slice(0, 1);
+      refreshCoverage(child);
+      child.coverage.structurallyUntypedObjectSourceNodes = 1;
+    },
+  );
   expectAccept("undeclared subtree descendant", (_parent, child) => {
     child.addedSelectors[0] = {
       segments: [{ key: "extra" }, { key: "deep" }],
@@ -1600,11 +1694,19 @@ function main() {
 
 export { artifactBytes, artifactId, parseArtifactBytes, testFixtures, validateArtifact };
 
-const invokedDirectly =
-  process.argv[1] !== undefined &&
-  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+function isDirectInvocation() {
+  if (process.argv[1] === undefined) {
+    return false;
+  }
+  const modulePath = fileURLToPath(import.meta.url);
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(modulePath);
+  } catch {
+    return resolve(process.argv[1]) === modulePath;
+  }
+}
 
-if (invokedDirectly) {
+if (isDirectInvocation()) {
   try {
     main();
   } catch (error) {
