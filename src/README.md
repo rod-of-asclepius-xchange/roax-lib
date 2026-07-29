@@ -81,7 +81,7 @@ rather than hiding:
 
 | Module | What it owns |
 |---|---|
-| `errors.ts` | The error taxonomy. Codes are the corpus's own reason strings, emitted verbatim. |
+| `errors.ts` | The error taxonomy. Codes are the corpus's own reason strings, emitted verbatim. Every rejection of input is a `RoaxError`; the one caller-precondition violation, an out-of-range leaf index in `tree.ts`, is a `RangeError` and is deliberately outside the taxonomy. |
 | `json.ts` | The literal-preserving reader and writer, and the unpaired-surrogate rejection. |
 | `numbers.ts` | Canonical integer and decimal (section 6.2), including the 1024-digit bound. |
 | `bytes.ts` | `u32be`, `u64be`, UTF-8, NFC, hex, and RFC 4648 section 4 base64. |

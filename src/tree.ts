@@ -57,6 +57,11 @@ export function merkleTreeHead(hash: HashFunction, leaves: readonly Uint8Array[]
  * The RFC 9162 section 2.1.3 audit path for the leaf at `index` in a tree of `leaves`.
  *
  * Ordered from the leaf outwards, which is the order `verifyInclusion` consumes.
+ *
+ * **Throws a `RangeError`, not a `RoaxError`, for an index outside the tree.** That is the one
+ * throw in this package outside the error taxonomy, because an out-of-range argument is a caller
+ * precondition violation rather than a rejection of record input; `./errors.js` gives the full
+ * reasoning. A consumer catching only `RoaxError` does not catch this.
  */
 export function inclusionProof(
   hash: HashFunction,

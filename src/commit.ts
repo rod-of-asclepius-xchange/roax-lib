@@ -123,6 +123,11 @@ export interface Commitment {
   readonly root: Uint8Array;
   /** The UNION count: record leaves plus reserved leaves (specification section 11.1). */
   readonly leafCount: number;
+  /**
+   * Forwards to `inclusionProof`, so an index outside this tree surfaces its `RangeError` rather
+   * than a `RoaxError`. `discloseFrom` never reaches that: it passes indices taken from this
+   * commitment's own leaves.
+   */
   auditPathFor(index: number): Uint8Array[];
 }
 
