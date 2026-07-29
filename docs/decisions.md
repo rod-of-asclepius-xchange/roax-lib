@@ -1,6 +1,9 @@
 # Decisions: settled, open, and the reasoning
 
-**Status:** three decisions are genuinely open and they are all in Part 1: **A**, **C** and **D**.
+**Status:** four decisions are genuinely open. Three are in Part 1 and belong to the project owner -
+**A**, **C** and **D**. The fourth, **D14**, was identified on 2026-07-29 while building a
+conformance vector and is in Part 2a; it is open because nobody has ruled it, not because it is
+awaiting the owner specifically.
 Everything else has been ruled. **Decision B** was ruled earlier, with the residual open questions
 named inside it. The **ten engineering decisions in Part 2 - D3, D4, D5, D6, D7, D8, D9, D11, D12
 and D13 - were ruled on 2026-07-28**, and each carries its reasoning so that it can be overturned on
@@ -14,6 +17,9 @@ The protocol specification is **written on the recommended answer to each decisi
 open**, so that it is concrete and readable rather than hedged into uselessness. That is a drafting
 choice, not a ruling. A specification that hides a live decision behind confident prose is worse than
 one that names it, so each is named here with its alternatives and their consequences.
+
+`docs/conformance-corpus.md` class 19 records the vector that would settle D14 and states why it is
+deliberately not built.
 
 **A decision that looks settled in the specification but is still marked OPEN here is worse than
 either**, so the two documents move together in one change. That warning is in this document because
@@ -172,16 +178,25 @@ description has to come from outside.
 - **The `Poseidon-BN254` parameterization is not pinned**, and no parameterization is invented here.
   The field, the rate and capacity, the round constants, and the encoding from a length-prefixed
   byte string to field elements all have to be pinned before any Poseidon record is issued. The
-  byte-level preimages in specification sections 7 and 8 are stated over byte strings and do **not**
-  transfer to a prime-field permutation unmodified. `ROAX-CANON/1` therefore **defines** the
+  byte-level preimage in specification section 8 is stated over byte strings and does **not**
+  transfer to a prime-field permutation unmodified. Section 7 no longer states a preimage of its own,
+  because D4 was ruled D4b and salt derivation is gone, so section 8's leaf preimage is the only one
+  left to carry across. `ROAX-CANON/1` therefore **defines** the
   construction for `SHA-256` only and **registers** `Poseidon-BN254`, with a normative MUST NOT
   against issuing under it until a revision pins the parameterization.
 - **The cost consequences below are unchanged by the ruling** and still have to be planned for
   rather than discovered. They are what makes selecting Poseidon a deliberate per-record act.
 
-**Written into the spec:** `hashAlg` as an algorithm-qualified domain component and a reserved leaf
-(sections 7, 7.4, 8, 11.2, 12), with the enum in `schemas/envelope-2.0.json` carrying both values
-and the Poseidon caution stated in the schema itself.
+**Written into the spec:** `hashAlg` as an algorithm-qualified domain component and deliberately
+**not** as a reserved leaf (sections 7, 7.4, 8, 11.2, 12), with the enum in
+`schemas/envelope-2.0.json` carrying both values and the Poseidon caution stated in the schema
+itself.
+An earlier version of this line said "and a reserved leaf", which contradicted the paragraph above it:
+`roax.hashAlg` was removed because a leaf is hashed under the algorithm it names and therefore cannot
+bind it, and specification section 11.2 records that removal.
+Section 7 stays in the citation list because it is where `DOMAIN` is stated to be
+algorithm-qualified; sections 7.4 and 8 carry the binding and the leaf preimage, 11.2 records the
+removed leaf, and 12 carries the versioning consequence.
 
 | | **SHA-256** | **Poseidon over BN254** |
 |---|---|---|
@@ -651,6 +666,52 @@ up moving at the speed of the slower one.
 
 ---
 
+## Part 2a - Newly identified, and genuinely open
+
+### D14 - Does type-map matching normalize the key it matches on? **OPEN**
+
+**Identified on 2026-07-29 while building the conformance vector decision D12's ruling required.**
+It is recorded here rather than settled in passing, because settling it changes matching in both
+reference implementations and in the type-map tooling at once.
+
+**Written into the spec:** nothing. Specification section 6.1 pins NFC for **hashing**, and section
+4.2 requires an uncovered path to fail closed. Neither says whether the type-map **lookup** that
+runs *before* hashing compares a normalized key or the bytes as received.
+
+**Why it is not academic.** Both reference implementations currently match **raw**, with no `nfc()`
+on either the pattern token or the segment key (`corpus/tools/roax_ref.py` `_match_from`;
+`corpus/tools/roax_ref.mjs` `matchPattern`). So a record whose key is written decomposed fails the
+lookup and is **refused outright by the fail-closed rule**, while the identical record written
+composed resolves and commits. The two render identically to a human.
+
+**That is the invisible-divergence failure D12 exists to prevent, arriving one layer up.** D12
+reasoned that a record passing through a normalizing form field must not get a different root; under
+raw matching it does not get a different root, it gets rejected instead, and the rejection is just as
+invisible to whoever typed the value.
+
+**The evidence that this is unresolved rather than merely undocumented.** The synthetic type map in
+`corpus/tools/synthetic_records.py` carries the Kelvin key under **both** spellings, so
+`record-guard-kelvin-key` resolves identically under either reading. That is a workaround standing
+in for a decision, and it is why no existing vector settles the question.
+`corpus/README.md` records the same gap in its specification-reading notes.
+
+**The two matchers in this repository already answer it differently, and that is the substance of the question rather than a detail of it.**
+`docs/type-maps.md` section 3 step 2 requires a conforming resolver of the published DFA artifacts to NFC-normalize a KEY segment before taking its transition, so those artifacts are already described as reading D14a.
+The corpus reference implementations are display-pattern matchers over `corpus/type-maps/` rather than the DFA, and they compare raw, as above.
+Neither document is wrong about the thing it owns, and neither is the specification, which says nothing.
+What is open is which reading the specification states for both, and until it does, the cost line below understates D14b: matching raw normatively would also change the resolver semantics `docs/type-maps.md` section 3 already publishes, not only leave the corpus matchers alone.
+
+| Option | Consequence |
+|---|---|
+| **D14a. Match over NFC-normalized keys** | Follows specification section 11.2's general rule, "check the bytes you commit, not the bytes you received", and makes the two spellings behave identically end to end. Cost: every type map and both implementations change together, and a pattern authored in one form silently starts matching the other. |
+| **D14b. Match raw, and say so normatively** | No code changes. Cost: the divergence above becomes a specified behaviour rather than an accident, and every type map must enumerate every spelling it intends to accept - which is what the Kelvin workaround already does by hand. |
+
+**Not ruled here, and the conformance vector that would settle it is deliberately not built.**
+`docs/conformance-corpus.md` class 19 carries the **value** case only and says why the **key** case
+is absent: building it would decide this question rather than test a decided one.
+
+---
+
 ## Part 3 - Settled
 
 These are not open. They are recorded with their reasons so the reasons are auditable later.
@@ -681,6 +742,6 @@ Recorded so that nobody mistakes a gap for a conclusion.
 | **The five reference implementations share one author.** | They do not share a JSON parser, number representation, Unicode API, map or sort. They do share one reading of the specification. Hence gate 3 in the corpus. |
 | **No character with version-dependent NFC has been identified.** | The Unicode pin is inferred from dogtag having found it necessary in code, not from an exhibited failing character. Conformance class 16 says so explicitly. |
 | **The ROAX chain integration is not designed.** | Anchoring registry shape, batching and revocation semantics are a real design space that no research leg covered. |
-| **The `Poseidon-BN254` parameterization is not pinned.** | Decision B is ruled: both hash families are first-class and selectable per record. What is not settled is the parameterization - field, rate and capacity, round constants, and the byte-string-to-field-element encoding, which the byte-level preimages of specification sections 7 and 8 do not survive without. `ROAX-CANON/1` defines SHA-256 only and registers Poseidon-BN254 with a MUST NOT against issuing under it. No parameterization has been invented to fill the gap. |
+| **The `Poseidon-BN254` parameterization is not pinned.** | Decision B is ruled: both hash families are first-class and selectable per record. What is not settled is the parameterization - field, rate and capacity, round constants, and the byte-string-to-field-element encoding, which the byte-level preimage of specification section 8 does not survive without. Section 7 no longer states a preimage, because D4 was ruled D4b. `ROAX-CANON/1` defines SHA-256 only and registers Poseidon-BN254 with a MUST NOT against issuing under it. No parameterization has been invented to fill the gap. |
 | **Which record families will select Poseidon is unknown.** | Blob handling is an optimization for a SHA-256 record and a requirement for a Poseidon one. D9 is ruled and no longer waits on this: the content-addressed binding is **defined** in `ROAX-CANON/1` and **selected by no version-1 profile**, so the answer to this question decides when a profile selects it rather than whether the binding exists. |
 | **The audit's boundary conclusion was reached without consulting dogtag.** | **Closed.** Checked during this work; the conclusion survives, and dogtag's narrower single-profile shape is explained rather than adopted. See specification section 14.1. |

@@ -997,97 +997,6 @@
         "reason": "reserved-namespace"
       }
     ],
-    "salt": [
-      {
-        "name": "salt-root-path",
-        "class": 12,
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-        "segments": [],
-        "saltHex": "1b5e3ed335e51df2269572abc7d1a256"
-      },
-      {
-        "name": "salt-value-path",
-        "class": 12,
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-        "segments": [
-          {
-            "key": "value"
-          }
-        ],
-        "saltHex": "a2c552d02761aac66b0474b313511b80"
-      },
-      {
-        "name": "salt-reserved-record-id",
-        "class": 12,
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-        "segments": [
-          {
-            "key": "roax.recordId"
-          }
-        ],
-        "saltHex": "312b7634d0bbc798038f1516776c403b"
-      },
-      {
-        "name": "salt-nested-path",
-        "class": 12,
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-        "segments": [
-          {
-            "key": "fhirBundle"
-          },
-          {
-            "key": "entry"
-          },
-          {
-            "index": 0
-          },
-          {
-            "key": "resourceType"
-          }
-        ],
-        "saltHex": "d4f9755a982da2389ba9ed7e2c918cd5"
-      },
-      {
-        "name": "salt-same-master-other-record-id",
-        "class": 12,
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-        "recordId": "urn:uuid:22222222-2222-4222-8222-222222222222",
-        "segments": [
-          {
-            "key": "value"
-          }
-        ],
-        "saltHex": "8fcf4391315c6098560572ef937dc3b0"
-      },
-      {
-        "name": "salt-other-master-same-record-id",
-        "class": 12,
-        "masterSaltHex": "ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100",
-        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-        "segments": [
-          {
-            "key": "value"
-          }
-        ],
-        "saltHex": "a2ee9cdc7c459611376b50e4da54753f"
-      },
-      {
-        "name": "salt-unicode-path",
-        "class": 12,
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-        "segments": [
-          {
-            "key": "é"
-          }
-        ],
-        "saltHex": "22f92a3032ffb0cd74c89b56e15ac860"
-      }
-    ],
     "leaf": [
       {
         "name": "leaf-decimal-0.010",
@@ -5845,10 +5754,11 @@
         "schemaVersion": "1.0",
         "issuerId": "did:web:corpus.roax.invalid",
         "recordFile": "corpus/fixtures/records/structure-empty-array.json",
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        "saltsFile": "corpus/fixtures/salts/record-structure-empty-array.json",
+        "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "9fd62bddef613936f2dbcb3672017df0df732496fba136b829dcc595782566a2"
+        "root": "bbc2c37d82f2b03dceefe9742047658085b9416198b0d2b421566711e959b833"
       },
       {
         "name": "record-structure-empty-object",
@@ -5857,10 +5767,11 @@
         "schemaVersion": "1.0",
         "issuerId": "did:web:corpus.roax.invalid",
         "recordFile": "corpus/fixtures/records/structure-empty-object.json",
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        "saltsFile": "corpus/fixtures/salts/record-structure-empty-object.json",
+        "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "096ca7df7a719fb36213c8c71642044c604b0eceed7a6dae62a9ea6822f77303"
+        "root": "0c8f3d521c04af6a02f14f452b67b948854488690263253998d0ebb484e70cc8"
       },
       {
         "name": "record-structure-explicit-null",
@@ -5869,10 +5780,11 @@
         "schemaVersion": "1.0",
         "issuerId": "did:web:corpus.roax.invalid",
         "recordFile": "corpus/fixtures/records/structure-explicit-null.json",
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        "saltsFile": "corpus/fixtures/salts/record-structure-explicit-null.json",
+        "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "bc1eec302fa40dd6b3e3d77b4215e19844f595321aec9831e06f4884cd22713d"
+        "root": "067e03416521fccc2258d7892a27532ccd7b7af87dba7d196bafc87836aba838"
       },
       {
         "name": "record-entry-layout-flattened",
@@ -5881,10 +5793,11 @@
         "schemaVersion": "1.0",
         "issuerId": "did:web:corpus.roax.invalid",
         "recordFile": "corpus/fixtures/records/entry-flattened.json",
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        "saltsFile": "corpus/fixtures/salts/record-entry-layout-flattened.json",
+        "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 8,
-        "root": "380edb1f77f292ff60768f21d6473252f16d7271ac9c34ac483a37569a1b2bb2"
+        "root": "f792d98e2011b914d8661a43b306e272276d30d67c51798f4d104adec1de5176"
       },
       {
         "name": "record-entry-layout-normalized",
@@ -5893,10 +5806,11 @@
         "schemaVersion": "1.0",
         "issuerId": "did:web:corpus.roax.invalid",
         "recordFile": "corpus/fixtures/records/entry-normalized.json",
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        "saltsFile": "corpus/fixtures/salts/record-entry-layout-normalized.json",
+        "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 8,
-        "root": "9a0ba252a29ccae97070885577c34aa78d6f778960920f82dae341102d3d7726"
+        "root": "8b338329fe325e0af8ca61ed1044142b88650ced964048071a04fc2945602781"
       },
       {
         "name": "record-guard-bare-roax",
@@ -5905,10 +5819,11 @@
         "schemaVersion": "1.0",
         "issuerId": "did:web:corpus.roax.invalid",
         "recordFile": "corpus/fixtures/records/guard-bare-roax.json",
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        "saltsFile": "corpus/fixtures/salts/record-guard-bare-roax.json",
+        "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "93435f0599a4f7a4b6ee7f73616f786ab06e93971fe5ee98b3e5e9e99a27c8ac"
+        "root": "e210c4686e1c0ad825c2e165e8533a981fe049dd4945d8195f6c6b7ebeddfff1"
       },
       {
         "name": "record-guard-roax-x",
@@ -5917,10 +5832,11 @@
         "schemaVersion": "1.0",
         "issuerId": "did:web:corpus.roax.invalid",
         "recordFile": "corpus/fixtures/records/guard-roax-x.json",
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        "saltsFile": "corpus/fixtures/salts/record-guard-roax-x.json",
+        "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "0b5dbfb2f7615430c4e14152367d0581a48ce7ec90c4e1b7c6b3b6c987b49b46"
+        "root": "c0aa310b62653a6ed509b8bbd8a7c046a6930412e2e737b7365c5d962e301b1c"
       },
       {
         "name": "record-guard-nested-roax-dotted",
@@ -5929,10 +5845,11 @@
         "schemaVersion": "1.0",
         "issuerId": "did:web:corpus.roax.invalid",
         "recordFile": "corpus/fixtures/records/guard-nested-roax-dotted.json",
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        "saltsFile": "corpus/fixtures/salts/record-guard-nested-roax-dotted.json",
+        "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "3535d700a1318ebd6c1885f21cd56233766531c2c07d37bd78b5c8d42a440348"
+        "root": "3d9bf0bec5cf85b63122b4bae73a5f6f29a12beb286ad3a2fd264f742e0ac592"
       },
       {
         "name": "record-guard-kelvin-key",
@@ -5941,10 +5858,11 @@
         "schemaVersion": "1.0",
         "issuerId": "did:web:corpus.roax.invalid",
         "recordFile": "corpus/fixtures/records/guard-kelvin-key.json",
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        "saltsFile": "corpus/fixtures/salts/record-guard-kelvin-key.json",
+        "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "c4ec92ee0f91c450064e70b97d624997406f109f03b0edb2b1863d61d7718d0e"
+        "root": "d913e52ad4c918f87466d9fbd40070119379f8d293ab85ce1a7ad50f79313107"
       },
       {
         "name": "record-typed-scalars",
@@ -5953,10 +5871,11 @@
         "schemaVersion": "1.0",
         "issuerId": "did:web:corpus.roax.invalid",
         "recordFile": "corpus/fixtures/records/typed-scalars.json",
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        "saltsFile": "corpus/fixtures/salts/record-typed-scalars.json",
+        "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 9,
-        "root": "272afada42910c30735dc7dc0bbd0f9ed1c59d9b94d7a6437833cf4bbb98fc44"
+        "root": "7846cbd141f123da932004f049303eaa8bd7180d329bfc2c74d54f484f688c4f"
       },
       {
         "name": "record-typed-scalars-with-key-id",
@@ -5965,10 +5884,11 @@
         "schemaVersion": "1.0",
         "issuerId": "did:web:corpus.roax.invalid",
         "recordFile": "corpus/fixtures/records/typed-scalars.json",
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        "saltsFile": "corpus/fixtures/salts/record-typed-scalars-with-key-id.json",
+        "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 10,
-        "root": "80e3141b47ec750110cd0d2e68cc3ce0885ab8e55d693fd3ff34f0e2bd93851a",
+        "root": "de356f8f967a2a166f012172e339df1ecc31b5a45f406fd8da03b3a6ca356953",
         "issuerKeyId": "did:web:corpus.roax.invalid#key-1"
       },
       {
@@ -5978,10 +5898,11 @@
         "schemaVersion": "2.0",
         "issuerId": "did:web:corpus.roax.invalid",
         "recordFile": "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/sample-data.ts#sampleDocument",
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        "saltsFile": "corpus/fixtures/salts/record-sg.gov.moh.recovery-healthcert-no-key-id.json",
+        "saltPairing": "positional",
         "recordId": "urn:uuid:aaaaaaa3-0000-4000-8000-000000000003",
         "leafCount": 69,
-        "root": "abc1d49e101dff2f6c8d76354df0bea4b23292ac8786d05f0fc7bfd82f715a38"
+        "root": "2cc986bb42bedfb35b5ec0490859b75a0d1744bfdad6d7278346833c925e42a1"
       },
       {
         "name": "record-sg.gov.moh.recovery-healthcert-with-key-id",
@@ -5991,74 +5912,126 @@
         "issuerId": "did:web:corpus.roax.invalid",
         "issuerKeyId": "did:web:corpus.roax.invalid#key-1",
         "recordFile": "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/sample-data.ts#sampleDocument",
-        "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        "saltsFile": "corpus/fixtures/salts/record-sg.gov.moh.recovery-healthcert-with-key-id.json",
+        "saltPairing": "positional",
         "recordId": "urn:uuid:aaaaaaa3-0000-4000-8000-000000000003",
         "leafCount": 70,
-        "root": "b76c8e02398bd0ad7093f4cf02433d4d01f235b4d5e6be2a6e6eceb94fa67e88"
+        "root": "bfb3cdf4016bdd0567612adc281f7522eae78bfba8ac43c12bc272235d0b26e7"
       }
     ],
     "unlinkability": [
       {
-        "name": "unlinkability-fresh-master-salt",
+        "name": "unlinkability-independent-per-leaf-salts",
         "class": 12,
-        "segments": [
-          {
-            "key": "fhirBundle"
-          },
-          {
-            "key": "entry"
-          },
-          {
-            "index": 0
-          },
-          {
-            "key": "birthDate"
-          }
+        "paths": [
+          [
+            {
+              "key": "fhirBundle"
+            },
+            {
+              "key": "entry"
+            },
+            {
+              "index": 0
+            },
+            {
+              "key": "birthDate"
+            }
+          ],
+          [
+            {
+              "key": "fhirBundle"
+            },
+            {
+              "key": "entry"
+            },
+            {
+              "index": 0
+            },
+            {
+              "key": "gender"
+            }
+          ]
         ],
         "tag": 2,
         "value": "1965-08-09",
-        "recordA": {
-          "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-          "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-          "leafHash": "827ffa0a6d5a8bd1c91e07e96e09bc15da50740979d967815307851ffe9e9494"
-        },
-        "recordB": {
-          "masterSaltHex": "ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100",
-          "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-          "leafHash": "3103468812cb0cfa07fa00f172a2d134d6f7b9ad09df5f3d7f06b2296b445953"
-        },
-        "expectDistinct": true
+        "trials": 4,
+        "expectDistinctSaltsWithinIssuance": true,
+        "expectDistinctSaltsAcrossIssuances": true,
+        "expectDistinctLeafHashesAcrossIssuances": true
       },
       {
-        "name": "unlinkability-record-id-binding",
+        "name": "unlinkability-shared-record-id",
         "class": 12,
-        "segments": [
-          {
-            "key": "fhirBundle"
-          },
-          {
-            "key": "entry"
-          },
-          {
-            "index": 0
-          },
-          {
-            "key": "birthDate"
-          }
+        "paths": [
+          [
+            {
+              "key": "fhirBundle"
+            },
+            {
+              "key": "entry"
+            },
+            {
+              "index": 0
+            },
+            {
+              "key": "birthDate"
+            }
+          ],
+          [
+            {
+              "key": "roax.recordId"
+            }
+          ]
         ],
         "tag": 2,
         "value": "1965-08-09",
-        "recordA": {
-          "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-          "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-          "leafHash": "827ffa0a6d5a8bd1c91e07e96e09bc15da50740979d967815307851ffe9e9494"
-        },
-        "recordB": {
-          "masterSaltHex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-          "recordId": "urn:uuid:22222222-2222-4222-8222-222222222222",
-          "leafHash": "46f151d5d1912b600229d495a7a9fd2bac91e5a752f0d5d77581e32afebe3c93"
-        },
-        "expectDistinct": true
+        "trials": 4,
+        "expectDistinctSaltsWithinIssuance": true,
+        "expectDistinctSaltsAcrossIssuances": true,
+        "expectDistinctLeafHashesAcrossIssuances": true,
+        "recordIds": [
+          "urn:uuid:11111111-1111-4111-8111-111111111111",
+          "urn:uuid:11111111-1111-4111-8111-111111111111"
+        ]
+      },
+      {
+        "name": "unlinkability-reserved-and-record-leaf",
+        "class": 12,
+        "paths": [
+          [
+            {
+              "key": "roax.issuer.id"
+            }
+          ],
+          [
+            {
+              "key": "é"
+            }
+          ]
+        ],
+        "tag": 2,
+        "value": "1965-08-09",
+        "trials": 4,
+        "expectDistinctSaltsWithinIssuance": true,
+        "expectDistinctSaltsAcrossIssuances": true,
+        "expectDistinctLeafHashesAcrossIssuances": true
+      }
+    ],
+    "normalization": [
+      {
+        "name": "normalization-nfc-value-end-to-end",
+        "class": 19,
+        "site": "value",
+        "recordFileNFD": "corpus/fixtures/records/nfc-value-nfd.json",
+        "recordFileNFC": "corpus/fixtures/records/nfc-value-nfc.json",
+        "saltsFile": "corpus/fixtures/salts/normalization-nfc-value.json",
+        "recordType": "org.roax.corpus.synthetic",
+        "schemaVersion": "1.0",
+        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
+        "issuerId": "did:web:corpus.roax.invalid",
+        "expectSameRoot": true,
+        "root": "bec3821d0d990e73f8985c240fec53b5bff44b6990938b31184c9df715fe3a71"
       }
     ],
     "envelope": [
@@ -6302,28 +6275,28 @@
       },
       {
         "name": "identity-outer-record-type-downgrade",
-        "class": 14,
+        "class": 18,
         "envelopeFile": "corpus/fixtures/envelopes/identity-outer-record-type-downgrade.json",
         "expectAccept": false,
         "reason": "outer-identity-mismatch"
       },
       {
         "name": "identity-outer-schema-version-mismatch",
-        "class": 14,
+        "class": 18,
         "envelopeFile": "corpus/fixtures/envelopes/identity-outer-schema-version-mismatch.json",
         "expectAccept": false,
         "reason": "outer-identity-mismatch"
       },
       {
         "name": "identity-outer-record-id-mismatch",
-        "class": 14,
+        "class": 18,
         "envelopeFile": "corpus/fixtures/envelopes/identity-outer-record-id-mismatch.json",
         "expectAccept": false,
         "reason": "outer-identity-mismatch"
       },
       {
         "name": "identity-outer-issuer-id-mismatch",
-        "class": 14,
+        "class": 18,
         "envelopeFile": "corpus/fixtures/envelopes/identity-outer-issuer-id-mismatch.json",
         "expectAccept": false,
         "reason": "outer-identity-mismatch"

@@ -6,9 +6,12 @@ validates against the successor contract this document defines yet.
 the contract this document defines.
 [`schemas/conformance-corpus-1.0.json`](../schemas/conformance-corpus-1.0.json) is retained because
 it, and not the successor, governs the corpus artifact as committed today.
-The successor is a major bump because it deletes definitions the committed artifact still uses, so
-that artifact does not validate against it and has to be rebuilt to it; the requirements below are
-stated against the successor and the gap is named in section 3.
+The successor is a major bump because it REQUIRES the exact type-map artifact identity on the
+type-map and record vectors, which the committed artifact does not carry, so that artifact does not
+validate against it and has to be rebuilt to it.
+It is not a major bump for the D4b vector shapes: those landed in the 1.0 file and in the artifact
+together, under the same-change rule in section 1.1.
+The requirements below are stated against the successor.
 
 ---
 
@@ -100,13 +103,15 @@ optional, absent, or expressible both ways through a `oneOf`. The exception is a
 **subject** is the open mechanism, because testing a mechanism is not the same as presuming it.
 **That exception currently has no instance.** The two it used to have, `saltVector` and
 `unlinkabilitySide.masterSaltHex`, both existed to test the derived-salt mechanism and were removed
-with it when D4 was ruled; `saltVector` is gone from
+with it when D4 was ruled.
+`saltVector` is gone from both `schemas/conformance-corpus-1.0.json` and
 `schemas/conformance-corpus-2.0.json` entirely, because under section 7 a salt is an input rather
 than something derived from anything, and `leafVector.saltHex` already carries it.
-Both definitions survive in `schemas/conformance-corpus-1.0.json`, marked superseded, for the
-narrow reason that the committed corpus still carries vectors of both shapes and that file has to
-keep describing what it governs; they are not the design as it now stands. A later editor
-adding such a class should record the distinction on the definition itself, as those two did.
+The deletion reached the 1.0 file rather than the successor alone because section 1.1 above requires
+a canonicalization change to land with the vectors that assert it, and the committed corpus was
+rebuilt in the same change.
+A later editor adding such a class should record the distinction on the definition itself, as those
+two did.
 
 ## 2. Release gates
 
@@ -140,13 +145,11 @@ the highest-numbered class is skipped silently. Both
 `schemas/conformance-corpus-1.0.json` and `schemas/conformance-corpus-2.0.json` set the
 `classRef` maximum to 19 to match.
 
-**Class 19 is expressible only under the successor schema.** Its vector shape is the `normalization`
-group, which `schemas/conformance-corpus-2.0.json` introduces and
-`schemas/conformance-corpus-1.0.json` does not carry, because adding it to the file that governs the
-committed artifact would describe vectors that artifact has no way to hold. Class 18 needs no new
-group and is expressible under both, through `envelopeVector.verifierConfig`. Until the corpus is
-rebuilt against the successor, class 19 has no vectors, and that is a stated gap rather than a
-silent one.
+**Both new classes are expressible under both schema versions.** Class 19's vector shape is the
+`normalization` group, which `schemas/conformance-corpus-1.0.json` carries alongside
+`schemas/conformance-corpus-2.0.json`, because the committed artifact was rebuilt in the same change
+that added the class rather than left to a later migration.
+Class 18 needs no new group and is expressible through `envelopeVector.verifierConfig`.
 
 **Classes 18 and 19 were added, and class 12 was rewritten, when the ten engineering decisions were
 ruled on 2026-07-28.** Class numbers are stable: class 12 kept its number and its subject and lost
@@ -279,6 +282,59 @@ Whole, with their roots and leaf counts.
 Records are referenced by file, never inlined, so that no reference schema or sample is copied into
 this repository. The reference material lives outside the repository by design.
 
+**A vector in this class MUST name a carrier the salts come with, and there are exactly two.** Either
+a bare record file together with the salts file its root was computed under, or a single full
+envelope copy, which carries the record body and its `salts` array together (specification section
+7.3). `schemas/conformance-corpus-1.0.json` expresses that as a two-branch `oneOf` on `recordVector`
+rather than as advice, and the second branch forbids a salts file alongside an envelope so the two
+carriers cannot disagree about which set the asserted root was computed under.
+
+**Why this is structural now and was not before.** Under the deleted D4a construction a bare record
+file plus a `masterSaltHex` and the record identifier was enough to re-derive every salt, so carrying
+them was optional. Decision D4 is ruled D4b and every salt is an independent random draw that nothing
+can re-derive (specification section 7), so a vector naming only a bare record file asserts a root no
+runner can recompute: schema-valid, and vacuous, in the class this document calls mandatory.
+
+#### Why this class pairs its salts positionally, and every other carrier pairs by path
+
+**Read this before making the two consistent, because the consistent-looking direction is the unsafe
+one.**
+
+A salt set names a salt for each leaf, and there are two ways to say which salt belongs to which
+leaf. Every hand-authored fixture in this corpus, and every envelope, pairs **by path**: each entry
+carries explicit path segments, exactly as the `salts` array of `schemas/envelope-1.0.json` is
+defined. The class-10 vectors pair **positionally**: a bare array of salts in `encodePath` order.
+`recordVector.saltPairing` names which shape a vector uses, and it is required rather than inferred,
+because the two are not distinguishable by inspection and a runner that guesses wrong computes a
+wrong root instead of reporting an error.
+
+**Specification section 7.2 rejects positional pairing for an envelope**, and the reason is precise:
+it makes salt-to-leaf pairing depend on the reader reproducing the section 9 sort correctly before it
+can read the salts at all. In production that is a hazard, because a sort that is subtly wrong yields
+a wrong root rather than a complaint.
+
+**In a corpus vector, reproducing that sort is the thing under test.** The property that makes
+positional pairing dangerous in an envelope is exactly what makes it valid here: an implementation
+whose sort disagrees mispairs the salts and fails the vector, which is the detection the class exists
+to provide rather than a defect it introduces.
+
+**Why this class needs it at all**, stated so the tradeoff is not mistaken for an optimization. The
+class-10 records are the genuine third-party MOH reference samples, at 69 and 70 leaves. A
+path-keyed salt set for one of them would enumerate every path of a shipped reference sample into
+this repository, which is public, and `AGENTS.md` forbids committing the reference schemata - not
+even a fragment. A positional array discloses only the leaf count, and `leafCount` is already
+published in the same vector, so it adds nothing a reader did not already have.
+
+> **If these two are ever harmonized, the dangerous direction is making envelopes positional.**
+> That would move the sort dependency from a test, where it is the subject, into a deployed record,
+> where specification section 7.2 rules it out. Harmonizing the other way - making class 10
+> path-keyed - is merely forbidden by the references policy. Neither is an improvement.
+
+This is the second consequence of the D4b ruling that the ruling itself did not work through; the
+first was `roax.recordId` moving from mandatory-by-arithmetic to mandatory-by-policy in the
+minimum-disclosure floor (specification sections 10.2 and 11.2). Both are recorded rather than
+absorbed, because a reader who finds one unexplained will not trust the other.
+
 ### Class 11 - the schema binding itself
 
 The type map is a data file and MUST be in the corpus, with vectors asserting that a given structured path and observed JSON kind under a given map yield a given tag, and that an uncovered path-kind pair fails closed, as required by specification section 4.2.
@@ -305,6 +361,10 @@ a binding no profile has declared.
 
 **Two records for the same subject, sharing a path and a value at that path, MUST produce different
 leaf hashes for that path.**
+**And within a single record, no two leaves may share a salt**, which specification section 7 states
+as its own MUST rather than as a consequence of the first: an implementation MUST draw each salt
+independently and MUST NOT reuse one across leaves. Both halves are asserted here, because the second
+is not observable anywhere else in this document.
 
 This class kept its number and its subject when decision D4 was ruled D4b and lost its mechanism.
 The old version built the two records with two different `masterSalt` values and asserted the same
@@ -320,20 +380,64 @@ three:
   seed, so that reissuing a record reproduces the same root. This reads like a feature -
   "reissuance is idempotent" - which is exactly why the specification forbids it in section 7 and why
   a vector rather than a sentence enforces it.
+  *Caught by `expectDistinctSaltsAcrossIssuances`.*
 - **A salt reused across leaves.** One draw per record rather than one per leaf.
+  *Caught by `expectDistinctSaltsWithinIssuance`, and by nothing else in this document.*
 - **A salt reused across records**, which is the patient-linkage failure itself.
+  *Caught by `expectDistinctSaltsAcrossIssuances` and by
+  `expectDistinctLeafHashesAcrossIssuances`.*
 
 #### The shape this class has to take, and its honest limit
 
 **This class asserts a relation between generated values rather than a pinned expected value**, and
 that is forced by the ruling rather than a shortcut. Under D4b the salts are independently random, so
 no fixed hexadecimal expectation can exist: a vector file cannot pin what the implementation under
-test is required to draw freshly. A `class12Vector` therefore describes an issuance to perform and
-the relation the results MUST satisfy.
+test is required to draw freshly. An `unlinkabilityVector` therefore describes an issuance to perform
+and the relations the results MUST satisfy.
 
-The runner issues the same `(path, tag, value)` under the vector's `trials` independent issuances,
-and asserts that all of the resulting salts are distinct and all of the resulting leaf hashes are
-distinct.
+**The vector carries at least two DISTINCT paths, and that is what makes the second mistake
+reachable.** It names a `paths` array, one `tag` and one `value`, and each of its `trials`
+independent issuances emits a leaf at every one of those paths carrying that same tag and value.
+The runner then asserts three things:
+
+**The record and the type map this class issues against are SYNTHETIC, and the corpus build
+constructs both.** No referenced MOH sample is involved, and none could be: the class needs one value
+carried at two paths, and a tag is a property of a path under a type map rather than of a vector,
+with an uncovered path failing closed (specification section 4.2, decision D7 ruled D7a).
+So the build binds every entry in `paths` to the vector's `tag` in a map it makes
+for the purpose, and MUST reject a vector it cannot construct one for. This is stated because the one
+tag shared by two paths is otherwise a claim the vector file cannot make good on by itself.
+
+1. **Within each issuance**, the salts at the `paths` entries are all distinct. This is the only
+   assertion in this document that fails an implementation drawing one salt per record and reusing it
+   across that record's leaves. A one-path vector cannot see that mistake at all: the single salt
+   still differs from trial to trial, so both cross-issuance assertions pass while the unlinkability
+   property specification section 7 requires has been destroyed.
+2. **At each path across issuances**, the salt drawn in every trial differs from the salt drawn at
+   that path in every other trial.
+3. **At each path across issuances**, the leaf hash differs likewise.
+
+**There is deliberately no within-issuance leaf-hash assertion.** Two leaves at different paths carry
+different encoded paths inside the leaf preimage (specification section 8), so their hashes differ
+whether or not their salts do, and asserting it would read as coverage it is not. The salts are where
+the property is observable within one record, which is why assertion 1 is stated on salts alone.
+
+**The distinctness of `paths` is enforced by the schema, not asked for in prose, because assertion 1
+is the only guard of its kind in this corpus.** Two entries naming the same path would have it assert
+distinctness over a path a record can hold only once, which switches the guard off while the vector
+still validates, and a guard a malformed vector can disable is not a guard.
+`schemas/conformance-corpus-1.0.json` uses `uniqueItems` on `paths`, and that is exact rather than
+partial here: the array's items are the structured segment lists themselves, and two paths are equal
+exactly when their segment sequences are equal (specification section 5.1). One tag and one value are
+shared by every path for the same reason - it is what lets the entries be bare segment lists that
+`uniqueItems` can compare - and it makes the vector strictly stronger, because two leaves carrying
+the same tag and value at different paths additionally expose a salt derived from record content,
+which per-path values would mask.
+
+**One residue the corpus build must enforce in code**, stated rather than left for a reader to find:
+two keys differing only in Unicode normalization form are unequal as JSON text and equal as paths
+once NFC is applied (specification section 6.1), so the build MUST compare NFC-normalized segments
+and reject such a pair. That is the same kind of check the build already owns for class coverage.
 
 > **The limit, stated rather than left for a reader to discover.** This detects a **deterministic**
 > or **reused** salt, which is the failure that has actually happened in comparable systems. It does
@@ -497,18 +601,60 @@ that takes authority from the root and from its own configured anchoring layer.
 | A top-level `typeMap.id` that disagrees with the disclosed `roax.typeMap.id` leaf | **Reject before resolving a record leaf** | A verifier selecting a convenient map from the discovery hint instead of the ID committed inside the root (specification sections 4.2, 10 and 11.2). |
 | Candidate type-map bytes whose content ID does not reproduce the committed `roax.typeMap.id`, including a second artifact with the same semver | **Reject** | A verifier selecting by version or locator rather than the exact immutable artifact ID (specification section 4.2 and [`type-maps.md`](type-maps.md) section 4). |
 | An envelope whose `hashAlg` disagrees with the `(root, hashAlg)` pair the verifier's anchoring registry records | **Reject** | A verifier taking the algorithm from the document rather than from the registry. This is exactly what specification section 7.4's H2 requires and what H1 does **not** provide. |
-| An envelope whose `hashAlg` is absent from the verifier's configured allow-list, and present in the registry | **Reject** | The retired-algorithm case, which H2 alone does not close. Specification section 7.4, H3. |
+| A `SHA-256` envelope whose `(root, hashAlg)` pair the registry records correctly, verified against a configured allow-list of `["Poseidon-BN254"]` | **Reject** | The retired-algorithm case, which H2 alone does not close. Specification section 7.4, H3. |
 | An envelope whose `anchor.registry` and `anchor.chainId` name a registry the verifier is not configured with, and which would return a valid pair | **Reject, without reading that registry** | The dogtag `documentStore` bug in this design's shape: an attacker-supplied address that answers "valid". A verifier MUST resolve the anchoring layer from its own configuration. |
 | A well-formed envelope whose `anchor` block is absent entirely, verified against the verifier's own registry | **Accept** | The upper edge. `anchor` is a routing hint, so its absence MUST NOT make a verifiable record unverifiable, and an implementation that hard-requires it has made the field authority in a different way. |
+
+**The allow-list row has to name `SHA-256` as the excluded algorithm, and the earlier phrasing did
+not.** It read "an envelope whose `hashAlg` is absent from the allow-list, and present in the
+registry", which with only two registered values fits a `Poseidon-BN254` envelope alone. Such an
+envelope is rejected regardless, for having no defined construction (specification section 7.4), so
+the vector would record a pass against an implementation that has no allow-list at all. The
+discriminating shape is the one the table now states: an algorithm the implementation would otherwise
+accept, excluded by configuration.
 
 **The last row is the reason this class cannot be only rejections.** A corpus of rejections alone is
 passed by an implementation that rejects everything with an `anchor` mismatch including the case
 where nothing is wrong, and treating a routing hint as required is itself a way of depending on it.
 
-**What a runner needs that no other class needs.** These vectors are the only ones whose outcome
-depends on what the *verifier* is configured with rather than only on the envelope, so
-`envelopeVector` carries an optional `verifierConfig` block stating the anchoring facts and the
-allow-list in force for that vector. Without it the expected outcome is not determined by the file.
+**What a runner needs that no other class needs.** The registry rows are the only vectors whose
+outcome depends on what the *verifier* is configured with rather than only on the envelope, so
+`envelopeVector` carries a `verifierConfig` block stating the anchored `(root, hashAlg)` pair, the
+allow-list and the configured registry. `schemas/conformance-corpus-1.0.json` permits that block at
+class 18 and **forbids** it at every other class, and requires all four members when it is present
+rather than any subset, so a partial block cannot let a vector pass or fail for a reason the file
+did not fix.
+
+**Whether a class-18 vector needs the block is a stated limit, not a structural rule.** It is
+required for a vector whose outcome turns on verifier configuration and inapplicable to one the
+envelope alone determines, and no JSON Schema keyword can tell those apart. The corpus build owns
+that check. An earlier revision required the block on *every* class-18 vector, written when this
+class was expected to be the registry rows alone; it rejected the committed corpus the moment the
+identity rows arrived, which is how the over-tightening was found.
+
+#### What is built, and the named gap
+
+**Built: the four identity rows.** A disclosed copy whose top-level `recordType`, `schemaVersion`,
+`recordId` or `issuer.id` disagrees with the reserved leaf committed inside the root is rejected,
+with every inclusion proof still verifying against the genuine root. Their **reject** verdict is
+determined by the envelope alone, since the field and the committed leaf disagree with each other,
+so they carry no `verifierConfig`. These four carried class 14 until the D8 ruling created this
+class; they were always this assertion, and the floor class is about a disclosed copy *omitting* a
+non-redactable path, which is a different property.
+
+> **NAMED GAP, blocked rather than merely unwritten: the registry rows.** The
+> `hashAlg`-from-registry row, the substituted-`anchor.registry` row and the absent-`anchor` accept
+> row are **not built**, and the blocker is a dependency rather than effort. This corpus models no
+> anchoring registry, because **specification section 2.2 deliberately leaves the anchoring registry
+> undesigned** and hands it forward as a stated requirement on that future work. Building these
+> vectors would make the corpus invent that interface, which section 1.2 of this document forbids
+> outright: the corpus may not require what the design has not decided. That rule has already been
+> broken twice in this project, both times over `masterSalt`, which is why it is not being broken a
+> third time for a class this project's own ruling mandated.
+>
+> **These rows become buildable the moment the anchoring registry is designed, and not before.**
+> Until then the H2 and H3 bindings of specification section 7.4 rest on the normative text alone,
+> and this paragraph is the record that they do.
 
 ### Class 19 - NFC normalization, end to end, with a root
 
@@ -527,6 +673,25 @@ they produce the same root.**
 Use a string whose NFC form is stable across recent Unicode versions, so that this class tests
 normalization rather than the version pin; class 16 owns the version question and is honest about
 what it can and cannot demonstrate.
+
+**The key-site row is defined here and deliberately NOT built, and decision D14 is the reason.**
+The corpus carries the value site alone, which is one vector rather than the table's two.
+The specification pins NFC for hashing and says nothing about whether type-map matching normalizes
+the key it matches on, so both reference implementations compare a pattern token against a segment
+key raw (`corpus/README.md`, ambiguity 4).
+A built key-site vector has to resolve its key through the type map, so it would pass under one
+reading and fail under the other, which settles D14 from inside a data file rather than testing it.
+Section 1.2 forbids exactly that, and `docs/decisions.md` Part 2a records D14 as open.
+The row stays in this table because the class is not complete until D14 is ruled and the vector is
+built under the ruling, and stating the gap here is what keeps a passing class 19 from reading as
+coverage it does not have.
+
+**Both forms MUST be computed under one shared salt set, and the vector MUST name the file carrying
+it.** Under decision D4b every salt is an independent random draw (specification section 7), so two
+issuances of the two forms produce different roots for a reason that has nothing to do with
+normalization, and the equality assertion would then hold nothing. `schemas/conformance-corpus-1.0.json`
+requires `saltsFile` on `normalizationVector` for that reason, the same way `recordVector` requires a
+salt carrier for class 10.
 
 **Why this is not covered by class 4.** Class 4 asserts NFC against NFD at **leaf** level, in values
 and in keys. That catches an implementation whose `encodeValue` skips normalization. It does not

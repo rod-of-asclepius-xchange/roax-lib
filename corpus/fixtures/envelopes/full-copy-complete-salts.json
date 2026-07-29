@@ -4,7 +4,7 @@
   "recordType": "org.roax.corpus.synthetic",
   "schemaVersion": "1.0",
   "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-  "root": "272afada42910c30735dc7dc0bbd0f9ed1c59d9b94d7a6437833cf4bbb98fc44",
+  "root": "906206bfe0f1e5e57c9345ba605b675a2cab7de26a247a587d3c6305ef1cb255",
   "leafCount": 9,
   "issuer": {
     "id": "did:web:corpus.roax.invalid"
@@ -21,7 +21,7 @@
           "key": "flag"
         }
       ],
-      "salt": "45f1842fb1fe3b2e1ea3c8e7faa200c6"
+      "salt": "2f65021180914c9f1e146b89dafc9f23"
     },
     {
       "segments": [
@@ -29,7 +29,7 @@
           "key": "marker"
         }
       ],
-      "salt": "eb0c149d66270e019db255801a61e5da"
+      "salt": "a51963873dc8f4325dbcf607f4ce1f1a"
     },
     {
       "segments": [
@@ -37,7 +37,7 @@
           "key": "roax.recordId"
         }
       ],
-      "salt": "312b7634d0bbc798038f1516776c403b"
+      "salt": "98b8055870e713e8be7cbd40f03055ab"
     },
     {
       "segments": [
@@ -45,7 +45,7 @@
           "key": "roax.issuer.id"
         }
       ],
-      "salt": "81b4daf535d4f8dbc2a121bc2f4e92a7"
+      "salt": "3baf1dd047a2ded6909f06c5d4865e22"
     },
     {
       "segments": [
@@ -53,7 +53,7 @@
           "key": "roax.recordType"
         }
       ],
-      "salt": "c24889ba40e46be7643a6c1d2030e125"
+      "salt": "c26189cf7647dfa19e287ad9cf24f359"
     },
     {
       "segments": [
@@ -61,7 +61,7 @@
           "key": "roax.schemaVersion"
         }
       ],
-      "salt": "dde8c29a376074d7043fc68d7c15061e"
+      "salt": "d86d8c746bfb225f6a4e8f84d1915902"
     },
     {
       "segments": [
@@ -72,7 +72,7 @@
           "key": "text"
         }
       ],
-      "salt": "26d57c3fd5a8ccf21f1e8f7378ad524e"
+      "salt": "970cb28f0c5ed29220ab9c7d7581bb1e"
     },
     {
       "segments": [
@@ -83,7 +83,7 @@
           "key": "decimal"
         }
       ],
-      "salt": "3f7f6060d6ed97c224bd8ff54671e195"
+      "salt": "d5973c94ebe921519029fee2bdaec835"
     },
     {
       "segments": [
@@ -94,7 +94,7 @@
           "key": "integer"
         }
       ],
-      "salt": "d4a52adc9f2077abf4a9d4f3f29cd9ca"
+      "salt": "9965cbb9e3bf5f827a28d0b58d5cff2a"
     }
   ]
 }

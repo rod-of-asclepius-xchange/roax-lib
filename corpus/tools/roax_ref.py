@@ -15,7 +15,6 @@ Section references below are to `docs/spec/roax-canon-1.md`.
 from __future__ import annotations
 
 import hashlib
-import hmac
 import re
 import unicodedata
 
@@ -302,41 +301,87 @@ def _require_absent(tag: int, value) -> None:
 
 
 # --------------------------------------------------------------------------------------------
-# Salt derivation (section 7)
+# Salts (section 7)
 # --------------------------------------------------------------------------------------------
+#
+# Decision D4 is ruled D4b, so there is NOTHING TO DERIVE HERE. Every salt is 16 bytes drawn
+# independently from a CSPRNG at issuance, with at least 128 bits of entropy, and no key
+# derivation function, master secret or salt preimage exists in this design (spec section 7).
+#
+# A salt is therefore an INPUT to this implementation rather than something it computes. That is
+# what makes a fixed vector file possible at all: the corpus build draws each salt once and
+# commits it, and both implementations read the committed set. An earlier version of this file
+# derived salts by HMAC-SHA-256 over a master salt and a preimage carrying the record identifier,
+# which is the D4a construction the ruling deleted.
 
-SALT_LABEL = b"/salt"
+SALT_BYTES = 16
 
 
-def salt_preimage(hash_alg: str, record_id: str, segments) -> bytes:
-    """Section 7. Every component is length-prefixed, exactly as in section 8.
+class SaltSet:
+    """The committed salt of every leaf of one record, addressed by its structured path.
 
-    Note the specification writes RID as `utf8(recordId)` rather than `utf8(NFC(recordId))`,
-    while the reserved leaf roax.recordId is a STRING and therefore IS normalized. The corpus
-    carries only ASCII record identifiers, so the two readings agree on every vector; the
-    divergence is recorded in corpus/README.md rather than decided by a vector.
+    This is the `salts` array schemas/envelope-1.0.json defines, in memory. Pairing is by
+    ENCODED PATH rather than by position, deliberately: a positional array would make
+    salt-to-leaf pairing depend on reproducing the section 9 sort before the salts can even be
+    read, which is the cross-implementation divergence the corpus exists to prevent
+    (spec section 7.2).
     """
-    dom = domain(hash_alg)
-    rid = record_id.encode("utf-8")
-    p = encode_path(segments)
-    return (
-        u32be(len(dom))
-        + dom
-        + u32be(len(SALT_LABEL))
-        + SALT_LABEL
-        + u32be(len(rid))
-        + rid
-        + u32be(len(p))
-        + p
-    )
+
+    def __init__(self, entries):
+        self._by_path = {}
+        for entry in entries:
+            segments = entry["segments"]
+            salt = bytes.fromhex(entry["salt"])
+            if len(salt) != SALT_BYTES:
+                raise RoaxError("salt-length", str(len(salt)))
+            key = encode_path(segments)
+            if key in self._by_path:
+                raise RoaxError("duplicate-salt-path", "")
+            self._by_path[key] = salt
+
+    def for_leaf(self, segments) -> bytes:
+        """Fail closed on a missing salt, rather than drawing one.
+
+        A drawn-on-demand salt would make this implementation produce a root that no other
+        implementation could reproduce, which is exactly the silent divergence the corpus is
+        the enforcement mechanism against.
+        """
+        key = encode_path(segments)
+        if key not in self._by_path:
+            raise RoaxError("salt-missing", display_path(segments))
+        return self._by_path[key]
+
+    def __len__(self):
+        return len(self._by_path)
 
 
-def derive_salt(hash_alg: str, master_salt: bytes, record_id: str, segments) -> bytes:
-    """Section 7. HMAC-SHA-256 under every hashAlg: a salt is a secret input, not a tree hash."""
-    if len(master_salt) != 32:
-        raise RoaxError("master-salt-length", str(len(master_salt)))
-    mac = hmac.new(master_salt, salt_preimage(hash_alg, record_id, segments), hashlib.sha256)
-    return mac.digest()[:16]
+def salt_set_from_document(doc, ordered) -> "SaltSet":
+    """Load a committed corpus salt set, in either of the two carriers class 10 needs.
+
+    `pairing: "path"` is the shape schemas/envelope-1.0.json defines and everything else uses:
+    explicit segments per entry, self-describing.
+
+    `pairing: "positional"` is a bare array in encodePath order, and it is a CORPUS-ONLY
+    carrier that MUST NEVER become an envelope shape. Specification section 7.2 rejects it for
+    an envelope because it makes pairing depend on reproducing the section 9 sort before the
+    salts can be read at all; in a corpus vector reproducing that sort is the thing under test,
+    so a mispairing fails the vector instead of yielding a silently wrong root. It exists
+    because the class-10 records are third-party reference samples at 69 and 70 leaves, and a
+    path-keyed set would enumerate every path of one into a public repository, which the
+    references policy forbids. A positional array discloses only the leaf count, which the
+    vector already publishes as leafCount. See docs/conformance-corpus.md class 10.
+    """
+    pairing = doc.get("pairing")
+    salts = doc.get("salts")
+    if pairing == "path":
+        return SaltSet(salts)
+    if pairing == "positional":
+        if len(salts) != len(ordered):
+            raise RoaxError("salt-count-mismatch", f"{len(salts)} salts for {len(ordered)} leaves")
+        return SaltSet(
+            [{"segments": leaf.segments, "salt": s} for leaf, s in zip(ordered, salts)]
+        )
+    raise RoaxError("salt-pairing-unknown", repr(pairing))
 
 
 # --------------------------------------------------------------------------------------------
@@ -590,12 +635,17 @@ def reserved_leaves(record_type: str, schema_version: str, record_id: str, issue
     return out
 
 
-def build_tree(hash_alg: str, record, type_map, master_salt: bytes, record_type: str,
-               schema_version: str, record_id: str, issuer_id: str, issuer_key_id=None):
-    """Sections 3.3, 7, 8 and 9. Returns (root, ordered leaves, salts, leaf hashes).
+def ordered_leaves(record, type_map, record_type: str, schema_version: str, record_id: str,
+                   issuer_id: str, issuer_key_id=None):
+    """Sections 3.3 and 9. The leaf set, in encodePath order, WITHOUT any salt.
 
-    The leaf set is the UNION of the reserved leaves and the record's own, formed BEFORE the
-    sort, so the two are indistinguishable to the tree function.
+    Split out from build_tree when decision D4 was ruled D4b. Leaf order is a function of the
+    path set alone (spec section 9), so it is computable before a salt exists - which is what
+    lets a caller draw a salt set for a record, and what lets the envelope verifier recover leaf
+    order without inventing salt values to get it.
+
+    The union of the reserved leaves and the record's own is formed BEFORE the sort, so the two
+    are indistinguishable to the tree function.
     """
     record_leaves = flatten(record, type_map)
     if not record_leaves:
@@ -613,14 +663,25 @@ def build_tree(hash_alg: str, record, type_map, master_salt: bytes, record_type:
     if len(set(paths)) != len(paths):
         raise RoaxError("duplicate-path", "")
     encoded.sort(key=lambda pair: pair[0])
-    ordered = [leaf for _, leaf in encoded]
+    return [leaf for _, leaf in encoded]
 
-    salts = [derive_salt(hash_alg, master_salt, record_id, leaf.segments) for leaf in ordered]
+
+def build_tree(hash_alg: str, record, type_map, salts: "SaltSet", record_type: str,
+               schema_version: str, record_id: str, issuer_id: str, issuer_key_id=None):
+    """Sections 3.3, 7, 8 and 9. Returns (root, ordered leaves, salts, leaf hashes).
+
+    `salts` is a SaltSet and is an INPUT: under decision D4b nothing here derives a salt
+    (spec section 7). A leaf with no committed salt is an error rather than a fresh draw.
+    """
+    ordered = ordered_leaves(
+        record, type_map, record_type, schema_version, record_id, issuer_id, issuer_key_id
+    )
+    leaf_salts = [salts.for_leaf(leaf.segments) for leaf in ordered]
     hashes = [
         leaf_hash(hash_alg, leaf.segments, leaf.tag, leaf.value, salt)
-        for leaf, salt in zip(ordered, salts)
+        for leaf, salt in zip(ordered, leaf_salts)
     ]
-    return mth(hash_alg, hashes), ordered, salts, hashes
+    return mth(hash_alg, hashes), ordered, leaf_salts, hashes
 
 
 # --------------------------------------------------------------------------------------------

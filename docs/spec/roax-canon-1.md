@@ -736,7 +736,8 @@ rather than an aspiration.
 > `hashAlg` is a design choice made in this document. The reasoning is that the binding exists to
 > keep a large blob out of an expensive hash, so tying the blob digest to `hashAlg` would make a
 > Poseidon record hash the whole blob through Poseidon and defeat the binding's only purpose; a
-> 40-byte `BLOB_REF` value is then cheap under either algorithm. The consequence to accept knowingly
+> 44-byte `BLOB_REF` value - `u64be` length 8, `u32be` digest length 4, digest 32 - is then cheap
+> under either algorithm. The consequence to accept knowingly
 > is that a `BLOB_REF` leaf depends on SHA-256's collision resistance even inside a record whose tree
 > is not SHA-256. A revision that wants a different blob digest must register it explicitly rather
 > than infer it from `hashAlg`.
@@ -984,8 +985,10 @@ constants and - the part the byte layouts above do not survive without - the enc
 length-prefixed byte string to field elements.
 
 > **Normative:** a record MUST NOT be issued with `hashAlg: "Poseidon-BN254"` until a revision of
-> this specification pins that parameterization. The byte-level preimages in sections 7 and 8 are
-> stated over byte strings and do not transfer to a prime-field permutation unmodified.
+> this specification pins that parameterization. The byte-level preimage in section 8 is
+> stated over byte strings and does not transfer to a prime-field permutation unmodified.
+> Section 7 no longer states a preimage of its own, because decision D4 was ruled D4b and salt
+> derivation is gone; section 8's leaf preimage is the only one left to carry across.
 
 ---
 
@@ -1139,7 +1142,9 @@ it:
 ## 10. Selective disclosure
 
 A disclosed copy carries, for each revealed leaf: its path as **structured segments**, its leaf
-index, its type tag, its value, its `salt(path)`, and its RFC 9162 audit path.
+index, its type tag, its value, **the leaf's own salt**, and its RFC 9162 audit path.
+There is no path-keyed derivation function to look up: since decision D4 was ruled D4b the salt is an
+independent random draw stored alongside the leaf it belongs to (section 7).
 It MAY additionally carry the display path, which is display only and is never an input to anything
 the verifier computes (section 5.2).
 
@@ -1824,8 +1829,8 @@ healthcert already speaks, so it costs an adopter nothing, and the property that
 the digest rule being independent of the wire format - is what keeps a future binary transport from
 becoming a `canon` bump.
 
-> **Normative:** a serialization format MUST NOT become the digest rule. The leaf, salt and tree
-> constructions of sections 6 through 9 are defined over byte strings and are the only inputs to a
+> **Normative:** a serialization format MUST NOT become the digest rule. The value, leaf and tree
+> constructions of sections 6, 8 and 9 are defined over byte strings and are the only inputs to a
 > root. In particular, deterministic CBOR MAY be used to carry an envelope and MUST NOT be used to
 > compute one.
 
@@ -1940,8 +1945,10 @@ This is decision D / D10 and it is OPEN.
 
 ## 15. Decisions: what is ruled and what is still open
 
-**Three decisions are still open, and all three belong to the project owner.**
+**Three of the open decisions belong to the project owner.**
 This specification takes no position on any of them and defines nothing that depends on one.
+A fourth, D14, was identified after the engineering rulings below and is stated at the end of this
+section.
 
 - **A** - whether roax-lib needs EU recognition, which would mandate SD-JWT VC and ISO mdoc export
   profiles.
@@ -1970,6 +1977,14 @@ rulings rather than on a recommendation. Eight confirmed what it already said; t
 | **D11** detached signature | None in v1, with the constraints on any future one stated normatively now | 2.2 |
 | **D12** normalization | D12a, NFC pinned at Unicode 15.1, with an end-to-end corpus vector | 6.1 |
 | **D13** clinical validation | D13a at the protocol layer, plus a normative prohibition on claiming clinical facts from root validity | 2.3 |
+
+**One further question is open and was identified after these rulings, while building the vector
+D12 required: whether the type-map lookup matches over an NFC-normalized key or over the bytes as
+received.** Section 6.1 pins NFC for hashing and section 4.2 requires an uncovered path to fail
+closed; neither says which form the lookup that precedes hashing compares. Both reference
+implementations currently match raw, so a decomposed key is refused by the fail-closed rule while
+its composed twin commits, and the two render identically. That is decision D14 in
+`docs/decisions.md` and this document does not settle it.
 
 **All of them, with their alternatives, their reasoning and the constraints they were ruled under,
 are in [`docs/decisions.md`](../decisions.md).** A decision that looks settled here and still reads

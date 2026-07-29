@@ -4,7 +4,7 @@
   "recordType": "sg.gov.moh.vaccination-healthcert",
   "schemaVersion": "1.0",
   "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-  "root": "cf3494e3be6a93dccd9253b5caabac3be13d6b64c9595d03e61bfa6aa84deef9",
+  "root": "262925e7186b1bec61033833823dbfc8c669fdf430ede9b618154caf50aefd17",
   "leafCount": 11,
   "issuer": {
     "id": "did:web:corpus.roax.invalid",
@@ -23,12 +23,12 @@
         "index": 5,
         "tag": 2,
         "value": "sg.gov.moh.vaccination-healthcert",
-        "salt": "c24889ba40e46be7643a6c1d2030e125",
+        "salt": "5955168a6e8d7f36f3402374102170a0",
         "auditPath": [
-          "cb113d9fe589d57a00b055a99ea15d9bb9e8468e76ac995aba740c415368add4",
-          "fc1449b34b7bc1cb6c67f14a57d19713744b1973d2512bc2cfdfe9f0439a600b",
-          "d4fbcc61dbd096cb711254f7811881638a2f8076014a75114955fcb388555843",
-          "8ebe9673e16174213baa78590e4f88b39822bc8ee8c20084a5e7aa189c2b0896"
+          "f77d4fe9a054e7e3acff707579e6212346248ab10056d83cc7ccc5c69d10c5fc",
+          "ecf238e1f0909b2feb7f7b064a23314e6096550f97e775573c3e8b05c923b954",
+          "2474d4227b1373177b0fc4312046c6e3e529baf3ad14e331ccb0a5c1efb69968",
+          "d454e5303970819fe568fa5452808d95edc4900c656515b05c8cbc9e2ea8aa90"
         ]
       },
       {
@@ -41,12 +41,12 @@
         "index": 7,
         "tag": 2,
         "value": "1.0",
-        "salt": "dde8c29a376074d7043fc68d7c15061e",
+        "salt": "1d94824d059f5abcd0b48b4458aad090",
         "auditPath": [
-          "7339ae575cff53b25a97a6ce33c052fc4bc49ce9d082e94e9535f4283a7f4f19",
-          "94c8768faf82718fa5ec7993ea42e76adfea2b1f2fa59955320aa0afef7c7b1f",
-          "d4fbcc61dbd096cb711254f7811881638a2f8076014a75114955fcb388555843",
-          "8ebe9673e16174213baa78590e4f88b39822bc8ee8c20084a5e7aa189c2b0896"
+          "ce5ab420f020695a164c24f50048b39849ffdd248a5b79df8ee419c517d0ddef",
+          "9a33c2af6c636464f1e817d70b77e5fea7ba22fdd02cdda9b7afd2eef6f94e4b",
+          "2474d4227b1373177b0fc4312046c6e3e529baf3ad14e331ccb0a5c1efb69968",
+          "d454e5303970819fe568fa5452808d95edc4900c656515b05c8cbc9e2ea8aa90"
         ]
       },
       {
@@ -59,12 +59,12 @@
         "index": 3,
         "tag": 2,
         "value": "urn:uuid:11111111-1111-4111-8111-111111111111",
-        "salt": "312b7634d0bbc798038f1516776c403b",
+        "salt": "0dbb601e33e9d0ecdd2c30a3f6ba2dfd",
         "auditPath": [
-          "37771df7f467c21a9ff9a810a971598cdab55c083b6a81b537619349051ceda4",
-          "1a183d5646f8c5ac6012edfe4d0b43e470b20e23461848f0044e4da33495f1d0",
-          "0c16e5b35e6b518be7105fe9b7a4c19a975c084aef7494d8fdb00c08f6f7fd26",
-          "8ebe9673e16174213baa78590e4f88b39822bc8ee8c20084a5e7aa189c2b0896"
+          "924c9749faa1fb4e57c8730967c6652d735ba8f8d96c3962607d9c87c2c7a268",
+          "80dd70f5ab666a0fc3963e0643d5ad94debfb0c48d8ce3a17af28a433fb8c644",
+          "f79acc5b27cf11c2d10102b02dd2402764c48478515954fb1d54e0bc9f737c2e",
+          "d454e5303970819fe568fa5452808d95edc4900c656515b05c8cbc9e2ea8aa90"
         ]
       },
       {
@@ -77,12 +77,12 @@
         "index": 4,
         "tag": 2,
         "value": "did:web:corpus.roax.invalid",
-        "salt": "81b4daf535d4f8dbc2a121bc2f4e92a7",
+        "salt": "881aebdc5cdf791d6514c23c5999d24b",
         "auditPath": [
-          "4c96c4a98cb5412c99289e23faefb81beb3281e3bd93ed5b075f76a640918c90",
-          "fc1449b34b7bc1cb6c67f14a57d19713744b1973d2512bc2cfdfe9f0439a600b",
-          "d4fbcc61dbd096cb711254f7811881638a2f8076014a75114955fcb388555843",
-          "8ebe9673e16174213baa78590e4f88b39822bc8ee8c20084a5e7aa189c2b0896"
+          "4620801ca35f66b720a4ee82ff5aa25848f24dd662d8100aefd2b2b13d3caa80",
+          "ecf238e1f0909b2feb7f7b064a23314e6096550f97e775573c3e8b05c923b954",
+          "2474d4227b1373177b0fc4312046c6e3e529baf3ad14e331ccb0a5c1efb69968",
+          "d454e5303970819fe568fa5452808d95edc4900c656515b05c8cbc9e2ea8aa90"
         ]
       },
       {
@@ -95,12 +95,12 @@
         "index": 1,
         "tag": 2,
         "value": "2026-07-28T00:00:00Z",
-        "salt": "47824e6a50f1ed8c25d014cc035d6c69",
+        "salt": "4f255940d7fea610b7145b50f838e397",
         "auditPath": [
-          "f8a19c6b109244ee4fc29d3a9cd3ba0722d07ff0f090dbcaa64fdb7a58623b70",
-          "32c005dfe18fe1f9c370d5a1c3a5912fb31a6a95860aa10442531a1a502ac55e",
-          "0c16e5b35e6b518be7105fe9b7a4c19a975c084aef7494d8fdb00c08f6f7fd26",
-          "8ebe9673e16174213baa78590e4f88b39822bc8ee8c20084a5e7aa189c2b0896"
+          "1c1f5ab276ec6a118101a36470d7ea1bd62189f4f23baec97b16fc41e198da4f",
+          "24e5d600a0e061418be82be8e249729fb89124c2c30fd3cda493de99ee7744f8",
+          "f79acc5b27cf11c2d10102b02dd2402764c48478515954fb1d54e0bc9f737c2e",
+          "d454e5303970819fe568fa5452808d95edc4900c656515b05c8cbc9e2ea8aa90"
         ]
       },
       {
@@ -116,10 +116,10 @@
         "index": 10,
         "tag": 2,
         "value": "urn:uuid:notary-1",
-        "salt": "57ac3b8b70fe7165a7e11cd364c18877",
+        "salt": "d5a8f7ff7437c71aac33aa3926baf3fd",
         "auditPath": [
-          "a96f392c63b63d23ed810e581e01182b01cf63e4da622bdfa3bad77a0ef0fdcc",
-          "d94edf52a4379945be66c9d1542d71dfaeb87926826b1694367a87efe9d2642e"
+          "ebaafd0eb002656d0a2b3bc1b9090a1d524f6433729736cdb351d0706bdb755c",
+          "e07c2f5cba44d93621f7f8c0394b84abf5b38a264c9f18887cf3922f20a5ef89"
         ]
       }
     ]

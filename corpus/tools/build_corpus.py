@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import secrets
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -26,7 +27,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import corpus_plan as plan  # noqa: E402
 import fixture_io  # noqa: E402
 import moh_records  # noqa: E402
-import roax_ref as ref  # noqa: E402
+import roax_ref as ref
+import salt_sets  # noqa: E402
 import synthetic_records  # noqa: E402
 from envelope_fixtures import build_envelope_fixtures  # noqa: E402
 from roax_ref import RoaxError  # noqa: E402
@@ -36,6 +38,20 @@ CORPUS_DIR = os.path.dirname(HERE)
 REPO_ROOT = os.path.dirname(CORPUS_DIR)
 
 CORPUS_VERSION = "1.0.0"
+
+# docs/conformance-corpus.md section 3 states the class count, and schemas/conformance-corpus-1.0.json
+# sets classRef's maximum to match. All three MOVE TOGETHER: a stale count here means the
+# highest-numbered class is never checked for coverage, which is the silent skip the coverage
+# report exists to prevent. 17 until the ten engineering decisions were ruled on 2026-07-28, which
+# added class 18 (outside-the-root authority, decision D8) and class 19 (NFC end to end, D12).
+CLASS_COUNT = 19
+# docs/conformance-corpus.md class 8 makes these leaf counts mandatory, and
+# schemas/conformance-corpus-1.0.json names this check as what enforces that, since a requirement
+# on the SET of tree vectors is not expressible per vector. Held separately from
+# `corpus_plan.TREE_SIZES` on purpose: a check reading the same constant the build iterates would
+# agree with any edit to it, including one that dropped a non-power-of-two size and left the split
+# rule untested.
+MANDATORY_TREE_SIZES = (1, 2, 3, 5, 7, 8, 9, 130)
 HASH_ALG = "SHA-256"
 # Section 6.1 pins Unicode 15.1. Implementation A runs Python's own tables; the value written
 # here is the pin, and `build_corpus.py --report` prints the tables actually used so a mismatch
@@ -155,18 +171,85 @@ class _AllStringsTypeMap:
         return ref.TAG_STRING
 
 
-def build_salt():
+def build_unlinkability():
+    """Class 12, and it ASSERTS RATHER THAN PINS.
+
+    Decision D4 is ruled D4b, so salts are independent random draws and no fixed expectation can
+    exist for what an implementation must draw freshly. The vector describes an issuance to
+    perform and the relations the results MUST satisfy; this builder performs it.
+
+    Three assertions, one per mistake docs/conformance-corpus.md class 12 names:
+
+      within-issuance salts distinct   catches ONE DRAW PER RECORD reused across its leaves,
+                                       which a single-path vector cannot see, because such an
+                                       implementation still varies that path between trials;
+      across-issuance salts distinct   catches a DETERMINISTIC salt and one REUSED ACROSS
+                                       RECORDS, which is the patient-linkage failure itself;
+      across-issuance leaf hashes      the property the class is named for, and the one a
+        distinct                       reader checks: the same subject, path and value twice
+                                       must not produce the same leaf hash.
+
+    There is deliberately no within-issuance LEAF HASH assertion. Two different paths carry
+    different encoded paths into the section 8 preimage, so their leaf hashes differ whatever
+    the salts do, and asserting it would be coverage that cannot fail.
+
+    HONEST LIMIT, also stated in the class: this detects a deterministic or reused salt. It does
+    NOT detect a weak CSPRNG - 16 bytes from a badly seeded generator passes every trial while
+    providing far less than the 128 bits spec section 7 requires. No fixed vector file can test
+    a randomness source.
+    """
     out = []
-    for name, cls, master_hex, record_id, segments in plan.SALT:
-        salt = ref.derive_salt(HASH_ALG, bytes.fromhex(master_hex), record_id, segments)
-        out.append({
+    for name, cls, paths, tag, value, trials, record_ids in plan.UNLINKABILITY:
+        # Two entries that are different JSON text and the SAME path once NFC is applied pass the
+        # schema's uniqueItems (spec section 6.1), and the within-issuance assertion would then
+        # compare a path a record can hold only once. `encode_path` normalizes, so comparing
+        # encoded forms is the duplicate-path rejection `ordered_leaves` makes over a record's
+        # union; this class issues no record and never reaches that one.
+        if len({ref.encode_path(p) for p in paths}) != len(paths):
+            raise SystemExit(
+                f"corpus defect: unlinkability vector {name!r} names two paths that are equal "
+                f"once NFC is applied"
+            )
+        seen_salts = set()
+        seen_hashes = set()
+        for trial in range(trials):
+            drawn = [secrets.token_bytes(16) for _ in paths]
+            if len({s.hex() for s in drawn}) != len(drawn):
+                raise SystemExit(
+                    f"corpus defect: unlinkability vector {name!r} drew a repeated salt within "
+                    f"one issuance at trial {trial}"
+                )
+            for segments, salt in zip(paths, drawn):
+                key = (ref.encode_path(segments).hex(), salt.hex())
+                if key in seen_salts:
+                    raise SystemExit(
+                        f"corpus defect: unlinkability vector {name!r} repeated a salt across "
+                        f"issuances"
+                    )
+                seen_salts.add(key)
+                h = ref.leaf_hash(HASH_ALG, segments, tag, value, salt).hex()
+                hkey = (ref.encode_path(segments).hex(), h)
+                if hkey in seen_hashes:
+                    raise SystemExit(
+                        f"corpus defect: unlinkability vector {name!r} repeated a leaf hash "
+                        f"across issuances at the same path"
+                    )
+                seen_hashes.add(hkey)
+
+        vec = {
             "name": name,
             "class": cls,
-            "masterSaltHex": master_hex,
-            "recordId": record_id,
-            "segments": segments,
-            "saltHex": salt.hex(),
-        })
+            "paths": paths,
+            "tag": tag,
+            "value": value,
+            "trials": trials,
+            "expectDistinctSaltsWithinIssuance": True,
+            "expectDistinctSaltsAcrossIssuances": True,
+            "expectDistinctLeafHashesAcrossIssuances": True,
+        }
+        if record_ids is not None:
+            vec["recordIds"] = record_ids
+        out.append(vec)
     return out
 
 
@@ -222,6 +305,12 @@ def synthetic_tree_leaves(n):
 
 
 def build_tree_and_inclusion():
+    missing = [n for n in MANDATORY_TREE_SIZES if n not in plan.TREE_SIZES]
+    if missing:
+        raise SystemExit(
+            f"corpus defect: class 8 requires leaf counts {list(MANDATORY_TREE_SIZES)} "
+            f"(docs/conformance-corpus.md class 8) and the plan omits {missing}"
+        )
     trees = []
     inclusions = []
     for n in plan.TREE_SIZES:
@@ -361,28 +450,8 @@ def build(references=None, notes=None, check=False):
     type_map_vectors = synthetic_records.build_type_map_vectors()
     envelopes = build_envelope_fixtures(HASH_ALG)
 
-    unlinkability = []
-    for name, cls, segments, tag, value, a, b in plan.UNLINKABILITY:
-        sides = []
-        for master_hex, record_id in (a, b):
-            salt = ref.derive_salt(HASH_ALG, bytes.fromhex(master_hex), record_id, segments)
-            sides.append({
-                "masterSaltHex": master_hex,
-                "recordId": record_id,
-                "leafHash": ref.leaf_hash(HASH_ALG, segments, tag, value, salt).hex(),
-            })
-        if sides[0]["leafHash"] == sides[1]["leafHash"]:
-            raise SystemExit(f"corpus defect: unlinkability vector {name!r} collides")
-        unlinkability.append({
-            "name": name,
-            "class": cls,
-            "segments": segments,
-            "tag": tag,
-            "value": value,
-            "recordA": sides[0],
-            "recordB": sides[1],
-            "expectDistinct": True,
-        })
+    unlinkability = build_unlinkability()
+    normalization = synthetic_records.build_normalization_vectors()
 
     return {
         "corpusVersion": CORPUS_VERSION,
@@ -393,7 +462,6 @@ def build(references=None, notes=None, check=False):
             "encodePath": build_encode_path(),
             "encodeValue": build_encode_value(),
             "reject": build_reject(),
-            "salt": build_salt(),
             "leaf": build_leaf(),
             "tree": trees,
             "inclusion": inclusions,
@@ -401,6 +469,7 @@ def build(references=None, notes=None, check=False):
             "typeMap": type_map_vectors + build_moh_type_map_vectors(notes),
             "record": records,
             "unlinkability": unlinkability,
+            "normalization": normalization,
             "envelope": envelopes,
         },
     }
@@ -416,7 +485,7 @@ def serialize(corpus) -> str:
 
 
 def coverage(corpus):
-    """Which of the seventeen classes have vectors. A class with none is a coverage gap."""
+    """Which of the CLASS_COUNT classes have vectors. A class with none is a coverage gap."""
     seen = {}
     for kind, vectors in corpus["vectors"].items():
         for v in vectors:
@@ -425,17 +494,28 @@ def coverage(corpus):
     return seen
 
 
+def _is_external_record(vector):
+    """Whether a record vector's record lives outside this repository.
+
+    `recordFile` is one of the two carriers the corpus schema admits; the other is a full
+    envelope copy, which is always a fixture inside `corpus/` and therefore never external. A
+    vector carrying only `envelopeFile` must not be read as external here, and it must not raise
+    either: both callers walk the COMMITTED file, which a future vector may legitimately use that
+    carrier in.
+    """
+    return "recordFile" in vector and not vector["recordFile"].startswith("corpus/")
+
+
 def _external_record_vectors(corpus):
     """Names of record vectors whose record file lives outside this repository."""
-    return {v["name"] for v in corpus["vectors"].get("record", [])
-            if not v["recordFile"].startswith("corpus/")}
+    return {v["name"] for v in corpus["vectors"].get("record", []) if _is_external_record(v)}
 
 
 def _without_external_records(corpus):
     trimmed = dict(corpus)
     trimmed["vectors"] = dict(corpus["vectors"])
     trimmed["vectors"]["record"] = [
-        v for v in corpus["vectors"].get("record", []) if v["recordFile"].startswith("corpus/")
+        v for v in corpus["vectors"].get("record", []) if not _is_external_record(v)
     ]
     return json.dumps(trimmed, sort_keys=True)
 
@@ -480,12 +560,39 @@ def main():
     ap.add_argument("--out", default=os.path.join(CORPUS_DIR, "conformance-corpus-1.0.json"))
     ap.add_argument("--references", default=os.environ.get("ROAX_REFERENCES"))
     ap.add_argument("--report", action="store_true", help="print per-class coverage")
+    ap.add_argument("--draw-salts", action="store_true",
+                    help="draw fresh salt sets into corpus/fixtures/salts/ and exit. Run ONCE "
+                         "and commit the result: under decision D4b a salt is an independent "
+                         "random draw that nothing can re-derive, so a normal build reads the "
+                         "committed sets and never draws one (spec section 7). IT LEAVES THE "
+                         "TREE INCONSISTENT: drawing runs a full build, so every envelope and "
+                         "record fixture is rewritten under the new salts while the corpus file "
+                         "itself keeps its old roots, and --check fails until a normal build "
+                         "follows.")
     ap.add_argument("--check", action="store_true",
                     help="rebuild and compare the corpus AND every fixture against the "
                          "committed files instead of writing them; writes nothing")
     ap.add_argument("--extract-to", default=None,
                     help="also write the extracted MOH samples here, for the runner to read")
     args = ap.parse_args()
+
+    if args.draw_salts:
+        # Draw and exit. Deliberately not part of any build: a build that drew its own salts
+        # would produce a root no other machine could reproduce, which is the silent divergence
+        # this corpus is the enforcement mechanism against.
+        if args.check:
+            raise SystemExit("--draw-salts and --check are contradictory: one writes, one compares")
+        salt_sets.set_drawing(True)
+        notes = []
+        build(args.references, notes, check=False)
+        drawn = salt_sets.committed_names()
+        print(f"drew {len(drawn)} salt set(s) into {salt_sets.REPO_PREFIX}")
+        for name in drawn:
+            print(f"  {name}")
+        print("commit these; a normal build reads them and never draws.")
+        print("then run a normal build: every envelope and record fixture has just been "
+              "rewritten under the new salts and the corpus file still carries the old roots.")
+        return
 
     notes = []
     corpus = build(args.references, notes, check=args.check)
@@ -544,7 +651,7 @@ def main():
         import unicodedata
         print(f"  generator Unicode tables: {unicodedata.unidata_version} (corpus pins {UNICODE_VERSION})")
         cov = coverage(corpus)
-        for cls in range(1, 18):
+        for cls in range(1, CLASS_COUNT + 1):
             if cls in cov:
                 detail = ", ".join(f"{k}={n}" for k, n in sorted(cov[cls].items()))
                 print(f"  class {cls:2d}: {detail}")

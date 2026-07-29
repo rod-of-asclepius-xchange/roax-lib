@@ -1,0 +1,115 @@
+{
+  "pairing": "path",
+  "salts": [
+    {
+      "segments": [
+        {
+          "key": "id"
+        }
+      ],
+      "salt": "3acf84fe0e5dbff473ac84c203e9bfad"
+    },
+    {
+      "segments": [
+        {
+          "key": "type"
+        }
+      ],
+      "salt": "b7872cea7fa9438cbb40ef72c9c0f4a0"
+    },
+    {
+      "segments": [
+        {
+          "key": "version"
+        }
+      ],
+      "salt": "ba10f64bee3fbc76b58163123eb25f1d"
+    },
+    {
+      "segments": [
+        {
+          "key": "validFrom"
+        }
+      ],
+      "salt": "a6fbae9cded4c02afd51fccaf747be22"
+    },
+    {
+      "segments": [
+        {
+          "key": "validUntil"
+        }
+      ],
+      "salt": "d4bac73189076705773e19f8d9592632"
+    },
+    {
+      "segments": [
+        {
+          "key": "fhirVersion"
+        }
+      ],
+      "salt": "8489e647abe1b391e202a249d281b552"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.recordId"
+        }
+      ],
+      "salt": "25f59c4cde8ca90c10b54cf4feffbeea"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.issuer.id"
+        }
+      ],
+      "salt": "9eea61fcc95cc772d16554fcb5cb7fd3"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.recordType"
+        }
+      ],
+      "salt": "bbbfb2ce7a62689ef3ee824cbc65a6dc"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.issuer.keyId"
+        }
+      ],
+      "salt": "07f66a40c57b65f703c01a5d1257c70b"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.schemaVersion"
+        }
+      ],
+      "salt": "28827cf5754dce6f043d65ddf1efda8e"
+    },
+    {
+      "segments": [
+        {
+          "key": "patient"
+        },
+        {
+          "key": "gender"
+        }
+      ],
+      "salt": "38a876fe1b00832ce8b0e0622b6d2b86"
+    },
+    {
+      "segments": [
+        {
+          "key": "patient"
+        },
+        {
+          "key": "birthDate"
+        }
+      ],
+      "salt": "eae86304682556c9e4e1dd80c8f4267b"
+    }
+  ]
+}

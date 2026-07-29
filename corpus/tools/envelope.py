@@ -136,7 +136,12 @@ def _verify(envelope, type_maps):
         return False, "hash-alg-not-allowed"
 
     if _has(envelope, "masterSalt"):
-        # Section 7.3 rule 3. masterSalt MUST NEVER appear in any envelope, full or disclosed.
+        # Section 7.3 rule 3: no envelope may carry any value from which the salt of an
+        # undisclosed leaf could be obtained. Decision D4 is ruled D4b, so no such value exists
+        # in the design and this check is vacuous today - kept because rule 3 binds any future
+        # revision that reintroduces a derived salt, and because a seed added to an envelope
+        # would hand every holder the ability to recompute every withheld leaf's salt in a copy
+        # that still verified. Class 17 carries the matching vector.
         return False, "master-salt-in-envelope"
 
     has_record = _has(envelope, "record")
@@ -184,11 +189,14 @@ def _verify_full(envelope, hash_alg, root, identity, type_maps):
     salt_entries = _get(envelope, "salts")
 
     # The reserved-namespace guard, the duplicate-key rejection and the fail-closed type-map
-    # lookup all live inside build_tree, so this call is what makes class 15's reject row fire
-    # BEFORE anything is compared against the root.
-    _computed, leaves, _salts, _hashes = ref.build_tree(
-        hash_alg, body, type_map, _ordering_only_master_salt(), **identity
-    )
+    # lookup all live inside ordered_leaves, so this call is what makes class 15's reject row
+    # fire BEFORE anything is compared against the root.
+    #
+    # ordered_leaves rather than build_tree: a full copy carries the salt of every leaf, so a
+    # verifier needs the leaf ORDER and never a salt it did not read from the envelope. Under
+    # the deleted D4a construction this had to call build_tree with a dummy master salt purely
+    # to reach the ordering pass, which is exactly the awkwardness the split removed.
+    leaves = ref.ordered_leaves(body, type_map, **identity)
 
     if len(salt_entries) != leaf_count:
         # Section 11.1: the derived count and the declared one disagreeing MUST be a rejection,
@@ -214,16 +222,6 @@ def _verify_full(envelope, hash_alg, root, identity, type_maps):
     if ref.mth(hash_alg, rebuilt) != root:
         return False, "root-mismatch"
     return True, "ok"
-
-
-def _ordering_only_master_salt():
-    """A full copy carries per-leaf salts, so no master salt is needed to REBUILD one.
-
-    Decision D4 is OPEN and this verifier must work under either answer, so it never derives a
-    salt for verification: every salt is read from the `salts` array. This value only feeds the
-    ordering pass inside build_tree, and leaf order is a function of paths alone.
-    """
-    return b"\x00" * 32
 
 
 def _verify_disclosed(envelope, hash_alg, root, identity):

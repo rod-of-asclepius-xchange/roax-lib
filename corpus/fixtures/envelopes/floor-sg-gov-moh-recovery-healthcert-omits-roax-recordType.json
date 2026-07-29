@@ -4,7 +4,7 @@
   "recordType": "sg.gov.moh.recovery-healthcert",
   "schemaVersion": "2.0",
   "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-  "root": "bf82777fd06d66f15eea3ba472e5da6799ea8721905b4b1d51e075a9ba90f396",
+  "root": "7fbc605290fdf5623ff58692ee594f1bc7ff00d606bef686a1c742b96f8b24ac",
   "leafCount": 13,
   "issuer": {
     "id": "did:web:corpus.roax.invalid",
@@ -23,12 +23,12 @@
         "index": 10,
         "tag": 2,
         "value": "2.0",
-        "salt": "dde8c29a376074d7043fc68d7c15061e",
+        "salt": "28827cf5754dce6f043d65ddf1efda8e",
         "auditPath": [
-          "ce2173bc1c66b21496a373e56823dc9b6c47a19b5f1241be34292088db2b5037",
-          "af494aa628f1f04c3f21e1e21ad075dd35dab8bcb99cdb53dd7e4e98fa4c3b13",
-          "bf474473c5f9e62b692f71b426da4766c3e7d56f4f2891623f4bdfac32de3d2d",
-          "fc1644671a577997a404f6786017e126c8e1003c4dce5c18cd5951777dc19312"
+          "95d6fe899e6f084289d0a97ac0be089c1c255c44c3f6e8b570b98f6476efc535",
+          "2e15f86968a019ca70ac3c5ba2a35c198db40142758ffe29257486a4ba89e237",
+          "1d3e21980dec970c722138ba902d91aad5abf0c29c9f9beb4fb9461efe495da3",
+          "df31b0c8c7aac8ac8cca8ffcccb0ea42513bf3a499143f4a9087b282ebec4625"
         ]
       },
       {
@@ -41,12 +41,12 @@
         "index": 6,
         "tag": 2,
         "value": "urn:uuid:11111111-1111-4111-8111-111111111111",
-        "salt": "312b7634d0bbc798038f1516776c403b",
+        "salt": "25f59c4cde8ca90c10b54cf4feffbeea",
         "auditPath": [
-          "cb113d9fe589d57a00b055a99ea15d9bb9e8468e76ac995aba740c415368add4",
-          "353c56cb28d87697999916ab3ce1d170860d78f8e87995d09c5c26e81734a419",
-          "bbcc34bfd3a2f39805a01ff149261b91a85b2f1dfa9514f0191e2a9250cc703c",
-          "e7a28f6b914bb2836ab4e0d7aec78e241981912ac800d85699ff8250518878b2"
+          "aa84ad7f39e39f302644f81e91e79e5c34964588593032a1829035b1ea943430",
+          "e0af3239d095f84fca0b01be21a1056dddef51263b1d84405bcdd0b65163e714",
+          "1c3fea4af51bcef31c3da6dd848be6b8e64bea9c291546f1d1ce99d8f52f0a31",
+          "4c04199f7ed15de7a3cbb4498371b5433c6c0bbc1f98938f0f0e6651fa3b82e1"
         ]
       },
       {
@@ -59,12 +59,12 @@
         "index": 7,
         "tag": 2,
         "value": "did:web:corpus.roax.invalid",
-        "salt": "81b4daf535d4f8dbc2a121bc2f4e92a7",
+        "salt": "9eea61fcc95cc772d16554fcb5cb7fd3",
         "auditPath": [
-          "095f0c4e5e01a4463870530f37dd1ba49eee664cf157789aa8ce44180cfe2909",
-          "353c56cb28d87697999916ab3ce1d170860d78f8e87995d09c5c26e81734a419",
-          "bbcc34bfd3a2f39805a01ff149261b91a85b2f1dfa9514f0191e2a9250cc703c",
-          "e7a28f6b914bb2836ab4e0d7aec78e241981912ac800d85699ff8250518878b2"
+          "10adba66fca7292b5dc8f8946f7003057a5e89c5b126e7531906261e890a2428",
+          "e0af3239d095f84fca0b01be21a1056dddef51263b1d84405bcdd0b65163e714",
+          "1c3fea4af51bcef31c3da6dd848be6b8e64bea9c291546f1d1ce99d8f52f0a31",
+          "4c04199f7ed15de7a3cbb4498371b5433c6c0bbc1f98938f0f0e6651fa3b82e1"
         ]
       },
       {
@@ -77,12 +77,12 @@
         "index": 2,
         "tag": 2,
         "value": "rec-healthcert-v2.0",
-        "salt": "cdfe9bac8b28a9ca203d4855d8d9e842",
+        "salt": "ba10f64bee3fbc76b58163123eb25f1d",
         "auditPath": [
-          "39c31a8c4444d880bc1d2469f26bbf547947b31a1d1740373b59485cb51f7a66",
-          "9600d3f862e55b5aacc2ce0ba11386c2967a5b8863f80f2fe553e4374868e741",
-          "621f51db781eba72f74fdbeafdb3210de9b1cf81b7f2ba46ecc58ca5ddb1fad9",
-          "e7a28f6b914bb2836ab4e0d7aec78e241981912ac800d85699ff8250518878b2"
+          "c16658f438cd510403fd8e3fa41233cd3d03de552206fc86c504188a6d851b1c",
+          "129606581a52e3e4c9fd610585c27e62611437b1097e84a2c68d5fe83ac6cef1",
+          "d4086193217969647f74a0d24358d8cc3f9ec2e3a86ea3fe16e119fae816138b",
+          "4c04199f7ed15de7a3cbb4498371b5433c6c0bbc1f98938f0f0e6651fa3b82e1"
         ]
       },
       {
@@ -95,12 +95,12 @@
         "index": 1,
         "tag": 2,
         "value": "PCR",
-        "salt": "b69f27db157c304d50e4c8e4c6c256a5",
+        "salt": "b7872cea7fa9438cbb40ef72c9c0f4a0",
         "auditPath": [
-          "f8a19c6b109244ee4fc29d3a9cd3ba0722d07ff0f090dbcaa64fdb7a58623b70",
-          "ae7950dcfa88aae20bd6bae7e1ddbf3989026650e01f9c6defd90611c05b5fe9",
-          "621f51db781eba72f74fdbeafdb3210de9b1cf81b7f2ba46ecc58ca5ddb1fad9",
-          "e7a28f6b914bb2836ab4e0d7aec78e241981912ac800d85699ff8250518878b2"
+          "353ea81dff1963d4590db2a1fd7c64b40711c8915973bac2cf048d4f49e3aa78",
+          "7bb5c078fb0831fa5786af094d6f8a3ae18ae042812d977d623882039fa4dfd9",
+          "d4086193217969647f74a0d24358d8cc3f9ec2e3a86ea3fe16e119fae816138b",
+          "4c04199f7ed15de7a3cbb4498371b5433c6c0bbc1f98938f0f0e6651fa3b82e1"
         ]
       },
       {
@@ -113,12 +113,12 @@
         "index": 3,
         "tag": 2,
         "value": "2026-07-28T00:00:00Z",
-        "salt": "47824e6a50f1ed8c25d014cc035d6c69",
+        "salt": "a6fbae9cded4c02afd51fccaf747be22",
         "auditPath": [
-          "1db3c96813642e487e2ba4cf393649912e0d7d2f6b6e4a4eb08d2c9d1eca3b31",
-          "9600d3f862e55b5aacc2ce0ba11386c2967a5b8863f80f2fe553e4374868e741",
-          "621f51db781eba72f74fdbeafdb3210de9b1cf81b7f2ba46ecc58ca5ddb1fad9",
-          "e7a28f6b914bb2836ab4e0d7aec78e241981912ac800d85699ff8250518878b2"
+          "788ce9d58a85b0c7ebca006ecf461851b6ebae2a2084add9975f48a652858577",
+          "129606581a52e3e4c9fd610585c27e62611437b1097e84a2c68d5fe83ac6cef1",
+          "d4086193217969647f74a0d24358d8cc3f9ec2e3a86ea3fe16e119fae816138b",
+          "4c04199f7ed15de7a3cbb4498371b5433c6c0bbc1f98938f0f0e6651fa3b82e1"
         ]
       },
       {
@@ -131,12 +131,12 @@
         "index": 4,
         "tag": 2,
         "value": "2026-10-28T00:00:00Z",
-        "salt": "03d7b6ccdd801db8ac2c2150b0ff0cce",
+        "salt": "d4bac73189076705773e19f8d9592632",
         "auditPath": [
-          "37771df7f467c21a9ff9a810a971598cdab55c083b6a81b537619349051ceda4",
-          "7a7437dfd0e20e4cf11384425bdf00d27236871bf233c76251a51fd22176cda5",
-          "bbcc34bfd3a2f39805a01ff149261b91a85b2f1dfa9514f0191e2a9250cc703c",
-          "e7a28f6b914bb2836ab4e0d7aec78e241981912ac800d85699ff8250518878b2"
+          "259373c21094436105478548ce8be9c34e11ecbc786b78191782317ae0d5aab9",
+          "0c6e9c6ef2afa33adce982a440652f9e5fd8188c5b8deddb638c52e5e7db22d6",
+          "1c3fea4af51bcef31c3da6dd848be6b8e64bea9c291546f1d1ce99d8f52f0a31",
+          "4c04199f7ed15de7a3cbb4498371b5433c6c0bbc1f98938f0f0e6651fa3b82e1"
         ]
       },
       {
@@ -149,12 +149,12 @@
         "index": 9,
         "tag": 2,
         "value": "did:web:corpus.roax.invalid#key-1",
-        "salt": "2a485e75eaf030468968581cc7ee3b3e",
+        "salt": "07f66a40c57b65f703c01a5d1257c70b",
         "auditPath": [
-          "a4fe19ef46cf1dfbc88b2559c968378aaeead2565022b4a1e4cace947696d0e3",
-          "13316541a65143f9cf03c4e2fdf72aa550aad60401e13fc83207df2d8cc91942",
-          "bf474473c5f9e62b692f71b426da4766c3e7d56f4f2891623f4bdfac32de3d2d",
-          "fc1644671a577997a404f6786017e126c8e1003c4dce5c18cd5951777dc19312"
+          "daa759fbd162ce8024983325e33f633bffc0de5b0fd16d93fa1c350bf5e7d2c2",
+          "78b75a5adf45a89f53feb80deff63267e45167c1563f0be742aa3ea3c1c8f69a",
+          "1d3e21980dec970c722138ba902d91aad5abf0c29c9f9beb4fb9461efe495da3",
+          "df31b0c8c7aac8ac8cca8ffcccb0ea42513bf3a499143f4a9087b282ebec4625"
         ]
       }
     ]

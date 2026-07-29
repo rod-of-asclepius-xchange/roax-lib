@@ -1,0 +1,105 @@
+{
+  "pairing": "path",
+  "salts": [
+    {
+      "segments": [
+        {
+          "key": "roax.recordId"
+        }
+      ],
+      "salt": "79f716df0be11f73d42abd89c325a389"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.issuer.id"
+        }
+      ],
+      "salt": "f12d87122baa5c04df62bd9467c30b2d"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.recordType"
+        }
+      ],
+      "salt": "4c06448997a7221a05b47c273f387931"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.schemaVersion"
+        }
+      ],
+      "salt": "b20cc9b9e854a1002337a9ba4a260e63"
+    },
+    {
+      "segments": [
+        {
+          "key": "fhirBundle"
+        },
+        {
+          "key": "resourceType"
+        }
+      ],
+      "salt": "3626fd205c9a1d91f4a72e106dcdc15c"
+    },
+    {
+      "segments": [
+        {
+          "key": "fhirBundle"
+        },
+        {
+          "key": "entry"
+        },
+        {
+          "index": 0
+        },
+        {
+          "key": "fullUrl"
+        }
+      ],
+      "salt": "eb346db3f7a7d9898bbfd5686f23e320"
+    },
+    {
+      "segments": [
+        {
+          "key": "fhirBundle"
+        },
+        {
+          "key": "entry"
+        },
+        {
+          "index": 0
+        },
+        {
+          "key": "resource"
+        },
+        {
+          "key": "gender"
+        }
+      ],
+      "salt": "948bc91359a98cc5cd32447f020cc380"
+    },
+    {
+      "segments": [
+        {
+          "key": "fhirBundle"
+        },
+        {
+          "key": "entry"
+        },
+        {
+          "index": 0
+        },
+        {
+          "key": "resource"
+        },
+        {
+          "key": "resourceType"
+        }
+      ],
+      "salt": "fbec2ebc92c14fcd3d1715cc46322014"
+    }
+  ]
+}

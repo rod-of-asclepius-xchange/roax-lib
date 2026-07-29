@@ -1,6 +1,6 @@
 # The ROAX conformance corpus
 
-**Status:** first cut. 476 vectors, all 17 classes reachable, 15 complete and 2 partial.
+**Status:** first cut. 471 vectors, all 19 classes reachable, 15 complete and 4 partial.
 **Normative definition:** [`docs/conformance-corpus.md`](../docs/conformance-corpus.md).
 **Schema:** [`schemas/conformance-corpus-1.0.json`](../schemas/conformance-corpus-1.0.json).
 **Specification:** [`docs/spec/roax-canon-1.md`](../docs/spec/roax-canon-1.md), which governs where the
@@ -17,6 +17,7 @@ enforcement mechanism for cross-language agreement, not a safety net.
 | `type-maps/*.json` | The type maps class 10 and class 11 are asserted against. Three are derived from the reference schemas with a citation on every entry; one is authored for the synthetic fixtures and says so. |
 | `fixtures/records/*.json` | Synthetic records for classes 5, 7, 13 and 15. Authored here; no reference sample is reproduced. |
 | `fixtures/envelopes/*.json` | Envelopes for classes 14, 15 and 17. Generated. |
+| `fixtures/salts/*.json` | The committed per-leaf salt sets. **Inputs, not generated fixtures**: under decision D4b a salt is an independent CSPRNG draw that nothing can re-derive (specification section 7), so a fresh build cannot recompute one and comparing it against a fresh draw would fail forever. Drawn once by `build_corpus.py --draw-salts` and committed; a build that finds one missing FAILS rather than drawing, because a drawn-on-demand salt would give one machine a root no other machine could reproduce. Class 10's sets pair positionally, everything else by path - `docs/conformance-corpus.md` class 10 says why, and why harmonizing them toward positional envelopes would be the unsafe direction. |
 | `tools/` | Two independent implementations, the generator, the runner and the schema validator. |
 
 **No reference schema or sample is copied into this repository.** Class 10 names the MOH samples by
@@ -43,7 +44,9 @@ Both arguments are optional and their absence is reported rather than hidden.
    files, writing nothing;
 2. implementation B recomputes every derived value in the corpus and rewrites it;
 3. the two files are compared byte for byte;
-4. every artifact is validated against the repository's JSON Schemas.
+4. every artifact is validated against the repository's JSON Schemas, and both directions of the
+   schemas' conditionals are probed with synthesized whole-corpus documents, because a conditional
+   that never fires compiles perfectly and asserts nothing.
 
 Step 1 alone would only prove that one program is self-consistent.
 
@@ -86,14 +89,14 @@ means operationally. The procedure per class:
 | `encodePath` | `encodePath(segments)` equals `encodedHex`; the display path equals `displayPath`. |
 | `encodeValue` | `encodeValue(tag, input)` equals `encodedHex`. |
 | `reject` | The input MUST error. The `reason` is the reference reason code; an implementation with its own taxonomy should map to it rather than ignore it. |
-| `salt` | `salt(path)` under `(masterSaltHex, recordId)` equals `saltHex`. |
-| `leaf` | `leafHash(segments, tag, value, saltHex)` equals `leafHash`. |
+| `leaf` | `leafHash(segments, tag, value, saltHex)` equals `leafHash`. The salt is an INPUT: decision D4 is ruled D4b, so nothing derives one (specification section 7). |
+| `record` | Flatten the record, union the reserved leaves, order by encoded path, take each leaf's salt from the set `saltsFile` names in the shape `saltPairing` declares; the leaf count then equals `leafCount` and the root equals `root`. A vector may instead carry the whole thing as one full envelope copy, naming `envelopeFile` and no salt set; `check_corpus.mjs` reports that carrier SKIPPED rather than reading it. |
+| `unlinkability` | Perform `trials` independent issuances at the paths given, with YOUR OWN generator, and assert the three relations. Nothing is compared against a pinned value, because under D4b there is none to pin. |
 | `tree` | `MTH(leafHashes)` equals `root`. |
 | `inclusion` | Verifying `(leafHash, index, treeSize, auditPath, root)` returns `expect`. Generating the audit path for `index` reproduces `auditPath`. |
 | `negativeProof` | Verification MUST fail. |
 | `typeMap` | Resolving `segments` at `jsonKind` against `type-maps/<recordType>.json` yields `expectTag`, or fails closed when `expectFailClosed`. |
-| `record` | Building the tree over `recordFile` yields `leafCount` and `root`. |
-| `unlinkability` | Each side's leaf hash matches, and the two differ. |
+| `normalization` | Build a root over `recordFileNFD` and over `recordFileNFC`, both under the ONE salt set `saltsFile` names, so any difference between the two roots is normalization and nothing else. The two agree iff `expectSameRoot`, and the root equals `root`. |
 | `envelope` | Verifying `envelopeFile` returns `expectAccept`, **and rejects for `reason`**. The reason is not decoration here: several fixtures are rejectable for more than one cause, so a boolean alone would pass an implementation that never ran the check the vector is about. `guard-reject-reserved-collision` is the clearest case - the record it carries cannot be hashed at all, so its envelope holds a placeholder root, and an implementation that skips the reserved-namespace guard rejects it on `root-mismatch` and looks correct. |
 
 ### Input escape forms
@@ -132,12 +135,14 @@ Counts are vectors in the file, measured by `build_corpus.py --report`.
 | 9 negative proof vectors | 11 | complete |
 | 10 the three real MOH records | 2 | **partial - 1 of 3 records** |
 | 11 the schema binding | 23 | complete. Includes the three unknown-algorithm and unknown-profile fail-closed vectors: specification section 12.2 calls that "the same rule section 4.2 applies to an unknown path, applied one level up", and section 4.2 is what this class tests. |
-| 12 salt freshness and unlinkability | 9 | complete |
+| 12 cross-record unlinkability | 3 | complete. Behavioural rather than pinned: the runner draws and asserts. Detects a deterministic or reused salt; it CANNOT detect a weak CSPRNG, and no fixed vector file can. |
 | 13 reference-schema hazards | 2 | **partial - the `$id` half is inexpressible** |
-| 14 minimum-disclosure floor | 38 | complete. The last four bind the envelope's OUTER identity to the reserved leaves committed inside the root - see below. |
+| 14 minimum-disclosure floor | 34 | complete. The four outer-identity vectors this row used to count are class 18 now - see below. |
 | 15 reserved-namespace guard | 20 | complete |
 | 16 Unicode version sensitivity | 20 | complete, at the strength class 16 itself states |
 | 17 withheld-leaf salt | 8 | complete |
+| 18 outside-the-root authority | 4 | **partial - the identity rows only; the registry rows are a named gap** |
+| 19 NFC end to end, with a root | 1 | **partial - the value site only; the key site is gated on decision D14** |
 
 ### Class 10 is partial, and the reason is a finding rather than an omission
 
@@ -164,8 +169,9 @@ blocking.
 
 ### The floor is over segments, and the outer identity does not select it alone
 
-Two things class 14 asserts that are easy to get wrong in the same place, both of them recorded here
-because a corpus is the only place they can be pinned.
+Two things that are easy to get wrong in the same place, and a corpus is the only place either can be pinned.
+The first is class 14's.
+The second is class 18's: the four identity vectors sat in class 14 only because class 18 did not exist yet, and they moved when decision D8 created it.
 
 **A floor path is SEGMENTS, never display notation.** `docs/profiles/vaccination-healthcert.md`
 section 4 writes `notarisationMetadata.reference`, and specification section 5.2 is explicit that a
@@ -184,6 +190,7 @@ expiry, and every inclusion proof still verifies against the genuine recovery ro
 `identity-outer-record-type-downgrade` carries exactly that copy and the other three carry a
 mismatch in each remaining reserved field; all four reject with `outer-identity-mismatch`. Measured:
 with the binding removed, all four are **accepted**.
+Those four are the whole of class 18 as built, and they carry no `verifierConfig` because the envelope alone determines each of them.
 
 #### The identity binding runs BEFORE the floor, and that order is required
 
@@ -245,6 +252,22 @@ type that can express it. It is enforced in `tools/build_type_maps.py`, which re
 file path and never registers a schema by `$id`, and the two colliding `$id` values were confirmed
 by reading them.
 
+### Class 18 is partly built, and the unbuilt half is a named gap rather than an omission
+
+The four identity rows are built and are described above.
+The registry-dependent rows of `docs/conformance-corpus.md` class 18 are not, and they cannot be: each of them turns on what the verifier's own anchoring registry answers, and specification section 2.2 deliberately leaves that registry undesigned.
+Building them here would make the corpus invent that interface, which section 1.2 of the corpus document forbids for the same reason it forbids binding an unresolved path.
+That is why `schemas/conformance-corpus-1.0.json` PERMITS `envelopeVector.verifierConfig` at class 18 rather than requiring it: an earlier revision required it, and the four built vectors carry none because the envelope alone determines them, so the requirement rejected the committed corpus.
+The completeness rule the block exists for - a vector whose outcome turns on the verifier's configuration must state that configuration - is stated in the schema and is **not mechanically enforced today**, because the vectors that would need the check are exactly the ones that cannot be built yet.
+
+### Class 19 carries the value site only, and decision D14 is why
+
+The class defines two sites, a value and an object key, because an implementation can normalize one and not the other.
+Only the value site is built.
+A key-site vector has to resolve its key through the type map, and whether type-map matching normalizes the key it matches on is an open question - ambiguity 4 below, recorded as decision D14 in `docs/decisions.md` Part 2a.
+Both reference implementations match raw, so a built key-site vector would pass under one reading of that question and fail under the other, which settles it from inside a data file.
+The row stays in the class table in `docs/conformance-corpus.md` so that a passing class 19 does not read as coverage it does not have.
+
 ## What was actually measured, and what was not
 
 **The corpus was generated twice, in two languages, and the outputs are byte-identical.**
@@ -277,8 +300,9 @@ they caught one - see below. Scope the claim to that.
 
 That work built five implementations that produced identical roots on the three real MOH records.
 **None of its whole-record roots transfer, and none were used.** It predates the reserved leaf set,
-used a bare `ROAX-CANON/1` domain string rather than the algorithm-qualified one, and used a salt
-preimage with no length prefixes and no `recordId` in it. Each of those changes every leaf hash in
+used a bare `ROAX-CANON/1` domain string rather than the algorithm-qualified one, and derived its
+salts through a preimage where this design now draws them independently (decision D4b,
+specification section 7). Each of those changes every leaf hash in
 every record, so its 87-, 130- and 65-leaf roots are not comparable with anything here.
 
 Two things from it agree with this work, and both were read before this work was done, so they are
@@ -331,14 +355,16 @@ deliberate: a vector that discriminated would settle the question from inside th
    form *before* the output-grammar normalization, which is the literal reading and the
    memory-safe one. Under the other reading `0e99999` canonicalizes to `0`; under this one it is
    rejected. No vector carries `0e99999`.
-3. **`recordId` is not normalized in the salt preimage.** Section 7 writes `RID = utf8(recordId)`,
-   not `utf8(NFC(recordId))`, while the reserved leaf `roax.recordId` is a STRING and therefore *is*
-   normalized. Every corpus record identifier is ASCII, so the two readings agree throughout.
+3. **Resolved and removed: the record identifier in the salt preimage.** This list previously
+   recorded that section 7 wrote `RID = utf8(recordId)` rather than `utf8(NFC(recordId))`, while
+   the reserved leaf `roax.recordId` is a STRING and therefore *is* normalized. Decision D4 was
+   ruled D4b and section 7 has no preimage at all, so the ambiguity is gone rather than resolved.
+   The reserved leaf is unaffected and still normalizes.
 4. **Type-map matching is not stated to be over normalized keys.** Section 11.2's general rule -
    "check the bytes you commit, not the bytes you received" - suggests it should be, but the
    specification does not say so, and both implementations compare a pattern token against a
-   segment key **raw**, with no `nfc()` on either side (`_match_from`, `roax_ref.py:715`;
-   `matchPattern`, `roax_ref.mjs:564`). The synthetic type map therefore
+   segment key **raw**, with no `nfc()` on either side (`_match_from`, `roax_ref.py:776`;
+   `matchPattern`, `roax_ref.mjs:619`). The synthetic type map therefore
    carries the Kelvin key under **both** spellings, so that `record-guard-kelvin-key` resolves
    identically under either reading and no vector settles the question.
 5. **The type-map `pattern` field is display notation**, so it cannot address a key containing `.`,
@@ -375,14 +401,13 @@ today. Changing the sentence in section 11.1 would be a specification change and
 
 | Field | Presumes | Resolution |
 |---|---|---|
-| `recordVector.masterSaltHex` | D4 salt strategy | **OPTIONAL** and left optional. It is present on every vector because these vectors were built under D4a, and a D4b implementation reads the salts from the record's envelope and ignores it. |
-| `saltVector.masterSaltHex`, `unlinkabilitySide.masterSaltHex` | D4 | **REQUIRED**, correctly. Class 12 is the class where master-salt freshness *is* the assertion, so the value is its subject rather than an assumption. |
+| `recordVector.saltsFile` and `saltPairing` | D4 salt strategy | **RULED D4b**, so this is no longer a presumption to manage. Every salt is an independent random draw that nothing can re-derive, so a vector must name the set its root was computed under; a bare record file plus a root asserts something no runner can reproduce. `masterSaltHex` and the whole `saltVector` class are gone - they expressed a derivation that no longer exists. |
 | Leaf ordering in every `record`, `tree` and `envelope` vector | D5 leaf ordering | Encoded-path order, per specification section 9. There is no root without an ordering, so class 8 and class 10 are inexpressible otherwise. The specification governs (section 1.1) and this is derived from it, not decided here. |
 | `typeMapVector.expectFailClosed` | D7 unknown paths | Fail-closed, per specification section 4.2, which states the rule normatively and records that it is the recommended answer to D7. Same resolution as D5. |
 | NFC in every string and key vector | D12 normalization | NFC with a pinned Unicode version, per specification section 6.1. Same resolution. |
 | `hashAlg` | B, ruled | `SHA-256`. See below. |
 
-Nothing here binds a `number` to a numeric tag, adds a default tag, or requires `masterSalt` in any
+Nothing here binds a `number` to a numeric tag, adds a default tag, or requires a salt seed in any
 envelope.
 
 ## Why there is no Poseidon-BN254 corpus

@@ -1,0 +1,107 @@
+{
+  "pairing": "path",
+  "salts": [
+    {
+      "segments": [
+        {
+          "key": "id"
+        }
+      ],
+      "salt": "a1746e186fa87581280c8017c4158ebb"
+    },
+    {
+      "segments": [
+        {
+          "key": "type"
+        }
+      ],
+      "salt": "5484994787bda00e081af868886fda86"
+    },
+    {
+      "segments": [
+        {
+          "key": "version"
+        }
+      ],
+      "salt": "b0a5f1943313d321110490930a31067c"
+    },
+    {
+      "segments": [
+        {
+          "key": "validFrom"
+        }
+      ],
+      "salt": "50d634c2874d47ac8ac501a59105b412"
+    },
+    {
+      "segments": [
+        {
+          "key": "validUntil"
+        }
+      ],
+      "salt": "35f3e0389b0da409c304b038789a9994"
+    },
+    {
+      "segments": [
+        {
+          "key": "fhirVersion"
+        }
+      ],
+      "salt": "59d29a81cefafaf8ca188326954db0e6"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.recordId"
+        }
+      ],
+      "salt": "a6348b27744994974d6b3e9c8d75c763"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.issuer.id"
+        }
+      ],
+      "salt": "557a0845f13f3d2f6ac71e7fd6b857be"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.recordType"
+        }
+      ],
+      "salt": "bd3905a8ccf21e102168bb1bd86323d2"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.schemaVersion"
+        }
+      ],
+      "salt": "9b8f81684a420214aa94a1e67a143617"
+    },
+    {
+      "segments": [
+        {
+          "key": "patient"
+        },
+        {
+          "key": "gender"
+        }
+      ],
+      "salt": "7b4732695a024e6b65b25e5f9bb0d6f9"
+    },
+    {
+      "segments": [
+        {
+          "key": "patient"
+        },
+        {
+          "key": "birthDate"
+        }
+      ],
+      "salt": "6c9d4d55e14f36a3c06412a495097241"
+    }
+  ]
+}

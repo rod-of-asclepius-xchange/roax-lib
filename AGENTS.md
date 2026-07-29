@@ -151,7 +151,11 @@ These are the things a future agent is most likely to get wrong.
 - **Numbers are never parsed through a float.** Anywhere. This is the whole point of the design;
   see `docs/decisions.md` part 0. In test vectors and JSON Schemas, INTEGER and DECIMAL values are
   carried as **strings**, because a JSON number in a vector file would be destroyed by the very
-  parser under test.
+  parser under test. Every value carrier in `schemas/conformance-corpus-1.0.json` now `$ref`s
+  `carrierValue`, which makes a JSON number **unrepresentable at any depth** rather than merely
+  discouraged in a description. The one deliberate exception is the envelope's `record` property:
+  a full copy carries the record in its original JSON form, numbers included, so constraining it
+  would be wrong and the spec section 6.4 parser requirement is what protects those literals.
 
 - **Trailing zeros in decimals are significant.** `0.010` is not `0.01`. FHIR R4 says SHALL. dogtag
   strips them (`crates/dogtag-standard-rs/src/encode.rs:51-59`) and ROAX deliberately does not. If
@@ -297,8 +301,13 @@ Both flags are optional and their absence is reported, never hidden. Things to k
 - **Python's `$` also matches before a trailing newline; JavaScript's does not.** Anchor every
   grammar in section 6.2 with `\A`/`\Z`. The first draft of implementation A accepted `"1.0\n"` and
   canonicalized it. `reject-decimal-trailing-newline` pins it.
-- **Class 10 is 1 of 3 records** and class 13 is half, both for reasons recorded in
-  `corpus/README.md`. Do not fill either in without reading why they are short.
+- **Four classes are deliberately short, and each is short for a reason recorded in
+  `corpus/README.md`: 10, 13, 18 and 19.** Class 10 is 1 of 3 records and class 13 is half. Class 18
+  carries the four identity rows and not the registry rows, which need an anchoring registry that
+  specification section 2.2 leaves undesigned. Class 19 carries the value site and not the key site,
+  which is gated on decision D14. Do not fill any of them in without reading why they are short -
+  building the unbuilt half of 18 or 19 decides an open question from inside a data file, which
+  `docs/conformance-corpus.md` section 1.2 forbids.
 - **`org.roax.corpus.synthetic` is a corpus-only `recordType`.** It is not in the `docs/profiles/`
   registry and must never be issued against. It exists so structural vectors do not borrow a real
   health authority's identifier and so authored type-map bindings never mix into a map that claims
@@ -320,19 +329,34 @@ Both flags are optional and their absence is reported, never hidden. Things to k
 
 ## The open decisions are open on purpose
 
-`docs/decisions.md` holds four decisions belonging to the project owner (A, B, C, D) plus ten more.
+`docs/decisions.md` holds four decisions belonging to the project owner (A, B, C, D), plus the ten
+engineering ones, plus D14 in part 2a.
 
-**Only three are still open, and all three are the owner's: A, C and D.** B was ruled earlier - both
-hash families are first-class and selectable per record - and what stays open under it is the
-`Poseidon-BN254` parameterization. **The ten engineering decisions D3 through D13 were ruled on
-2026-07-28** and the specification is written on those rulings rather than on a recommendation; see
-specification section 15 for the table of where each lands. Eight confirmed what the specification
-already said. Two changed it: D4 to independent per-leaf salts, and D9 gaining the `BLOB_REF` binding.
+**Four are still open. Three are the owner's - A, C and D - and the fourth, D14, is not.** B was
+ruled earlier - both hash families are first-class and selectable per record - and what stays open
+under it is the `Poseidon-BN254` parameterization. **The ten engineering decisions D3 through D13
+were ruled on 2026-07-28** and the specification is written on those rulings rather than on a
+recommendation; see specification section 15 for the table of where each lands. Eight confirmed what
+the specification already said. Two changed it: D4 to independent per-leaf salts, and D9 gaining the
+`BLOB_REF` binding.
 
-**Do not resolve A, C or D in code or prose without an explicit ruling**, and if one is ruled, update
-`docs/decisions.md` in the same change rather than only the specification. A decision that looks
-settled in the spec but is still marked OPEN in the decisions document is worse than either. Part 1's
-A, C and D sections are the owner's and are not edited by ruling work elsewhere in the document.
+**D14 asks whether the type-map LOOKUP matches over an NFC-normalized key or over the bytes as
+received, and it is open** (`docs/decisions.md` part 2a).
+The specification pins NFC for hashing and is silent on the lookup that precedes it, so a decomposed
+key is refused by the fail-closed rule while its composed twin commits and the two render
+identically.
+The two matchers in this tree already disagree: `docs/type-maps.md` section 3 step 2 requires the
+published DFA to normalize, and the display-pattern matchers of `corpus/tools/roax_ref.py` and
+`corpus/tools/roax_ref.mjs` compare raw.
+Adding an `nfc()` call to either side, or removing the one in the DFA's stated semantics, rules D14
+silently - so do not, and note that the synthetic map carries the Kelvin key under both spellings
+precisely so no committed vector depends on the answer.
+
+**Do not resolve A, C, D or D14 in code or prose without an explicit ruling**, and if one is ruled,
+update `docs/decisions.md` in the same change rather than only the specification. A decision that
+looks settled in the spec but is still marked OPEN in the decisions document is worse than either.
+Part 1's A, C and D sections are the owner's and are not edited by ruling work elsewhere in the
+document.
 
 ## Validating the schemas
 
@@ -344,17 +368,21 @@ its own for a conditional - validate instances both ways, since an `if`/`then` t
 compiles perfectly and asserts nothing.
 
 **The envelope and the corpus vector file each have two live schema versions, and the pair is not a
-leftover.** `schemas/envelope-2.0.json` and `schemas/conformance-corpus-2.0.json` carry the
-type-map binding, the six-leaf floor and the D4b vector shapes, and are what the specification and
-`docs/conformance-corpus.md` describe. `schemas/envelope-1.0.json` and
-`schemas/conformance-corpus-1.0.json` are retained with their meaning unchanged because they, not
-the successors, govern the corpus artifact and the 54 envelope fixtures as committed, which
-`corpus/tools/validate_schemas.mjs` measures. Neither pair may be collapsed by tightening the 1.0
-file: doing that invalidates committed artifacts instead of rebuilding them, and rebuilding them is
-corpus-side work. The schema version is not the canonicalization version - both envelope schemas
-pin `canon` to `ROAX-CANON/1`.
+leftover.**
+`schemas/envelope-2.0.json` and `schemas/conformance-corpus-2.0.json` carry the type-map binding and the six-leaf floor, and are what the specification and `docs/type-maps.md` describe.
+`schemas/envelope-1.0.json` and `schemas/conformance-corpus-1.0.json` govern the corpus artifact and the 54 envelope fixtures as committed, which `corpus/tools/validate_schemas.mjs` measures.
 
-Two things to know if you touch them:
+**The two files differ in what stayed behind, and the difference is deliberate.**
+`schemas/envelope-1.0.json` is unchanged in meaning BY THE RULING: D4b altered no envelope bytes, so what it took from D4b was description changes alone, and its floor stays at five reserved leaves where the successor's is six.
+It did gain one structural conditional separately, so read that sentence as scoped to the ruling rather than as "nothing structural changed": an `issuer.keyId` now raises `leafCount` and `salts.minItems` from 5 to 6 together, since that case emits the fifth reserved leaf, and every committed fixture already satisfies it.
+That rule was structural in the corpus schema and prose-only here until it was noticed.
+`schemas/conformance-corpus-1.0.json` was **migrated in place** instead, because the D4b ruling did change the vector shapes: `saltVector`, `unlinkabilitySide` and `recordVector.masterSaltHex` are deleted, `saltsFile` and `normalizationVector` are added, and the committed corpus was rebuilt in the same change.
+The same-change rule in specification section 1.1 and `docs/conformance-corpus.md` section 1.1 is why: a canonicalization change lands with the vectors that assert it, and leaving the deleted derivation expressible in the file that governs the artifact would have left the corpus implementing a construction the specification no longer has.
+So what still makes the corpus successor a MAJOR bump is the type-map binding alone: it requires the exact artifact identity on the type-map and record vectors, which the committed corpus does not carry.
+Do not tighten the 1.0 files any further without rebuilding what they govern in the same change.
+The schema version is not the canonicalization version - both envelope schemas pin `canon` to `ROAX-CANON/1`.
+
+Five things to know if you touch them:
 
 - Ajv's `strictRequired` rejects `required` inside a `not`/`anyOf` subschema unless the same
   subschema also lists those properties. The schemas carry no-op `"properties": {"x": true}`
@@ -362,3 +390,21 @@ Two things to know if you touch them:
   compilation.
 - Union types (`"type": ["string","boolean"]`) trip `strictTypes`. The envelope pins each value type
   per tag in its `allOf` conditionals instead, which is more precise anyway.
+- **`strictTypes` rejects any type-specific keyword inside an `if`, `then` or `else` branch unless
+  that branch declares the `type` itself**, because a branch cannot see the `type` on the same
+  property in `properties`. It applies to `minimum`, to `minItems` and to `required` alike, and at
+  every nesting depth: `recordVector`'s `then` writes `{"type": "integer", "minimum": 6}`, and the
+  envelope's `issuer.keyId` conditional writes `{"type": "object", "required": ["keyId"], ...}` on a
+  property one level down. Every one of those repetitions is required, not redundant.
+- **A property is FORBIDDEN inside a branch with the false schema, `"properties": {"x": false}`.**
+  That idiom is used in `recordVector`'s two-branch `oneOf` and in `envelopeVector`'s `else`, and it
+  compiles clean under strict mode. It is shorter than `"not": {"required": ["x"], "properties":
+  {"x": true}}` and needs no `strictRequired` annotation, because it carries no `required`.
+- **A conditional keyed on a vector's `class` needs an instance test on BOTH sides.**
+  `envelopeVector` PERMITS `verifierConfig` at class 18 and forbids it everywhere else.
+  It is not required there, and a revision that required it was reverted for rejecting the committed corpus: the four class-18 vectors are the identity rows, which the envelope alone determines, so a config on them would be inert.
+  The else-branch is the half a compile check cannot see.
+  `corpus/tools/validate_schemas.mjs` carries those probes rather than leaving them to a reader: a class-18 instance without the block (MUST pass), one carrying a complete block (MUST pass), one carrying an empty or a partial block (MUST fail, since the block's own `required` names four members), and a class-14 instance carrying one (MUST fail).
+  It probes `recordVector`'s two-branch `oneOf` and the deleted D4a carriers the same way, and every probe mutates a clone of the whole committed corpus rather than a `$defs` subschema: compiling proves the `$ref` resolves, and only a root-level instance proves the branch is reached by the path a runner takes.
+  Add a probe there when you add a conditional, because `run.sh` step 4 is the only thing that runs them.
+  The completeness rule that block exists for - a vector whose outcome turns on the verifier's configuration must carry one - is still not mechanically enforced by any of this, and the schema says so rather than naming an enforcer.
