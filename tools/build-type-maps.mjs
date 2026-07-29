@@ -495,7 +495,10 @@ function admitsEmptyObject(node) {
 }
 
 function admitsEmptyArray(node) {
-  return !Number.isInteger(node.minItems) || node.minItems === 0;
+  return (
+    (!Number.isInteger(node.minItems) || node.minItems === 0) &&
+    !Object.hasOwn(node, "contains")
+  );
 }
 
 function compileAutomaton(store, rootNode) {
@@ -851,11 +854,11 @@ class FixtureStore {
 }
 
 function mergedBranches(first, second) {
-  return { properties: { value: { anyOf: [first, second] } } };
+  return { type: "object", properties: { value: { anyOf: [first, second] } } };
 }
 
 function singleBranch(node) {
-  return { properties: { value: node } };
+  return { type: "object", properties: { value: node } };
 }
 
 function expectCompileRejects(name, document, pattern) {
@@ -930,6 +933,14 @@ function selfTest() {
     /merges object branches that disagree on empty-object admission/,
   );
   expectCompileRejects(
+    "object branch forbids empty through required and declares no type",
+    mergedBranches(
+      { properties: { a: { type: "string" } }, required: ["a"] },
+      { type: "object", properties: { b: { type: "string" } } },
+    ),
+    /merges object branches that disagree on empty-object admission/,
+  );
+  expectCompileRejects(
     "array branches disagree on empty admission",
     mergedBranches(
       { type: "array", items: { type: "string" } },
@@ -953,6 +964,30 @@ function selfTest() {
     ),
     /merges array branches that disagree on empty-array admission/,
   );
+  expectCompileRejects(
+    "array branch forbids empty through minItems and declares no items",
+    mergedBranches(
+      { type: "array", minItems: 1 },
+      { type: "array", items: { type: "string" } },
+    ),
+    /merges array branches that disagree on empty-array admission/,
+  );
+  expectCompileRejects(
+    "array branch forbids empty through contains",
+    mergedBranches(
+      { type: "array", items: { type: "string" }, contains: { type: "string" } },
+      { type: "array", items: { type: "string" } },
+    ),
+    /merges array branches that disagree on empty-array admission/,
+  );
+  expectCompileRejects(
+    "array branch forbids empty through contains and declares no type",
+    mergedBranches(
+      { items: { type: "string" }, contains: { type: "string" } },
+      { type: "array", items: { type: "string" } },
+    ),
+    /merges array branches that disagree on empty-array admission/,
+  );
   expectCompiles(
     "object branches agree that empty is admitted",
     mergedBranches(
@@ -972,6 +1007,14 @@ function selfTest() {
   expectNoTag(
     "an items keyword alone does not declare the instance an array",
     singleBranch({ items: { type: "string" } }),
+    TAG.EMPTY_ARRAY,
+  );
+  expectNoTag(
+    "a contains keyword alone leaves the array kind unresolved",
+    mergedBranches(
+      { contains: { type: "string" } },
+      { type: "array", items: { type: "string" } },
+    ),
     TAG.EMPTY_ARRAY,
   );
   process.stdout.write("validated type-map generator self-tests\n");

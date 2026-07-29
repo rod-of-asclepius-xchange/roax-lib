@@ -103,21 +103,31 @@ These are the things a future agent is most likely to get wrong.
   of publishing a guessed EMPTY_OBJECT or omitting a valid EMPTY_ARRAY.
   EMPTY_ARRAY and EMPTY_OBJECT are distinct leaves, so a permissive union is silent widening.
   **Both comparisons select a branch by container-ness, which is the declared type OR the
-  applicable applicator keyword**: `type: "object"` or `properties` on the object side,
-  `type: "array"` or `items` on the array side, which is the same test `classifyNode` already
-  applies when it declines to tag a container. Selecting on the declared type alone drops
+  applicator keyword**: `type: "object"` or `properties` on the object side, `type: "array"` or
+  `items` on the array side, which are the same keywords `classifyNode` already treats as container
+  markers when it declines to tag a node. Selecting on the declared type alone drops
   `{"items": {...}, "minItems": 1}` out of the comparison, and selecting on the applicator alone
   drops `{"type": "object", "required": ["x"]}`; either way the surviving permissive branch
   publishes an empty-container leaf unopposed, which is the widening itself.
-  **Comparison is widened; evidence and traversal are not.** An EMPTY_ARRAY binding still cites
-  only `type: "array"` branches and `anyIndex` still comes only from their `items`, because an
-  `items` keyword on an untyped node constrains arrays without asserting the instance is one, and
-  inferring a tag from an inapplicable keyword is what section 1.5 of `docs/type-maps.md` forbids.
-  The object side already behaves this way: `keyGroups` skips a selected branch that declares no
-  `properties`. `expectNoTag` pins it.
+  **The admission predicates must cover every keyword of the pinned dialect that can forbid the
+  empty container, or the comparison compares the wrong answer.** For objects that is a non-empty
+  `required` and `minProperties`; `dependencies` and `propertyNames` pass vacuously on `{}`. For
+  arrays it is `minItems` **and `contains`**, because draft-06 section 6.14 and draft-07 section
+  6.4.6 both require at least one matching element and `[]` has none. A node whose only container
+  keyword is `contains` needs no selector clause: `classifyNode` leaves it unresolved for every
+  kind, and an unresolved kind suppresses that kind's binding, so the state already fails closed.
+  **The three sets are not the same set, and the object and array sides differ.** The COMPARISON is
+  the widened container-ness set on both. TRAVERSAL is narrow on both: `keyGroups` skips a selected
+  branch declaring no `properties`, and `anyIndex` comes only from the `items` of `type: "array"`
+  branches. EVIDENCE differs - an EMPTY_ARRAY binding cites only `type: "array"` branches, because
+  an `items` keyword on an untyped node constrains arrays without asserting the instance is one and
+  inferring a tag from an inapplicable keyword is what section 1.5 of `docs/type-maps.md` forbids,
+  whereas an EMPTY_OBJECT binding cites the widened set, so a bare `{"type": "object"}` is cited.
+  That is not the same defect: a declared `type: "object"` does assert object-ness, so the tag still
+  comes from declared schema evidence. `expectNoTag` pins the array half.
   `--self-test` proves both rejections against constructed schemas and needs no reference checkout,
-  and on each side the empty-forbidding branch of one case carries no applicator and of another
-  carries no declared type, so the selection rule is pinned rather than assumed.
+  and on each side one case drops the applicator from a branch and another drops the declared type,
+  so both halves of both disjunctions are pinned rather than assumed.
 
 - **The object rejection above means the four published artifacts can currently be neither
   regenerated nor `--check`ed, and that is the ruled trade.** `--check` compiles before it

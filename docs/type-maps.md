@@ -429,16 +429,24 @@ Resolving those states needs combinator-aware evaluation, which the DFA closure 
 The committed artifacts, their content IDs and the section 2.1 table remain authoritative and are still checked in full by `tools/check-type-maps.mjs`; only regeneration is blocked.
 
 **Which branches each rejection compares.**
-Both sides select a branch by container-ness, which is the declared type **or** the applicable applicator keyword: a branch is an object branch when it declares `type: "object"` or declares `properties`, and an array branch when it declares `type: "array"` or declares `items`.
-That is the same test `classifyNode` already applies when it declines to assign a scalar tag to a container.
+Both sides select a branch by container-ness, which is the declared type **or** the applicator keyword: a branch is an object branch when it declares `type: "object"` or declares `properties`, and an array branch when it declares `type: "array"` or declares `items`.
+Those are the same keywords `classifyNode` already treats as container markers when it declines to assign a scalar tag.
 Selecting on the applicator alone would drop an empty-forbidding branch shaped `{"type": "object", "required": ["x"]}`, and selecting on the declared type alone would drop one shaped `{"items": {...}, "minItems": 1}`.
 Either omission lets the surviving permissive branch decide the state on its own, which is the silent widening the rejection exists to prevent.
 
-**The comparison is widened; the evidence and the traversal are not, and the difference is deliberate.**
-An EMPTY_ARRAY binding still cites only branches declaring `type: "array"`, and `anyIndex` is still derived only from their `items`.
-An `items` keyword on a node with no declared type constrains the instance *if* it is an array without asserting that it is one, so treating it as evidence of array-ness would infer a tag from an inapplicable keyword, which is exactly what section 1.5 rules out for the object side.
-The object side already draws the same line: a selected branch that declares no `properties` contributes no KEY transition.
-`--self-test` pins this with a case asserting that `{"items": {...}}` alone binds no EMPTY_ARRAY.
+**What each side asks of a selected branch is every keyword of the pinned dialect that can forbid the empty container.**
+For objects that is a non-empty `required` and `minProperties`, which is complete: JSON Schema Validation draft-06 sections 6.17 and 6.16 are the only two that can reject `{}`, while `dependencies` and `propertyNames` pass vacuously on it.
+For arrays it is `minItems` **and `contains`**, since a `contains` schema demands at least one matching element under JSON Schema Validation draft-06 section 6.14 and draft-07 section 6.4.6, and the empty array has none; reading `minItems` alone would let a `contains` branch answer that it admits `[]` when it rejects it.
+A node whose only container keyword is `contains` needs no matching selector clause, because `classifyNode` leaves such a node unresolved for every JSON kind and an unresolved kind suppresses that kind's binding, so the state fails closed without reaching the comparison at all.
+
+**The comparison, the evidence and the traversal are three different sets, and the two sides do not treat them alike.**
+The comparison is the widened container-ness set on both sides.
+Traversal is narrow on both: a selected branch declaring no `properties` contributes no KEY transition, and `anyIndex` is derived only from the `items` of branches declaring `type: "array"`.
+The evidence sets differ, and the asymmetry is deliberate rather than an oversight.
+An EMPTY_ARRAY binding cites only branches declaring `type: "array"`, because an `items` keyword on a node with no declared type constrains the instance *if* it is an array without asserting that it is one, so treating it as evidence of array-ness would infer a tag from an inapplicable keyword, which is exactly what section 1.5 rules out.
+An EMPTY_OBJECT binding cites the widened set, so a branch shaped `{"type": "object"}` with no `properties` is cited as a `schema-container-type` source.
+That is not the same thing: a declared `type: "object"` asserts object-ness, so the tag still rests on declared schema evidence rather than on an inapplicable keyword.
+`--self-test` pins the array half with a case asserting that `{"items": {...}}` alone binds no EMPTY_ARRAY.
 
 **The 34-state count above was taken under the narrower `properties`-only and `type: "array"`-only selections and is therefore a LOWER BOUND rather than an exact count.**
 Widening a selection can only add branches to the set whose empty-admission answers are compared, so every state that fired still fires and further states may join them; it cannot remove one.
@@ -451,10 +459,10 @@ The generator's own rejections are provable without any reference checkout:
 node tools/build-type-maps.mjs --self-test
 ```
 
-It compiles constructed schemas whose merged object branches disagree through `required` and through `minProperties`, and whose merged array branches disagree through `minItems`, asserts that each is rejected, and asserts that agreeing branches still yield EMPTY_OBJECT and EMPTY_ARRAY respectively.
-Two of the object cases give the empty-forbidding branch no `properties` keyword at all, and two of the array cases give the branch on one side of the disagreement no declared type at all, so together they are the regression that pins the container-ness selection stated just above.
-Under the narrower selection each of those branches is invisible, the state resolves to a single permissive answer, and an empty-container binding is published for a state one reachable branch rejects.
-A final case asserts the other half of the rule, that an `items` keyword on an untyped node binds no EMPTY_ARRAY on its own.
+It compiles constructed schemas whose merged object branches disagree through `required` and through `minProperties`, and whose merged array branches disagree through `minItems` and through `contains`, asserts that each is rejected, and asserts that agreeing branches still yield EMPTY_OBJECT and EMPTY_ARRAY respectively.
+Both halves of both container-ness disjunctions are pinned independently, which takes four of those cases: an object branch carrying `properties` and no declared type, an object branch carrying `type: "object"` and no `properties`, an array branch carrying `items` and no declared type, and an array branch carrying `type: "array"` and no `items`.
+Each is the empty-forbidding side of its disagreement, so narrowing either selector back to one half makes that branch invisible, the state resolves to a single permissive answer, and an empty-container binding is published for a state one reachable branch rejects.
+Two further cases assert the other half of the rule: that an `items` keyword on an untyped node binds no EMPTY_ARRAY on its own, and that a `contains` keyword on an untyped node leaves the array kind unresolved rather than binding it.
 
 The reference checkout MUST be at Open-Attestation/schemata commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`, as recorded in every artifact.
 The generator resolves cross-file references by file path and does not inspect `$id`.
