@@ -5,17 +5,66 @@ release, architecture, and sharp-edge notes that should travel with the code.
 
 ## What this repository is right now
 
-Specification, schemas, the conformance corpus, and the independent Rust implementation under `rust/`.
+Specification, schemas, the conformance corpus, and two of the five ruled libraries: the independent Rust implementation under `rust/` and the independent TypeScript implementation under `src/`.
 Decision D was ruled to five independent, corpus-enforced libraries on 2026-07-29 (`docs/decisions.md`, decision D).
+The specifications came first so the design could be reviewed before five language implementations existed to be re-litigated, and that ordering held.
 `rust/README.md` owns that crate's protocol boundaries, its build, test and lint commands, and the open-decision behaviour it preserves.
 
-Do not add the TypeScript, Go, Swift or Kotlin library without an explicit instruction to do so.
+Do not add the Go, Swift or Kotlin library without an explicit instruction to do so.
 
 `corpus/tools/` holds two small reference implementations, in Python and in plain `.mjs`. **They are
 corpus tooling and they are not roax-lib.** They exist to generate and check the vectors and they
-are deliberately parser-only, error-code-only and unoptimized. They are also why there is no
-`package.json`: a TypeScript package here would read as the beginning of a library. If you need a
-third implementation for cross-checking, add another single-file one; do not promote these.
+are deliberately parser-only, error-code-only and unoptimized. If you need a further implementation
+for cross-checking, add another single-file one; do not promote these, and do not fold them into
+`src/`.
+
+### The TypeScript library
+
+`src/` is the library, `conformance/` is its corpus runner, `test/` is its unit tests. See
+[`src/README.md`](src/README.md).
+
+**`package.json` and `tsconfig.json` now exist, and an earlier version of this file gave their
+absence as a rule.** That rule was "a TypeScript package here would read as the beginning of a
+library", and it is superseded because the library is now deliberate rather than accidental. It is
+superseded **only for the two libraries that exist**, Rust and TypeScript: adding a `go.mod`, a
+`Package.swift` or a Gradle build is still the thing not to do without an instruction. The package
+is zero-dependency at
+runtime - `node:crypto` supplies SHA-256 and the CSPRNG - and TypeScript plus `@types/node` are the
+only devDependencies. Ajv is still installed OUTSIDE the tree and named by `ROAX_AJV`, as the
+schema-validation section below describes; do not add it here.
+
+**The five builds are independent BY METHOD and identical BY REQUIREMENT.** Write each from
+`docs/spec/roax-canon-1.md`. Do not read `corpus/tools/roax_ref.py`, `corpus/tools/roax_ref.mjs` or
+`corpus/tools/check_corpus.mjs` while implementing one - `check_corpus.mjs` imports a reference
+implementation, so reading it is reading that implementation. Their agreement is the only evidence
+the specification says one thing, and an implementation written by reading one is a port wearing
+the costume of a third opinion. Validate against the corpus **after** writing a module, never
+while. The bar is byte-identical results on every vector, and a difference is a finding to escalate
+rather than a variance to tolerate.
+
+**Findings from that build are in
+[`docs/typescript-implementation-findings.md`](docs/typescript-implementation-findings.md), and
+three of them are things a future implementer will hit in any language.**
+
+- **The corpus can only be passed through a type-map format this repository forbids for
+  resolution.** Every vector needing a map resolves against `corpus/type-maps/<recordType>.json`,
+  which is the display-pattern format `schemas/type-map-1.0.json` calls superseded and says MUST
+  NOT be used to resolve. There is no published artifact for `org.roax.corpus.synthetic` at all, so
+  no structured-path DFA can resolve a single corpus record. Under specification section 1.1 that
+  is a release-blocking corpus defect. Build the resolver behind an interface and say so; do not
+  quietly treat the display-pattern format as operative.
+- **Specification section 3.3's empty-container rule is unsatisfiable against the committed
+  corpus,** measured at exactly 2 vectors of class 5. `a.b` carries an empty array and an empty
+  object in those fixtures, and the synthetic map declares `a.b` for `jsonKind: "null"` alone, so
+  under the specification's rule both records fail closed and have no root. Expose both readings
+  rather than picking one silently.
+- **Section 10 step 1 cannot be discharged for `hl7.fhir.bundle`**, because `corpus/type-maps/`
+  carries no map for it while eight class-14 fixtures disclose a `resourceType` record leaf.
+
+Run it with `npm run conformance`. `ROAX_REFERENCE_RECORDS=<dir>` runs class 10 against records
+extracted from a reference checkout with `corpus/tools/extract_reference_record.py`, which is a
+data-extraction utility rather than a reference implementation and is therefore safe to read while
+building one. Without it class 10 reports SKIPPED and is never reported green unrun.
 
 ## This repository is PUBLIC
 
@@ -376,7 +425,9 @@ Part 1's A and C sections are the owner's and are not edited by ruling work else
 
 ## Validating the schemas
 
-There is no CI and no npm package manifest. The JSON Schemas were checked with Ajv 8 in **strict mode**
+There is no CI, and the `package.json` at the root is the TypeScript library's rather than a place
+to add schema tooling: Ajv stays outside the tree. The JSON Schemas were checked with Ajv 8 in
+**strict mode**
 plus `ajv-formats`, and all seven compile clean. Re-check after any edit: install `ajv` and
 `ajv-formats` outside the tree, then `new Ajv2020({strict: true}).compile()` each of the seven files,
 using the `ajv/dist/2020.js` entry point because they are draft 2020-12. Compiling is not enough on

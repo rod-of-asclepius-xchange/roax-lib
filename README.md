@@ -7,12 +7,18 @@ selectively disclose real health records - FHIR, and Singapore MOH's PDT, recove
 and vaccination healthcerts - integrating with ROAX.
 
 Status: **implementation phase.**
-The independent Rust library lives under `rust/`; the TypeScript, Go, Swift and Kotlin libraries have not been added.
+The specifications and schemas were drafted and reviewed before any library existed, deliberately,
+so that the design could be settled before five implementations existed to re-litigate it.
+Two of those five now exist: the independent Rust library under [`rust/`](rust/) and the independent
+TypeScript library under [`src/`](src/).
+The Go, Swift and Kotlin libraries have not been added.
 
 ## Start here
 
 | Read | For |
 |---|---|
+| [`src/README.md`](src/README.md) | The TypeScript library: what it is, how to run it, and the four traps JavaScript sets for this design. |
+| [`docs/typescript-implementation-findings.md`](docs/typescript-implementation-findings.md) | **Where that independent build disagreed with the corpus, and where the specification admitted two honest readings.** Worth more than the code. |
 | [`docs/decisions.md`](docs/decisions.md) | **The decisions, ruled and open, each with its reasoning.** Three are still open: A and C belong to the project owner, and D14 was identified afterwards while building a conformance vector. Start here if you are reviewing rather than implementing. |
 | [`docs/spec/roax-canon-1.md`](docs/spec/roax-canon-1.md) | The protocol. Precise enough to implement from. Section 2 says what it does not solve; section 14 reconciles it against dogtag. |
 | [`docs/profiles/`](docs/profiles/) | One document per record family, because the four families do **not** share one concrete object. |
@@ -83,6 +89,7 @@ schemas/            JSON Schemas
 type-maps/          immutable generated base maps and their registry
 tools/              type-map reproduction and integrity checks
 rust/               independent Rust implementation of ROAX-CANON/1
+src/                independent TypeScript implementation of ROAX-CANON/1
 ```
 
 Reference material used during design - including third-party schemata - is kept
