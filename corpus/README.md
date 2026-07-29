@@ -289,12 +289,10 @@ demonstration that these particular vectors are stable across that release bound
 demonstration that a version mismatch is detectable, which class 16 already says it is not, because
 no character whose NFC form changed between releases has been identified for this corpus.
 
-**Gate 3 of `docs/conformance-corpus.md` section 2 is NOT discharged.** That gate requires an
-implementation written by a different author, from the specification text alone, to pass the corpus
-unmodified. Both implementations here have one author, so they share one reading of the
-specification, and a shared misreading is exactly what a corpus exists to catch. What two
-implementations in two languages do catch is transcription slips and language-API divergence, and
-they caught one - see below. Scope the claim to that.
+**Both reference implementations here have one author**, so they share one reading of the specification, and a shared misreading is exactly what a corpus exists to catch.
+What two implementations in two languages do catch is transcription slips and language-API divergence, and they caught one - see below.
+Scope the claim to that.
+Nothing in this directory discharges gate 3 of `docs/conformance-corpus.md`, and section 2.1 of that document owns the gate's status.
 
 ### The prior canonicalization research was used narrowly, and here is exactly how
 

@@ -134,6 +134,25 @@ but they do share one author's reading of the specification.
 **A shared misreading is exactly the failure a corpus exists to catch, and five implementations by
 one author cannot catch it.** So gate 3 is a release gate, not a caveat.
 
+### 2.1 Gate 3 status: partially satisfied, ruled 2026-07-29
+
+**Gate 3 is PARTIALLY SATISFIED. It is not met, and it MUST NOT be recorded as met.**
+This subsection owns that status; other documents point here rather than restating it.
+
+**What the ruling credits.**
+The ROAX libraries written so far were each produced by a different team from the one that built the corpus.
+Each was explicitly instructed not to read [`corpus/tools/roax_ref.py`](../corpus/tools/roax_ref.py) or [`corpus/tools/roax_ref.mjs`](../corpus/tools/roax_ref.mjs) while implementing, and each was validated against the corpus only after it had been written.
+That is genuine independence from the corpus tooling, and independence from the corpus tooling is what gate 3 chiefly protects.
+The Rust library under [`rust/`](../rust) is the one of them that lives in this repository; the ruling also covers a TypeScript implementation, which does not.
+
+**What the ruling withholds.**
+A single briefing author wrote every implementation brief, and those briefs carried specific warnings: trailing zeros in a decimal are significant, the display path is never hashed, and an unbound path fails closed.
+A genuinely unrelated third party reading only the specification text would not have had those warnings.
+So a briefed implementation cannot demonstrate that the specification text alone carries those three rules, which is the demonstration gate 3 asks for.
+
+**Gate 3 is fully cleared only when an implementation passes that the same briefing author did not brief.**
+Until then the gate stays open, and no document may describe the corpus as validated in the sense gate 3 requires.
+
 ## 3. Mandatory vector classes
 
 **Nineteen classes.** A class with no vectors is a coverage gap and the corpus build MUST report it
