@@ -1,11 +1,12 @@
 # Packaging metadata for the Python implementation of ROAX-CANON/1.
 #
 # This is the FIRST package manifest in the repository and it is scoped to `python/`
-# deliberately. AGENTS.md records that the absence of a manifest was itself a signal - a
-# `package.json` at the root would have read as the beginning of a library while the
-# design was still under review. The captain has since ruled for five independent builds,
-# so a manifest for this language is now correct; nothing here makes `corpus/tools/`
-# installable, and those two files remain corpus tooling rather than roax-lib.
+# deliberately. The repository carried none at all while the design was still under
+# review, because a manifest at the root would have read as the beginning of a library.
+# The project owner ruled for five independent builds on 2026-07-29 (`docs/decisions.md`,
+# decision D), so a manifest for this language is now correct; nothing here makes
+# `corpus/tools/` installable, and those two files remain corpus tooling rather than
+# roax-lib.
 #
 # There are NO runtime dependencies and there will not be any. Every hazard this library
 # exists to close is in the standard library's own defaults, so a dependency that wrapped

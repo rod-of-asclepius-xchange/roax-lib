@@ -17,7 +17,7 @@ It records every place this build disagreed with the conformance corpus or found
 
 ## Why it is written from the specification
 
-The captain ruled five independent builds rather than a shared core.
+The project owner ruled five independent builds rather than a shared core.
 This was written from [`docs/spec/roax-canon-1.md`](../docs/spec/roax-canon-1.md) alone; `corpus/tools/roax_ref.py` and `corpus/tools/roax_ref.mjs` were not read while it was built.
 
 That is the whole method.

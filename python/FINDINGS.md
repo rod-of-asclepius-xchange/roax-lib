@@ -56,7 +56,8 @@ That is a corpus edit and belongs to whoever owns the corpus.
 
 ## 2. DIVERGENCE, already known: the committed corpus commits four reserved leaves and specification section 11.2 lists five
 
-`schemas/envelope-1.0.json` carries no `typeMap` member, so `roax.typeMap.id` is not committed and the always-emitted reserved set is `roax.recordType`, `roax.schemaVersion`, `roax.recordId`, `roax.issuer.id`, plus the conditional `roax.issuer.keyId`.
+`schemas/envelope-1.0.json` commits no `roax.typeMap.id` leaf, so the always-emitted reserved set is `roax.recordType`, `roax.schemaVersion`, `roax.recordId`, `roax.issuer.id`, plus the conditional `roax.issuer.keyId`.
+It does carry a top-level `typeMap` object with `required: [id, version]` and `id` pinned to `^sha256:[0-9a-f]{64}$`, and that member is OPTIONAL there, which is the distinction that matters: it is outside the root and no leaf authenticates it, so that schema's own description calls it "a hint and nothing more" and directs a verifier that means to rely on it to `schemas/envelope-2.0.json`.
 Specification section 11.2 and `schemas/envelope-2.0.json` make it five plus the conditional.
 
 Confirmed from the fixtures rather than assumed: `corpus/fixtures/envelopes/guard-accept-bare-roax.json` carries a two-key record, `leafCount: 6`, and a `salts` array naming exactly those four reserved paths.
@@ -74,7 +75,7 @@ The 2.0 set is implemented and **is not exercised by any committed vector**, so 
 
 Specification section 10 step 1 requires a verifier to check "a record leaf's tag against the exact selected map under section 4.2".
 Section 4.2 selects the exact map by content ID, committed at `roax.typeMap.id`.
-`schemas/envelope-1.0.json` carries neither, so for a 1.0 disclosed copy there is no exact map to select and no way to identify one the envelope actually named.
+`schemas/envelope-1.0.json` commits no such leaf, and the optional top-level `typeMap.id` it does carry sits outside the root, so for a 1.0 disclosed copy the only thing available is an unauthenticated hint and there is no way to identify a map the envelope actually committed to.
 
 This is observable in the corpus rather than merely theoretical.
 `corpus/fixtures/envelopes/floor-hl7-fhir-bundle-complete.json` is a disclosed copy at `recordType: "hl7.fhir.bundle"`, and `corpus/type-maps/` contains **no** `hl7.fhir.bundle` map at all - only the synthetic, PDT, recovery and vaccination ones.
@@ -181,6 +182,13 @@ Resulting order, pinned in a comment in `roax_canon.verify._verify_full_copy`: s
 `corpus/fixtures/envelopes/salt-leak-disclosed-copy-with-master-salt.json` is separately worth naming: `masterSalt` is not in `schemas/envelope-1.0.json`'s closed property set, so the fixture is schema-invalid, and a verifier that let a generic unknown-property error win would report `envelope-shape` where the vector wants `master-salt-in-envelope`.
 The seed-member check therefore runs before the unknown-member check, and it names a list rather than one field, because specification section 7.3 rule 3 binds any future revision that reintroduces a derived salt.
 
+Both checks run at **every** object `schemas/envelope-1.0.json` closes and not at the top level alone, which is what makes them a defence rather than a gesture.
+Each nested object is dereferenced by named key, so an extra member one level down would otherwise be ignored: a `disclosure` carrying its own `salts` array, or an `issuer` carrying a `masterSalt`, hands a reader the salt of an undisclosed leaf inside a copy that verifies `ok`, which is the accept path that makes it a leak rather than a curiosity.
+`anchor` is closed for the adjacent reason rather than the same one: no check in the module dereferences it, and being unread is exactly what makes it a place to park bytes nobody looks at.
+The seed scan skips a name the object legitimately declares, because `salt` is in the list and is the member being asked for on a `salts` entry and on a disclosed leaf.
+No committed vector moves, measured over all 54 envelope fixtures rather than assumed: the observed nested key sets are exactly `issuer{id, keyId}`, `disclosure{mode, leaves}`, `salts` entry `{segments, salt}` and leaf `{segments, displayPath, index, tag, value, salt, auditPath}`, and no fixture carries `anchor` or `typeMap` at all.
+The only undeclared member anywhere in the 54 is the top-level `masterSalt` of `salt-leak-disclosed-copy-with-master-salt.json`, which is the fixture that asks to be rejected.
+
 ---
 
 ## 10. CONFIRMATION: specification section 11.1's forged-tree-size measurement reproduces in Python
@@ -223,7 +231,7 @@ Recorded because the task named two of them and asked for the rest, and because 
 | `json.loads` accepts `NaN`, `Infinity`, `-Infinity` | produces floats | `parse_constant` raises `non-finite-number` |
 | a plain `dict` object hook drops duplicate keys | `{"a":1,"a":2}` becomes `{"a":2}` | `object_pairs_hook` raises `duplicate-key` |
 | **`parse_int=str, parse_float=str` collapses `5` and `"5"`** | the type map resolves the wrong tag | `JsonNumber` is a distinct `str` subclass; `json_kind` reads the type |
-| **`JsonNumber` subclasses `str`, so it passes `isinstance(x, str)` at every carrier boundary** | a JSON number reaches a member the envelope schema pins to a string, and the envelope still verifies | `jsonio.is_json_string`, applied at the outer identity members and `typeMap.id` (`verify.py`, `_verify`), at `KEY` path segments (`path.segments_from_json`), at a type-map `pattern` (`typemap.DisplayPatternTypeMap.__init__`) and at `disclosure.leaves[].value` for tags 2, 3, 4 and 5 (`verify._decode_carrier`) |
+| **`JsonNumber` subclasses `str`, so it passes `isinstance(x, str)` at every carrier boundary** | a JSON number reaches a member the envelope schema pins to a string, and the envelope still verifies | `jsonio.is_json_string`, applied at the outer identity members and `typeMap.id` (`verify.py`, `_verify`), at `KEY` path segments (`path.segments_from_json`), at a type-map `pattern` (`typemap.DisplayPatternTypeMap.__init__`), at `disclosure.leaves[].value` for tags 2, 3, 4 and 5 (`verify._decode_carrier`) and at every hex field - `root`, each `salts[].salt`, each disclosed leaf's `salt` and each `auditPath` entry (`verify._hexbytes`) |
 | `$` in a regular expression also matches before a trailing newline | `"1.0\n"` is accepted and canonicalized | every grammar anchored `\A` and `\Z` |
 | `\d` matches non-ASCII decimal digits, and `int("１２")` is 12 | a fullwidth numeral canonicalizes | grammars spell `[0-9]` out; `isdigit`, `isdecimal`, `isnumeric` are never used |
 | `str` holds unpaired surrogates and `unicodedata.normalize` passes them through | fails later at `.encode("utf-8")`, after the guard has run | explicit check before normalization, `unpaired-surrogate` |
