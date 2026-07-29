@@ -6,9 +6,12 @@ validates against the successor contract this document defines yet.
 the contract this document defines.
 [`schemas/conformance-corpus-1.0.json`](../schemas/conformance-corpus-1.0.json) is retained because
 it, and not the successor, governs the corpus artifact as committed today.
-The successor is a major bump because it deletes definitions the committed artifact still uses, so
-that artifact does not validate against it and has to be rebuilt to it; the requirements below are
-stated against the successor and the gap is named in section 3.
+The successor is a major bump because it REQUIRES the exact type-map artifact identity on the
+type-map and record vectors, which the committed artifact does not carry, so that artifact does not
+validate against it and has to be rebuilt to it.
+It is not a major bump for the D4b vector shapes: those landed in the 1.0 file and in the artifact
+together, under the same-change rule in section 1.1.
+The requirements below are stated against the successor.
 
 ---
 
@@ -670,6 +673,18 @@ they produce the same root.**
 Use a string whose NFC form is stable across recent Unicode versions, so that this class tests
 normalization rather than the version pin; class 16 owns the version question and is honest about
 what it can and cannot demonstrate.
+
+**The key-site row is defined here and deliberately NOT built, and decision D14 is the reason.**
+The corpus carries the value site alone, which is one vector rather than the table's two.
+The specification pins NFC for hashing and says nothing about whether type-map matching normalizes
+the key it matches on, so both reference implementations compare a pattern token against a segment
+key raw (`corpus/README.md`, ambiguity 4).
+A built key-site vector has to resolve its key through the type map, so it would pass under one
+reading and fail under the other, which settles D14 from inside a data file rather than testing it.
+Section 1.2 forbids exactly that, and `docs/decisions.md` Part 2a records D14 as open.
+The row stays in this table because the class is not complete until D14 is ruled and the vector is
+built under the ruling, and stating the gap here is what keeps a passing class 19 from reading as
+coverage it does not have.
 
 **Both forms MUST be computed under one shared salt set, and the vector MUST name the file carrying
 it.** Under decision D4b every salt is an independent random draw (specification section 7), so two
