@@ -1,0 +1,52 @@
+# Packaging metadata for the Python implementation of ROAX-CANON/1.
+#
+# This is the FIRST package manifest in the repository and it is scoped to `python/`
+# deliberately. AGENTS.md records that the absence of a manifest was itself a signal - a
+# `package.json` at the root would have read as the beginning of a library while the
+# design was still under review. The captain has since ruled for five independent builds,
+# so a manifest for this language is now correct; nothing here makes `corpus/tools/`
+# installable, and those two files remain corpus tooling rather than roax-lib.
+#
+# There are NO runtime dependencies and there will not be any. Every hazard this library
+# exists to close is in the standard library's own defaults, so a dependency that wrapped
+# `json` or `unicodedata` would put a second reading of the specification between this
+# code and the bytes it commits.
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "roax-canon"
+version = "0.1.0"
+description = "ROAX-CANON/1: canonicalization, commitment and selective disclosure for health records"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+keywords = ["roax", "canonicalization", "merkle", "selective-disclosure", "fhir"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Healthcare Industry",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security :: Cryptography",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Specification = "https://github.com/rod-of-asclepius-xchange/roax-lib/blob/main/docs/spec/roax-canon-1.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+roax_canon = ["py.typed"]
+
+# Line length matches what the repository's prose is hard-wrapped at, so a doc comment and
+# the code it sits on wrap the same way.
+[tool.black]
+line-length = 100
+
+[tool.flake8]
+max-line-length = 110
+# E203 is where flake8 and black disagree about slice colons; black wins.
+extend-ignore = ["E203"]
