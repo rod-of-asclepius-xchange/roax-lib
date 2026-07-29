@@ -25,6 +25,7 @@ import {
   canonicalizeDecimal,
   resolveHashFunction,
   toHex,
+  hexNibble,
   TypeTag,
   REGISTERED_PROFILES,
   type Path,
@@ -362,6 +363,36 @@ test('a salt set naming one path twice is rejected (class 17)', () => {
 
 test('Poseidon-BN254 has no defined construction and is refused (section 7.4)', () => {
   expectCode('hash-alg-unsupported', () => resolveHashFunction('Poseidon-BN254'));
+});
+
+// ---------------------------------------------------------------------------------------------
+// `hexNibble` resolves ONE hexadecimal digit. Written against the code unit rather than as
+// `HEX.indexOf(ch)`, because `indexOf` is a substring search: it answers 10 for the two-character
+// string 'ab' and 0 for the empty string, so an `indexOf` form silently accepts input that is not
+// a digit. Pinned because the function is exported and the next caller may not pre-validate.
+// ---------------------------------------------------------------------------------------------
+
+test('hexNibble accepts one hexadecimal digit in either case and nothing else', () => {
+  assert.equal(hexNibble('0'), 0);
+  assert.equal(hexNibble('9'), 9);
+  assert.equal(hexNibble('a'), 10);
+  assert.equal(hexNibble('f'), 15);
+  assert.equal(hexNibble('A'), 10);
+  assert.equal(hexNibble('F'), 15);
+
+  // The three shapes an `indexOf` implementation gets wrong.
+  assert.equal(hexNibble('ab'), -1, "'ab' is a substring of the table, not a digit");
+  assert.equal(hexNibble('0123'), -1, "'0123' is a substring of the table, not a digit");
+  assert.equal(hexNibble(''), -1, 'the empty string is a substring of every string');
+
+  assert.equal(hexNibble('g'), -1);
+  assert.equal(hexNibble('G'), -1);
+  assert.equal(hexNibble(' '), -1);
+  // Adjacent to the accepted ranges on both sides: '/' and ':' bracket the digits, '`' and 'g'
+  // bracket lowercase, '@' and 'G' bracket uppercase.
+  for (const ch of ['/', ':', '`', '@']) {
+    assert.equal(hexNibble(ch), -1, `${JSON.stringify(ch)} is adjacent to a range, not inside one`);
+  }
 });
 
 console.log(`unit: ${passed} passed, ${failures.length} failed`);

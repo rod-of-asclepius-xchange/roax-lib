@@ -106,7 +106,6 @@ export function concatBytes(parts: readonly Uint8Array[]): Uint8Array {
 }
 
 const HEX = '0123456789abcdef';
-const HEX_UPPER = '0123456789ABCDEF';
 
 export function toHex(bytes: Uint8Array): string {
   let out = '';
@@ -118,19 +117,39 @@ export function toHex(bytes: Uint8Array): string {
 }
 
 /**
- * The value of one hexadecimal digit, in either case, or `-1` for anything else.
+ * The value of one hexadecimal digit, in either case, or `-1` for anything that is not exactly
+ * one hexadecimal digit.
  *
- * A table lookup rather than `Number.parseInt(ch, 16)`, so that no path in this package converts
- * text to a machine number through a general-purpose numeric parser. `parseInt` is also lenient in
- * ways a decoder must not be: it stops at the first non-digit and returns what it read, so
- * `parseInt('0x', 16)` is `0` rather than an error.
+ * A code-unit comparison rather than `Number.parseInt(ch, 16)`, so that no path in this package
+ * converts text to a machine number through a general-purpose numeric parser. `parseInt` is also
+ * lenient in ways a decoder must not be: it stops at the first non-digit and returns what it read,
+ * so `parseInt('0x', 16)` is `0` rather than an error.
+ *
+ * **It is written against the code unit rather than as `HEX.indexOf(ch)`, and that is the point.**
+ * `String.prototype.indexOf` is a SUBSTRING search, so `'0123456789abcdef'.indexOf('ab')` is `10`
+ * and `.indexOf('')` is `0`: an `indexOf` form returns a plausible nibble for input that is not a
+ * digit at all, which in a library whose whole job is committing to exact bytes is the worst
+ * available failure shape. Both callers happen to pass a single character today, so the contract
+ * has to hold for the next one rather than for them.
  *
  * Both cases are accepted because the two callers differ: `fromHex` admits lowercase only and
  * rejects the rest before reaching here, while a JSON `\u` escape is case-insensitive by RFC 8259.
  */
 export function hexNibble(ch: string): number {
-  const lower = HEX.indexOf(ch);
-  return lower >= 0 ? lower : HEX_UPPER.indexOf(ch);
+  if (ch.length !== 1) {
+    return -1;
+  }
+  const code = ch.charCodeAt(0);
+  if (code >= 0x30 && code <= 0x39) {
+    return code - 0x30;
+  }
+  if (code >= 0x61 && code <= 0x66) {
+    return code - 0x61 + 0x0a;
+  }
+  if (code >= 0x41 && code <= 0x46) {
+    return code - 0x41 + 0x0a;
+  }
+  return -1;
 }
 
 export function fromHex(hex: string, where = 'value'): Uint8Array {
