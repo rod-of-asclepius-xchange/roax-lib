@@ -1,0 +1,115 @@
+{
+  "typeMapVersion": "1.0.0",
+  "recordType": "org.roax.corpus.synthetic",
+  "schemaVersion": "1.0",
+  "sourceSchemas": [
+    {
+      "path": "corpus/fixtures/records",
+      "note": "Authored for the corpus. No reference schema was consulted and none is cited, because these records do not come from one."
+    }
+  ],
+  "entries": [
+    {
+      "pattern": "a.b",
+      "jsonKind": "null",
+      "tag": 0,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "marker",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "fhirBundle.resourceType",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].fullUrl",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resourceType",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].gender",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.resourceType",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.gender",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "roax",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "roaxX.foo",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "a.**",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "Kelvin",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "Kelvin",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "counts.integer",
+      "jsonKind": "number",
+      "tag": 3,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "counts.decimal",
+      "jsonKind": "number",
+      "tag": 4,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "counts.text",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "flag",
+      "jsonKind": "boolean",
+      "tag": 1,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    }
+  ]
+}

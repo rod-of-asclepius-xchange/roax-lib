@@ -1,0 +1,160 @@
+"""Class 10 - record vectors over the three real Singapore MOH samples.
+
+The samples are read in place from a read-only reference checkout and are never copied into
+this repository, so `recordFile` names the third-party module and export rather than a file
+here. `corpus/README.md` documents the extraction a runner performs first.
+
+Only the profiles whose type map binds EVERY scalar the sample contains get a vector. A profile
+with an unbound path does not get one, and it does not get a guessed binding either: under
+specification section 4.2 an uncovered path fails closed, so a record containing one is not
+committable and there is no root to pin. Those paths become class 11 fail-closed vectors
+instead, which is a real assertion rather than a placeholder.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import build_type_maps  # noqa: E402
+import roax_ref as ref  # noqa: E402
+from corpus_plan import ISSUER_ID, ISSUER_KEY_ID, MASTER_SALT_A  # noqa: E402
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+CORPUS_DIR = os.path.dirname(HERE)
+TYPE_MAP_DIR = os.path.join(CORPUS_DIR, "type-maps")
+
+# One stable record identifier per sample. These are corpus identifiers, not anything the
+# samples carry: `recordId` is an envelope field and is in every salt preimage (section 7).
+RECORD_IDS = {
+    "sg.gov.moh.vaccination-healthcert": "urn:uuid:aaaaaaa1-0000-4000-8000-000000000001",
+    "sg.gov.moh.pdt-healthcert": "urn:uuid:aaaaaaa2-0000-4000-8000-000000000002",
+    "sg.gov.moh.recovery-healthcert": "urn:uuid:aaaaaaa3-0000-4000-8000-000000000003",
+}
+
+
+def find_src_root(references):
+    if not references:
+        return None
+    candidate = os.path.join(references, "schemata", "src")
+    if os.path.isdir(candidate):
+        return candidate
+    return references if os.path.isdir(references) else None
+
+
+def load_type_map(record_type):
+    import json
+    path = os.path.join(TYPE_MAP_DIR, record_type + ".json")
+    if not os.path.exists(path):
+        return None
+    with open(path, "r", encoding="utf-8") as handle:
+        return ref.TypeMap(json.load(handle))
+
+
+def build_record_vectors(references):
+    """Return (vectors, notes). `notes` records every omission, loudly.
+
+    A missing reference checkout produces vectors=[] and a note. It MUST NOT produce silence:
+    class 10 reporting green while unrun is the defect this whole document is about.
+    """
+    notes = []
+    src_root = find_src_root(references)
+    if src_root is None:
+        notes.append(
+            "class 10 SKIPPED: no reference checkout supplied (--references / ROAX_REFERENCES). "
+            "The three MOH samples live outside this repository by design."
+        )
+        return [], notes
+
+    import json_literal
+    from extract_reference_record import ExtractError, extract
+
+    vectors = []
+    for profile in build_type_maps.PROFILES:
+        record_type = profile["recordType"]
+        type_map = load_type_map(record_type)
+        if type_map is None:
+            notes.append(f"class 10 SKIPPED for {record_type}: no type map in corpus/type-maps")
+            continue
+
+        module = os.path.join(src_root, profile["module"])
+        if not os.path.exists(module):
+            notes.append(f"class 10 SKIPPED for {record_type}: {profile['module']} not found")
+            continue
+        with open(module, "r", encoding="utf-8") as handle:
+            try:
+                text = extract(handle.read(), profile["export"])
+            except ExtractError as exc:
+                notes.append(f"class 10 SKIPPED for {record_type}: extraction failed - {exc}")
+                continue
+        record = json_literal.loads(text)
+        record_id = RECORD_IDS[record_type]
+        record_file = "references/schemata/src/" + profile["module"] + "#" + profile["export"]
+
+        try:
+            root, leaves, _salts, _hashes = ref.build_tree(
+                "SHA-256", record, type_map, bytes.fromhex(MASTER_SALT_A),
+                record_type, profile["schemaVersion"], record_id, ISSUER_ID,
+            )
+        except ref.RoaxError as exc:
+            # The honest outcome for a profile whose reference schema does not determine a tag
+            # for every scalar in its own shipped sample.
+            notes.append(
+                f"class 10 OMITTED for {record_type}: the record is not committable under the "
+                f"fail-closed rule of specification section 4.2 - {exc.code} at {exc.detail}. "
+                f"The unbound paths are class 11 fail-closed vectors instead."
+            )
+            continue
+
+        vectors.append({
+            "name": f"record-{record_type}-no-key-id",
+            "class": 10,
+            "recordType": record_type,
+            "schemaVersion": profile["schemaVersion"],
+            "issuerId": ISSUER_ID,
+            "recordFile": record_file,
+            "masterSaltHex": MASTER_SALT_A,
+            "recordId": record_id,
+            "leafCount": len(leaves),
+            "root": root.hex(),
+        })
+
+        # The same record with issuer.keyId present. Section 11.2: an absent issuer.keyId emits
+        # NO leaf, so the two vectors differ by exactly one leaf and by their whole root. An
+        # implementation that emits a NULL leaf or an empty string for the absent case matches
+        # neither.
+        root2, leaves2, _s2, _h2 = ref.build_tree(
+            "SHA-256", record, type_map, bytes.fromhex(MASTER_SALT_A),
+            record_type, profile["schemaVersion"], record_id, ISSUER_ID, ISSUER_KEY_ID,
+        )
+        if len(leaves2) != len(leaves) + 1 or root2 == root:
+            raise SystemExit(f"corpus defect: issuer.keyId did not add exactly one leaf for {record_type}")
+        vectors.append({
+            "name": f"record-{record_type}-with-key-id",
+            "class": 10,
+            "recordType": record_type,
+            "schemaVersion": profile["schemaVersion"],
+            "issuerId": ISSUER_ID,
+            "issuerKeyId": ISSUER_KEY_ID,
+            "recordFile": record_file,
+            "masterSaltHex": MASTER_SALT_A,
+            "recordId": record_id,
+            "leafCount": len(leaves2),
+            "root": root2.hex(),
+        })
+
+    return vectors, notes
+
+
+def unbound_paths(references):
+    """The (recordType, pattern, jsonKind, why) tuples class 11 turns into fail-closed vectors."""
+    src_root = find_src_root(references)
+    if src_root is None:
+        return []
+    out = []
+    for entry in build_type_maps.build(os.path.dirname(os.path.dirname(src_root)), None):
+        for u in entry["unbound"]:
+            out.append((entry["recordType"], u["pattern"], u["jsonKind"], u["why"]))
+    return out

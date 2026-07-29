@@ -1,0 +1,58 @@
+{
+  "canon": "ROAX-CANON/1",
+  "hashAlg": "SHA-256",
+  "recordType": "org.roax.corpus.synthetic",
+  "schemaVersion": "1.0",
+  "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
+  "root": "0000000000000000000000000000000000000000000000000000000000000000",
+  "leafCount": 5,
+  "issuer": {
+    "id": "did:web:corpus.roax.invalid"
+  },
+  "record": {
+    "roax.recordId": "squatted",
+    "marker": "guard"
+  },
+  "salts": [
+    {
+      "segments": [
+        {
+          "key": "roax.recordType"
+        }
+      ],
+      "salt": "00000000000000000000000000000000"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.schemaVersion"
+        }
+      ],
+      "salt": "00000000000000000000000000000000"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.recordId"
+        }
+      ],
+      "salt": "00000000000000000000000000000000"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.issuer.id"
+        }
+      ],
+      "salt": "00000000000000000000000000000000"
+    },
+    {
+      "segments": [
+        {
+          "key": "marker"
+        }
+      ],
+      "salt": "00000000000000000000000000000000"
+    }
+  ]
+}

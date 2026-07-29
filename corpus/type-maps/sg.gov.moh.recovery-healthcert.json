@@ -1,0 +1,314 @@
+{
+  "typeMapVersion": "0.1.0",
+  "recordType": "sg.gov.moh.recovery-healthcert",
+  "schemaVersion": "2.0",
+  "sourceSchemas": [
+    {
+      "path": "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json",
+      "commit": "09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa",
+      "note": "Resolved by file path, never by $id: two reference schemas carry copy-pasted $id values."
+    }
+  ],
+  "entries": [
+    {
+      "pattern": "fhirBundle.entry[*].fullUrl",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.birthDate",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.category[*].coding[*].code",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.category[*].coding[*].display",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.category[*].coding[*].system",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.code.coding[*].code",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.code.coding[*].display",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.code.coding[*].system",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.collection.collectedDateTime",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.contact[*].address.text",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.contact[*].address.type",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: string enum"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.contact[*].address.use",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: string enum"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.contact[*].telecom[*].system",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: string enum"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.contact[*].telecom[*].value",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.effectiveDateTime",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.extension[*].extension[*].url",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.extension[*].extension[*].valueCodeableConcept.coding[*].code",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.extension[*].extension[*].valueCodeableConcept.coding[*].system",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.extension[*].extension[*].valueCodeableConcept.text",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.extension[*].url",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.gender",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: string enum"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.identifier[*].id",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.identifier[*].type.coding[*].code",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.identifier[*].type.coding[*].display",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.identifier[*].type.coding[*].system",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.identifier[*].value",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.name",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.name[*].text",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.resourceType",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: string const"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.specimen.reference",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.specimen.type",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.status",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: string enum"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.type.coding[*].code",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.type.coding[*].display",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.type.coding[*].system",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.type[*].coding[*].code",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.type[*].coding[*].display",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.type[*].coding[*].system",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.valueCodeableConcept.coding[*].code",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.valueCodeableConcept.coding[*].display",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.entry[*].resource.valueCodeableConcept.coding[*].system",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: type string"
+    },
+    {
+      "pattern": "fhirBundle.resourceType",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: string const"
+    },
+    {
+      "pattern": "fhirBundle.type",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json: string enum"
+    },
+    {
+      "pattern": "fhirVersion",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json: type string"
+    },
+    {
+      "pattern": "id",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json: type string"
+    },
+    {
+      "pattern": "logo",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json: type string"
+    },
+    {
+      "pattern": "type",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json: type string"
+    },
+    {
+      "pattern": "validFrom",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json: type string"
+    },
+    {
+      "pattern": "validUntil",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json: type string"
+    },
+    {
+      "pattern": "version",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/schema.json: type string"
+    }
+  ]
+}
