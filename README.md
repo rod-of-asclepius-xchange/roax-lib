@@ -7,7 +7,7 @@ selectively disclose real health records - FHIR, and Singapore MOH's PDT, recove
 and vaccination healthcerts - integrating with ROAX.
 
 Status: **implementation phase.**
-The independent Rust library lives under `rust/`; the TypeScript, Go, Swift and Kotlin libraries have not been added.
+The independent Rust library lives under `rust/` and the independent Python library under `python/`; the TypeScript, Go, Swift and Kotlin libraries have not been added.
 
 ## Start here
 
@@ -20,6 +20,7 @@ The independent Rust library lives under `rust/`; the TypeScript, Go, Swift and 
 | [`docs/conformance-corpus.md`](docs/conformance-corpus.md) | What cross-language agreement has to be proven against, and why that is a release gate rather than decoration. |
 | [`schemas/`](schemas/) | JSON Schemas for the envelope, the type map and the conformance corpus. |
 | [`rust/`](rust/) | The independent Rust implementation, its protocol boundaries and validation commands. |
+| [`python/`](python/) | The independent Python implementation, standard library only. [`python/FINDINGS.md`](python/FINDINGS.md) records where it disagreed with the corpus and where the specification was ambiguous. |
 
 ## Why not OpenAttestation
 
@@ -82,7 +83,9 @@ docs/conformance-corpus.md
 schemas/            JSON Schemas
 type-maps/          immutable generated base maps and their registry
 tools/              type-map reproduction and integrity checks
+corpus/             the conformance corpus, its fixtures and its two reference implementations
 rust/               independent Rust implementation of ROAX-CANON/1
+python/             independent Python implementation of ROAX-CANON/1
 ```
 
 Reference material used during design - including third-party schemata - is kept

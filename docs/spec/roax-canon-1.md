@@ -2,7 +2,7 @@
 
 **Status:** draft for review.
 Not frozen.
-The independent Rust implementation exists under `rust/`; the other four ruled independent libraries have not been added.
+The independent Rust implementation exists under `rust/` and the independent Python implementation under `python/`; the TypeScript, Go, Swift and Kotlin libraries have not been added.
 **Version string:** `ROAX-CANON/1`
 **Date:** 2026-07-28
 
