@@ -298,8 +298,12 @@
           "description": "A FULL envelope copy in the shape schemas/envelope-1.0.json defines, which carries the record body and its `salts` array together. A full copy MUST carry the salt of every leaf of the union (spec section 7.3), so this one file is self-sufficient and saltsFile would be a second, contradictable source of the same values.",
           "type": "string"
         },
+        "saltPairing": {
+          "description": "How the salt set in saltsFile pairs its salts to leaves. REQUIRED alongside recordFile, because the two shapes are not distinguishable by inspection and a runner that guesses wrong computes a wrong root rather than an error. 'path' is the default shape and the one every hand-authored fixture uses: entries carry explicit segments, exactly as schemas/envelope-1.0.json defines the `salts` array, so pairing is self-describing. 'positional' is a bare array of salts in encodePath order, and it exists for ONE reason recorded here so it is not mistaken for an optimization - see the note below.",
+          "enum": ["path", "positional"]
+        },
         "saltsFile": {
-          "description": "The file carrying the per-leaf salts this vector's root was computed with, one per leaf of the union, in the `salts` shape schemas/envelope-1.0.json defines. REQUIRED alongside recordFile rather than optional, because a bare record file plus a root is not a reproducible assertion: every salt is an independent random draw that nothing can re-derive (spec section 7, decision D4 ruled D4b). This field replaced masterSaltHex, which expressed a derivation that no longer exists.",
+          "description": "The file carrying the per-leaf salts this vector's root was computed with, one per leaf of the union. REQUIRED alongside recordFile rather than optional, because a bare record file plus a root is not a reproducible assertion: every salt is an independent random draw that nothing can re-derive (spec section 7, decision D4 ruled D4b). This field replaced masterSaltHex, which expressed a derivation that no longer exists. Its shape is named by saltPairing. WHY CLASS 10 PAIRS POSITIONALLY WHILE ENVELOPES PAIR BY PATH, and this must not be 'harmonized' away: spec section 7.2 rejects positional pairing FOR AN ENVELOPE because it makes salt-to-leaf pairing depend on the reader reproducing the section 9 sort correctly before it can read the salts at all, which in production is a hazard. In a corpus vector, reproducing that sort IS THE THING UNDER TEST, so the same property that makes positional pairing dangerous in an envelope is what makes it valid here - a mispairing surfaces as a failed vector rather than as a silently wrong root. The reason class 10 needs it: its records are the genuine third-party MOH reference samples at 69 and 70 leaves, and a path-keyed salt set would enumerate every path of a shipped reference sample into this PUBLIC repository, which AGENTS.md forbids for the reference schemata - not even a fragment. A positional array discloses only the leaf count, and leafCount is already published in this very vector. IF SOMEONE LATER HARMONIZES THESE TWO, THE DANGEROUS DIRECTION IS MAKING ENVELOPES POSITIONAL. Do not.",
           "type": "string"
         },
         "recordId": { "type": "string" },
@@ -321,13 +325,13 @@
       "oneOf": [
         {
           "description": "A bare record file together with the salt set its root was computed under. Both are required: neither alone determines the root.",
-          "required": ["recordFile", "saltsFile"],
-          "properties": { "recordFile": true, "saltsFile": true, "envelopeFile": false }
+          "required": ["recordFile", "saltsFile", "saltPairing"],
+          "properties": { "recordFile": true, "saltsFile": true, "saltPairing": true, "envelopeFile": false }
         },
         {
           "description": "A full envelope copy, which already carries both. saltsFile is forbidden here rather than merely unnecessary: two carriers of the same salts can disagree, and a runner has no rule for which one the asserted root was computed under.",
           "required": ["envelopeFile"],
-          "properties": { "envelopeFile": true, "recordFile": false, "saltsFile": false }
+          "properties": { "envelopeFile": true, "recordFile": false, "saltsFile": false, "saltPairing": false }
         }
       ]
     },

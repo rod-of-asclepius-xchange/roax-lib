@@ -273,6 +273,46 @@ them was optional. Decision D4 is ruled D4b and every salt is an independent ran
 can re-derive (specification section 7), so a vector naming only a bare record file asserts a root no
 runner can recompute: schema-valid, and vacuous, in the class this document calls mandatory.
 
+#### Why this class pairs its salts positionally, and every other carrier pairs by path
+
+**Read this before making the two consistent, because the consistent-looking direction is the unsafe
+one.**
+
+A salt set names a salt for each leaf, and there are two ways to say which salt belongs to which
+leaf. Every hand-authored fixture in this corpus, and every envelope, pairs **by path**: each entry
+carries explicit path segments, exactly as the `salts` array of `schemas/envelope-1.0.json` is
+defined. The class-10 vectors pair **positionally**: a bare array of salts in `encodePath` order.
+`recordVector.saltPairing` names which shape a vector uses, and it is required rather than inferred,
+because the two are not distinguishable by inspection and a runner that guesses wrong computes a
+wrong root instead of reporting an error.
+
+**Specification section 7.2 rejects positional pairing for an envelope**, and the reason is precise:
+it makes salt-to-leaf pairing depend on the reader reproducing the section 9 sort correctly before it
+can read the salts at all. In production that is a hazard, because a sort that is subtly wrong yields
+a wrong root rather than a complaint.
+
+**In a corpus vector, reproducing that sort is the thing under test.** The property that makes
+positional pairing dangerous in an envelope is exactly what makes it valid here: an implementation
+whose sort disagrees mispairs the salts and fails the vector, which is the detection the class exists
+to provide rather than a defect it introduces.
+
+**Why this class needs it at all**, stated so the tradeoff is not mistaken for an optimization. The
+class-10 records are the genuine third-party MOH reference samples, at 69 and 70 leaves. A
+path-keyed salt set for one of them would enumerate every path of a shipped reference sample into
+this repository, which is public, and `AGENTS.md` forbids committing the reference schemata - not
+even a fragment. A positional array discloses only the leaf count, and `leafCount` is already
+published in the same vector, so it adds nothing a reader did not already have.
+
+> **If these two are ever harmonized, the dangerous direction is making envelopes positional.**
+> That would move the sort dependency from a test, where it is the subject, into a deployed record,
+> where specification section 7.2 rules it out. Harmonizing the other way - making class 10
+> path-keyed - is merely forbidden by the references policy. Neither is an improvement.
+
+This is the second consequence of the D4b ruling that the ruling itself did not work through; the
+first was `roax.recordId` moving from mandatory-by-arithmetic to mandatory-by-policy in the
+minimum-disclosure floor (specification sections 10.2 and 11.2). Both are recorded rather than
+absorbed, because a reader who finds one unexplained will not trust the other.
+
 ### Class 11 - the schema binding itself
 
 The type map is a data file and MUST be in the corpus, with vectors asserting that a given path
