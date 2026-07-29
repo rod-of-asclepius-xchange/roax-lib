@@ -9,6 +9,12 @@
  * dosage that is a different statement about a drug. `readJson` in `./json.js` is a hand-written
  * scanner for that reason, and nothing in this package calls `JSON.parse` on anything it commits
  * to.
+ *
+ * **What this package throws.** Every rejection of input is a `RoaxError` carrying a
+ * `RoaxErrorCode`, which is the conformance corpus's own reason string. The one exception is a
+ * precondition violation by the caller: `inclusionProof`, and `Commitment.auditPathFor` which
+ * forwards to it, throw a `RangeError` for a leaf index outside the tree. See `./errors.js` for
+ * why that one is deliberately outside the taxonomy.
  */
 
 export { RoaxError, type RoaxErrorCode } from './errors.js';

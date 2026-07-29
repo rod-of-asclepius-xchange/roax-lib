@@ -53,7 +53,20 @@ export type RoaxErrorCode =
   // Section 7 salt rules.
   | 'salt-length';
 
-/** Every rejection in this library is one of these. Nothing throws a bare `Error`. */
+/**
+ * **Every rejection of INPUT is a `RoaxError` carrying one of the codes above.**
+ *
+ * A precondition violation by the CALLER is not, and there is exactly one of those in the package:
+ * `inclusionProof` in `./tree.js` throws a `RangeError` for a leaf index outside the tree it was
+ * handed. That is deliberately outside this taxonomy rather than an omission from it. These codes
+ * are the conformance corpus's own reason strings emitted verbatim, which is what lets an envelope
+ * vector assert a REASON rather than a boolean, so minting a code here to cover a caller's bad
+ * argument would spend the one property that makes the taxonomy checkable against the corpus.
+ * `RangeError` is also the JavaScript idiom for an out-of-range argument.
+ *
+ * A consumer writing `catch (e) { if (e instanceof RoaxError) ... }` therefore handles every
+ * rejection of a record, an envelope or a type map, and drops that one `RangeError`.
+ */
 export class RoaxError extends Error {
   readonly code: RoaxErrorCode;
   /** Optional machine-readable context. Never part of any hash preimage. */
