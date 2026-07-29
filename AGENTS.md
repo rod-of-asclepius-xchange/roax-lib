@@ -201,18 +201,25 @@ Both flags are optional and their absence is reported, never hidden. Things to k
   health authority's identifier and so authored type-map bindings never mix into a map that claims
   schema provenance.
 
-## A specification claim that measurement contradicts
+## A specification claim that measurement contradicted, now corrected
 
-**Section 11.1 says `leafCount` is self-binding in a disclosed copy. It is not.** RFC 9162 section
-2.1.3.2 takes `tree_size` as an input, so an attacker who controls `leafCount` controls the shape
-the verifier reconstructs. Measured on an 8-leaf tree: the internal node `MTH(L[0:4])` presented as
-a leaf at index 0 fails verification under the true tree size 8 and **succeeds** under a forged tree
-size 2, against the same genuine root.
+**`leafCount` is NOT self-binding in a disclosed copy**, and section 11.1 said it was until this was
+measured. RFC 9162 section 2.1.3.2 takes `tree_size` as an input, so an attacker who controls
+`leafCount` controls the shape the verifier reconstructs. Measured on an 8-leaf tree: the internal
+node `MTH(L[0:4])` presented as a leaf at index 0 fails verification under the true tree size 8 and
+**succeeds** under a forged tree size 2, against the same genuine root.
 
 What actually blocks it is section 10 step 1 - recompute the leaf hash from the disclosed fields
-rather than trust a supplied one - plus second-preimage resistance. That defence is already
-normative. The `leafCount` sentence claims a second one that is not there, and the specification has
-not been changed here because that is a specification decision.
+rather than trust a supplied one - plus the `0x00` leaf-domain byte and second-preimage resistance.
+That defence was already normative; the `leafCount` sentence claimed a second one that was not there.
+
+**The specification has since been changed.** Section 11.1 now carries the correction under "An
+earlier version of this section claimed a binding that does not exist", with the reproduction, and
+`schemas/envelope-1.0.json` carries the same caution on `leafCount`. Corpus class 9 gained a
+`forged-tree-size` attack vector, and its vectors MUST be driven through the full disclosed-copy
+verification path rather than a bare fold primitive - a runner that hands `verifyInclusion` a leaf
+hash directly records a pass for an implementation with no defence at all. Never add a check that
+leans on `leafCount` in a disclosed copy.
 
 ## Documentation conventions in force here
 
