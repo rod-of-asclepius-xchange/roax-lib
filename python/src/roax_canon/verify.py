@@ -65,7 +65,7 @@ from .record import (
 from .text import nfc
 from .tree import verify_inclusion
 from .typemap import TypeResolver
-from .value import BLOB_REF, BYTES, STRING, VALUELESS_TAGS
+from .value import BLOB_REF, BYTES, DECIMAL, INTEGER, STRING, TAG_NAMES, VALUELESS_TAGS
 
 __all__ = ["VerifierConfig", "VerificationResult", "verify_envelope"]
 
@@ -417,22 +417,60 @@ def _verify_full_copy(env, cfg, hasher, root, leaf_count, record_type) -> Verifi
 _RESERVED_TAG = STRING
 
 
+#: The tags whose disclosed-copy ``value`` carrier is a JSON **string**.
+#: `schemas/envelope-1.0.json` pins ``"type": "string"`` on the disclosed leaf's ``value``
+#: for each of them, and specification section 6.4 is why for the two numeric ones: a JSON
+#: number in the carrier is read back through a float by any ordinary consumer, and
+#: ``0.010`` becomes ``0.01`` while this package still verifies the envelope, because the
+#: literal happens to survive :class:`~roax_canon.jsonio.JsonNumber` on the way in.
+#: Every other tag is absent for a reason: 1 `BOOL` carries a JSON boolean, 0 `NULL`,
+#: 6 `EMPTY_ARRAY` and 7 `EMPTY_OBJECT` carry no value at all, and 8 `BLOB_REF` is
+#: rejected before this is reached (specification section 6.5).
+_STRING_CARRIER_TAGS = frozenset({STRING, INTEGER, DECIMAL, BYTES})
+
+
 def _decode_carrier(tag: int, value: Any) -> Any:
-    """Turn an envelope carrier value into what :func:`encode_value` expects.
+    """Validate a disclosed leaf's ``value`` carrier and hand :func:`encode_value` what it
+    expects.
 
-    Only `BYTES` needs it. The envelope carries those bytes as lowercase hex, which is
-    what `schemas/envelope-1.0.json` pins, and is a different carrier from the RFC 4648
-    base64 the *record* uses for the same field (specification section 6.3).
+    **The scope is exactly ``disclosure.leaves[].value`` and nothing else.**
+    A full copy's ``record`` body carries record numbers in their original JSON form by
+    specification section 7.3, and the flattener resolves those through the observed JSON
+    kind, so the same test applied there would contradict the specification as well as
+    every full-copy vector.
+    :func:`roax_canon.value.encode_value` is the wrong site for the same reason: the
+    record path legitimately hands it a :class:`~roax_canon.jsonio.JsonNumber` whenever a
+    map binds kind ``number`` to tag 2, 3 or 4.
 
-    **No committed corpus vector reaches this**, because no version-1 profile binds
-    `BYTES`: the healthcert blob fields bind STRING and FHIR ``base64Binary`` is
-    unresolved (specification section 6.3). It is implemented anyway because
-    :func:`roax_canon.disclose.disclosed_copy` emits that carrier, and an encoder without
-    a decoder is a round trip that does not close.
+    :func:`~roax_canon.jsonio.is_json_string` and not ``isinstance(value, str)``, because
+    `JsonNumber` subclasses :class:`str` so the literal survives, and that same
+    subclassing is what carries a JSON number through every carrier boundary in this
+    package undetected.
+
+    `BYTES` is carried as lowercase hex, which is what `schemas/envelope-1.0.json` pins
+    and is a different carrier from the RFC 4648 base64 the *record* uses for the same
+    field (specification section 6.3).
+    The hex test alone does not subsume the string test: an all-digit JSON number literal
+    of even length matches `_HEX_CARRIER`.
+
+    **No committed corpus vector reaches any of this.**
+    No envelope fixture carries a non-string ``value`` at tags 2, 3 or 4, and no version-1
+    profile binds `BYTES`, because the healthcert blob fields bind STRING and FHIR
+    ``base64Binary`` is unresolved (specification section 6.3).
+    The `BYTES` decoder exists because :func:`roax_canon.disclose.disclosed_copy` emits
+    that carrier, and an encoder without a decoder is a round trip that does not close.
     """
+    if tag not in _STRING_CARRIER_TAGS:
+        return value
+    if not is_json_string(value):
+        raise RoaxError(
+            ErrorCode.ENVELOPE_SHAPE,
+            f"a {TAG_NAMES[tag]} leaf value is carried as a JSON string and never as a "
+            f"JSON number (specification section 6.4)",
+        )
     if tag != BYTES:
         return value
-    if not isinstance(value, str) or _HEX_CARRIER.match(value) is None:
+    if _HEX_CARRIER.match(value) is None:
         raise RoaxError(
             ErrorCode.ENVELOPE_SHAPE,
             "a BYTES leaf value is carried as an even-length lowercase hex string",

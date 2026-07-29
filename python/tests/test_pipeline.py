@@ -508,6 +508,82 @@ class TestHostileEnvelopeMembers(unittest.TestCase):
         hostile["recordType"] = JsonNumber("5")
         self.assertEqual(verify_envelope(hostile, self.config).reason, ErrorCode.PROFILE_UNKNOWN)
 
+    def test_a_json_number_disclosed_leaf_value_is_rejected(self):
+        # No corpus vector reaches this at any tag, so this test is the only thing holding
+        # it: no envelope fixture carries a non-string `value` at tag 2, 3 or 4.
+        #
+        # DECIMAL is the case that shows the harm. `JsonNumber` subclasses `str`, so a
+        # carrier of 0.010 canonicalizes to the same "0.010" the genuine leaf committed
+        # and the envelope verifies, while any consumer re-reading those same bytes with a
+        # stdlib parser gets 0.01 - the trailing-zero destruction specification section
+        # 6.4 and `docs/decisions.md` part 0 exist to prevent, and which
+        # `schemas/envelope-1.0.json` forbids by pinning the carrier to "type": "string".
+        record = loads('{"marker": "m", "amount": 0.010}')
+        built = issue(record, IDENTITY, resolver())
+        profile = Profile("org.roax.corpus.synthetic", ((Key("marker"),),))
+        config = VerifierConfig(
+            profiles=DEFAULT_PROFILES.with_profile(profile),
+            resolvers={"org.roax.corpus.synthetic": resolver()},
+        )
+        reveal = list(profile.floor()) + [(Key("marker"),), (Key("amount"),)]
+        envelope = disclosed_copy(reveal, IDENTITY, built, profile=profile)
+
+        def with_amount(carrier):
+            copied = {**envelope, "disclosure": {**envelope["disclosure"]}}
+            copied["disclosure"]["leaves"] = [
+                {**leaf, "value": carrier} if leaf["displayPath"] == "amount" else leaf
+                for leaf in envelope["disclosure"]["leaves"]
+            ]
+            return copied
+
+        # The encoder must emit the schema's string carrier rather than the record's
+        # JsonNumber, or the round trip stops closing: this is what `disclosed_copy`
+        # produced unmodified.
+        emitted = next(
+            leaf for leaf in envelope["disclosure"]["leaves"] if leaf["displayPath"] == "amount"
+        )["value"]
+        self.assertEqual(emitted, "0.010")
+        self.assertNotIsInstance(emitted, JsonNumber)
+        self.assertTrue(verify_envelope(envelope, config).accepted)
+
+        self.assertTrue(verify_envelope(with_amount("0.010"), config).accepted)
+        self.assertEqual(
+            verify_envelope(with_amount(JsonNumber("0.010")), config).reason,
+            ErrorCode.ENVELOPE_SHAPE,
+        )
+        # The same collapse at the other two string carriers, and the tags that are
+        # deliberately NOT string carriers must keep working.
+        self.assertEqual(
+            verify_envelope(with_amount(JsonNumber("5")), config).reason,
+            ErrorCode.ENVELOPE_SHAPE,
+        )
+        boolean = loads('{"marker": "m", "flag": true}')
+        boolean_built = issue(boolean, IDENTITY, resolver())
+        self.assertTrue(
+            verify_envelope(
+                disclosed_copy(
+                    list(profile.floor()) + [(Key("marker"),), (Key("flag"),)],
+                    IDENTITY,
+                    boolean_built,
+                    profile=profile,
+                ),
+                config,
+            ).accepted
+        )
+
+    def test_a_tag_8_leaf_keeps_its_own_reason(self):
+        # Specification section 6.5 rejects a tag-8 leaf before any carrier is read, so
+        # the carrier check must not preempt `blob-ref-not-declared`.
+        envelope = self.disclosed()
+        envelope["disclosure"]["leaves"][0] = {
+            **envelope["disclosure"]["leaves"][0],
+            "tag": 8,
+            "value": {"blobByteLength": JsonNumber("14314"), "blobDigest": "00" * 32},
+        }
+        self.assertEqual(
+            verify_envelope(envelope, self.config).reason, ErrorCode.BLOB_REF_NOT_DECLARED
+        )
+
     def test_a_json_number_path_key_is_rejected(self):
         # The same collapse one layer down: {"key": 5} would encode identically to
         # {"key": "5"} (specification section 5).
