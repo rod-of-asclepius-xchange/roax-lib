@@ -180,10 +180,12 @@ An ID authenticates exact bytes but does not grant authority, just as an algorit
 ### 2.2 Source-level scalar coverage
 
 The table deliberately separates direct or constraint-derived evidence from FHIR-specific inference.
-The inferred numeric bindings use the FHIR element suffixes `Decimal`, `Integer`, `PositiveInt` and `UnsignedInt` together with the corresponding named primitive definitions.
+The inference column counts exactly the operative bindings whose evidence is a generated FHIR element-name suffix, which is the `fhir-element-name` basis in `coverage.byBasis`: 74 for full FHIR, 7 for each lite scope and none for vaccination.
+Those are the suffixes `Decimal`, `Integer`, `PositiveInt` and `UnsignedInt`.
+A binding taken from a named FHIR primitive definition such as `decimal`, `integer`, `positiveInt` or `unsignedInt` reads a declared type name rather than an element-name suffix, so it is counted as confident; that is the `fhir-named-primitive` basis, with 8 bindings for full FHIR and 4 for each lite scope.
 JSON Schema Validation draft-06 section 6.3.3 makes `pattern` a string keyword, so the numeric regex is not itself a validator constraint on `type: "number"`; FHIR R4 JSON section 2.6.2.3 and the generated element names supply the semantic evidence.
 
-| Profile scope | Finite scalar audit units | Confident | Operative FHIR inference | Unresolved | Additional gaps outside the declared scalar set |
+| Profile scope | Finite scalar audit units | Confident | Operative FHIR element-name inference | Unresolved | Additional gaps outside the declared scalar set |
 |---|---:|---:|---:|---:|---|
 | Full FHIR root union | 3,345 schema-local slots | 3,264 | 74 | 7 | Null placeholders conflict with the reference schema, and 659 object-applicator source nodes omit an object type. |
 | PDT base plus lite Bundle | 331 declared units | 319 | 7 | 5 | 20 endorsed-sample pairs are undeclared by the base schema, and 65 reachable lite-FHIR object nodes omit an object type. |
@@ -353,7 +355,15 @@ Recovery also leaves its root open.
 Vaccination closes its root but leaves nested issuer, renderer, recommendation, date-criterion and Notarise surfaces open.
 The base artifacts list those extension regions as non-operative `extensionPoints`.
 Each prefix defines a structured region in which an issuer child may add an exact selector that has no inherited output for the observed JSON kind, under ruled decision D7.
-That includes an unknown-key subtree and a previously unresolved output such as vaccination `dose`, but it never permits overriding an operative parent output.
+A prefix admits exactly two selector shapes, and `tools/check-type-map-extension.mjs` enforces both:
+
+1. The selector extends the prefix with a segment that the base map does not declare at that prefix state, and may then descend as deep as the issuer needs inside that otherwise untyped subtree.
+2. The selector names a direct child of the prefix that the base map declares but leaves unresolved for the observed JSON kind, such as vaccination `dose`.
+
+A prefix therefore never reaches a descendant of a path the base map already declares.
+The PDT and recovery root prefixes admit undeclared root properties and their subtrees, which is what their open `additionalProperties` root actually permits.
+They do not open the shared lite FHIR Bundle, so `base64Binary` and `Narrative.div` stay unresolved for every issuer of those profiles until a base-map revision rules them.
+Rebinding a declared path is a base-map revision under section 5.2, not an extension, and overriding an operative parent output is never permitted.
 Complete validation against the selected base profile still runs first, so the prefix does not make a schema-invalid path valid under ROAX-CANON/1 section 4.2.
 
 ### 5.1 Composition and conflict rules
@@ -368,6 +378,7 @@ Changing or removing a parent binding is a replacement base-map revision, not an
 | Two issuers add the same selector with different tags | Both may remain issuer-scoped, but they cannot be merged. |
 | One effective artifact has two outputs for the same path language and observed kind | Reject the artifact. |
 | A child overlaps an inherited selector | Reject the child, even if the proposed tag is the same. |
+| A child binds a descendant of a path the base map already declares | Reject the child; only a base-map revision may type that subtree. |
 | Two artifacts carry the same semver | Their content IDs distinguish them, and no verifier chooses by version ordering. |
 | Another installed map covers a path missing from the selected map | Fail closed and do not search the other map. |
 
@@ -391,6 +402,7 @@ An issuer child MUST use canonical DFA state numbering so independent tooling ca
 State `s0` is first, newly encountered targets receive consecutive IDs in breadth-first discovery order, NFC KEY transitions are traversed in UTF-8 byte order, and `anyIndex` is traversed after the KEY transitions.
 Within a state, bindings are sorted by `jsonKind`, KEY transitions are sorted by UTF-8 bytes, and the set-valued `basis` and `sources` arrays are sorted without duplicates.
 The executable checks for these carrier rules are in `tools/check-type-map-extension.mjs`, and the permitted object shapes are closed by `schemas/type-map-artifact-1.0.json`.
+`tools/check-type-maps.mjs` applies that same encoding to the four published base artifacts, so a base map and an issuer child are held to one set of carrier rules rather than two.
 
 ## 6. Reproduction and review
 
@@ -414,6 +426,30 @@ node tools/build-type-maps.mjs \
   --references references/schemata \
   --out type-maps \
   --check
+```
+
+Both generator invocations need the reference checkout, which `.gitignore` excludes.
+The published artifacts and the registry are therefore also checked directly from the committed tree, with no reference checkout:
+
+```sh
+ROAX_AJV=/tmp/roax-ajv node tools/check-type-maps.mjs
+```
+
+That checker recomputes every content ID from the exact bytes, validates the four artifacts and `type-maps/registry-1.0.0.json` against `schemas/type-map-artifact-1.0.json` and `schemas/type-map-registry-1.0.json`, exercises both branches of the artifact schema's `parentTypeMapId` conditional with a valid child instance and with instances each branch must reject, applies the shared carrier validation in `tools/check-type-map-extension.mjs` so the carrier invariants have one executable encoding, re-verifies the pinned repository, path and commit of every source and binding reference, and asserts a fixed set of operative and fail-closed path bindings.
+
+It needs Ajv 8 and `ajv-formats` installed outside this tree, because the repository deliberately carries no package manifest:
+
+```sh
+npm install --prefix /tmp/roax-ajv ajv ajv-formats
+```
+
+`ROAX_AJV` names that directory, and the tool also resolves Ajv from the working directory when it is already available there.
+Passing `--skip-schema-validation` runs the dependency-free subset and says so in its output.
+
+The extension validator's self-tests, including the extension-point containment rules in section 5, run with:
+
+```sh
+node tools/check-type-map-extension.mjs --self-test
 ```
 
 An issuer extension can be checked against its exact parent with:

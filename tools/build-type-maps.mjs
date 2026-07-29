@@ -462,7 +462,7 @@ function classifyNode(store, node) {
     };
   }
 
-  const hasCombinator = ["allOf", "anyOf", "oneOf"].some((keyword) =>
+  const hasCombinator = ["anyOf", "oneOf"].some((keyword) =>
     Array.isArray(node[keyword]),
   );
   if (
@@ -486,29 +486,26 @@ function compileAutomaton(store, rootNode) {
   const close = (input) => {
     const stack = [...input];
     const closed = new Map();
+    const expanded = new Set();
     while (stack.length > 0) {
       const node = stack.pop();
       if (node === null || typeof node !== "object" || Array.isArray(node)) {
         continue;
       }
+      const { absolute, pointer } = store.location(node);
+      const identity = store.relativeSource(absolute, pointer);
+      if (expanded.has(identity)) {
+        continue;
+      }
+      expanded.add(identity);
       if (typeof node.$ref === "string") {
         stack.push(store.resolveRef(node, node.$ref));
         continue;
       }
       if (Array.isArray(node.allOf)) {
-        throw new Error(
-          `${store.relativeSource(
-            store.location(node).absolute,
-            store.location(node).pointer,
-          )}: allOf requires intersection-aware compilation`,
-        );
+        throw new Error(`${identity}: allOf requires intersection-aware compilation`);
       }
-      const { absolute, pointer } = store.location(node);
-      const identity = store.relativeSource(absolute, pointer);
-      if (closed.has(identity)) {
-        continue;
-      }
-      const combinators = ["allOf", "anyOf", "oneOf"].filter((keyword) =>
+      const combinators = ["anyOf", "oneOf"].filter((keyword) =>
         Array.isArray(node[keyword]),
       );
       const hasDirectConstraint =
@@ -524,9 +521,7 @@ function compileAutomaton(store, rootNode) {
         closed.set(identity, node);
       }
       for (const keyword of combinators) {
-        if (Array.isArray(node[keyword])) {
-          stack.push(...node[keyword]);
-        }
+        stack.push(...node[keyword]);
       }
     }
     return [...closed.entries()].sort(([left], [right]) => compareUtf8(left, right));
@@ -671,25 +666,32 @@ function compileAutomaton(store, rootNode) {
     }
 
     const propertyNodes = objectSchemas;
-    const propertyNames = [
-      ...new Set(
-        propertyNodes.flatMap(([, node]) =>
-          node.properties && typeof node.properties === "object"
-            ? Object.keys(node.properties)
-            : [],
-        ),
-      ),
-    ].sort(compareUtf8);
-    const keys = propertyNames.map((key) => {
-      const next = close(
-        propertyNodes.flatMap(([, node]) =>
-          node.properties && Object.hasOwn(node.properties, key)
-            ? [node.properties[key]]
-            : [],
-        ),
-      );
-      return { key, to: intern(next) };
-    });
+    const keyGroups = new Map();
+    for (const [, node] of propertyNodes) {
+      if (!node.properties || typeof node.properties !== "object") {
+        continue;
+      }
+      for (const propertyName of Object.keys(node.properties)) {
+        const key = propertyName.normalize("NFC");
+        if (!keyGroups.has(key)) {
+          keyGroups.set(key, { propertyNames: new Set(), nodes: [] });
+        }
+        const group = keyGroups.get(key);
+        group.propertyNames.add(propertyName);
+        group.nodes.push(node.properties[propertyName]);
+      }
+    }
+    const keys = [...keyGroups.entries()]
+      .sort(([left], [right]) => compareUtf8(left, right))
+      .map(([key, group]) => {
+        if (group.propertyNames.size > 1) {
+          throw new Error(
+            `state s${index} merges distinct property names that share the NFC key ` +
+              `${JSON.stringify(key)}`,
+          );
+        }
+        return { key, to: intern(close(group.nodes)) };
+      });
 
     const itemNodes = explicitArrays
       .filter(([, node]) => node.items && typeof node.items === "object")

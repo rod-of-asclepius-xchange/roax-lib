@@ -1,14 +1,24 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { createRequire } from "node:module";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ID_DOMAIN = Buffer.from("ROAX-TYPE-MAP/1\0", "utf8");
+import {
+  artifactBytes,
+  artifactId,
+  parseArtifactBytes,
+  testFixtures,
+  validateArtifact,
+} from "./check-type-map-extension.mjs";
+
 const REFERENCE_COMMIT = "09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa";
 const REFERENCE_REPOSITORY = "https://github.com/Open-Attestation/schemata.git";
-const outputRoot = resolve(process.argv[2] ?? "type-maps");
+const SOURCE_PREFIX = "references/schemata/src/";
+const toolDirectory = dirname(fileURLToPath(import.meta.url));
+const repositoryRoot = resolve(toolDirectory, "..");
 const EXPECTED_UNTYPED_OBJECT_SOURCE_NODES = new Map([
   ["hl7.fhir.bundle", 659],
   ["sg.gov.moh.pdt-healthcert", 65],
@@ -16,138 +26,124 @@ const EXPECTED_UNTYPED_OBJECT_SOURCE_NODES = new Map([
   ["sg.gov.moh.vaccination-healthcert", 33],
 ]);
 
-function compareUtf8(left, right) {
-  return Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8"));
+const USAGE =
+  "Usage: node tools/check-type-maps.mjs [type-map-directory] [--skip-schema-validation]\n";
+
+function parseArgs(argv) {
+  const args = { out: undefined, schemaValidation: true };
+  for (const arg of argv) {
+    if (arg === "--skip-schema-validation") {
+      args.schemaValidation = false;
+    } else if (arg === "--help") {
+      process.stdout.write(USAGE);
+      process.exit(0);
+    } else if (arg.startsWith("--") || args.out !== undefined) {
+      throw new Error(`unknown argument: ${arg}\n${USAGE}`);
+    } else {
+      args.out = arg;
+    }
+  }
+  return {
+    outputRoot: resolve(args.out ?? join(repositoryRoot, "type-maps")),
+    schemaValidation: args.schemaValidation,
+  };
 }
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
-function artifactId(bytes) {
-  return `sha256:${createHash("sha256").update(ID_DOMAIN).update(bytes).digest("hex")}`;
-}
-
-function stateIndex(artifact) {
-  const index = new Map();
-  for (const state of artifact.automaton.states) {
-    assert(!index.has(state.id), `${artifact.recordType}: duplicate state ${state.id}`);
-    index.set(state.id, state);
+function loadSchemaValidators() {
+  const bases = [];
+  if (process.env.ROAX_AJV) {
+    bases.push(resolve(process.env.ROAX_AJV));
   }
-  assert(index.has(artifact.automaton.start), `${artifact.recordType}: missing start state`);
-  return index;
+  bases.push(process.cwd(), toolDirectory);
+  const failures = [];
+  for (const base of bases) {
+    let compile;
+    try {
+      const require = createRequire(join(base, "roax-schema-resolution.cjs"));
+      const ajvModule = require("ajv/dist/2020.js");
+      const formatsModule = require("ajv-formats");
+      const Ajv2020 = ajvModule.default ?? ajvModule;
+      const addFormats = formatsModule.default ?? formatsModule;
+      const ajv = new Ajv2020({ strict: true });
+      addFormats(ajv);
+      compile = (name) => ajv.compile(readJson(join(repositoryRoot, "schemas", name)));
+    } catch (error) {
+      failures.push(`  ${base}: ${error.message.split("\n")[0]}`);
+      continue;
+    }
+    return {
+      base,
+      artifact: compile("type-map-artifact-1.0.json"),
+      registry: compile("type-map-registry-1.0.json"),
+    };
+  }
+  throw new Error(
+    "ajv 8 and ajv-formats are required to validate the artifacts against their JSON Schemas.\n" +
+      "Install them outside this tree and name that directory with ROAX_AJV:\n" +
+      "  npm install --prefix /tmp/roax-ajv ajv ajv-formats\n" +
+      "  ROAX_AJV=/tmp/roax-ajv node tools/check-type-maps.mjs\n" +
+      "Pass --skip-schema-validation to run only the dependency-free carrier and binding checks.\n" +
+      `Resolution attempts:\n${failures.join("\n")}`,
+  );
 }
 
-function validateAutomaton(artifact) {
-  const states = stateIndex(artifact);
-  assert.equal(artifact.format, "ROAX-TYPE-MAP/1");
-  assert.equal(artifact.automaton.representation, "structured-path-dfa/1");
-  assert.equal(artifact.automaton.start, "s0");
-  assert.deepEqual(artifact.scope, { kind: "profile" });
-  assert.equal(artifact.parentTypeMapId, undefined);
-  assert.deepEqual(artifact.addedSelectors, []);
-  assert.equal(artifact.coverage.states, states.size);
+function expectSchemaValid(validate, instance, label) {
+  assert(
+    validate(instance),
+    `${label}: ${JSON.stringify(validate.errors?.slice(0, 3) ?? [])}`,
+  );
+}
 
+function expectSchemaInvalid(validate, instance, label) {
+  assert(!validate(instance), `${label}: the schema accepted an instance it must reject`);
+}
+
+function validateConditionalCarrierRules(schemas, parent, child) {
+  expectSchemaValid(schemas.artifact, parent, "base artifact fixture");
+  expectSchemaValid(schemas.artifact, child, "child artifact fixture");
+
+  const profileScopedChild = structuredClone(child);
+  profileScopedChild.scope = { kind: "profile" };
+  expectSchemaInvalid(schemas.artifact, profileScopedChild, "child artifact with profile scope");
+
+  const emptyChild = structuredClone(child);
+  emptyChild.addedSelectors = [];
+  expectSchemaInvalid(schemas.artifact, emptyChild, "child artifact with no added selector");
+
+  const issuerScopedBase = structuredClone(parent);
+  issuerScopedBase.scope = { kind: "issuers", issuerIds: ["did:example:issuer"] };
+  expectSchemaInvalid(schemas.artifact, issuerScopedBase, "base artifact with issuer scope");
+
+  const extendingBase = structuredClone(parent);
+  extendingBase.addedSelectors = structuredClone(child.addedSelectors);
+  expectSchemaInvalid(schemas.artifact, extendingBase, "base artifact with an added selector");
+}
+
+function validateProvenance(artifact) {
   const sourceIds = new Set();
   for (const source of artifact.sourceSchemas) {
     assert(!sourceIds.has(source.sourceId), `${artifact.recordType}: duplicate sourceId`);
     sourceIds.add(source.sourceId);
-    assert(source.sourceId.startsWith("references/schemata/src/"));
+    assert(source.sourceId.startsWith(SOURCE_PREFIX));
     assert.equal(source.kind, "git");
     assert.equal(source.repositoryUri, REFERENCE_REPOSITORY);
     assert(source.path.startsWith("src/"));
-    assert(!source.path.startsWith("/"));
-    assert(!source.path.split("/").includes(".."));
     assert.equal(source.sourceId, `references/schemata/${source.path}`);
     assert.equal(source.commit, REFERENCE_COMMIT);
   }
-  for (const point of artifact.extensionPoints) {
-    let state = states.get(artifact.automaton.start);
-    for (const segment of point.prefix) {
-      if (segment.key !== undefined) {
-        assert.equal(segment.key, segment.key.normalize("NFC"));
-        const next = state.keys?.find(({ key }) => key === segment.key)?.to;
-        assert(next !== undefined, `${artifact.recordType}: invalid extension-point KEY`);
-        state = states.get(next);
-      } else {
-        assert(state.anyIndex !== undefined, `${artifact.recordType}: invalid extension-point INDEX`);
-        state = states.get(state.anyIndex);
-      }
-    }
-  }
-
-  const reached = new Set([artifact.automaton.start]);
-  const queue = [artifact.automaton.start];
-  const totals = {
-    keyTransitions: 0,
-    indexTransitions: 0,
-    resolvedOutputs: 0,
-    unresolvedOutputStates: 0,
-    structurallyUntypedObjectStates: 0,
-  };
-  for (const [position, state] of artifact.automaton.states.entries()) {
-    assert.equal(state.id, `s${position}`, `${artifact.recordType}: non-canonical state order`);
-    const keys = new Set();
-    const keyOrder = (state.keys ?? []).map(({ key }) => key);
-    assert.deepEqual(keyOrder, [...keyOrder].sort(compareUtf8));
-    for (const transition of state.keys ?? []) {
-      assert.equal(transition.key, transition.key.normalize("NFC"));
-      assert(!keys.has(transition.key), `${state.id}: duplicate KEY transition`);
-      keys.add(transition.key);
-      assert(states.has(transition.to), `${state.id}: dangling KEY transition`);
-      totals.keyTransitions += 1;
-    }
-    if (state.anyIndex !== undefined) {
-      assert(states.has(state.anyIndex), `${state.id}: dangling INDEX transition`);
-      totals.indexTransitions += 1;
-    }
-    const kinds = new Set();
+  for (const state of artifact.automaton.states) {
     for (const binding of state.bindings ?? []) {
-      assert(!kinds.has(binding.jsonKind), `${state.id}: duplicate output kind`);
-      kinds.add(binding.jsonKind);
-      assert.notEqual(binding.tag, 8, `${state.id}: version-1 base map emits BLOB_REF`);
-      totals.resolvedOutputs += 1;
       for (const source of binding.sources) {
-        assert(source.startsWith("references/schemata/src/"));
         assert(
-          sourceIds.has(source.split("#", 1)[0]),
-          `${artifact.recordType}: binding cites an unknown sourceId`,
+          source.startsWith(SOURCE_PREFIX),
+          `${artifact.recordType}: binding cites a source outside the pinned checkout`,
         );
       }
     }
-    if (state.unresolved !== undefined) {
-      totals.unresolvedOutputStates += 1;
-      for (const row of state.unresolved) {
-        for (const source of row.sources) {
-          assert(
-            sourceIds.has(source.split("#", 1)[0]),
-            `${artifact.recordType}: unresolved row cites an unknown sourceId`,
-          );
-        }
-        for (const kind of row.jsonKinds) {
-          assert(!kinds.has(kind), `${state.id}: operative and unresolved output overlap`);
-        }
-      }
-    }
-    if (state.structurallyUntypedObject === true) {
-      totals.structurallyUntypedObjectStates += 1;
-    }
-  }
-  while (queue.length > 0) {
-    const state = states.get(queue.shift());
-    for (const next of [
-      ...(state.keys ?? []).map(({ to }) => to),
-      ...(state.anyIndex === undefined ? [] : [state.anyIndex]),
-    ]) {
-      if (!reached.has(next)) {
-        reached.add(next);
-        queue.push(next);
-      }
-    }
-  }
-  assert.equal(reached.size, states.size, `${artifact.recordType}: unreachable DFA state`);
-  for (const [field, total] of Object.entries(totals)) {
-    assert.equal(artifact.coverage[field], total, `${artifact.recordType}: stale ${field}`);
   }
   assert.equal(
     artifact.coverage.structurallyUntypedObjectSourceNodes,
@@ -157,7 +153,7 @@ function validateAutomaton(artifact) {
 }
 
 function resolveBinding(artifact, segments, jsonKind) {
-  const states = stateIndex(artifact);
+  const states = new Map(artifact.automaton.states.map((state) => [state.id, state]));
   let state = states.get(artifact.automaton.start);
   for (const segment of segments) {
     const next =
@@ -188,70 +184,110 @@ function expectUnbound(artifact, segments, jsonKind) {
   );
 }
 
-const registry = readJson(join(outputRoot, "registry-1.0.0.json"));
-assert.equal(registry.maps.length, 4, "registry must contain exactly four base maps");
-const artifacts = new Map();
-for (const row of registry.maps) {
-  const path = join(outputRoot, basename(row.path));
-  const bytes = readFileSync(path);
-  assert.equal(artifactId(bytes), row.id, `${row.recordType}: incorrect content ID`);
-  const artifact = JSON.parse(bytes);
-  assert.equal(artifact.recordType, row.recordType);
-  assert.equal(artifact.schemaVersion, row.schemaVersion);
-  assert.equal(artifact.typeMapVersion, row.typeMapVersion);
-  assert.deepEqual(artifact.scope, row.scope);
-  validateAutomaton(artifact);
-  artifacts.set(row.recordType, artifact);
+function validateBindings(artifacts) {
+  const fhir = artifacts.get("hl7.fhir.bundle");
+  expectTag(fhir, ["resourceType"], "string", 2);
+  expectTag(fhir, ["multipleBirthInteger"], "number", 3);
+  expectTag(fhir, ["valueQuantity", "value"], "number", 4);
+  expectTag(fhir, ["extension", 0, "extension", 1, "valueDecimal"], "number", 4);
+  expectUnbound(fhir, ["text", "div"], "string");
+  expectUnbound(fhir, ["data"], "string");
+  expectUnbound(fhir, ["notInSchema"], "string");
+
+  const pdt = artifacts.get("sg.gov.moh.pdt-healthcert");
+  expectTag(pdt, ["id"], "string", 2);
+  expectTag(pdt, ["type", 0], "string", 2);
+  expectUnbound(pdt, ["type"], "array");
+  expectTag(
+    pdt,
+    ["fhirBundle", "entry", 0, "resource", "valueQuantity", "value"],
+    "number",
+    4,
+  );
+  expectUnbound(pdt, ["$template", "name"], "string");
+  expectUnbound(pdt, ["notarisationMetadata", "reference"], "string");
+  expectUnbound(pdt, ["issuerAddedEmptyArray"], "array");
+  expectUnbound(pdt, ["issuerAddedEmptyObject"], "object");
+
+  const recovery = artifacts.get("sg.gov.moh.recovery-healthcert");
+  expectTag(recovery, ["validUntil"], "string", 2);
+  expectUnbound(recovery, ["type", 0], "string");
+  expectUnbound(recovery, ["issuerAdded"], "string");
+
+  const vaccination = artifacts.get("sg.gov.moh.vaccination-healthcert");
+  expectTag(vaccination, ["attachments"], "array", 6);
+  expectTag(vaccination, ["attachments", 0], "object", 7);
+  expectTag(vaccination, ["fhirBundle", "entry", 0, "birthDate"], "string", 2);
+  expectUnbound(
+    vaccination,
+    ["fhirBundle", "entry", 0, "resource", "birthDate"],
+    "string",
+  );
+  expectUnbound(
+    vaccination,
+    ["notarisationMetadata", "signedEuHealthCerts", 0, "dose"],
+    "number",
+  );
+  expectUnbound(
+    vaccination,
+    ["notarisationMetadata", "signedEuHealthCerts", 0, "expiryDateTime"],
+    "string",
+  );
+  expectUnbound(vaccination, ["notarisationMetadata", "issuerAdded"], "string");
 }
 
-const fhir = artifacts.get("hl7.fhir.bundle");
-expectTag(fhir, ["resourceType"], "string", 2);
-expectTag(fhir, ["multipleBirthInteger"], "number", 3);
-expectTag(fhir, ["valueQuantity", "value"], "number", 4);
-expectTag(fhir, ["extension", 0, "extension", 1, "valueDecimal"], "number", 4);
-expectUnbound(fhir, ["text", "div"], "string");
-expectUnbound(fhir, ["data"], "string");
-expectUnbound(fhir, ["notInSchema"], "string");
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const schemas = args.schemaValidation ? loadSchemaValidators() : undefined;
 
-const pdt = artifacts.get("sg.gov.moh.pdt-healthcert");
-expectTag(pdt, ["id"], "string", 2);
-expectTag(pdt, ["type", 0], "string", 2);
-expectUnbound(pdt, ["type"], "array");
-expectTag(
-  pdt,
-  ["fhirBundle", "entry", 0, "resource", "valueQuantity", "value"],
-  "number",
-  4,
-);
-expectUnbound(pdt, ["$template", "name"], "string");
-expectUnbound(pdt, ["notarisationMetadata", "reference"], "string");
-expectUnbound(pdt, ["issuerAddedEmptyArray"], "array");
-expectUnbound(pdt, ["issuerAddedEmptyObject"], "object");
+  const fixtures = testFixtures();
+  assert.equal(
+    fixtures.child.parentTypeMapId,
+    artifactId(artifactBytes(fixtures.parent)),
+    "the extension fixture does not identify its own parent bytes",
+  );
 
-const recovery = artifacts.get("sg.gov.moh.recovery-healthcert");
-expectTag(recovery, ["validUntil"], "string", 2);
-expectUnbound(recovery, ["type", 0], "string");
-expectUnbound(recovery, ["issuerAdded"], "string");
+  const registryPath = join(args.outputRoot, "registry-1.0.0.json");
+  const registry = readJson(registryPath);
+  assert.equal(registry.maps.length, 4, "registry must contain exactly four base maps");
+  if (schemas !== undefined) {
+    expectSchemaValid(schemas.registry, registry, registryPath);
+    validateConditionalCarrierRules(schemas, fixtures.parent, fixtures.child);
+  }
 
-const vaccination = artifacts.get("sg.gov.moh.vaccination-healthcert");
-expectTag(vaccination, ["attachments"], "array", 6);
-expectTag(vaccination, ["attachments", 0], "object", 7);
-expectTag(vaccination, ["fhirBundle", "entry", 0, "birthDate"], "string", 2);
-expectUnbound(
-  vaccination,
-  ["fhirBundle", "entry", 0, "resource", "birthDate"],
-  "string",
-);
-expectUnbound(
-  vaccination,
-  ["notarisationMetadata", "signedEuHealthCerts", 0, "dose"],
-  "number",
-);
-expectUnbound(
-  vaccination,
-  ["notarisationMetadata", "signedEuHealthCerts", 0, "expiryDateTime"],
-  "string",
-);
-expectUnbound(vaccination, ["notarisationMetadata", "issuerAdded"], "string");
+  const artifacts = new Map();
+  for (const row of registry.maps) {
+    const path = join(args.outputRoot, basename(row.path));
+    const bytes = readFileSync(path);
+    assert.equal(artifactId(bytes), row.id, `${row.recordType}: incorrect content ID`);
+    const artifact = parseArtifactBytes(bytes, path);
+    assert.equal(artifact.recordType, row.recordType);
+    assert.equal(artifact.schemaVersion, row.schemaVersion);
+    assert.equal(artifact.typeMapVersion, row.typeMapVersion);
+    assert.deepEqual(artifact.scope, row.scope);
+    assert.equal(
+      artifact.parentTypeMapId,
+      undefined,
+      `${row.recordType}: a published base map must not name a parent`,
+    );
+    if (schemas !== undefined) {
+      expectSchemaValid(schemas.artifact, artifact, path);
+    }
+    validateArtifact(artifact, row.recordType);
+    validateProvenance(artifact);
+    artifacts.set(row.recordType, artifact);
+  }
 
-process.stdout.write(`validated ${artifacts.size} type-map artifacts\n`);
+  validateBindings(artifacts);
+  process.stdout.write(
+    `validated ${artifacts.size} type-map artifacts and the registry` +
+      `${schemas === undefined ? " without JSON Schema validation" : ""}\n`,
+  );
+}
+
+try {
+  main();
+} catch (error) {
+  process.stderr.write(`${error.message}\n`);
+  process.exitCode = 1;
+}

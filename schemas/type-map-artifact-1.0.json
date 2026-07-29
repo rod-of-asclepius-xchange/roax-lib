@@ -82,7 +82,7 @@
       }
     },
     "extensionPoints": {
-      "description": "Non-operative declaration of structured path regions where an issuer may propose exact selectors that have no inherited output for the observed kind. A prefix never supplies a fallback tag and never permits overriding an inherited output.",
+      "description": "Non-operative declaration of structured path regions where an issuer may propose exact selectors that have no inherited output for the observed kind. A prefix never supplies a fallback tag, never permits overriding an inherited output, and never reaches a descendant of a path the parent already declares. See docs/type-maps.md section 5.",
       "type": "array",
       "items": {
         "$ref": "#/$defs/extensionPoint"
@@ -235,6 +235,7 @@
           "additionalProperties": false,
           "properties": {
             "key": {
+              "description": "Structured KEY segment. It carries the literal key and MUST already be NFC-normalized under the pinned Unicode version, which this carrier schema cannot express and an artifact validator therefore enforces.",
               "type": "string"
             }
           }
@@ -257,7 +258,7 @@
       "additionalProperties": false,
       "properties": {
         "prefix": {
-          "description": "Structured prefix of the region in which an exact child selector may be added. The selector may introduce an unknown-key subtree or fill a previously unresolved observed-kind output, but complete profile validation still applies.",
+          "description": "Structured prefix of the region in which an exact child selector may be added. The selector either extends the prefix with a segment the parent does not declare at that state, and may then descend inside that otherwise untyped subtree, or names a direct child of the prefix that the parent declares but leaves unresolved for the observed kind. Complete profile validation still applies. An extension validator enforces both shapes.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/segmentPattern"
@@ -324,6 +325,7 @@
       "additionalProperties": false,
       "properties": {
         "key": {
+          "description": "Transition key. It MUST already be NFC-normalized under the pinned Unicode version, which this carrier schema cannot express and an artifact validator therefore enforces.",
           "type": "string"
         },
         "to": {

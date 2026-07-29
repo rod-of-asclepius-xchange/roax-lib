@@ -2,6 +2,8 @@
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual, TextDecoder } from "node:util";
 
 const ID_DOMAIN = Buffer.from("ROAX-TYPE-MAP/1\0", "utf8");
@@ -718,6 +720,36 @@ function resolveState(states, segments) {
   return state;
 }
 
+function extensionPointAdmits(point, selector, parentStates) {
+  const prefix = point.prefix;
+  if (!startsWithSegments(selector.segments, prefix)) {
+    return false;
+  }
+  if (selector.segments.length === prefix.length) {
+    return false;
+  }
+  const prefixState = resolveState(parentStates, prefix);
+  if (prefixState === undefined) {
+    return false;
+  }
+  const inherited = transitionMap(prefixState).get(
+    segmentToken(selector.segments[prefix.length]),
+  );
+  if (inherited === undefined) {
+    return true;
+  }
+  if (selector.segments.length !== prefix.length + 1) {
+    return false;
+  }
+  const targetState = parentStates.get(inherited);
+  if (targetState === undefined || bindingMap(targetState).has(selector.jsonKind)) {
+    return false;
+  }
+  return (targetState.unresolved ?? []).some((row) =>
+    row.jsonKinds.includes(selector.jsonKind),
+  );
+}
+
 function validateExtensionPoints(artifact, states, label) {
   ensure(Array.isArray(artifact.extensionPoints), `${label}: extensionPoints must be an array`);
   const seen = new Set();
@@ -1052,9 +1084,11 @@ function validateExtension(parent, parentBytes, child) {
   for (const selector of childValidated.selectors.values()) {
     ensure(
       parent.extensionPoints.some((point) =>
-        startsWithSegments(selector.segments, point.prefix),
+        extensionPointAdmits(point, selector, parentValidated.states),
       ),
-      `child: addedSelector ${renderSegments(selector.segments)} lies outside every parent extensionPoint`,
+      `child: addedSelector ${renderSegments(selector.segments)} lies outside every parent extensionPoint; ` +
+        "an added selector must introduce a segment the parent does not declare at the prefix, " +
+        "or name a direct child of the prefix that the parent leaves unresolved for the observed kind",
     );
     const parentState = resolveState(parentValidated.states, selector.segments);
     const parentBinding = parentState === undefined
@@ -1134,6 +1168,11 @@ function testFixtures() {
     basis: ["schema-type"],
     sources: ["base#/properties/known"],
   };
+  const inheritedUnresolved = {
+    jsonKinds: ["number"],
+    reason: "The base schema does not choose one numeric ROAX tag.",
+    sources: ["base#/properties/known"],
+  };
   const parent = {
     format: "ROAX-TYPE-MAP/1",
     typeMapVersion: "1.0.0",
@@ -1152,6 +1191,7 @@ function testFixtures() {
         {
           id: "s1",
           bindings: [inheritedBinding],
+          unresolved: [inheritedUnresolved],
           structurallyUntypedObject: true,
         },
       ],
@@ -1243,6 +1283,20 @@ function expectReject(name, pattern, mutate, beforeParentId) {
     return;
   }
   fail(`self-test ${name}: invalid extension was accepted`);
+}
+
+function expectAccept(name, mutate, beforeParentId) {
+  const fixtures = testFixtures();
+  if (beforeParentId !== undefined) {
+    beforeParentId(fixtures.parent, fixtures.child);
+  }
+  fixtures.child.parentTypeMapId = artifactId(artifactBytes(fixtures.parent));
+  mutate(fixtures.parent, fixtures.child);
+  try {
+    validateExtension(fixtures.parent, artifactBytes(fixtures.parent), fixtures.child);
+  } catch (error) {
+    fail(`self-test ${name}: valid extension was rejected: ${error.message}`);
+  }
 }
 
 function expectParseReject(name, bytes, pattern) {
@@ -1379,6 +1433,75 @@ function selfTest() {
     },
   );
   expectReject(
+    "descendant of a declared path",
+    /outside every parent extensionPoint/,
+    (parent, child) => {
+      child.addedSelectors = [
+        {
+          segments: [{ key: "known" }, { key: "extra" }],
+          jsonKind: "string",
+          tag: 2,
+          evidence: ["supplement"],
+        },
+      ];
+      child.automaton.states = [
+        { id: "s0", keys: [{ key: "known", to: "s1" }] },
+        {
+          id: "s1",
+          keys: [{ key: "extra", to: "s2" }],
+          bindings: structuredClone(parent.automaton.states[1].bindings),
+          unresolved: structuredClone(parent.automaton.states[1].unresolved),
+          structurallyUntypedObject: true,
+        },
+        {
+          id: "s2",
+          bindings: [
+            {
+              jsonKind: "string",
+              tag: 2,
+              basis: ["profile-ruling"],
+              sources: ["supplement#/properties/extra"],
+            },
+          ],
+        },
+      ];
+      refreshCoverage(child);
+      child.coverage.structurallyUntypedObjectSourceNodes = 1;
+    },
+  );
+  expectReject(
+    "declared child with no unresolved output",
+    /outside every parent extensionPoint/,
+    () => {},
+    (parent) => {
+      delete parent.automaton.states[1].unresolved;
+      refreshCoverage(parent);
+      parent.coverage.structurallyUntypedObjectSourceNodes = 1;
+    },
+  );
+  expectAccept("undeclared subtree descendant", (_parent, child) => {
+    child.addedSelectors[0] = {
+      segments: [{ key: "extra" }, { key: "deep" }],
+      jsonKind: "string",
+      tag: 2,
+      evidence: ["supplement"],
+    };
+    child.automaton.states[1] = { id: "s1", keys: [{ key: "deep", to: "s3" }] };
+    child.automaton.states.push({
+      id: "s3",
+      bindings: [
+        {
+          jsonKind: "string",
+          tag: 2,
+          basis: ["profile-ruling"],
+          sources: ["supplement#/properties/extra/properties/deep"],
+        },
+      ],
+    });
+    refreshCoverage(child);
+    child.coverage.structurallyUntypedObjectSourceNodes = 1;
+  });
+  expectReject(
     "BLOB_REF",
     /BLOB_REF tag 8/,
     (_parent, child) => {
@@ -1475,9 +1598,17 @@ function main() {
   );
 }
 
-try {
-  main();
-} catch (error) {
-  process.stderr.write(`${error.message}\n`);
-  process.exitCode = 1;
+export { artifactBytes, artifactId, parseArtifactBytes, testFixtures, validateArtifact };
+
+const invokedDirectly =
+  process.argv[1] !== undefined &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (invokedDirectly) {
+  try {
+    main();
+  } catch (error) {
+    process.stderr.write(`${error.message}\n`);
+    process.exitCode = 1;
+  }
 }

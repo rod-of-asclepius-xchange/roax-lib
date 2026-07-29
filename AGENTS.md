@@ -58,6 +58,24 @@ These are the things a future agent is most likely to get wrong.
   Every selector must cite an immutable supplemental source, and its materialized binding must cite
   every evidence source by `sourceId`.
   Publication review still retrieves each source and verifies its commit or content digest.
+  Its `--self-test` mode covers those rejections without any external artifact.
+
+- **An extension point does not open the whole subtree beneath it.** A `prefix` admits only two
+  selector shapes: a segment the base map does not declare at that prefix state, and then anything
+  below that untyped subtree; or a direct child of the prefix that the base map declares but leaves
+  unresolved for the observed kind, such as vaccination `dose`. So the PDT and recovery empty root
+  prefixes reach undeclared root properties, not the shared lite FHIR Bundle, and no issuer can
+  privately bind `base64Binary` or `Narrative.div`. Rebinding a declared path is a base-map
+  revision. See `docs/type-maps.md` section 5.
+
+- **`tools/check-type-maps.mjs` is the only checker that runs against the committed tree.**
+  `build-type-maps.mjs --check` needs the gitignored reference checkout; this one does not.
+  It recomputes the content IDs, validates the four artifacts and the registry against their JSON
+  Schemas, exercises both branches of the artifact schema's `parentTypeMapId` conditional in both
+  directions, reuses `validateArtifact` from the extension checker rather than re-encoding the
+  carrier rules, and pins a set of operative and fail-closed bindings.
+  It needs Ajv 8 and `ajv-formats` installed outside the tree and named by `ROAX_AJV`;
+  `--skip-schema-validation` runs the dependency-free subset. See `docs/type-maps.md` section 6.
 
 - **The FHIR schemata use object keywords without declaring object type.**
   The full schema has 659 reached object-applicator source nodes with no `type: "object"`, and the
@@ -73,24 +91,14 @@ These are the things a future agent is most likely to get wrong.
   empty is admitted need combinator-aware evaluation, so `tools/build-type-maps.mjs` fails instead
   of publishing a guessed EMPTY_OBJECT or omitting a valid EMPTY_ARRAY.
 
-  `corpus/tools/build_type_maps.py` now derives one per healthcert family from the reference
-  schemas, and what it found is the sharpest open item in the project:
-
-  - **recovery** binds completely, 50 of 50 `(pattern, jsonKind)` pairs.
-  - **vaccination** leaves two unbound. `signedEuHealthCerts[*].dose` is declared `"type": "number"`
-    with no pattern, and ROAX has *two* numeric tags, so JSON Schema `number` chooses neither. FHIR
-    itself distinguishes `integer` from `decimal` by **pattern**, both being `"type": "number"`;
-    the notarise schema carries no pattern. `expiryDateTime` is declared with a `format` and
-    `examples` and **no `type` at all**.
-  - **PDT** leaves twenty unbound. Its root object declares seven members and does not close
-    itself, so `$template`, `attachments`, `issuers` and `notarisationMetadata` - all four in its
-    own shipped sample - are permitted and undeclared.
-
-  **Under the fail-closed rule of specification section 4.2, that makes two of the three real MOH
-  samples uncommittable today.** Binding them needs a ruling, not a resolver improvement, and the
-  ruling must land in `docs/decisions.md` and the type map together. Do NOT quietly bind `number`
-  to a tag to make class 10 green: `docs/conformance-corpus.md` section 1.2 exists because that
-  kind of fix decides an open question from inside a data file.
+- **Do not make the object branch throw on disagreement to match the array branch.** It was tried
+  and measured: the symmetric throw fires on 34 states of the pinned checkout (30 full FHIR, 2 PDT,
+  2 recovery) and leaves all four published artifacts unbuildable. The condition it detects is also
+  the wrong one. When one branch permits `{}` and another requires a member, `{}` validates under
+  `anyOf` and satisfies exactly one branch under `oneOf`, so the permissive union is correct there.
+  The genuinely `oneOf`-unsound case is the opposite: two or more branches that all permit `{}`.
+  Detecting that needs combinator-aware evaluation, which the closure has discarded by then, so it
+  is an open ruling for the project owner rather than a mechanical fix.
 
 - **Numbers are never parsed through a float.** Anywhere. This is the whole point of the design;
   see `docs/decisions.md` part 0. In test vectors and JSON Schemas, INTEGER and DECIMAL values are
@@ -127,6 +135,15 @@ These are the things a future agent is most likely to get wrong.
   and `unicodeVersion` are matched for equality, never parsed or ordered (spec section 12.1). No
   dotted-numeric pattern accepts even FHIR's own 22 `fhirVersion` values. ROAX's own artifacts,
   `corpusVersion` and `typeMapVersion`, keep semver. Do not harmonize the two groups.
+
+- **An unresolved path is bound by a ruling, not by a resolver improvement.**
+  Under the fail-closed rule of specification section 4.2, two of the three real MOH samples are uncommittable today.
+  Vaccination is blocked on `dose`, declared `"type": "number"` where ROAX has two numeric tags, and on `expiryDateTime`, declared with a `format` and examples and no `type` at all (`docs/type-maps.md` section 1.1).
+  PDT is blocked on the 20 endorsed-sample `(pattern, kind)` pairs its open root leaves undeclared (`docs/type-maps.md` section 1.2).
+  Recovery is the one whose sample commits, which is why class 10 has a vector for it alone (`corpus/README.md`), and that is a statement about the sample rather than about full coverage: the recovery base map carries the same five unresolved lite-FHIR slots as PDT (`docs/type-maps.md` sections 1.3 and 2.2).
+  A ruling lands in `docs/decisions.md` and the type map together.
+  Do NOT quietly bind `number` to a tag to make class 10 green: `docs/conformance-corpus.md` section 1.2 exists because that kind of fix decides an open question from inside a data file.
+  Note the tool split when citing any of this: `corpus/tools/build_type_maps.py` is corpus-side and writes the vectors' maps, while the published `type-maps/` artifacts come from `tools/build-type-maps.mjs`.
 
 - **The corpus may not require what the design has not decided.** A required corpus field that
   presumes one side of an open decision silently rules it (`docs/conformance-corpus.md` section
