@@ -1,0 +1,582 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://roax.example/schemas/type-map-artifact/1.0/schema.json",
+  "title": "ROAX type-map artifact format 1",
+  "description": "Schema for immutable ROAX type-map artifacts. The operative map is a structured-path DFA, so literal dotted keys are never confused with nested keys and display paths are never parsed. Unknown transitions and unknown outputs fail closed. See docs/type-maps.md.",
+  "type": "object",
+  "required": [
+    "format",
+    "typeMapVersion",
+    "recordType",
+    "schemaVersion",
+    "scope",
+    "sourceSchemas",
+    "extensionPoints",
+    "addedSelectors",
+    "coverage",
+    "automaton"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "ROAX-TYPE-MAP/1"
+    },
+    "typeMapVersion": {
+      "description": "ROAX-owned three-part semver. It is metadata and is never used for latest-version lookup.",
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "recordType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "description": "Opaque profile-owned identifier. It is matched only for exact equality.",
+      "type": "string",
+      "minLength": 1
+    },
+    "parentTypeMapId": {
+      "description": "Exact immutable parent ID for an additive issuer extension.",
+      "$ref": "#/$defs/typeMapId"
+    },
+    "scope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "profile"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "issuerIds"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "issuers"
+            },
+            "issuerIds": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sourceSchemas": {
+      "description": "Immutable provenance records for every schema or profile declaration used by the artifact. Each source has a locally unique sourceId that bindings and addedSelectors may reference.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sourceSchema"
+      }
+    },
+    "extensionPoints": {
+      "description": "Non-operative declaration of structured path regions where an issuer may propose exact selectors that have no inherited output for the observed kind. A prefix never supplies a fallback tag, never permits overriding an inherited output, and never reaches a descendant of a path the parent already declares. See docs/type-maps.md section 5.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/extensionPoint"
+      }
+    },
+    "addedSelectors": {
+      "description": "Selectors added by this artifact relative to its parent. Base maps carry an empty array. The automaton remains the complete materialized effective map.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/selectorBinding"
+      }
+    },
+    "coverage": {
+      "$ref": "#/$defs/coverage"
+    },
+    "automaton": {
+      "$ref": "#/$defs/automaton"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["parentTypeMapId"],
+        "properties": {
+          "parentTypeMapId": true
+        }
+      },
+      "then": {
+        "properties": {
+          "scope": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "issuers"
+              }
+            }
+          },
+          "addedSelectors": {
+            "type": "array",
+            "minItems": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "scope": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "profile"
+              }
+            }
+          },
+          "addedSelectors": {
+            "type": "array",
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "typeMapId": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sourceSchema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "sourceId",
+            "kind",
+            "repositoryUri",
+            "path",
+            "commit"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "sourceId": {
+              "$ref": "#/$defs/sourceId"
+            },
+            "kind": {
+              "const": "git"
+            },
+            "repositoryUri": {
+              "description": "Public identity of the Git repository whose commit and relative path identify the source bytes.",
+              "type": "string",
+              "format": "uri"
+            },
+            "path": {
+              "description": "Public repository-relative path. Absolute paths and parent-directory traversal are forbidden.",
+              "type": "string",
+              "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "sourceId",
+            "kind",
+            "uri",
+            "digest"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "sourceId": {
+              "$ref": "#/$defs/sourceId"
+            },
+            "kind": {
+              "const": "content"
+            },
+            "uri": {
+              "description": "Public retrieval location for the source bytes.",
+              "type": "string",
+              "format": "uri"
+            },
+            "digest": {
+              "description": "SHA-256 over the exact retrieved source bytes, with no domain prefix or JSON reserialization.",
+              "$ref": "#/$defs/sha256Digest"
+            }
+          }
+        }
+      ]
+    },
+    "sourceId": {
+      "description": "Artifact-local provenance identifier. It is compared as an exact opaque string.",
+      "type": "string",
+      "pattern": "^[^#]+$"
+    },
+    "sha256Digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sourceReference": {
+      "description": "Reference to one sourceSchemas entry by sourceId, optionally followed by a JSON Pointer fragment. An artifact validator must reject a sourceId that is not present.",
+      "type": "string",
+      "pattern": "^[^#]+(?:#(?:/.*)?)?$"
+    },
+    "segmentPattern": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["key"],
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "description": "Structured KEY segment. It carries the literal key and MUST already be NFC-normalized under the pinned Unicode version, which this carrier schema cannot express and an artifact validator therefore enforces.",
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["anyIndex"],
+          "additionalProperties": false,
+          "properties": {
+            "anyIndex": {
+              "const": true
+            }
+          }
+        }
+      ]
+    },
+    "extensionPoint": {
+      "type": "object",
+      "required": ["prefix", "note"],
+      "additionalProperties": false,
+      "properties": {
+        "prefix": {
+          "description": "Structured prefix of the region in which an exact child selector may be added. The selector either extends the prefix with a segment the parent does not declare at that state, and may then descend inside that otherwise untyped subtree, or names a direct child of the prefix exactly one segment deeper at which the parent has no binding for the observed kind and carries an explicit unresolved row naming that kind. A declared path with neither a binding nor such a row is not extensible. Complete profile validation still applies. An extension validator enforces both shapes.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/segmentPattern"
+          }
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "selectorBinding": {
+      "type": "object",
+      "required": ["segments", "jsonKind", "tag", "evidence"],
+      "additionalProperties": false,
+      "properties": {
+        "segments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/segmentPattern"
+          }
+        },
+        "jsonKind": {
+          "$ref": "#/$defs/jsonKind"
+        },
+        "tag": {
+          "$ref": "#/$defs/tag"
+        },
+        "evidence": {
+          "description": "References to sourceSchemas entries by exact sourceId. An extension validator must reject missing or duplicate source IDs.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sourceId"
+          }
+        }
+      }
+    },
+    "jsonKind": {
+      "enum": [
+        "string",
+        "number",
+        "boolean",
+        "null",
+        "object",
+        "array"
+      ]
+    },
+    "tag": {
+      "description": "ROAX type tag. Tag 8 BLOB_REF is registered but selected by no version-1 profile, so a profile-aware artifact validator must reject an operative tag-8 binding under spec section 6.5 even though this carrier schema admits its numeric form.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8
+    },
+    "stateId": {
+      "type": "string",
+      "pattern": "^s(?:0|[1-9][0-9]*)$"
+    },
+    "keyTransition": {
+      "type": "object",
+      "required": ["key", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "description": "Transition key. It MUST already be NFC-normalized under the pinned Unicode version, which this carrier schema cannot express and an artifact validator therefore enforces.",
+          "type": "string"
+        },
+        "to": {
+          "$ref": "#/$defs/stateId"
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "required": ["jsonKind", "tag", "basis", "sources"],
+      "additionalProperties": false,
+      "properties": {
+        "jsonKind": {
+          "$ref": "#/$defs/jsonKind"
+        },
+        "tag": {
+          "$ref": "#/$defs/tag"
+        },
+        "basis": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "schema-type",
+              "schema-const",
+              "schema-enum",
+              "schema-container-type",
+              "fhir-named-primitive",
+              "fhir-element-name",
+              "profile-ruling"
+            ]
+          }
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sourceReference"
+          }
+        }
+      }
+    },
+    "unresolved": {
+      "description": "Declared gap for the listed kinds. A resolver supplies no output for them and MUST fail closed, but these rows are operative for the extension lifecycle: an issuer child may bind a direct child of an extension point only where such a row already names the observed kind, and a child MUST carry every inherited row unchanged except for kinds it resolves with a binding. See docs/type-maps.md sections 3 and 5.",
+      "type": "object",
+      "required": ["jsonKinds", "reason", "sources"],
+      "additionalProperties": false,
+      "properties": {
+        "jsonKinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/jsonKind"
+          }
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sources": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sourceReference"
+          }
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/stateId"
+        },
+        "keys": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/keyTransition"
+          }
+        },
+        "anyIndex": {
+          "$ref": "#/$defs/stateId"
+        },
+        "bindings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/binding"
+          }
+        },
+        "unresolved": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/unresolved"
+          }
+        },
+        "structurallyUntypedObject": {
+          "description": "Non-operative audit marker. At least one source node contributing KEY transitions at this state has properties but omits type object, so no non-object tag may be inferred from those applicators.",
+          "const": true
+        }
+      }
+    },
+    "automaton": {
+      "type": "object",
+      "required": ["representation", "start", "states"],
+      "additionalProperties": false,
+      "properties": {
+        "representation": {
+          "const": "structured-path-dfa/1"
+        },
+        "start": {
+          "const": "s0"
+        },
+        "states": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/state"
+          }
+        }
+      }
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tagCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "0": {
+          "$ref": "#/$defs/count"
+        },
+        "1": {
+          "$ref": "#/$defs/count"
+        },
+        "2": {
+          "$ref": "#/$defs/count"
+        },
+        "3": {
+          "$ref": "#/$defs/count"
+        },
+        "4": {
+          "$ref": "#/$defs/count"
+        },
+        "5": {
+          "$ref": "#/$defs/count"
+        },
+        "6": {
+          "$ref": "#/$defs/count"
+        },
+        "7": {
+          "$ref": "#/$defs/count"
+        },
+        "8": {
+          "$ref": "#/$defs/count"
+        }
+      }
+    },
+    "basisCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema-type": {
+          "$ref": "#/$defs/count"
+        },
+        "schema-const": {
+          "$ref": "#/$defs/count"
+        },
+        "schema-enum": {
+          "$ref": "#/$defs/count"
+        },
+        "schema-container-type": {
+          "$ref": "#/$defs/count"
+        },
+        "fhir-named-primitive": {
+          "$ref": "#/$defs/count"
+        },
+        "fhir-element-name": {
+          "$ref": "#/$defs/count"
+        },
+        "profile-ruling": {
+          "$ref": "#/$defs/count"
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": [
+        "concretePathCardinality",
+        "states",
+        "keyTransitions",
+        "indexTransitions",
+        "resolvedOutputs",
+        "unresolvedOutputStates",
+        "structurallyUntypedObjectSourceNodes",
+        "structurallyUntypedObjectStates",
+        "byTag",
+        "byBasis",
+        "notes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "concretePathCardinality": {
+          "const": "infinite"
+        },
+        "states": {
+          "$ref": "#/$defs/count"
+        },
+        "keyTransitions": {
+          "$ref": "#/$defs/count"
+        },
+        "indexTransitions": {
+          "$ref": "#/$defs/count"
+        },
+        "resolvedOutputs": {
+          "$ref": "#/$defs/count"
+        },
+        "unresolvedOutputStates": {
+          "description": "DFA states carrying explicit non-operative unresolved rows. Object-applicator states that omit an object type are counted separately.",
+          "$ref": "#/$defs/count"
+        },
+        "structurallyUntypedObjectStates": {
+          "description": "DFA states reached from at least one schema node that has properties but does not explicitly declare type object. Child traversal is retained, while no non-object binding is inferred from those object applicators.",
+          "$ref": "#/$defs/count"
+        },
+        "structurallyUntypedObjectSourceNodes": {
+          "description": "Unique reachable source-schema nodes that have properties but do not explicitly declare type object. This source-local measure and the DFA-state measure differ when schema unions merge nodes.",
+          "$ref": "#/$defs/count"
+        },
+        "byTag": {
+          "$ref": "#/$defs/tagCounts"
+        },
+        "byBasis": {
+          "$ref": "#/$defs/basisCounts"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

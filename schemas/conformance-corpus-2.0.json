@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://roax.example/schemas/conformance-corpus/1.0/schema.json",
-  "title": "ROAX conformance corpus schema v1",
-  "description": "Schema for the shared cross-language test-vector file. Because ROAX may ship five independent libraries and cannot lean on a single core behind an FFI layer the way dogtag does (spec section 14.3), this corpus is the entire enforcement mechanism for cross-language agreement, not a safety net. Normative content requirements: docs/conformance-corpus.md. THIS FILE GOVERNS corpus/conformance-corpus-1.0.json AS COMMITTED, and corpus/tools/validate_schemas.mjs measures that. It is superseded in content by schemas/conformance-corpus-2.0.json, which carries the requirements the ruled decisions and the type-map binding impose on a vector: the exact type-map artifact identity on the type-map and record vectors, the `normalization` group for class 19, and the D4b replacements for the salt and unlinkability vectors. The successor is a MAJOR bump because it deletes definitions this file must keep, so the committed corpus does not validate against it and must be rebuilt to it. Several definitions below are therefore marked superseded: they are accurate about the file they govern and are not the design as it now stands.",
+  "$id": "https://roax.example/schemas/conformance-corpus/2.0/schema.json",
+  "title": "ROAX conformance corpus schema v2",
+  "description": "Schema for the shared cross-language test-vector file. Because ROAX may ship five independent libraries and cannot lean on a single core behind an FFI layer the way dogtag does (spec section 14.3), this corpus is the entire enforcement mechanism for cross-language agreement, not a safety net. Normative content requirements: docs/conformance-corpus.md. NO CORPUS ARTIFACT VALIDATES AGAINST THIS SCHEMA YET, and that is a stated gap rather than an oversight. The committed corpus at corpus/conformance-corpus-1.0.json is governed by schemas/conformance-corpus-1.0.json and validates against it; this file is the successor contract the corpus must be rebuilt to, and it is separated so that the contract can be reviewed before the rebuild rather than after. Three changes make it breaking for the 1.0 corpus, each of which drops vectors that file still carries: the `salt` group and its saltVector are gone, because decision D4 was ruled D4b and a salt is now an independent CSPRNG draw with no derivation for a vector to assert (spec section 7); the unlinkability vector asserts distinct salts and distinct leaf hashes across trials rather than comparing two derived sides; and the type-map and record vectors now name the exact content-addressed artifact they were computed under. The added `normalization` group and the type-map identity fields are what class 19 and specification section 4.2 require of a vector. THIS SCHEMA VERSION IS NOT THE CANONICALIZATION VERSION AND NOT THE CORPUS FILE'S OWN corpusVersion: `canon` is still const 'ROAX-CANON/1' below, and corpusVersion below still versions the artifact rather than this contract. Per spec section 12.1 all three identifiers are ROAX's own, so this project shapes them, and the major part moved here because a document that validated stopped validating.",
   "type": "object",
   "required": ["corpusVersion", "canon", "hashAlg", "unicodeVersion", "vectors"],
   "additionalProperties": false,
@@ -30,7 +30,6 @@
         "encodePath": { "type": "array", "items": { "$ref": "#/$defs/encodePathVector" } },
         "encodeValue": { "type": "array", "items": { "$ref": "#/$defs/encodeValueVector" } },
         "reject": { "type": "array", "items": { "$ref": "#/$defs/rejectVector" } },
-        "salt": { "type": "array", "items": { "$ref": "#/$defs/saltVector" } },
         "leaf": { "type": "array", "items": { "$ref": "#/$defs/leafVector" } },
         "tree": { "type": "array", "items": { "$ref": "#/$defs/treeVector" } },
         "inclusion": { "type": "array", "items": { "$ref": "#/$defs/inclusionVector" } },
@@ -38,6 +37,7 @@
         "typeMap": { "type": "array", "items": { "$ref": "#/$defs/typeMapVector" } },
         "record": { "type": "array", "items": { "$ref": "#/$defs/recordVector" } },
         "unlinkability": { "type": "array", "items": { "$ref": "#/$defs/unlinkabilityVector" } },
+        "normalization": { "type": "array", "items": { "$ref": "#/$defs/normalizationVector" } },
         "envelope": { "type": "array", "items": { "$ref": "#/$defs/envelopeVector" } }
       }
     }
@@ -47,7 +47,7 @@
     "hex32": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "name": { "type": "string", "minLength": 1 },
     "classRef": {
-      "description": "Which numbered class in docs/conformance-corpus.md this vector discharges. Every class must be reachable from at least one vector; a class with no vectors is a coverage gap and the corpus build MUST report it. The maximum tracks the class count stated in section 3 of that document and MUST move with it. Raised from 17 to 19 on 2026-07-28 when the ten engineering decisions were ruled: class 18 fails an implementation that treats an outside-the-root field as authority (decision D8) and class 19 asserts NFC end to end with a root (decision D12). Class numbers are stable - class 12 kept its number and its subject when decision D4 was ruled D4b and lost only its mechanism, so nothing renumbered. Class 18 is expressible in this schema version, through envelopeVector.verifierConfig. CLASS 19 IS NOT: its vector shape is the `normalization` group, which exists only in schemas/conformance-corpus-2.0.json, so a class-19 vector cannot be carried by a corpus governed by this file.",
+      "description": "Which numbered class in docs/conformance-corpus.md this vector discharges. Every class must be reachable from at least one vector; a class with no vectors is a coverage gap and the corpus build MUST report it. The maximum tracks the class count stated in section 3 of that document and MUST move with it. Raised from 17 to 19 on 2026-07-28 when the ten engineering decisions were ruled: class 18 fails an implementation that treats an outside-the-root field as authority (decision D8) and class 19 asserts NFC end to end with a root (decision D12). Class numbers are stable - class 12 kept its number and its subject when decision D4 was ruled D4b and lost only its mechanism, so nothing renumbered.",
       "type": "integer",
       "minimum": 1,
       "maximum": 19
@@ -113,23 +113,8 @@
       }
     },
 
-    "saltVector": {
-      "description": "Asserts that a given (masterSalt, recordId, path) produces a given salt under the salt derivation this schema version was written against. RETAINED BECAUSE THE COMMITTED CORPUS STILL CARRIES SEVEN OF THESE, not because the derivation survives: decision D4 was ruled D4b on 2026-07-28, so a salt is now 16 bytes drawn independently from a CSPRNG and there is no derivation left for a vector to assert (spec section 7). schemas/conformance-corpus-2.0.json therefore drops this definition and its vector group outright, and that deletion is one of the three reasons the successor is a MAJOR bump rather than a minor one. Do not delete it here: this schema governs corpus/conformance-corpus-1.0.json as committed, and removing the definition would make that file invalid against its own schema without regenerating it. masterSaltHex is REQUIRED within this definition and that was correct for what it asserts - the vector TESTS the derivation, so masterSalt is its subject rather than an assumption about how salts came to exist. Do not relax it to match recordVector, which is a different case and says so.",
-      "type": "object",
-      "required": ["name", "class", "masterSaltHex", "recordId", "segments", "saltHex"],
-      "additionalProperties": false,
-      "properties": {
-        "name": { "$ref": "#/$defs/name" },
-        "class": { "$ref": "#/$defs/classRef" },
-        "masterSaltHex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "recordId": { "type": "string" },
-        "segments": { "$ref": "#/$defs/segments" },
-        "saltHex": { "type": "string", "pattern": "^[0-9a-f]{32}$" }
-      }
-    },
-
     "leafVector": {
-      "description": "One leafHash over (path, tag, value, salt) per spec section 8. The salt is an INPUT here and nothing derives it: decision D4 is ruled D4b, so each salt is 16 bytes drawn independently from a CSPRNG (spec section 7). In schemas/conformance-corpus-2.0.json this definition is what remains after saltVector is deleted, since a vector can still pin a leaf hash over a supplied salt when nothing can pin the salt itself.",
+      "description": "One leafHash over (path, tag, value, salt) per spec section 8. The salt is an INPUT here and nothing derives it: decision D4 is ruled D4b, so each salt is 16 bytes drawn independently from a CSPRNG (spec section 7). This definition replaced the deleted saltVector, which asserted that a (masterSalt, recordId, path) triple produced a given salt under a derivation that no longer exists.",
       "type": "object",
       "required": ["name", "class", "segments", "tag", "saltHex", "leafHash"],
       "additionalProperties": false,
@@ -202,26 +187,26 @@
     },
 
     "typeMapVector": {
-      "description": "Asserts that a given path under a given type map resolves to a given tag, fails closed, or that the MAP ITSELF is rejected. EXACTLY ONE of expectTag, expectFailClosed and expectMapRejected is required: with none the vector asserts nothing, and with more than one it asserts contradictory things. Every other vector type in this file requires its assertion, and class 11 is the highest-risk surface in the design (docs/conformance-corpus.md), so a silently vacuous vector is the worst place to allow one. THE EXACT-ARTIFACT FIELDS ARE OPTIONAL HERE AND REQUIRED IN schemas/conformance-corpus-2.0.json. Specification section 4.2 selects a map by content ID rather than by recordType, so a vector that names only a recordType does not identify what it was resolved against; that is a real gap and it is left open in this schema version for one reason only, that requiring the fields would invalidate the committed class-11 vectors, which carry none of them. The successor requires all four, and closing the gap means rebuilding the corpus rather than tightening this file.",
+      "description": "Asserts that a given path under a given type map resolves to a given tag, fails closed, or that the MAP ITSELF is rejected. EXACTLY ONE of expectTag, expectFailClosed and expectMapRejected is required: with none the vector asserts nothing, and with more than one it asserts contradictory things. Every other vector type in this file requires its assertion, and class 11 is the highest-risk surface in the design (docs/conformance-corpus.md), so a silently vacuous vector is the worst place to allow one.",
       "type": "object",
-      "required": ["name", "class", "recordType", "segments"],
+      "required": ["name", "class", "typeMapId", "typeMapVersion", "recordType", "schemaVersion", "segments", "jsonKind"],
       "additionalProperties": false,
       "properties": {
         "name": { "$ref": "#/$defs/name" },
         "class": { "$ref": "#/$defs/classRef" },
         "typeMapId": {
-          "description": "OPTIONAL in this schema version, REQUIRED in 2.0. Content ID of the exact immutable artifact under test (spec section 4.2).",
+          "description": "Content ID of the exact immutable artifact under test (spec section 4.2).",
           "type": "string",
           "pattern": "^sha256:[0-9a-f]{64}$"
         },
         "typeMapVersion": {
-          "description": "OPTIONAL in this schema version, REQUIRED in 2.0. ROAX-owned three-part semver carried by the exact artifact. It is exact metadata and never a latest-version selector (spec sections 4.2 and 12.1).",
+          "description": "ROAX-owned three-part semver carried by the exact artifact. It is exact metadata and never a latest-version selector (spec sections 4.2 and 12.1).",
           "type": "string",
           "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
         },
         "recordType": { "type": "string" },
         "schemaVersion": {
-          "description": "OPTIONAL in this schema version, REQUIRED in 2.0. Opaque profile-owned version that must equal the exact artifact field (spec sections 4.2 and 12.1).",
+          "description": "Opaque profile-owned version that must equal the exact artifact field (spec sections 4.2 and 12.1).",
           "type": "string",
           "minLength": 1
         },
@@ -251,7 +236,7 @@
     },
 
     "recordVector": {
-      "description": "A whole record with its root. The three real MOH samples are mandatory (class 10). Records are referenced by file rather than inlined, so that no reference schema or sample is copied into this repository. EVERY input to the root that the protocol REQUIRES is required here, because the leaf set is the UNION of the record's leaves and the reserved roax.* leaves (spec sections 3.3 and 11.2): recordType, schemaVersion, recordId and issuerId are reserved-leaf values under this schema version and therefore change the root, so a vector omitting any of them is not reproducible and the class-10 assertion would be untestable. The top-level canon and hashAlg supply the rest, via the domain string. The per-leaf salts are the remaining input and are not derivable from anything in this vector (spec section 7), so they come from the referenced record or envelope file, or from saltsFile. typeMapId is the fifth reserved-leaf value under specification section 4.2 and is OPTIONAL here and REQUIRED in schemas/conformance-corpus-2.0.json, for the same reason the envelope requirement moved to schemas/envelope-2.0.json: the committed class-10 vectors were computed over a four-reserved-leaf union and requiring it would invalidate them rather than correct them. A vector that omits it asserts a root computed without that leaf.",
+      "description": "A whole record with its root. The three real MOH samples are mandatory (class 10). Records are referenced by file rather than inlined, so that no reference schema or sample is copied into this repository. EVERY input to the root that the protocol REQUIRES is required here, because the leaf set is the UNION of the record's leaves and the reserved roax.* leaves (spec sections 3.3 and 11.2): recordType, schemaVersion, typeMapId, recordId and issuerId are reserved-leaf values and therefore change the root, so a vector omitting any of them is not reproducible and the class-10 assertion would be untestable. The top-level canon and hashAlg supply the rest, via the domain string. The per-leaf salts are the remaining input and are not derivable from anything in this vector (spec section 7), so they come from the referenced record or envelope file, or from saltsFile.",
       "type": "object",
       "required": [
         "name",
@@ -260,6 +245,7 @@
         "recordId",
         "recordType",
         "schemaVersion",
+        "typeMapId",
         "issuerId",
         "leafCount",
         "root"
@@ -278,7 +264,7 @@
           "minLength": 1
         },
         "typeMapId": {
-          "description": "OPTIONAL in this schema version, REQUIRED in 2.0. Committed as the reserved leaf roax.typeMap.id and selects the exact immutable artifact (spec sections 4.2 and 11.2). When present, the vector's leafCount and root account for that leaf and its floor is 6 rather than 5.",
+          "description": "Committed as the reserved leaf roax.typeMap.id and selects the exact immutable artifact (spec sections 4.2 and 11.2).",
           "type": "string",
           "pattern": "^sha256:[0-9a-f]{64}$"
         },
@@ -293,29 +279,24 @@
           "minLength": 1
         },
         "recordFile": { "type": "string" },
-        "masterSaltHex": {
-          "description": "OPTIONAL, and SUPERSEDED RATHER THAN MERELY OPTIONAL. It expressed the per-record derivation that decision D4 removed when it was ruled D4b on 2026-07-28: there is no masterSalt in this design, so a vector carrying this field is describing how its salts were produced under the earlier construction and nothing re-derives them from it now (spec section 7). It is retained because twenty-four of the committed vectors still carry it and this schema governs that file as committed. schemas/conformance-corpus-2.0.json drops it in favour of saltsFile alone. It was never REQUIRED even under the earlier construction, because requiring it would have decided open decision D4 from inside a data file - see the standing rule in docs/conformance-corpus.md section 1.2, which still binds for decisions A, C and D.",
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
         "saltsFile": {
-          "description": "OPTIONAL. The file carrying the per-leaf salts this vector's root was computed with, one per leaf of the union, in the `salts` shape schemas/envelope-1.0.json defines. Needed to reproduce a root from a bare record file, since decision D4 is ruled D4b and every salt is an independent random draw that nothing can re-derive (spec section 7). Omit when the referenced envelope or record file already carries them. This field supersedes masterSaltHex, which expressed a derivation that no longer exists.",
+          "description": "OPTIONAL. The file carrying the per-leaf salts this vector's root was computed with, one per leaf of the union, in the `salts` shape schemas/envelope-2.0.json defines. Needed to reproduce a root from a bare record file, since decision D4 is ruled D4b and every salt is an independent random draw that nothing can re-derive (spec section 7). Omit when the referenced envelope or record file already carries them. This field replaced masterSaltHex, which expressed a derivation that no longer exists.",
           "type": "string"
         },
         "recordId": { "type": "string" },
         "leafCount": {
-          "description": "The UNION count: the record's own leaves plus the 4 always-emitted reserved leaves of this schema version, plus 1 when issuerKeyId is present, plus 1 more when typeMapId is present. The floor is 5, because a record contributing zero leaves of its own MUST be rejected at issuance (spec section 3.3). In schemas/conformance-corpus-2.0.json roax.typeMap.id is always emitted and the floor is 6.",
+          "description": "The UNION count: the record's own leaves plus the 5 always-emitted reserved leaves, plus 1 when issuerKeyId is present. The floor is 6, because a record contributing zero leaves of its own MUST be rejected at issuance (spec section 3.3).",
           "type": "integer",
-          "minimum": 5
+          "minimum": 6
         },
         "root": { "$ref": "#/$defs/hex32" }
       }
     },
 
     "unlinkabilityVector": {
-      "description": "Class 12. Two records for the same subject, sharing a path AND a value at that path, MUST produce DIFFERENT leaf hashes for that path (spec section 7). This is the only vector class that catches an implementation whose salts are not independent, and that violation is invisible to every other class because each record verifies perfectly on its own. It catches three reachable mistakes: a salt derived deterministically so that reissuance reproduces the same root, which reads like a feature; one draw reused across the leaves of a record; and one draw reused across records, which is the patient-linkage failure itself. THE TWO-SIDED FORM BELOW IS SUPERSEDED AND IS KEPT ONLY BECAUSE THE COMMITTED CORPUS USES IT. It varies a masterSalt across the two sides, and decision D4 was ruled D4b on 2026-07-28, so there is no masterSalt left to vary; the class keeps its number and its subject and loses only its mechanism. schemas/conformance-corpus-2.0.json replaces both sides with `trials` independent issuances of the same (segments, tag, value) and asserts that all resulting salts and all resulting leaf hashes differ, which is the only form the ruling leaves available: with independently random salts there is no fixed expectation for what the implementation under test must draw freshly. HONEST LIMIT, true of either form: this detects a DETERMINISTIC or REUSED salt. It does NOT detect a weak or predictable CSPRNG - an implementation drawing 16 bytes from a poorly seeded generator passes while providing far less than the 128 bits spec section 7 requires. No fixed vector file can test a randomness source; that gap belongs to implementation review and is stated in docs/conformance-corpus.md class 12 rather than left for a passing run to imply.",
+      "description": "Class 12. Two records for the same subject, sharing a path AND a value at that path, MUST produce DIFFERENT leaf hashes for that path (spec section 7). This is the only vector class that catches an implementation whose salts are not independent, and that violation is invisible to every other class because each record verifies perfectly on its own. It catches three reachable mistakes: a salt derived deterministically so that reissuance reproduces the same root, which reads like a feature; one draw reused across the leaves of a record; and one draw reused across records, which is the patient-linkage failure itself. THIS VECTOR ASSERTS A RELATION RATHER THAN A PINNED VALUE, and that is forced by the ruling rather than a shortcut: decision D4 is ruled D4b, so the salts are independently random and no fixed expectation can exist for what the implementation under test must draw freshly. The runner performs `trials` independent issuances of the same (segments, tag, value) and asserts that all resulting salts differ and all resulting leaf hashes differ. HONEST LIMIT: this detects a DETERMINISTIC or REUSED salt. It does NOT detect a weak or predictable CSPRNG - an implementation drawing 16 bytes from a poorly seeded generator passes every trial while providing far less than the 128 bits spec section 7 requires. No fixed vector file can test a randomness source; that gap belongs to implementation review and is stated in docs/conformance-corpus.md class 12 rather than left for a passing run to imply.",
       "type": "object",
-      "required": ["name", "class", "segments", "tag", "recordA", "recordB", "expectDistinct"],
+      "required": ["name", "class", "segments", "tag", "trials", "expectDistinctSalts", "expectDistinctLeafHashes"],
       "additionalProperties": false,
       "properties": {
         "name": { "$ref": "#/$defs/name" },
@@ -323,21 +304,44 @@
         "segments": { "$ref": "#/$defs/segments" },
         "tag": { "$ref": "#/$defs/tagRef" },
         "value": {},
-        "recordA": { "$ref": "#/$defs/unlinkabilitySide" },
-        "recordB": { "$ref": "#/$defs/unlinkabilitySide" },
-        "expectDistinct": { "const": true }
+        "recordIds": {
+          "description": "OPTIONAL. The record identifiers to issue the trials under, when the vector wants to pin that a SHARED identifier still yields different leaf hashes. Under decision D4b the record identifier is not an input to any salt or preimage, so this changes nothing about the expected outcome; it exists so a vector can state that explicitly, because the deleted derived-salt construction did fold it in and a reader who knows that construction would otherwise wonder.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "trials": {
+          "description": "How many independent issuances the runner performs. Minimum 2, which is the pair the class is about; more raises confidence against an implementation that varies only the first draw.",
+          "type": "integer",
+          "minimum": 2
+        },
+        "expectDistinctSalts": { "const": true },
+        "expectDistinctLeafHashes": { "const": true }
       }
     },
 
-    "unlinkabilitySide": {
-      "description": "One side of a class-12 unlinkability pair, as the committed corpus carries it. masterSaltHex is REQUIRED within this definition because the two-sided form asserts that two DIFFERENT master salts yield different leaf hashes, so the value is the subject of that test rather than an assumption. Do not relax it to match recordVector, and do not delete this definition: schemas/conformance-corpus-2.0.json replaces the whole two-sided form with the trial-based one, and doing that here would invalidate the committed vectors instead of rebuilding them.",
+    "normalizationVector": {
+      "description": "Class 19. One record whose string differs before and after NFC, carried in BOTH forms, asserting that the two produce the SAME root (spec section 6.1, decision D12 ruled D12a). Class 4 already asserts NFC against NFD at LEAF level in values and keys; this class asserts the property of the whole pipeline over the union of spec section 3.3, which is where the routes a leaf-level vector misses actually are - a key compared before normalization, a reserved-leaf value written straight from the envelope, a path segment re-encoded from a cached form. THE ASSERTION IS EQUALITY, so the vector is complete without a pinned root: what it fixes is that both forms yield one value and that it is the same one. The optional root pins that value once the corpus file exists, as a regression against normalization silently changing. Use a string whose NFC form is stable across recent Unicode versions - the version pin is class 16's subject, and class 16 is explicit about what it can and cannot demonstrate.",
       "type": "object",
-      "required": ["masterSaltHex", "recordId", "leafHash"],
+      "required": ["name", "class", "site", "recordFileNFD", "recordFileNFC", "expectSameRoot"],
       "additionalProperties": false,
       "properties": {
-        "masterSaltHex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "recordId": { "type": "string" },
-        "leafHash": { "$ref": "#/$defs/hex32" }
+        "name": { "$ref": "#/$defs/name" },
+        "class": { "$ref": "#/$defs/classRef" },
+        "site": {
+          "description": "Where the differing sequence sits. Both are required by docs/conformance-corpus.md class 19, because an implementation can normalize values and not keys.",
+          "enum": ["value", "key"]
+        },
+        "recordFileNFD": { "type": "string" },
+        "recordFileNFC": { "type": "string" },
+        "saltsFile": {
+          "description": "The per-leaf salts both forms are computed under. REQUIRED IN PRACTICE for this class even though the schema leaves it optional: the two forms must share one salt set, or the roots differ for a reason that has nothing to do with normalization and the vector asserts nothing.",
+          "type": "string"
+        },
+        "expectSameRoot": { "const": true },
+        "root": {
+          "description": "OPTIONAL. The single root both forms produce, once computed.",
+          "$ref": "#/$defs/hex32"
+        }
       }
     },
 

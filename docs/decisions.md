@@ -1,13 +1,23 @@
 # Decisions: settled, open, and the reasoning
 
-**Status:** every decision marked OPEN is genuinely open. One - **Decision B**, the hash function -
-has since been ruled, and is marked RULED with the residual open questions named inside it. The rest
-have not been ruled on.
+**Status:** three decisions are genuinely open and they are all in Part 1: **A**, **C** and **D**.
+Everything else has been ruled. **Decision B** was ruled earlier, with the residual open questions
+named inside it. The **ten engineering decisions in Part 2 - D3, D4, D5, D6, D7, D8, D9, D11, D12
+and D13 - were ruled on 2026-07-28**, and each carries its reasoning so that it can be overturned on
+the reasoning rather than on authority.
 
-The protocol specification is **written on the recommended answer to each open decision**, so that
-it is concrete and readable rather than hedged into uselessness. That is a drafting choice, not a
-ruling. A specification that hides a live decision behind confident prose is worse than one that
-names it, so each is named here with its alternatives and their consequences.
+Eight of those ten confirmed what the specification already recommended. Two changed it: **D4** moved
+to D4b, independently random per-leaf salts, and **D9** gained a content-addressed blob binding that
+is defined but selected by no version-1 profile.
+
+The protocol specification is **written on the recommended answer to each decision that is still
+open**, so that it is concrete and readable rather than hedged into uselessness. That is a drafting
+choice, not a ruling. A specification that hides a live decision behind confident prose is worse than
+one that names it, so each is named here with its alternatives and their consequences.
+
+**A decision that looks settled in the specification but is still marked OPEN here is worse than
+either**, so the two documents move together in one change. That warning is in this document because
+it has already been a problem.
 
 ## Numbering
 
@@ -137,10 +147,13 @@ Three mechanisms replace it (specification section 7.4), and they are recorded w
 actually worth rather than as a list of equals:
 
 1. **H1.** The domain string is algorithm-qualified - `DOMAIN = ASCII "ROAX-CANON/1/" + hashAlg` -
-   and sits in every salt preimage (section 7) and every leaf preimage (section 8). Honestly, this
+   and sits in every leaf preimage (specification section 8). Honestly, this
    buys almost nothing cryptographically, for the same reason the leaf did not: the attacker
    computes both records under the same domain. It removes cross-algorithm root ambiguity by
    construction and makes the envelope schema's claim true, and that is all.
+   *(This sentence previously also said "every salt preimage". D4's ruling to D4b deleted salt
+   derivation, so there is no salt preimage; `DOMAIN` itself is untouched by that ruling and the
+   ruling under B is unaffected.)*
 2. **H2, the one that matters.** The anchoring registry MUST record the pair `(root, hashAlg)` and
    a verifier MUST take `hashAlg` from the **registry**, never from the envelope. Authority for the
    algorithm then comes from the same place authority for the root comes from. This document does
@@ -167,7 +180,7 @@ description has to come from outside.
   rather than discovered. They are what makes selecting Poseidon a deliberate per-record act.
 
 **Written into the spec:** `hashAlg` as an algorithm-qualified domain component and a reserved leaf
-(sections 7, 7.4, 8, 11.2, 12), with the enum in `schemas/envelope-1.0.json` carrying both values
+(sections 7, 7.4, 8, 11.2, 12), with the enum in `schemas/envelope-2.0.json` carrying both values
 and the Poseidon caution stated in the schema itself.
 
 | | **SHA-256** | **Poseidon over BN254** |
@@ -292,60 +305,112 @@ then choosing Da means discovering the gap after divergence has already shipped.
 
 ## Part 2 - The further decisions
 
-### D3 - Wire format of the envelope. **OPEN**
+**All ten were ruled on 2026-07-28.**
+Eight confirmed what the specification already recommended, so for those the ruling records the
+reasoning rather than changing a rule. Two changed the specification: **D4** moved to D4b and **D9**
+gained a content-addressed blob binding.
 
-**Written into the spec:** JSON, with deterministic CBOR explicitly allowed later.
+Each section keeps the option table it carried while the decision was open, because that table is the
+auditable record of what was weighed, and adds the ruling above it.
 
-The digest rule is independent of the wire format under this design, which is a property worth
-keeping deliberately. If a binary envelope is wanted, serialize the envelope in dCBOR without making
-dCBOR the digest rule - see specification section 13.2 for why the latter would reintroduce the FHIR
-precision bug from a different direction (dCBOR section 2.5 forces integral floats to integers, so
-`2.0` becomes `2`).
+### The standing constraints these rulings were made under
 
-### D4 - Salt strategy. **OPEN, and closer than the size saving suggests**
+Recorded here rather than repeated in each section, because they decided several of the close calls
+and a reader who does not know them will read some of these rulings as over-engineering.
 
-**Written into the spec:** one master salt, HMAC-derived per leaf, with the record identifier folded
-into the preimage (specification section 7).
+1. **Silent divergence between two conformant implementations is the failure this project exists to
+   remove.** Any option that lets two correct implementations produce different roots without either
+   detecting it loses, even when it is cheaper.
+2. **Development cost carries little weight**, against quality, simplicity, robustness, scalability
+   and long-term maintainability.
+3. **Every rule must be future-proof and must permit upgrades**, which is the constraint
+   specification section 12.2 states as a standing requirement.
+4. **No surface may state a fact it has not established.** This applies to a protocol claiming
+   clinical meaning exactly as it applies to any other surface, and it is what D13 turns on.
+
+### D3 - Wire format of the envelope. **RULED 2026-07-28: JSON, as recommended**
+
+**Written into the spec:** JSON, with deterministic CBOR explicitly allowed later as a transport and
+normatively forbidden as the digest rule (specification section 13.2).
+
+**The ruling.** JSON is the version-1 wire format. Deterministic CBOR remains explicitly permitted
+later as a **transport**, and MUST NOT become the digest rule.
+
+**Reasoning.** JSON is what every FHIR toolchain, every health authority and every existing
+healthcert already speaks, so it costs an adopter nothing. And the property that actually matters -
+the digest rule being independent of the wire format - is preserved, which is what keeps a future
+binary transport from being a breaking change rather than a `canon` bump.
+
+**The prohibition is the load-bearing half.** `draft-mcnally-deterministic-cbor-17` section 2.5
+forces integral floats to integers, so `2.0` becomes `2`. Making dCBOR the digest rule would
+reintroduce the exact FHIR precision bug of Part 0, arriving from a direction nobody would be
+watching. The specification therefore states the prohibition normatively rather than as advice.
+
+### D4 - Salt strategy. **RULED 2026-07-28: D4b. One independently random CSPRNG salt per leaf**
+
+**This ruling changed the specification.** The specification previously recommended D4a - one master
+salt, HMAC-derived per leaf, with the record identifier folded into the preimage - and section 7 was
+rewritten for D4b.
+
+**Written into the spec now:** each leaf carries its own 16-byte salt drawn independently from a
+CSPRNG (specification section 7). There is no master salt, no KDF, and no salt preimage.
 
 | Option | For | Against |
 |---|---|---|
 | **D4a. Derived from one master salt** | The issuer holds one 32-byte secret per record instead of 16 bytes per leaf, so it stores, backs up and reissues from about 1.4 KB less on an 87-leaf record and far less on a large FHIR bundle. | Has a sharp failure mode that D4b simply does not have. |
-| **D4b. dogtag's stored 16 bytes per leaf** | No shared secret exists, so there is nothing to reuse and no unlinkability failure mode at all. A holder can disclose a leaf without the issuer regenerating a salt. | Issuer-side storage size. |
+| **D4b. Independently random 16 bytes per leaf** (dogtag's choice) | No shared secret exists, so there is nothing to reuse and no unlinkability failure mode at all. A holder can disclose a leaf without the issuer regenerating a salt. | Issuer-side storage size. |
 
-**The size argument is about issuer storage, not envelope size, and that distinction was sharpened
-while closing a review finding.** Specification section 7.3 requires a **full copy to carry the salt
-of every leaf** under either option, because a full copy is otherwise unverifiable: the verifier
-needs `salt(path)` for each leaf and the record body has none. So a full copy is the same size under
-D4a and D4b, and a disclosed copy is small under both because it carries only the salts of the
-leaves it reveals.
+**Why the specification's own analysis leads to D4b.** Specification section 7.3 already required a
+full copy to carry the salt of **every** leaf under either option, because a full copy is otherwise
+unverifiable: the verifier needs the salt of each leaf and the record body has none. So the envelope
+is byte-identical either way, and a disclosed copy is small either way. The entire argument for D4a
+was therefore **issuer-side storage** - 16 bytes per leaf against one 32-byte secret per record,
+about 1.4 KB on an 87-leaf record.
 
-**The envelope format is deliberately agnostic here, so that this decision stays genuinely open.**
-An earlier draft of section 7.3 required a full copy to carry `masterSalt`. That was withdrawn: it
-is unimplementable under D4b, where no `masterSalt` exists, so a schema would have foreclosed this
-decision by accident. Carrying per-leaf salts works under both - HMAC-derived and written out under
-D4a, independently random and written out under D4b - and the envelope bytes are identical either
-way. Nothing in `schemas/envelope-1.0.json` should be read as a ruling on D4.
+**Against that sits a failure mode D4b does not have at all.** Under D4a, reusing `masterSalt` across
+two records for the same patient makes every shared path with a shared value produce the *same* leaf
+hash in both, so anyone who sees both disclosures links them. In a protocol whose purpose is patient
+privacy that is the worst failure available, and it is **silent**: both records verify perfectly.
 
-**The sharp failure mode, stated precisely.** Under D4a, reusing `masterSalt` across two records for
-the same patient makes every shared path with a shared value produce the *same* leaf hash in both, so
-a verifier who sees both disclosures links them. And "derive `masterSalt` deterministically so
-reissuance reproduces the same root" is an attractive-sounding way to do exactly that.
+The specification's defence was to bind `recordId` into every salt preimage, adopted from dogtag,
+which does the same to keep one wallet's two tags mutually unlinkable (`AGENTS.md:1744-1745` in the
+`dogtag-mono-repo`). That defence was real, and the specification was honest that it was defence in
+depth rather than a fix: if `recordId` is content-derived or reused across a reissuance, the linkage
+returns. But "derive the record identifier deterministically so reissuance reproduces the same root"
+is an *attractive-sounding* thing for an implementer to do, and the specification said so itself. A
+hazard a competent engineer can walk into while trying to be helpful is not adequately guarded by a
+MUST.
 
-**What the dogtag reconciliation changed here.** dogtag binds a per-record identifier into every KDF
-preimage precisely to keep two records of one owner mutually unlinkable (`AGENTS.md:1744-1745`).
-The specification adopts that, so the ROAX salt preimage includes `recordId`.
+**Trading a kilobyte of issuer storage for a silent cross-record patient-linkage hazard is a bad
+trade, and 1.4 KB is not a real cost in 2026.**
 
-**This is defense in depth, not a fix, and the distinction matters for this ruling.** It converts
-"one MUST protects everything" into "two independent things must both go wrong". If `recordId` is
-content-derived or reused across a reissuance, the linkage returns. D4a remains safe only with the
-MUST in specification section 7 and the vector in conformance class 12 both enforced.
+**The ruling also simplifies the protocol, which is a second and independent reason for it.** It
+deletes the KDF, the master salt, the `recordId`-in-preimage rule, and the old conformance class 12,
+whose only job was to enforce a MUST that no verifier can actually check. Five independent
+implementations have five fewer places to disagree subtly. dogtag reached this same answer for this
+same reason.
 
-**If the project would rather not carry that hazard at all, D4b is defensible and the argument
-against it is only size.**
+**Consequences applied in the same change:**
 
-### D5 - Leaf ordering. **OPEN**
+- Specification section 7 rewritten for independent per-leaf salts.
+  `masterSalt` disappears entirely; it was already forbidden in every envelope, so **no envelope
+  bytes change**.
+- Salt entropy is now normative: at least 128 bits from a CSPRNG, and `ROAX-CANON/1` pins the length
+  at exactly 16 bytes. It is the only thing standing between a withheld low-entropy leaf and a
+  dictionary search.
+- Conformance class 12 keeps its number and its subject and loses its mechanism: it now asserts that
+  two records for the same subject sharing a path and a value produce **different** leaf hashes.
+- `DOMAIN` stays algorithm-qualified exactly as it was. This ruling does not touch it.
+- **A consequence the ruling did not enumerate:** `roax.recordId` was mandatory to disclose **by arithmetic**, because a verifier needed it to rebuild a salt preimage.
+  With the preimage gone it is mandatory **by policy** instead, alongside `roax.issuer.id`.
+  `roax.recordType`, `roax.schemaVersion` and `roax.typeMap.id` are arithmetic because they select and authenticate the exact type-map artifact.
+  The floor now has five entries because the type-map work added `roax.typeMap.id` after the salt ruling.
+  Specification sections 4.2, 10.2 and 11.2 and the four profile documents carry the combined result.
 
-**Written into the spec:** by `encodePath` bytes (specification section 9).
+### D5 - Leaf ordering. **RULED 2026-07-28: D5a, by `encodePath` bytes, as recommended**
+
+**Written into the spec:** by `encodePath` bytes (specification section 9), with the residual leak
+now stated in sections 2.2, 9.3 and 10.1 rather than left implicit.
 
 | Option | Consequence |
 |---|---|
@@ -353,17 +418,44 @@ against it is only size.**
 | **D5b. By leaf hash** (dogtag's choice, `merkle.rs:24-26`) | Hides a leaf's position among its siblings, a small privacy gain. Tree shape then depends on salts. |
 | **D5c. Document order** | Fragile: depends on map iteration order, which is exactly the OpenAttestation trap. Not recommended under any reading. |
 
-### D6 - Absence proofs. **OPEN - flagged, not recommended**
+**Reasoning.** D5b buys a genuine but small privacy gain: it hides a leaf's position among its
+siblings. D5a buys a tree shape fully determined by the path set, and wins on three grounds.
 
-**Written into the spec:** not supported. Section 2.2 lists it as out of scope.
+The tree shape becomes reproducible and therefore *checkable*, so two implementations can be compared
+structurally, which matters enormously when five of them must agree. It keeps absence proofs
+available later at nearly no cost, which is what D6 then preserves deliberately. And under the D4b
+ruling above salts are now independently random, so D5b would make tree shape effectively random per
+record, which is the worst case for debugging a cross-implementation disagreement.
 
-They fall out of D5a nearly free. But "this record asserts no allergy" is a clinical claim with
-liability attached, and it needs a product decision rather than a cryptographic one. Deliberately
-flagged rather than recommended.
+**The residual leak is stated in the specification rather than left implicit.** Under D5a, a
+disclosure revealing leaves at two paths also reveals how many withheld leaves sort between them. In
+practice this is bounded, because these profiles are published and their path sets are largely known
+already, but it is a real structural leak and the privacy text must say so plainly rather than
+letting a reader infer that sorting by path costs nothing.
 
-### D7 - Unknown paths not in the type map. **OPEN**
+D5c stays rejected. It depends on map iteration order, which is precisely the OpenAttestation trap.
 
-**Written into the spec:** fail closed (specification section 4.2).
+### D6 - Absence proofs. **RULED 2026-07-28: out of scope for version 1, capability deliberately preserved**
+
+**Written into the spec:** not supported in version 1, with the construction recorded as admitting
+them (specification sections 2.2 and 9.3).
+
+**Reasoning.** Absence proofs fall out of D5a nearly free, so the cost of keeping the door open is
+close to zero and the specification records that the tree construction permits them.
+
+They stay unimplemented because "this record asserts no allergy" is a clinical claim with liability
+attached. That is a product and legal decision rather than a cryptographic one, and it is not one to
+make on the project owner's behalf.
+
+The version-1 specification therefore says three things together: the construction admits absence
+proofs, this version does not define them, and defining them requires a clinical-liability decision.
+That is honest, it forecloses nothing, and it stops a future implementer from reading the omission as
+an oversight and adding them unilaterally.
+
+### D7 - Unknown paths not in the type map. **RULED 2026-07-28: D7a, fail closed, as recommended**
+
+**Written into the spec:** fail closed (specification section 4.2), with the type map now stated as a
+first-class, independently versioned, issuer-extensible artifact (sections 4.2 and 4.3).
 
 | Option | Consequence |
 |---|---|
@@ -371,17 +463,34 @@ flagged rather than recommended.
 | **D7b. Default to STRING** | Records always process. Two libraries with different type maps produce different roots **silently**, which is the exact failure this project exists to avoid. |
 | **D7c. Default by observed JSON kind** | Same silent-divergence problem as D7b, plus it reintroduces syntactic type inference through the back door. |
 
-**The operational cost of D7a, stated rather than smoothed over.** The PDT base object allows
+**Reasoning.** This one is not close. D7b and D7c both let two libraries carrying different type-map
+versions produce different roots silently, which is the exact failure this project exists to remove,
+and D7c additionally smuggles syntactic type inference back in through a side door after the design
+went to some length to remove it (specification section 4.1).
+
+**The operational cost is real and is planned for rather than absorbed.** The PDT base object permits
 additional properties, so a legitimate PDT record may carry fields the type map has never seen, and
-D7a rejects it at issuance. For that profile the type map has to be maintained as an allowlist that
-issuers can extend, and extending it is a versioned change. See
-[`profiles/pdt-healthcert.md`](profiles/pdt-healthcert.md) section 5. That cost is real and it lands
-hardest on PDT.
+D7a rejects it at issuance. This lands hardest on PDT; see
+[`profiles/pdt-healthcert.md`](profiles/pdt-healthcert.md) section 5.
 
-### D8 - What goes inside the root. **OPEN**
+So the type map is **not a lookup table shipped once**. It is a first-class, independently versioned,
+issuer-extensible artifact with a defined extension path, and that is an explicit deliverable rather
+than a footnote. If extending it is slow or unclear, D7a becomes an adoption blocker for exactly the
+profile that already has the most real-world traffic, and the pressure to "just default it to STRING
+for now" will arrive from a real issuer with a real record, which is precisely when it will be
+hardest to refuse.
 
-**Written into the spec:** `canon`, `recordType`, `schemaVersion`, `recordId` and issuer identity
-inside as reserved leaves; routing hints outside (specification section 11.2).
+**One constraint on that extension path is load-bearing and is stated normatively:** an issuer
+extension MUST be additive. Retagging a path the map already covers changes the root of every
+already-issued record that reaches it, which specification section 12.2 forbids.
+
+### D8 - What goes inside the root. **RULED 2026-07-28: as recommended, plus a mandatory corpus vector**
+
+**Written into the spec:** `canon` is bound through the domain string in every leaf;
+`roax.recordType`, `roax.schemaVersion`, `roax.typeMap.id`, `roax.recordId` and `roax.issuer.id` are
+the five mandatory reserved leaves; `roax.issuer.keyId` is the conditional reserved leaf; routing
+hints stay outside; and outside-the-root fields are hints and never authority (specification
+sections 8, 11.2 and 11.3).
 
 **The tension is real in both directions and dogtag hit both ends.**
 
@@ -397,47 +506,86 @@ Put it **outside** and everything there is attacker-controlled. dogtag paid for 
 on-chain read both pass" (`AGENTS.md:333`). The fix was a whole extra mandatory issuer-whitelist
 pillar that exists only to compensate.
 
-The recommended split puts identity inside and routing outside, and the specification states
-normatively that outside-the-root fields are hints and never authority.
+The ruled split puts identity inside and routing outside, which respects both ends of that evidence.
 
-### D9 - Big blobs. **OPEN - worth a look**
+**One addition to the ruling, and it is the part that matters.** A normative sentence saying
+"outside-the-root fields are hints, never authority" is **not enough on its own** - dogtag had the
+equivalent understanding written down and still shipped the bug, then needed an entire extra
+mandatory pillar to compensate. The conformance corpus therefore MUST carry a vector that **fails**
+an implementation which trusts an outside-the-root field as authority. That is conformance class 18.
+A test that catches the mistake costs a day; the pillar dogtag needed to compensate for it cost far
+more.
 
-**Written into the spec:** hashed inline, bound as `STRING` over the base64 text (specification
-section 6.3).
+### D9 - Big blobs. **RULED 2026-07-28: inline for version 1, AND the content-addressed binding defined now**
+
+**This ruling extended the specification.** The specification previously recommended inline only and
+treated content-addressing as a later question.
+
+**Written into the spec:** explicitly typed healthcert blobs are hashed inline and bound as `STRING`
+over the base64 text, while FHIR `base64Binary` remains unresolved between STRING and BYTES
+(specification section 6.3); the content-addressed binding is **defined** as type tag 8 `BLOB_REF`
+and **selected by no version-1 profile**, so a record that selects it MUST be rejected (section
+6.5); and one canonical base64 form is pinned (section 6.3).
 
 `logo` and `attachments[].data` are **60-70% of all hashed bytes** across the three reference
 records: 14,314 bytes in the vaccination sample, 17,440 in the endorsed PDT, 2,618 in recovery.
 
-Content-addressing them - hash in the tree, blob out of band - would shrink records dramatically.
+**Why inline is right for now.** Under `hashAlg: "SHA-256"` a 14 KB blob costs about 41 microseconds.
+That is nothing, and inline keeps a record genuinely self-contained, which is worth a great deal in a
+setting where a traveller may present a credential offline at a border.
 
-**Not urgent for a record issued under `hashAlg: "SHA-256"`, where a 14 KB blob costs about 41
-microseconds. Becomes urgent for one issued under Poseidon, where the same blob costs about 14 ms.**
+**Why the alternative had to be specified now rather than later.** Decision B ruled that both hash
+families are permanent per-record selections, so D9 now hangs on whether any record family will
+select Poseidon. Under Poseidon the same blob costs about 14 ms, and for a Poseidon-selecting family
+blob handling stops being an optimization and becomes a requirement.
 
-Decision B is ruled, and it rules that both are permanent per-record selections rather than one
-project-wide choice, so D9 is no longer downstream of "which hash wins". It is downstream of
-**whether any record family will select Poseidon**, and for those families blob handling is a
-requirement rather than an optimization.
+Retrofitting a second leaf-binding form **after** five independent implementations exist is exactly
+the kind of change that splits a library family: some implement it, some do not, and a record that
+verifies in one fails in another. Specifying it once now, while there is no code to migrate, costs
+almost nothing. This is the standing future-proofing constraint applied where it is cheapest.
 
-A `BYTES` binding would additionally require pinning one canonical base64 form, since padding and
-line-wrap variants encode the same bytes differently.
+**Consequences applied in the same change:**
 
-### D11 - Detached signature. **OPEN**
+- The content-addressed binding commits to the blob's **length as well as its digest**. A digest
+  alone lets a substituted blob of different size pass anything that does not separately check the
+  size, so the length is inside the commitment rather than beside it.
+- It is **registered but unselected**, mirroring exactly how `Poseidon-BN254` is handled: present in
+  the schemas with a normative caution, and MUST NOT be issued against until a profile declares it.
+- **One canonical base64 form is pinned now**, because a `BYTES` or `BLOB_REF` binding is otherwise
+  ambiguous: RFC 4648 section 4, with padding, no line wrapping, standard alphabet. Padding and
+  line-wrap variants encode identical bytes differently, and that ambiguity is a root-divergence bug
+  waiting to happen.
+- **Under-specified by the ruling and decided here, labelled as such:** the ruling did not say which
+  digest the binding commits to. The specification pins SHA-256 regardless of `hashAlg`, and section
+  6.5 states the inference and its reason - binding the blob digest to `hashAlg` would make a
+  Poseidon record hash the whole blob through Poseidon, which is the cost the binding exists to
+  avoid. That is a design choice made here, not a ruling carried over.
 
-**Written into the spec:** no signature field (specification section 2.2).
+### D11 - Detached signature. **RULED 2026-07-28: no signature field in version 1, as recommended**
+
+**Written into the spec:** no signature field, plus the constraints on any future signature stated
+normatively now (specification section 2.2).
 
 Under this design the root is anchored and authority is re-derived from the chain, exactly as dogtag
 insists - resolve the issuing clone "from the verifier's own `DogTagIssuerFactory.rootIssuer(R)`,
 NEVER from `wrappedDoc.issuer.documentStore`" (`AGENTS.md:326`).
 
-If offline verification is wanted, a detached signature is the answer, and it MUST sign the root and
-MUST NOT become an alternative to anchoring. Adding it is cheap; adding it in a way that lets a
-verifier skip the chain is a regression to the failure mode D8 describes.
+**The constraints are written before the feature exists, and that is the point of this ruling.** A
+detached signature MUST sign the root, MUST NOT become an alternative to anchoring, and a verifier
+MUST NOT accept a signature in place of a chain read.
 
-### D12 - Unicode normalization. **OPEN - and it resolves a conflict between the research inputs**
+Writing the constraint before the feature is what stops it being added wrongly. A signature that lets
+a verifier skip the chain is a straight regression into the failure mode D8 describes, and the
+pressure to add exactly that will come from a real and sympathetic requirement - offline verification
+at a border with no connectivity - at a moment when saying no will be unpopular. Better to have said
+it already. This costs nothing now and is the same reasoning as D9.
 
-**Written into the spec:** NFC, with the Unicode version pinned at 15.1 (specification section 6.1).
+### D12 - Unicode normalization. **RULED 2026-07-28: D12a, NFC pinned at Unicode 15.1, as recommended**
 
-**This decision exists because two of the three research inputs disagreed**, and the disagreement is
+**Written into the spec:** NFC, with the Unicode version pinned at 15.1 (specification section 6.1),
+plus a conformance vector at class 19.
+
+**This decision existed because two of the three research inputs disagreed**, and the disagreement is
 recorded rather than quietly resolved in favour of one of them.
 
 - The canonicalization research specifies **mandatory NFC**.
@@ -450,30 +598,56 @@ recorded rather than quietly resolved in favour of one of them.
 | **D12a. NFC with a pinned Unicode version** | Two records that render identically hash identically. Satisfies the audit too, since it explicitly admits a versioned normalization rule. Cost: every implementation's NFC tables must match the pinned version, and NFC is version-dependent. |
 | **D12b. Preserve the exact scalar sequence** | No Unicode-version dependency at all. Cost: a record that passes through any normalizing form field - which is ordinary web-form behaviour - gets a different root, and the two forms render identically to a human, making the failure invisible. |
 
+**Reasoning, and the disagreement resolves cleanly on this project's own thesis.** D12b has no
+Unicode-version dependency, which is genuinely attractive. Its cost is that a record passing through
+any normalizing form field - ordinary web-form behaviour, not an edge case - gets a different root,
+and the two forms **render identically to a human**. That is an invisible failure, and invisible
+failures are what this project exists to remove.
+
+D12a's cost is that every implementation's NFC tables must match the pinned version. That is a real
+dependency, but it is **explicit and checkable**: `unicodeVersion` is already carried as an opaque
+equality-matched field, so a mismatch is detected rather than silently producing a different root.
+An explicit dependency that fails loudly beats no dependency that fails silently.
+
+The audit's position is satisfied too, since it explicitly admits a versioned normalization rule.
 dogtag chose to normalize (`crates/dogtag-standard-rs/src/encode.rs:11`) and separately found it
-necessary to pin a Unicode version (`encode.rs:6-7`), which is the evidence behind the recommended
-answer. That pin is recorded only in dogtag's source and not in its written scar list, so it is
-cited at that strength: evidence the pin was needed in practice, not a post-mortem of what went
-wrong without it.
+necessary to pin a Unicode version (`encode.rs:6-7`), which is the strongest available evidence that
+the pin is needed in practice rather than in theory. That pin is recorded only in dogtag's source and
+not in its written scar list, so it is cited at that strength.
 
-### D13 - Clinical validation level. **OPEN**
+**A conformance vector is required, not optional.** Class 19 carries a string that differs before and
+after NFC with its expected root, because without it the rule is prose that every implementation is
+trusted to have followed.
 
-**Written into the spec:** nothing. The protocol layer commits what it is given.
+### D13 - Clinical validation level. **RULED 2026-07-28: D13a at the protocol layer, with a mandatory honesty statement and a split**
+
+**Written into the spec:** a new section 2.3 stating what a valid root proves and what it does not,
+with a normative prohibition on asserting a clinical fact from root validity alone, and clinical
+validation recorded as a separate independently versioned layer that is out of scope here.
 
 | Option | Consequence |
 |---|---|
 | **D13a. Base FHIR only** | Broad interoperability, weak healthcare semantics. |
 | **D13b. Base FHIR plus named implementation profiles** | Actually enforces subject, event, cardinality and reference rules. Cost: more work and ongoing profile governance. |
 
-**Why this is on the list at all.** The four profile documents establish that the reference schemas
-enforce far less than they appear to. A minimal `{"resourceType":"Bundle"}` satisfies PDT and
-recovery; the recovery schema never checks the result is positive; the vaccination schema never
-requires any entry. So today a valid ROAX root proves a typed payload was committed by an issuer,
-and nothing clinical.
+**The finding this rests on is the important part and it now lives in the specification.** The four
+profile documents establish that the reference schemas enforce far less than they appear to. A
+minimal `{"resourceType":"Bundle"}` satisfies both PDT and recovery. The recovery schema never checks
+that the result is positive. The vaccination schema never requires any entry at all.
 
-If any product surface says "negative PDT result" or "proof of recovery", that claim needs D13b or
-it needs to be derived from the disclosed payload and clearly attributed to the payload rather than
-to the protocol.
+So today a valid ROAX root proves that a typed payload was committed by an identified issuer, and
+**nothing clinical whatsoever**. Any product surface saying "negative PDT result" or "proof of
+recovery" on the strength of root validity alone is stating a fact it has not established.
+
+**The ruling is a clean split.** The protocol layer stays honest and narrow: it proves commitment and
+issuer identity, and it says so in those words. Clinical validation is a **separate, independently
+versioned conformance layer** that a deployment may adopt, where D13b's named implementation profiles
+enforce subject, event, cardinality and reference rules.
+
+That split gets the honesty immediately, keeps the canonicalization layer clean, and lets D13b arrive
+later as an additive layer without touching a single byte of the digest rule. Merging the two would
+put clinical governance on the critical path of a cryptographic specification, which is how both end
+up moving at the speed of the slower one.
 
 ---
 
@@ -502,11 +676,11 @@ Recorded so that nobody mistakes a gap for a conclusion.
 
 | Gap | Status |
 |---|---|
-| **The type map does not exist.** | Established as necessary, tractable and roughly sized. Not built. On the critical path. |
+| **Some reference-schema paths remain untyped.** | Four executable base maps and their issuer extension mechanism are published. The remaining gap is evidence, not machinery: vaccination `dose` and `expiryDateTime`, PDT's 20 endorsed-sample path-kind pairs, FHIR XHTML, `base64Binary` and null placeholders remain unbound and fail closed. `docs/type-maps.md` sections 1 and 2 give the evidence and exact coverage. |
 | **Kotlin/JVM literal-preserving JSON is unverified.** | Every other target language has a confirmed mechanism. Kotlin was not tested by any research leg. |
 | **The five reference implementations share one author.** | They do not share a JSON parser, number representation, Unicode API, map or sort. They do share one reading of the specification. Hence gate 3 in the corpus. |
 | **No character with version-dependent NFC has been identified.** | The Unicode pin is inferred from dogtag having found it necessary in code, not from an exhibited failing character. Conformance class 16 says so explicitly. |
 | **The ROAX chain integration is not designed.** | Anchoring registry shape, batching and revocation semantics are a real design space that no research leg covered. |
 | **The `Poseidon-BN254` parameterization is not pinned.** | Decision B is ruled: both hash families are first-class and selectable per record. What is not settled is the parameterization - field, rate and capacity, round constants, and the byte-string-to-field-element encoding, which the byte-level preimages of specification sections 7 and 8 do not survive without. `ROAX-CANON/1` defines SHA-256 only and registers Poseidon-BN254 with a MUST NOT against issuing under it. No parameterization has been invented to fill the gap. |
-| **Which record families will select Poseidon is unknown.** | This is what D9 now turns on. Blob handling is an optimization for a SHA-256 record and a requirement for a Poseidon one. |
+| **Which record families will select Poseidon is unknown.** | Blob handling is an optimization for a SHA-256 record and a requirement for a Poseidon one. D9 is ruled and no longer waits on this: the content-addressed binding is **defined** in `ROAX-CANON/1` and **selected by no version-1 profile**, so the answer to this question decides when a profile selects it rather than whether the binding exists. |
 | **The audit's boundary conclusion was reached without consulting dogtag.** | **Closed.** Checked during this work; the conclusion survives, and dogtag's narrower single-profile shape is explained rather than adopted. See specification section 14.1. |

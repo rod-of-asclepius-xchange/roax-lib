@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://roax.example/schemas/type-map-registry/1.0/schema.json",
+  "title": "ROAX type-map registry format 1",
+  "description": "Schema for a registry of immutable ROAX type-map artifacts. The exact content ID selects a map, while versions are equality-checked metadata.",
+  "type": "object",
+  "required": [
+    "format",
+    "registryVersion",
+    "idAlgorithm",
+    "maps"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "ROAX-TYPE-MAP-REGISTRY/1"
+    },
+    "registryVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "idAlgorithm": {
+      "type": "object",
+      "required": [
+        "name",
+        "preimage"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "const": "sha256"
+        },
+        "preimage": {
+          "const": "utf8(\"ROAX-TYPE-MAP/1\\u0000\") || exactArtifactBytes"
+        }
+      }
+    },
+    "maps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/map"
+      }
+    }
+  },
+  "$defs": {
+    "typeMapId": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "scope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "profile"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "issuerIds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "issuers"
+            },
+            "issuerIds": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "map": {
+      "type": "object",
+      "required": [
+        "id",
+        "path",
+        "typeMapVersion",
+        "recordType",
+        "schemaVersion",
+        "scope"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/typeMapId"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^type-maps/(?!.*(?:^|/)\\.\\.(?:/|$)).+\\.json$"
+        },
+        "typeMapVersion": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "recordType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schemaVersion": {
+          "description": "Opaque profile-owned identifier matched only for exact equality.",
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,2382 @@
+{
+  "format": "ROAX-TYPE-MAP/1",
+  "typeMapVersion": "1.0.0",
+  "recordType": "sg.gov.moh.vaccination-healthcert",
+  "schemaVersion": "1.0",
+  "scope": {
+    "kind": "profile"
+  },
+  "sourceSchemas": [
+    {
+      "sourceId": "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json",
+      "kind": "git",
+      "repositoryUri": "https://github.com/Open-Attestation/schemata.git",
+      "path": "src/sg/gov/moh/vaccination-healthcert/1.0/schema.json",
+      "commit": "09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa"
+    },
+    {
+      "sourceId": "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json",
+      "kind": "git",
+      "repositoryUri": "https://github.com/Open-Attestation/schemata.git",
+      "path": "src/sg/gov/tech/notarise/1.0/schema.json",
+      "commit": "09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa"
+    }
+  ],
+  "extensionPoints": [
+    {
+      "prefix": [
+        {
+          "key": "issuers"
+        },
+        {
+          "anyIndex": true
+        }
+      ],
+      "note": "The issuer item omits additionalProperties: false."
+    },
+    {
+      "prefix": [
+        {
+          "key": "$template"
+        }
+      ],
+      "note": "The renderer object omits additionalProperties: false."
+    },
+    {
+      "prefix": [
+        {
+          "key": "fhirBundle"
+        },
+        {
+          "key": "entry"
+        },
+        {
+          "anyIndex": true
+        },
+        {
+          "key": "recommendation"
+        },
+        {
+          "anyIndex": true
+        }
+      ],
+      "note": "The recommendation item omits additionalProperties: false."
+    },
+    {
+      "prefix": [
+        {
+          "key": "fhirBundle"
+        },
+        {
+          "key": "entry"
+        },
+        {
+          "anyIndex": true
+        },
+        {
+          "key": "recommendation"
+        },
+        {
+          "anyIndex": true
+        },
+        {
+          "key": "dateCriterion"
+        },
+        {
+          "anyIndex": true
+        }
+      ],
+      "note": "The dateCriterion item omits additionalProperties: false."
+    },
+    {
+      "prefix": [
+        {
+          "key": "notarisationMetadata"
+        }
+      ],
+      "note": "The Notarise metadata object omits additionalProperties: false."
+    },
+    {
+      "prefix": [
+        {
+          "key": "notarisationMetadata"
+        },
+        {
+          "key": "signedEuHealthCerts"
+        },
+        {
+          "anyIndex": true
+        }
+      ],
+      "note": "Both signed EU certificate item branches omit additionalProperties: false."
+    }
+  ],
+  "addedSelectors": [],
+  "coverage": {
+    "concretePathCardinality": "infinite",
+    "states": 143,
+    "keyTransitions": 122,
+    "indexTransitions": 20,
+    "resolvedOutputs": 94,
+    "unresolvedOutputStates": 2,
+    "byTag": {
+      "2": 81,
+      "6": 6,
+      "7": 7
+    },
+    "byBasis": {
+      "schema-container-type": 13,
+      "schema-type": 77,
+      "schema-const": 2,
+      "schema-enum": 4
+    },
+    "structurallyUntypedObjectSourceNodes": 33,
+    "structurallyUntypedObjectStates": 26,
+    "notes": [
+      "fhirBundle.entry items use the flattened pseudo-FHIR layout and never gain a resource segment.",
+      "Schema nodes with properties but no explicit object type contribute exact child transitions and authorize only the object observed kind; other schema-admitted kinds remain unbound."
+    ]
+  },
+  "automaton": {
+    "representation": "structured-path-dfa/1",
+    "start": "s0",
+    "states": [
+      {
+        "id": "s0",
+        "keys": [
+          {
+            "key": "$template",
+            "to": "s1"
+          },
+          {
+            "key": "attachments",
+            "to": "s2"
+          },
+          {
+            "key": "fhirBundle",
+            "to": "s3"
+          },
+          {
+            "key": "fhirVersion",
+            "to": "s4"
+          },
+          {
+            "key": "id",
+            "to": "s5"
+          },
+          {
+            "key": "issuers",
+            "to": "s6"
+          },
+          {
+            "key": "logo",
+            "to": "s7"
+          },
+          {
+            "key": "name",
+            "to": "s8"
+          },
+          {
+            "key": "notarisationMetadata",
+            "to": "s9"
+          },
+          {
+            "key": "validFrom",
+            "to": "s10"
+          }
+        ]
+      },
+      {
+        "id": "s1",
+        "keys": [
+          {
+            "key": "name",
+            "to": "s11"
+          },
+          {
+            "key": "type",
+            "to": "s12"
+          },
+          {
+            "key": "url",
+            "to": "s13"
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "anyIndex": "s14",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/attachments"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "keys": [
+          {
+            "key": "entry",
+            "to": "s15"
+          },
+          {
+            "key": "resourceType",
+            "to": "s16"
+          },
+          {
+            "key": "type",
+            "to": "s17"
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/fhirVersion"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s5",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/id"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s6",
+        "anyIndex": "s18"
+      },
+      {
+        "id": "s7",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/logo"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s8",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/name"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s9",
+        "keys": [
+          {
+            "key": "notarisedOn",
+            "to": "s19"
+          },
+          {
+            "key": "passportNumber",
+            "to": "s20"
+          },
+          {
+            "key": "reference",
+            "to": "s21"
+          },
+          {
+            "key": "signedEuHealthCerts",
+            "to": "s22"
+          },
+          {
+            "key": "url",
+            "to": "s23"
+          }
+        ]
+      },
+      {
+        "id": "s10",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/validFrom"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s11",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/$template/properties/name"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s12",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/$template/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s13",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/$template/properties/url"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s14",
+        "keys": [
+          {
+            "key": "data",
+            "to": "s24"
+          },
+          {
+            "key": "filename",
+            "to": "s25"
+          },
+          {
+            "key": "type",
+            "to": "s26"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/attachments/items"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s15",
+        "anyIndex": "s27",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/fhirBundle/properties/entry"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s16",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-const"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/fhirBundle/properties/resourceType"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s17",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/fhirBundle/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s18",
+        "keys": [
+          {
+            "key": "id",
+            "to": "s28"
+          },
+          {
+            "key": "identityProof",
+            "to": "s29"
+          },
+          {
+            "key": "name",
+            "to": "s30"
+          },
+          {
+            "key": "revocation",
+            "to": "s31"
+          }
+        ]
+      },
+      {
+        "id": "s19",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/notarisedOn"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s20",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/passportNumber"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s21",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/reference"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s22",
+        "anyIndex": "s32"
+      },
+      {
+        "id": "s23",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/url"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s24",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/attachments/items/properties/data"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s25",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/attachments/items/properties/filename"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s26",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/attachments/items/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s27",
+        "keys": [
+          {
+            "key": "address",
+            "to": "s33"
+          },
+          {
+            "key": "birthDate",
+            "to": "s34"
+          },
+          {
+            "key": "code",
+            "to": "s35"
+          },
+          {
+            "key": "collection",
+            "to": "s36"
+          },
+          {
+            "key": "contact",
+            "to": "s37"
+          },
+          {
+            "key": "effectiveDateTime",
+            "to": "s38"
+          },
+          {
+            "key": "endpoint",
+            "to": "s39"
+          },
+          {
+            "key": "extension",
+            "to": "s40"
+          },
+          {
+            "key": "fullUrl",
+            "to": "s41"
+          },
+          {
+            "key": "gender",
+            "to": "s42"
+          },
+          {
+            "key": "id",
+            "to": "s43"
+          },
+          {
+            "key": "identifier",
+            "to": "s44"
+          },
+          {
+            "key": "location",
+            "to": "s45"
+          },
+          {
+            "key": "lotNumber",
+            "to": "s46"
+          },
+          {
+            "key": "name",
+            "to": "s47"
+          },
+          {
+            "key": "occurrenceDateTime",
+            "to": "s48"
+          },
+          {
+            "key": "patient",
+            "to": "s49"
+          },
+          {
+            "key": "performer",
+            "to": "s50"
+          },
+          {
+            "key": "qualification",
+            "to": "s51"
+          },
+          {
+            "key": "recommendation",
+            "to": "s52"
+          },
+          {
+            "key": "resourceType",
+            "to": "s53"
+          },
+          {
+            "key": "status",
+            "to": "s54"
+          },
+          {
+            "key": "type",
+            "to": "s55"
+          },
+          {
+            "key": "vaccineCode",
+            "to": "s56"
+          },
+          {
+            "key": "valueCodeableConcept",
+            "to": "s57"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s28",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/issuers/items/properties/id"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s29",
+        "keys": [
+          {
+            "key": "key",
+            "to": "s58"
+          },
+          {
+            "key": "location",
+            "to": "s59"
+          },
+          {
+            "key": "type",
+            "to": "s60"
+          }
+        ]
+      },
+      {
+        "id": "s30",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/issuers/items/properties/name"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s31",
+        "keys": [
+          {
+            "key": "location",
+            "to": "s61"
+          },
+          {
+            "key": "type",
+            "to": "s62"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/issuers/items/properties/revocation"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s32",
+        "keys": [
+          {
+            "key": "appleCovidCardUrl",
+            "to": "s63"
+          },
+          {
+            "key": "dose",
+            "to": "s64"
+          },
+          {
+            "key": "expiryDateTime",
+            "to": "s65"
+          },
+          {
+            "key": "qr",
+            "to": "s66"
+          },
+          {
+            "key": "type",
+            "to": "s67"
+          },
+          {
+            "key": "vaccineCode",
+            "to": "s68"
+          }
+        ]
+      },
+      {
+        "id": "s33",
+        "keys": [
+          {
+            "key": "country",
+            "to": "s69"
+          }
+        ]
+      },
+      {
+        "id": "s34",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Patient/properties/birthDate"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s35",
+        "keys": [
+          {
+            "key": "coding",
+            "to": "s70"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/code"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s36",
+        "keys": [
+          {
+            "key": "collectedDateTime",
+            "to": "s71"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s37",
+        "keys": [
+          {
+            "key": "address",
+            "to": "s72"
+          },
+          {
+            "key": "telecom",
+            "to": "s73"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s38",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/effectiveDateTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s39",
+        "keys": [
+          {
+            "key": "address",
+            "to": "s74"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s40",
+        "anyIndex": "s75"
+      },
+      {
+        "id": "s41",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Immunization/properties/fullUrl",
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/fullUrl",
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Location/properties/fullUrl",
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Patient/properties/fullUrl"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s42",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Patient/properties/gender"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s43",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Location/properties/id"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s44",
+        "anyIndex": "s76"
+      },
+      {
+        "id": "s45",
+        "keys": [
+          {
+            "key": "reference",
+            "to": "s77"
+          }
+        ]
+      },
+      {
+        "id": "s46",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Immunization/properties/lotNumber"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s47",
+        "anyIndex": "s78",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Location/properties/name",
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Organization/properties/name"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s48",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Immunization/properties/occurrenceDateTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s49",
+        "keys": [
+          {
+            "key": "reference",
+            "to": "s79"
+          }
+        ]
+      },
+      {
+        "id": "s50",
+        "keys": [
+          {
+            "key": "name",
+            "to": "s80"
+          }
+        ],
+        "anyIndex": "s81",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Immunization/properties/performer"
+            ]
+          },
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/performer"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s51",
+        "anyIndex": "s82"
+      },
+      {
+        "id": "s52",
+        "anyIndex": "s83",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/recommendation"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s53",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum",
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Immunization/properties/resourceType",
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/resourceType",
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Location/properties/resourceType",
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/resourceType",
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Organization/properties/resourceType",
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Patient/properties/resourceType",
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Specimen/properties/resourceType"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s54",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/status"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s55",
+        "keys": [
+          {
+            "key": "coding",
+            "to": "s84"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Organization/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s56",
+        "keys": [
+          {
+            "key": "coding",
+            "to": "s85"
+          }
+        ]
+      },
+      {
+        "id": "s57",
+        "keys": [
+          {
+            "key": "coding",
+            "to": "s86"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/valueCodeableConcept"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s58",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/issuers/items/properties/identityProof/properties/key"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s59",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/issuers/items/properties/identityProof/properties/location"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s60",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/issuers/items/properties/identityProof/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s61",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/issuers/items/properties/revocation/properties/location"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s62",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/properties/issuers/items/properties/revocation/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s63",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/signedEuHealthCerts/items/anyOf/0/properties/appleCovidCardUrl",
+              "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/signedEuHealthCerts/items/anyOf/1/properties/appleCovidCardUrl"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s64",
+        "unresolved": [
+          {
+            "jsonKinds": [
+              "number"
+            ],
+            "reason": "JSON Schema type number does not choose ROAX INTEGER or DECIMAL.",
+            "sources": [
+              "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/signedEuHealthCerts/items/anyOf/0/properties/dose"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s65",
+        "unresolved": [
+          {
+            "jsonKinds": [
+              "array",
+              "boolean",
+              "null",
+              "number",
+              "object",
+              "string"
+            ],
+            "reason": "The schema node has no JSON kind or semantic type constraint.",
+            "sources": [
+              "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/signedEuHealthCerts/items/anyOf/0/properties/expiryDateTime"
+            ]
+          },
+          {
+            "jsonKinds": [
+              "array",
+              "boolean",
+              "null",
+              "number",
+              "object",
+              "string"
+            ],
+            "reason": "The schema node has no JSON kind or semantic type constraint.",
+            "sources": [
+              "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/signedEuHealthCerts/items/anyOf/1/properties/expiryDateTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s66",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/signedEuHealthCerts/items/anyOf/0/properties/qr",
+              "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/signedEuHealthCerts/items/anyOf/1/properties/qr"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s67",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-const",
+              "schema-enum"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/signedEuHealthCerts/items/anyOf/0/properties/type",
+              "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/signedEuHealthCerts/items/anyOf/1/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s68",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/signedEuHealthCerts/items/anyOf/0/properties/vaccineCode"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s69",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Location/properties/address/properties/country"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s70",
+        "anyIndex": "s87"
+      },
+      {
+        "id": "s71",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Specimen/properties/collection/properties/collectedDateTime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s72",
+        "keys": [
+          {
+            "key": "text",
+            "to": "s88"
+          },
+          {
+            "key": "type",
+            "to": "s89"
+          },
+          {
+            "key": "use",
+            "to": "s90"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s73",
+        "anyIndex": "s91",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Organization/properties/contact/properties/telecom"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s74",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Organization/properties/endpoint/properties/address"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s75",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s92"
+          },
+          {
+            "key": "url",
+            "to": "s93"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s76",
+        "keys": [
+          {
+            "key": "type",
+            "to": "s94"
+          },
+          {
+            "key": "value",
+            "to": "s95"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s77",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Immunization/properties/location/properties/reference"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s78",
+        "keys": [
+          {
+            "key": "text",
+            "to": "s96"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s79",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Immunization/properties/patient/properties/reference",
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/patient/properties/reference"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s80",
+        "anyIndex": "s97"
+      },
+      {
+        "id": "s81",
+        "keys": [
+          {
+            "key": "actor",
+            "to": "s98"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s82",
+        "keys": [
+          {
+            "key": "identifier",
+            "to": "s99"
+          },
+          {
+            "key": "issuer",
+            "to": "s100"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s83",
+        "keys": [
+          {
+            "key": "dateCriterion",
+            "to": "s101"
+          },
+          {
+            "key": "forecastStatus",
+            "to": "s102"
+          },
+          {
+            "key": "targetDisease",
+            "to": "s103"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/recommendation/items"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s84",
+        "anyIndex": "s104"
+      },
+      {
+        "id": "s85",
+        "anyIndex": "s105"
+      },
+      {
+        "id": "s86",
+        "anyIndex": "s106"
+      },
+      {
+        "id": "s87",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s107"
+          },
+          {
+            "key": "display",
+            "to": "s108"
+          },
+          {
+            "key": "system",
+            "to": "s109"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s88",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Organization/properties/contact/properties/address/properties/text"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s89",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Organization/properties/contact/properties/address/properties/type"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s90",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Organization/properties/contact/properties/address/properties/use"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s91",
+        "keys": [
+          {
+            "key": "system",
+            "to": "s110"
+          },
+          {
+            "key": "value",
+            "to": "s111"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s92",
+        "keys": [
+          {
+            "key": "text",
+            "to": "s112"
+          }
+        ]
+      },
+      {
+        "id": "s93",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Patient/properties/extension/items/properties/url"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s94",
+        "keys": [
+          {
+            "key": "text",
+            "to": "s113"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/identifier/items/properties/type",
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Patient/properties/identifier/items/properties/type/anyOf/0"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s95",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/identifier/items/properties/value",
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Patient/properties/identifier/items/properties/value"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s96",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Patient/properties/name/items/properties/text"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s97",
+        "keys": [
+          {
+            "key": "text",
+            "to": "s114"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s98",
+        "keys": [
+          {
+            "key": "display",
+            "to": "s115"
+          }
+        ]
+      },
+      {
+        "id": "s99",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/qualification/items/properties/identifier"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s100",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/qualification/items/properties/issuer"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s101",
+        "anyIndex": "s116",
+        "bindings": [
+          {
+            "jsonKind": "array",
+            "tag": 6,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/recommendation/items/properties/dateCriterion"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s102",
+        "keys": [
+          {
+            "key": "coding",
+            "to": "s117"
+          }
+        ]
+      },
+      {
+        "id": "s103",
+        "keys": [
+          {
+            "key": "coding",
+            "to": "s118"
+          }
+        ]
+      },
+      {
+        "id": "s104",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s119"
+          },
+          {
+            "key": "display",
+            "to": "s120"
+          },
+          {
+            "key": "system",
+            "to": "s121"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s105",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s122"
+          },
+          {
+            "key": "display",
+            "to": "s123"
+          },
+          {
+            "key": "system",
+            "to": "s124"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s106",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s125"
+          },
+          {
+            "key": "display",
+            "to": "s126"
+          },
+          {
+            "key": "system",
+            "to": "s127"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s107",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/code/properties/coding/items/properties/code"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s108",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/code/properties/coding/items/properties/display"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s109",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/code/properties/coding/items/properties/system"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s110",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Organization/properties/contact/properties/telecom/items/properties/system"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s111",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Organization/properties/contact/properties/telecom/items/properties/value"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s112",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Patient/properties/extension/items/properties/code/properties/text"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s113",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Patient/properties/identifier/items/properties/type/anyOf/1/properties/text"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s114",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/performer/properties/name/items/properties/text"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s115",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Immunization/properties/performer/items/properties/actor/properties/display"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s116",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s128"
+          },
+          {
+            "key": "value",
+            "to": "s129"
+          }
+        ],
+        "bindings": [
+          {
+            "jsonKind": "object",
+            "tag": 7,
+            "basis": [
+              "schema-container-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/recommendation/items/properties/dateCriterion/items"
+            ]
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s117",
+        "anyIndex": "s130"
+      },
+      {
+        "id": "s118",
+        "anyIndex": "s131"
+      },
+      {
+        "id": "s119",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Specimen/properties/type/properties/coding/items/properties/code"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s120",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Specimen/properties/type/properties/coding/items/properties/display"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s121",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Specimen/properties/type/properties/coding/items/properties/system"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s122",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Immunization/properties/vaccineCode/properties/coding/items/properties/code"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s123",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Immunization/properties/vaccineCode/properties/coding/items/properties/display"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s124",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Immunization/properties/vaccineCode/properties/coding/items/properties/system"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s125",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/valueCodeableConcept/properties/coding/items/properties/code"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s126",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/valueCodeableConcept/properties/coding/items/properties/display"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s127",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/Observation/properties/valueCodeableConcept/properties/coding/items/properties/system"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s128",
+        "keys": [
+          {
+            "key": "coding",
+            "to": "s132"
+          }
+        ]
+      },
+      {
+        "id": "s129",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/recommendation/items/properties/dateCriterion/items/properties/value"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s130",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s133"
+          },
+          {
+            "key": "display",
+            "to": "s134"
+          },
+          {
+            "key": "system",
+            "to": "s135"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s131",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s136"
+          },
+          {
+            "key": "display",
+            "to": "s137"
+          },
+          {
+            "key": "system",
+            "to": "s138"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s132",
+        "anyIndex": "s139"
+      },
+      {
+        "id": "s133",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/recommendation/items/properties/forecastStatus/properties/coding/items/properties/code"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s134",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/recommendation/items/properties/forecastStatus/properties/coding/items/properties/display"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s135",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/recommendation/items/properties/forecastStatus/properties/coding/items/properties/system"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s136",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/recommendation/items/properties/targetDisease/properties/coding/items/properties/code"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s137",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/recommendation/items/properties/targetDisease/properties/coding/items/properties/display"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s138",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/recommendation/items/properties/targetDisease/properties/coding/items/properties/system"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s139",
+        "keys": [
+          {
+            "key": "code",
+            "to": "s140"
+          },
+          {
+            "key": "display",
+            "to": "s141"
+          },
+          {
+            "key": "system",
+            "to": "s142"
+          }
+        ],
+        "structurallyUntypedObject": true
+      },
+      {
+        "id": "s140",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/recommendation/items/properties/dateCriterion/items/properties/code/properties/coding/items/properties/code"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s141",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/recommendation/items/properties/dateCriterion/items/properties/code/properties/coding/items/properties/display"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s142",
+        "bindings": [
+          {
+            "jsonKind": "string",
+            "tag": 2,
+            "basis": [
+              "schema-type"
+            ],
+            "sources": [
+              "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/schema.json#/definitions/ImmunizationRecommendation/properties/recommendation/items/properties/dateCriterion/items/properties/code/properties/coding/items/properties/system"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

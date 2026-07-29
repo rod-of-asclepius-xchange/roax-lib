@@ -1,15 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://roax.example/schemas/type-map/1.0/schema.json",
-  "title": "ROAX type map v1",
-  "description": "Binds record paths to ROAX type tags. This file is the schema FOR the type map; the type map itself does not exist yet (spec section 4.3) and building it is on the critical path. The type map is NORMATIVE data: two libraries carrying different type maps produce different roots for the same record, which is the highest-risk surface in the design (spec section 4). It is versioned with the specification and is part of the conformance corpus (docs/conformance-corpus.md class 11).",
+  "title": "Superseded draft ROAX display-pattern type map v1",
+  "description": "Retained to identify the earlier review draft. It MUST NOT be used to publish or resolve a type map because its display-pattern and first-match representation conflicts with the structured-path rules in spec sections 4.2 and 5.2. Published artifacts use schemas/type-map-artifact-1.0.json and type-maps/registry-1.0.0.json, with coverage and migration rationale in docs/type-maps.md.",
   "type": "object",
   "required": ["typeMapVersion", "recordType", "schemaVersion", "entries"],
   "additionalProperties": false,
 
   "properties": {
     "typeMapVersion": {
-      "description": "Version of this type map. Changing any entry MUST bump it. A root computed under one type-map version is not reproducible under another if the changed entry was reachable. The three-part semver pattern is KEPT here on purpose, and the distinction is the one spec section 12.1 draws: this is one of ROAX's OWN artifacts, so this project defines the identifier and may legitimately constrain its shape. schemaVersion above is defined elsewhere - by the profile, and beyond it by FHIR or a health authority - and is therefore opaque. Do not 'harmonize' the two; they differ because their owners differ.",
+      "description": "Version of this type map. ADDING an entry MUST bump it; CHANGING one is forbidden, and the difference is normative rather than stylistic. Adding a binding for a path the map does not yet cover is the normal case and is what makes fail-closed workable for an open-world profile like PDT. Retagging a path the map ALREADY covers changes the root of every already-issued record that reaches that path, which spec section 12.2 forbids, so a correction to an existing binding is a new PROFILE version rather than a type-map patch, and records anchored under the old binding keep verifying under it. An earlier version of this description said only that changing any entry must bump the version, which permitted the retag and asked only for a version bump; decision D7's ruling to D7a made the additive constraint explicit (spec section 4.2). A root computed under one type-map version is not reproducible under another if the changed entry was reachable, which is why the distinction matters at all. The three-part semver pattern is KEPT here on purpose, and the distinction is the one spec section 12.1 draws: this is one of ROAX's OWN artifacts, so this project defines the identifier and may legitimately constrain its shape. schemaVersion above is defined elsewhere - by the profile, and beyond it by FHIR or a health authority - and is therefore opaque. Do not 'harmonize' the two; they differ because their owners differ.",
       "type": "string",
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
     },
@@ -41,7 +41,7 @@
     },
 
     "entries": {
-      "description": "Path-pattern to type-tag bindings. Order is significant: the FIRST matching entry wins, so more specific patterns MUST precede more general ones.",
+      "description": "Superseded display-pattern bindings. Their order-dependent first-match rule is unsafe for issuer extension composition and is not operative under spec section 4.2.",
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/$defs/entry" }
@@ -64,10 +64,10 @@
           "enum": ["string", "number", "boolean", "null", "object", "array"]
         },
         "tag": {
-          "description": "ROAX type tag: 0 NULL, 1 BOOL, 2 STRING, 3 INTEGER, 4 DECIMAL, 5 BYTES, 6 EMPTY_ARRAY, 7 EMPTY_OBJECT. Tags 6 and 7 are produced by the flattener for empty containers and are not normally asserted here.",
+          "description": "ROAX type tag: 0 NULL, 1 BOOL, 2 STRING, 3 INTEGER, 4 DECIMAL, 5 BYTES, 6 EMPTY_ARRAY, 7 EMPTY_OBJECT, 8 BLOB_REF. Tags 6 and 7 are produced by the flattener for empty containers and are not normally asserted here. Tag 8 selects the content-addressed blob binding, which is REGISTERED and selected by NO version-1 profile: an implementation MUST reject a type map that binds any path to tag 8 until a profile document under docs/profiles/ declares the binding for that path, and that profile MUST also state how the blob is carried out of band (spec section 6.5). It is accepted by this schema for the same reason Poseidon-BN254 is accepted in the envelope's hashAlg enum - so that the form is pinned once now rather than retrofitted after five independent implementations exist, which is the change that splits a library family.",
           "type": "integer",
           "minimum": 0,
-          "maximum": 7
+          "maximum": 8
         },
         "source": {
           "description": "Where this binding came from, so a reviewer can check it. E.g. the FHIR element declaration that says this element is `decimal`.",
@@ -77,5 +77,5 @@
     }
   },
 
-  "$comment": "Unknown paths MUST fail closed (spec section 4.2, decision D7 - OPEN). This schema deliberately provides no default-tag or fallback field: a type map that could express 'anything else is a STRING' would let two libraries with different maps silently agree on a wrong root. If decision D7 is ruled the other way, that fallback belongs here and this comment must be removed."
+  "$comment": "This schema is superseded and non-operative. Unknown paths still fail closed under spec section 4.2 and ruled decision D7. The immutable structured-path DFA artifact, additive issuer extension rules and exact content-ID selection are defined by schemas/type-map-artifact-1.0.json and docs/type-maps.md sections 3 through 5."
 }
