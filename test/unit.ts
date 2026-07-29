@@ -7,8 +7,12 @@
  */
 
 import { strict as assert } from 'node:assert';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   readJson,
+  carrierFromJson,
   writeJson,
   fromJsValue,
   RoaxError,
@@ -47,6 +51,74 @@ function test(name: string, body: () => void): void {
   } catch (e) {
     failures.push(`${name}: ${String(e)}`);
   }
+}
+
+/**
+ * The repository root, found by walking up from this module's own directory.
+ *
+ * The same shape `conformance/run.ts` uses and for the same reason: this file runs from `dist/`,
+ * so a path relative to the source tree would not resolve. `package.json` is the marker.
+ */
+const REPO_ROOT = ((): string => {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 8; i += 1) {
+    if (existsSync(resolve(dir, 'package.json')) && existsSync(resolve(dir, 'schemas'))) {
+      return dir;
+    }
+    dir = resolve(dir, '..');
+  }
+  throw new Error('could not find the repository root from the test module');
+})();
+
+/**
+ * A JSON Schema file, read with the host parser.
+ *
+ * `JSON.parse` is correct HERE and nowhere near a record: a schema carries no record value, so no
+ * numeric literal of the protocol passes through it. Reading it with this package's own reader
+ * would say the opposite of what section 6.4 means.
+ */
+function readJsonFile(file: string): unknown {
+  return JSON.parse(readFileSync(file, 'utf8')) as unknown;
+}
+
+/**
+ * The `value` pattern an envelope schema pins for tag 5, found structurally.
+ *
+ * A recursive search for the conditional rather than a fixed `$defs` path, so the test keeps
+ * comparing against the live schema if the surrounding structure is reorganized.
+ */
+function tagFivePattern(node: unknown): string | undefined {
+  if (node === null || typeof node !== 'object') {
+    return undefined;
+  }
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = tagFivePattern(item);
+      if (found !== undefined) {
+        return found;
+      }
+    }
+    return undefined;
+  }
+  const record = node as Record<string, unknown>;
+  const conditionTag = (((record['if'] as Record<string, unknown>)?.['properties'] as
+    | Record<string, unknown>
+    | undefined)?.['tag'] as Record<string, unknown> | undefined)?.['const'];
+  if (conditionTag === 5) {
+    const pattern = (((record['then'] as Record<string, unknown>)?.['properties'] as
+      | Record<string, unknown>
+      | undefined)?.['value'] as Record<string, unknown> | undefined)?.['pattern'];
+    if (typeof pattern === 'string') {
+      return pattern;
+    }
+  }
+  for (const value of Object.values(record)) {
+    const found = tagFivePattern(value);
+    if (found !== undefined) {
+      return found;
+    }
+  }
+  return undefined;
 }
 
 function expectCode(code: string, body: () => unknown): void {
@@ -291,6 +363,41 @@ test('base64 is RFC 4648 section 4: padded, standard alphabet, canonical final q
   expectCode('base64-not-canonical', () => decodeBase64Strict('AA=\n'));
 });
 
+test('a BYTES carrier is lowercase hex projected from the record base64 (section 6.3)', () => {
+  // **The record form and the carrier form differ for this one tag**, and this is the only place
+  // the two meet. Both envelope schemas pin `^([0-9a-f]{2})*$` for a disclosed tag-5 value, so a
+  // carrier that kept the base64 would be schema-invalid while still verifying against its own
+  // root - valid-looking and wrong, which is the dangerous shape.
+  assert.equal(carrierFromJson(TypeTag.BYTES, readJson('"AAECAw=="')), '00010203');
+  // Empty bytes survive as the empty string. BYTES is not one of the tags that carries no value,
+  // so the leaf keeps its `value` member and both schema patterns admit the empty match.
+  assert.equal(carrierFromJson(TypeTag.BYTES, readJson('""')), '');
+  // The non-canonical forms are rejected AT THE PROJECTION, because that is now the only place
+  // base64 is read: the URL-safe alphabet, a non-zero final quantum, and absent padding.
+  expectCode('base64-not-canonical', () => carrierFromJson(TypeTag.BYTES, readJson('"-_=="')));
+  expectCode('base64-not-canonical', () => carrierFromJson(TypeTag.BYTES, readJson('"AB=="')));
+  expectCode('base64-not-canonical', () => carrierFromJson(TypeTag.BYTES, readJson('"AAE"')));
+  // STRING at the same observed kind keeps the text verbatim, so the two tags are genuinely
+  // different projections rather than one with a cosmetic difference. The healthcert blob fields
+  // bind as STRING and their base64 text is hashed as text (section 6.3).
+  assert.equal(carrierFromJson(TypeTag.STRING, readJson('"AAECAw=="')), 'AAECAw==');
+});
+
+test('encodeValue reads a BYTES carrier as strict lowercase hex, never as base64', () => {
+  assert.equal(toHex(encodeValue(TypeTag.BYTES, '00010203')), '00010203');
+  assert.equal(encodeValue(TypeTag.BYTES, '').length, 0);
+  // Uppercase is rejected rather than folded: the carrier is pinned to ONE spelling, and accepting
+  // both would let two texts commit the same bytes.
+  expectCode('envelope-malformed', () => encodeValue(TypeTag.BYTES, '00AB'));
+  // Odd length, and a non-hex character.
+  expectCode('envelope-malformed', () => encodeValue(TypeTag.BYTES, '000'));
+  expectCode('envelope-malformed', () => encodeValue(TypeTag.BYTES, 'zz'));
+  // The base64 the earlier reading decoded HERE. It is not hex, and accepting it at this boundary
+  // is what let a schema-invalid disclosed copy verify against its own root.
+  expectCode('envelope-malformed', () => encodeValue(TypeTag.BYTES, 'AAECAw=='));
+  expectCode('value-type-mismatch', () => encodeValue(TypeTag.BYTES, true));
+});
+
 // ---------------------------------------------------------------------------------------------
 // Section 6.2 edges, and the two stated ambiguities.
 // ---------------------------------------------------------------------------------------------
@@ -466,7 +573,9 @@ const REVEAL_WITH_NUMERIC_LEAF: Path[] = [
 // ---------------------------------------------------------------------------------------------
 // Section 10 step 1: a disclosed record leaf's tag against the exact selected map, for EVERY tag a
 // record leaf can carry. The corpus cannot see this - all 318 disclosed leaves in its 54 envelope
-// fixtures are tag 2 STRING - so these two are the only coverage of the numeric and BYTES tags.
+// fixtures are tag 2 STRING - so these two are the only coverage of the numeric and BYTES tags
+// AGAINST THE MAP. The BYTES carrier form itself is covered separately, by the section 6.3 tests
+// above and the end-to-end BYTES round trip below.
 //
 // Both tamper only with the tag. That is deliberate: a tag that contradicts its own value would
 // also be caught downstream by `encodeValue`, so each test asserts that the MAP check fires first
@@ -596,6 +705,162 @@ test('a present-but-non-string optional member reads as absent, at every site', 
     value: true,
   });
   assert.equal(parseEnvelope(withMember(anchored.document, 'anchor', anchor)).anchor?.txHash, undefined);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Section 6.5, the SECOND rejection: an envelope carrying a tag-8 leaf.
+//
+// The first rejection - a map that binds a path to tag 8 - is covered above, and it reaches a full
+// copy transitively because re-flattening one runs `carrierFromJson`. A disclosed copy is never
+// re-flattened, so this half needs its own assertion and no committed vector carries a tag-8 leaf.
+// ---------------------------------------------------------------------------------------------
+
+test('a disclosed copy carrying a tag-8 BLOB_REF leaf is rejected (section 6.5)', () => {
+  const disclosed = discloseFrom(issued(), { reveal: REVEAL_WITH_NUMERIC_LEAF });
+  const tampered = mapDisclosedLeaves(disclosed, (leaf) =>
+    leafKey(leaf) === 'type' ? withMember(leaf, 'tag', { kind: 'number', literal: '8' }) : leaf,
+  );
+  expectCode('blob-ref-not-selectable', () => verifyEnvelope(parseEnvelope(tampered), VERIFIER));
+  // With no map, so the tag check cannot be the thing that caught it: the rejection is the tag
+  // itself, and `observedKindForTag` has no kind to look tag 8 up under in any case.
+  expectCode('blob-ref-not-selectable', () =>
+    verifyEnvelope(parseEnvelope(tampered), {
+      knownProfiles: REGISTERED_PROFILES,
+      requireTypeMapForDisclosedLeaves: false,
+    }),
+  );
+});
+
+test('a tag-8 leaf with no value still reports BLOB_REF rather than a missing value', () => {
+  // The ORDER inside the per-leaf loop, which is the part a later edit can silently break: a leaf
+  // carrying a salt and no value would otherwise surface as `disclosed-leaf-named-without-value`,
+  // which names a different defect and would send a reader looking for a withheld-salt smuggle.
+  const disclosed = discloseFrom(issued(), { reveal: REVEAL_WITH_NUMERIC_LEAF });
+  const tampered = mapDisclosedLeaves(disclosed, (leaf) => {
+    if (leafKey(leaf) !== 'type') {
+      return leaf;
+    }
+    const retagged = withMember(leaf, 'tag', { kind: 'number', literal: '8' });
+    assert.equal(retagged.kind, 'object');
+    return {
+      kind: 'object',
+      members: retagged.kind === 'object' ? retagged.members.filter(([k]) => k !== 'value') : [],
+    };
+  });
+  expectCode('blob-ref-not-selectable', () => verifyEnvelope(parseEnvelope(tampered), VERIFIER));
+});
+
+// ---------------------------------------------------------------------------------------------
+// Section 6.3 end to end: a BYTES leaf through issuance, disclosure, parsing and verification.
+//
+// **No published type map selects BYTES**, so nothing in `type-maps/`, `corpus/type-maps/` or the
+// committed corpus reaches this path - all 318 disclosed leaves in the 54 envelope fixtures are
+// tag 2 STRING, and no vector carries a tag-5 value at all. Synthetic coverage is therefore the
+// only coverage there can be, and it is required rather than optional: the carrier form is pinned
+// by both envelope schemas today and would otherwise be first exercised by whichever profile
+// binds `base64Binary`, long after five implementations had settled on a reading.
+// ---------------------------------------------------------------------------------------------
+
+const BYTES_MAP = LegacyPatternTypeMap.compile({
+  typeMapVersion: '1.0.0',
+  recordType: 'sg.gov.moh.pdt-healthcert',
+  schemaVersion: '2.0',
+  entries: [
+    { pattern: 'version', jsonKind: 'string', tag: 2 },
+    { pattern: 'type', jsonKind: 'string', tag: 2 },
+    { pattern: 'validFrom', jsonKind: 'string', tag: 2 },
+    { pattern: 'attachment', jsonKind: 'string', tag: 5 },
+    { pattern: 'emptyAttachment', jsonKind: 'string', tag: 5 },
+  ],
+});
+
+// The record carries BASE64, as a source record does. `attachment` is the `AAECAw==` of the
+// section 6.3 test above; `emptyAttachment` is the empty-bytes case, which has to travel the whole
+// way rather than only through `encodeValue`, because `value: ""` is what interacts with the
+// disclosed-leaf `hasValue` rule.
+const BYTES_RECORD = readJson(
+  '{"version":"pdt-healthcert-v2.0","type":"PCR","validFrom":"2026-07-28T00:00:00Z",' +
+    '"attachment":"AAECAw==","emptyAttachment":""}',
+);
+
+// The pdt floor - `version`, `type`, `validFrom` plus the reserved paths - and the two BYTES
+// leaves. Revealing less would be rejected for the floor rather than for anything about BYTES.
+const REVEAL_WITH_BYTES: Path[] = [
+  [{ key: 'roax.recordType' }],
+  [{ key: 'roax.schemaVersion' }],
+  [{ key: 'roax.typeMap.id' }],
+  [{ key: 'roax.recordId' }],
+  [{ key: 'roax.issuer.id' }],
+  [{ key: 'version' }],
+  [{ key: 'type' }],
+  [{ key: 'validFrom' }],
+  [{ key: 'attachment' }],
+  [{ key: 'emptyAttachment' }],
+];
+
+const BYTES_VERIFIER = {
+  knownProfiles: REGISTERED_PROFILES,
+  resolverFor: (t: string) => (t === IDENTITY.recordType ? BYTES_MAP : undefined),
+};
+
+/** The `value` of the single-KEY disclosed leaf at `key`, as text, or `undefined`. */
+function disclosedValueAt(envelope: JsonValue, key: string): string | undefined {
+  const leaves = memberValue(memberValue(envelope, 'disclosure'), 'leaves');
+  assert.equal(leaves.kind, 'array');
+  const leaf = (leaves.kind === 'array' ? leaves.items : []).find((l) => leafKey(l) === key);
+  assert.ok(leaf !== undefined, `no disclosed leaf at ${key}`);
+  const value = memberValue(leaf, 'value');
+  return value.kind === 'string' ? value.value : undefined;
+}
+
+test('a BYTES leaf issues, discloses as hex, parses and verifies (sections 6.3, 10)', () => {
+  const full = issueFullCopy({
+    record: BYTES_RECORD,
+    identity: IDENTITY,
+    resolver: BYTES_MAP,
+  });
+  // The full copy verifies, which is what proves the two halves agree: verification re-flattens
+  // the record, so the base64 goes through `carrierFromJson` a second time and the hex it yields
+  // goes through `encodeValue`. A projection and a decoder that disagreed would not close here.
+  assert.equal(verifyEnvelope(parseEnvelope(full.document), BYTES_VERIFIER).kind, 'full');
+
+  const disclosed = discloseFrom(full, { reveal: REVEAL_WITH_BYTES });
+  // The assertion the finding is about: `00010203`, not `AAECAw==`.
+  assert.equal(disclosedValueAt(disclosed, 'attachment'), '00010203');
+  assert.equal(disclosedValueAt(disclosed, 'emptyAttachment'), '');
+
+  // And the disclosed copy verifies against the root of the full copy, so the hex carrier
+  // reconstructs the same leaf hash the base64 record committed.
+  const result = verifyEnvelope(parseEnvelope(disclosed), BYTES_VERIFIER);
+  assert.equal(result.kind, 'disclosed');
+  assert.equal(result.root, full.root);
+});
+
+test('the disclosed BYTES carrier matches the tag-5 pattern of both live envelope schemas', () => {
+  // Read the pattern OUT OF THE SCHEMA rather than restating it here. A hardcoded copy would keep
+  // agreeing with itself after the schema moved, which is the whole failure mode: this test exists
+  // because the code and the schema had drifted apart with nothing comparing them.
+  const disclosed = discloseFrom(
+    issueFullCopy({ record: BYTES_RECORD, identity: IDENTITY, resolver: BYTES_MAP }),
+    { reveal: REVEAL_WITH_BYTES },
+  );
+  const values = ['attachment', 'emptyAttachment'].map((k) => disclosedValueAt(disclosed, k));
+
+  for (const schema of ['schemas/envelope-1.0.json', 'schemas/envelope-2.0.json']) {
+    const file = resolve(REPO_ROOT, schema);
+    // Never silently skipped: the schemas are committed to this repository, so an absent one is a
+    // defect to report rather than a check to drop.
+    assert.ok(existsSync(file), `${schema} is missing, so the live carrier check cannot run`);
+    const pattern = tagFivePattern(readJsonFile(file));
+    assert.ok(pattern !== undefined, `${schema} pins no tag-5 value pattern`);
+    for (const value of values) {
+      assert.ok(typeof value === 'string', 'a BYTES carrier is a string');
+      assert.match(value, new RegExp(pattern), `${schema} rejects the carrier ${value}`);
+    }
+    // The base64 the code used to emit is rejected by that same live pattern, so the check has
+    // teeth rather than passing for any string.
+    assert.ok(!new RegExp(pattern).test('AAECAw=='), `${schema} would have accepted base64`);
+  }
 });
 
 // ---------------------------------------------------------------------------------------------

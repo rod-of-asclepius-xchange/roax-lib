@@ -4,7 +4,7 @@
 
 import { fail } from './errors.js';
 import { canonicalizeDecimal, canonicalizeInteger } from './numbers.js';
-import { concatBytes, decodeBase64Strict, fromHex, nfc, u32be, u64be, utf8 } from './bytes.js';
+import { concatBytes, decodeBase64Strict, fromHex, nfc, toHex, u32be, u64be, utf8 } from './bytes.js';
 import { assertNoUnpairedSurrogate, type JsonValue } from './json.js';
 
 export const TypeTag = {
@@ -32,6 +32,11 @@ export function isTypeTag(n: number): n is TypeTagValue {
  * DECIMAL travel as strings because a JSON number in a carrier would be destroyed by the very
  * parser under test (specification section 6.4), and `BLOB_REF`'s byte length travels as a string
  * for the same reason - it is a hash-preimage input.
+ *
+ * **BYTES travels as lowercase hex of even length, NOT as the record's base64.** The carrier form
+ * is not the record form for this one tag: both envelope schemas pin `^([0-9a-f]{2})*$` for a
+ * disclosed tag-5 value, while specification section 6.3 governs the base64 a SOURCE RECORD may
+ * embed. `carrierFromJson` is the single place that projection happens.
  */
 export type CarrierValue =
   | boolean
@@ -105,9 +110,15 @@ export function encodeValue(tag: TypeTagValue, value: CarrierValue | undefined):
     }
     case TypeTag.BYTES: {
       if (typeof value !== 'string') {
-        fail('value-type-mismatch', 'a BYTES leaf carries base64 text');
+        fail('value-type-mismatch', 'a BYTES leaf carries lowercase hex');
       }
-      return decodeBase64Strict(value);
+      // The CARRIER is lowercase hex of even length, which is what both envelope schemas pin
+      // (`schemas/envelope-1.0.json:259-264`, `schemas/envelope-2.0.json:260-265`). The base64 of
+      // section 6.3 is a fact about the SOURCE RECORD and is decoded once, in `carrierFromJson`
+      // below; by the time a value reaches here it has already been through that projection, or it
+      // arrived from an envelope that carries the hex form directly. Decoding base64 here instead
+      // would emit a schema-invalid disclosed copy that still verified against its own root.
+      return fromHex(value, 'a BYTES value');
     }
     case TypeTag.BLOB_REF: {
       if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -159,11 +170,25 @@ export function carrierFromJson(tag: TypeTagValue, value: JsonValue): CarrierVal
       }
       return value.value;
     case TypeTag.STRING:
-    case TypeTag.BYTES:
       if (value.kind !== 'string') {
         fail('value-type-mismatch', `tag ${tag} requires a JSON string`);
       }
       return value.value;
+    case TypeTag.BYTES: {
+      if (value.kind !== 'string') {
+        fail('value-type-mismatch', `tag ${tag} requires a JSON string`);
+      }
+      // **This is the one projection that changes the text, and it is where base64 stops.** The
+      // record holds base64 (specification section 6.3); the carrier holds lowercase hex, because
+      // that is what both envelope schemas require of a disclosed tag-5 value. Decoding here rather
+      // than at `encodeValue` is what makes the two agree: a disclosed copy emits the hex, and the
+      // non-canonical base64 forms section 6.3 requires rejecting are rejected once, at the
+      // boundary where the record is read, rather than at every later re-encode.
+      //
+      // The bytes committed are unchanged by this - `fromHex(toHex(b))` is `b` - so it moves no
+      // root. Empty bytes survive as the empty string, which both schema patterns admit.
+      return toHex(decodeBase64Strict(value.value));
+    }
     case TypeTag.INTEGER:
     case TypeTag.DECIMAL:
       if (value.kind !== 'number') {

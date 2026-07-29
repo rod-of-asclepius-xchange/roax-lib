@@ -273,8 +273,20 @@ Recorded so a passing run does not read as coverage it does not have.
   `docs/conformance-corpus.md` class 11 mandates a row for the first half.
   No committed `typeMapVector` carries `expectMapRejected` and no committed envelope fixture
   carries a tag-8 leaf, so neither half is reached by a vector.
-  The record half is unit-tested; **the envelope half is currently asserted by neither a vector nor
-  a unit test**, and is recorded here rather than left to read as covered.
+  **Both halves are unit-tested**, and the envelope half takes two tests rather than one: that a
+  tag-8 leaf is refused both with a resolver available and without one, and that a tag-8 leaf
+  carrying NO value still reports `blob-ref-not-selectable`.
+  What the guard is worth was measured by deleting it, across both verifier configurations and all
+  three value shapes a tag-8 leaf can carry, rather than reasoned about.
+  Without it a verifier holding a map still fails closed on `blob-ref-not-selectable` for a string
+  and for a BLOB_REF-shaped value, through the uninvertible-tag branch described below, and reports
+  `disclosed-leaf-named-without-value` for a valueless leaf.
+  A verifier holding no map reports `value-type-mismatch` for a string, the same
+  `disclosed-leaf-named-without-value` for a valueless leaf, and for a BLOB_REF-shaped value reaches
+  the inclusion proof with nothing before it having objected.
+  That last one is the case the paragraph below describes: it failed on `inclusion-proof-failed` only
+  because the root under test does not commit such a leaf, which is a property of the fixture rather
+  than a rule being enforced.
   The two need separate code, which is the part that is easy to miss: the record half also covers
   a FULL copy transitively, because re-flattening one reaches `carrierFromJson`, but a disclosed
   copy is never re-flattened.
@@ -298,6 +310,33 @@ Recorded so a passing run does not read as coverage it does not have.
   final quantum whose unused bits are zero. No version-1 profile binds `BYTES`, so no vector
   reaches `decodeBase64Strict`. It is implemented and unit-tested, including the non-canonical
   final quantum that RFC 4648 section 3.5 identifies.
+- **The `BYTES` carrier form, which is hex and not the record's base64.** The two are different
+  spellings of the same bytes and the code had them confused: `carrierFromJson` kept the base64
+  and `encodeValue` decoded it, so a disclosed tag-5 leaf was emitted as `AAECAw==` where both
+  envelope schemas require `^([0-9a-f]{2})*$` (`schemas/envelope-1.0.json:259-264`,
+  `schemas/envelope-2.0.json:260-265`).
+  That copy verified against its own root while being schema-invalid, and a schema-valid hex
+  carrier was rejected or decoded as different bytes - the failure was symmetric and silent.
+  Base64 is now decoded once, at record projection in `carrierFromJson`, and `encodeValue` reads
+  strict lowercase even-length hex through `fromHex`.
+  **No committed vector moved, because no vector carries a tag-5 value at all**: the conformance
+  total is unchanged at 680 passed, 0 failed, 2 NOT RUN, which is the measurement that shows the
+  committed bytes and roots were preserved.
+  That covers the two class-10 vectors this run could not execute as well, and by argument rather
+  than by measurement: no map in `corpus/type-maps/` binds any path to tag 5, so the recovery
+  record cannot reach the changed code at all.
+  **The independent Rust library already reads it this way**, which is the strongest evidence
+  available that the specification says one thing here and that the TypeScript side was the
+  outlier: `rust/src/value.rs:54` decodes canonical base64 at record projection, `:157-158`
+  requires an envelope carrier to be hex that survives a re-encode round trip, so uppercase is
+  refused there too, and `:180` emits `hex::encode` into a disclosed leaf.
+  **Because no published map selects `BYTES`, synthetic coverage is the only coverage possible**
+  and is therefore required rather than optional - nothing in `type-maps/`, `corpus/type-maps/` or
+  the corpus reaches the path. `test/unit.ts` carries the base64-to-hex projection with its
+  non-canonical rejections, strict hex decoding including the uppercase, odd-length and non-hex
+  cases, an issue-disclose-parse-verify round trip under a synthetic tag-5 map that emits
+  `00010203`, empty bytes carried the whole way as `""`, and a check of the emitted carrier against
+  the tag-5 pattern read out of both live envelope schema files rather than restated in the test.
 
 ---
 
@@ -383,36 +422,67 @@ where the committed fixtures carry four.
 
 Node v22.21.0, TypeScript 5.9.3, `SHA-256`, corpus `1.0.0`.
 
-**Both corpus numbers are given, because the higher one is not reproducible on a bare checkout.**
+**Every number in this table was re-measured on the commit that carries it.**
+Nothing here is carried forward from an earlier run.
 
 | Run | Result |
 |---|---|
-| `npm test`, the default | **680 assertions, 0 failures, 2 SKIPPED** - class 10, whose records live outside this repository |
-| `ROAX_REFERENCE_RECORDS=<dir> npm run conformance` | **684 assertions, 0 failures, 0 skipped**, all 19 classes |
-| `test/unit.ts` | **30 tests, 0 failures** |
+| `npm test`, the default | **680 assertions, 0 failures, 2 NOT RUN** - class 10, whose records live outside this repository |
+| `ROAX_EMPTY_CONTAINERS=map-authorized`, the section 3.3 reading | **676 passed, 2 failed, 2 NOT RUN**, exit 1 |
+| `test/unit.ts` | **36 tests, 0 failures** |
 
-**Both were run under `emptyContainerPolicy: 'mechanical'`, which is the corpus's rule and NOT
-specification section 3.3's.** Finding 2 above gives the measurement in full: under section 3.3 the
-same run is 676 passed and 2 failed. A green corpus is therefore evidence of agreement with the
-committed vectors and is not, on its own, evidence of conformance to section 3.3 - the two are
-mutually exclusive as things stand.
+The runner's total line spells the third column `skipped` while the per-vector note for each of
+those 2 assertions reads `NOT RUN` and names its reason; they are the same 2 assertions, and
+neither spelling adds them to the passed count.
+
+**The corpus runs were made under `emptyContainerPolicy: 'mechanical'`, which is the corpus's rule
+and NOT specification section 3.3's.**
+Finding 2 above gives that measurement in full, and the second row is it: the two failures are
+`record-structure-empty-array` and `record-structure-empty-object`, both on
+`type-map-fail-closed: no binding in org.roax.corpus.synthetic for kind array|object at a.b`.
+A green corpus is therefore evidence of agreement with the committed vectors and is not, on its
+own, evidence of conformance to section 3.3 - the two are mutually exclusive as things stand.
 The runner DECLARES the active policy on every run, beside the Unicode declaration and for the same
 reason: a total line read on its own must not stand for a conformance claim the run did not make.
 
-Class 10 - the two real Singapore MOH recovery-healthcert vectors at 69 and 70 leaves - passes
-against a record extracted from a reference checkout outside this repository with
-`corpus/tools/extract_reference_record.py`, which is a data-extraction utility and not one of the
-two reference implementations. Nothing from that checkout is committed.
-Without `ROAX_REFERENCE_RECORDS` the class reports 2 skipped and is never reported green unrun.
+### Class 10 is NOT RUN here, and 684/0/0 is not claimed
+
+**Class 10 did not execute in any run recorded above, and its 2 assertions are counted as NOT RUN
+rather than as passed.**
+An earlier revision of this section carried a second corpus row - `ROAX_REFERENCE_RECORDS=<dir> npm
+run conformance` giving 684 assertions, 0 failures, 0 skipped across all 19 classes - and that row
+has been removed rather than restated, because it was not reproducible on this machine and a
+measurement that cannot be reproduced must not sit in a table of measurements as though it were
+current.
+
+The class needs a record this repository deliberately does not vendor.
+Its two vectors, the real Singapore MOH recovery-healthcert records at 69 and 70 leaves, resolve
+against `references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/sample-data.ts#sampleDocument`,
+which lives in a third-party checkout that `.gitignore` excludes and that no part of this
+repository may copy in.
+To run it:
+
+1. Extract the record with `corpus/tools/extract_reference_record.py --out
+   <dir>/sg.gov.moh.recovery-healthcert.json`, pointed at a reference checkout.
+   That utility is a data-extraction tool and NOT one of the two reference implementations, so
+   reading it while writing a library does not compromise the independence rule.
+2. Set **`ROAX_REFERENCE_RECORDS=<dir>`**, which is the one flag that enables the class.
+
+**The filename inside that directory is `<authority>.<profile>.json` and is this runner's contract
+rather than the corpus's**, since `recordVector` names only the path inside the reference checkout
+and the extraction utility writes wherever `--out` says.
+A file under any other name leaves the class NOT RUN.
+
+What IS verified here is the gate rather than the class.
 The two ways it cannot run are reported apart, because they have different remedies: the variable
 unset names the extraction command to run, and the variable set with the derived filename absent
-names the exact path that was probed and the `<authority>.<profile>.json` contract that produced it.
-That contract is this runner's rather than the corpus's, since `recordVector` names only the path
-inside the reference checkout and the extraction utility writes wherever `--out` says.
+names the exact path that was probed and the contract that produced it.
+Neither is ever counted toward the passed total, and neither is reported green unrun.
 
 Both gates fail loudly on a regression, which was verified rather than assumed: restoring dogtag's
 trailing-zero strip to `canonicalizeDecimal` makes `npm test` exit 1, with 16 class-1 failures in
 the corpus and the `0.010` unit test failing first.
 
 The roots this implementation produces are byte-identical to the committed ones on every vector
-that carries a root, including both MOH ones.
+that carries a root **and that ran**.
+That excludes the two class-10 MOH vectors, whose roots were not compared in any run recorded here.
