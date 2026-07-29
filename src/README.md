@@ -74,8 +74,20 @@ rather than hiding:
 
 | Variable | Effect |
 |---|---|
-| `ROAX_REFERENCE_RECORDS=<dir>` | Runs class 10 against records extracted from a reference checkout outside this repository. Without it the class reports 2 SKIPPED and is never reported green unrun. |
+| `ROAX_REFERENCE_RECORDS=<dir>` | Runs class 10 against records extracted from a reference checkout outside this repository. Without it the class reports 2 skipped, each carrying a NOT RUN reason, and is never reported green unrun. |
 | `ROAX_EMPTY_CONTAINERS=map-authorized` | Applies specification section 3.3's rule that an empty container's tag must be authorized by the map. The committed corpus cannot be passed under it; see finding 2. |
+
+Every run declares which empty-container policy it used, because the default is the corpus's rule
+rather than section 3.3's and a green total on its own would otherwise read as a conformance claim
+the run did not make.
+
+**The filename inside `ROAX_REFERENCE_RECORDS` is `<authority>.<profile>.json`**, for example
+`sg.gov.moh.recovery-healthcert.json`.
+That is a contract of this runner rather than of the corpus: a `recordVector` names only the path
+inside the reference checkout, and `corpus/tools/extract_reference_record.py` writes wherever
+`--out` says.
+An extraction under any other name is reported as NOT RUN naming the exact path that was probed,
+which is a different report from the variable being unset.
 
 ## Layout
 

@@ -81,7 +81,7 @@ against a reference checkout, so no `map-authorized` count with those records is
 
 The two rows differ by four assertions where only two vectors flip, which is not a third failure
 hiding somewhere: a record vector asserts `leafCount` and `root` separately, and a throw out of
-`commitRecord` emits one failure in place of both passes (`conformance/run.ts:476-479`).
+`commitRecord` emits one failure in place of both passes (`conformance/run.ts:525-528`).
 
 The two failures are `record-structure-empty-array` and `record-structure-empty-object`, each with
 `type-map-fail-closed: no binding in org.roax.corpus.synthetic for kind array|object at a.b`.
@@ -129,18 +129,30 @@ work.
 none is, the verifier records that step 1 was not discharged rather than passing silently. The
 runner reports it as a note on class 14.
 
-### Two further gaps in step 1, in the same family and stated for the same reason
+### One further gap in step 1, and one that was reported here and has since been closed
 
-Neither is exploitable, because step 2 recomputes the leaf hash from the disclosed tag and a wrong
+Neither was exploitable, because step 2 recomputes the leaf hash from the disclosed tag and a wrong
 tag therefore breaks the inclusion proof. Both are recorded because they are the same shape as the
 gap above, and because a reader who finds one undocumented will not trust the other.
 
-- **A disclosed INTEGER, DECIMAL or BYTES leaf's tag is not checked against the map.** The map's
-  output is selected by OBSERVED JSON KIND, and the mapping from tag back to kind is not one to
-  one: kind `number` covers INTEGER and DECIMAL, and kind `string` covers STRING and BYTES. A
-  disclosed copy carries the tag and not the observed kind, so the lookup cannot be inverted for
-  those tags. `observedKindForTag` in `src/envelope.ts` returns `undefined` for them and the check
-  is skipped. Invisible in the corpus, where every disclosed record leaf is tag 2 STRING.
+- **CLOSED: a disclosed INTEGER, DECIMAL or BYTES leaf's tag is now checked against the map.**
+  This was reported as a gap on the reasoning that the map's output is selected by OBSERVED JSON
+  KIND and that the mapping from tag back to kind is not one to one, kind `number` covering INTEGER
+  and DECIMAL and kind `string` covering STRING and BYTES.
+  That reasoning was wrong on its own terms, and visibly so: tag 2 STRING was checked through
+  exactly the kind said to be ambiguous.
+  The direction the check needs is tag to KIND, which is total, and it is the direction
+  `carrierFromJson` in `src/value.ts` already fixes at issuance.
+  Given a kind the map yields exactly one tag, so the leaf's own tag names the kind to look its path
+  up under and the single tag that comes back either equals it or contradicts it.
+  The cost of the earlier reading was one-sided: a leaf mis-issued as BYTES at a path bound to
+  STRING for kind `string` was accepted, while the same mistake the other way round was caught.
+  `observedKindForTag` in `src/envelope.ts` is now total over every tag a record leaf can carry and
+  returns `undefined` for tag 8 BLOB_REF alone, which implies no observed JSON kind; the caller
+  fails closed on that rather than skipping, and tag 8 is already rejected as the first check in the
+  same loop.
+  Invisible in the corpus either way: all 318 disclosed leaves across its 54 envelope fixtures are
+  tag 2 STRING, so `test/unit.ts` is the only coverage and carries one retag in each direction.
 - **The reserved-leaf branch of step 1 is not implemented.** Section 10 step 1 reads "checks a
   record leaf's tag against the exact selected map under section 4.2, **or checks a reserved leaf
   against the fixed table in section 11.2**". This implementation short-circuits both branches for
@@ -266,12 +278,17 @@ Recorded so a passing run does not read as coverage it does not have.
   The two need separate code, which is the part that is easy to miss: the record half also covers
   a FULL copy transitively, because re-flattening one reaches `carrierFromJson`, but a disclosed
   copy is never re-flattened.
-  Its leaves are taken as given, so a tag-8 leaf would pass the named-without-value check, skip the
-  map check - `observedKindForTag` returns nothing for tag 8, since the tag implies no observed
-  JSON kind - reach `encodeValue`, and verify against the root.
+  Its leaves are taken as given, so a tag-8 leaf would pass the named-without-value check, reach
+  `encodeValue`, and verify against the root.
+  The map check does not stop it either, and would not even for a verifier holding a map:
+  `observedKindForTag` returns nothing for tag 8, since the tag implies no observed JSON kind, so
+  there is no kind to look the path up under.
   The rejection is therefore the first check in the per-leaf loop of `verifyDisclosedCopy`, ahead
   of the named-without-value check, so that a tag-8 leaf carrying no value still reports
   `blob-ref-not-selectable` rather than a reason naming a different defect.
+  The map check's own uninvertible-tag branch fails closed with the same code, which makes it a
+  second line rather than the line: it is reached only when a resolver is available, and a verifier
+  with none would otherwise pass the leaf straight to `encodeValue`.
 - **The full-copy `leafCount` disagreement rule.** Specification section 11.1 requires that in a
   full copy "a derived count that disagrees with the `leafCount` field MUST be a rejection". The
   nearest committed vector, `full-copy-salts-length-not-leaf-count`, is caught one step earlier by
@@ -372,19 +389,26 @@ Node v22.21.0, TypeScript 5.9.3, `SHA-256`, corpus `1.0.0`.
 |---|---|
 | `npm test`, the default | **680 assertions, 0 failures, 2 SKIPPED** - class 10, whose records live outside this repository |
 | `ROAX_REFERENCE_RECORDS=<dir> npm run conformance` | **684 assertions, 0 failures, 0 skipped**, all 19 classes |
-| `test/unit.ts` | **22 tests, 0 failures** |
+| `test/unit.ts` | **30 tests, 0 failures** |
 
 **Both were run under `emptyContainerPolicy: 'mechanical'`, which is the corpus's rule and NOT
 specification section 3.3's.** Finding 2 above gives the measurement in full: under section 3.3 the
 same run is 676 passed and 2 failed. A green corpus is therefore evidence of agreement with the
 committed vectors and is not, on its own, evidence of conformance to section 3.3 - the two are
 mutually exclusive as things stand.
+The runner DECLARES the active policy on every run, beside the Unicode declaration and for the same
+reason: a total line read on its own must not stand for a conformance claim the run did not make.
 
 Class 10 - the two real Singapore MOH recovery-healthcert vectors at 69 and 70 leaves - passes
 against a record extracted from a reference checkout outside this repository with
 `corpus/tools/extract_reference_record.py`, which is a data-extraction utility and not one of the
 two reference implementations. Nothing from that checkout is committed.
 Without `ROAX_REFERENCE_RECORDS` the class reports 2 skipped and is never reported green unrun.
+The two ways it cannot run are reported apart, because they have different remedies: the variable
+unset names the extraction command to run, and the variable set with the derived filename absent
+names the exact path that was probed and the `<authority>.<profile>.json` contract that produced it.
+That contract is this runner's rather than the corpus's, since `recordVector` names only the path
+inside the reference checkout and the extraction utility writes wherever `--out` says.
 
 Both gates fail loudly on a regression, which was verified rather than assumed: restoring dogtag's
 trailing-zero strip to `canonicalizeDecimal` makes `npm test` exit 1, with 16 class-1 failures in

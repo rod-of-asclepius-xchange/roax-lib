@@ -8,7 +8,8 @@
  * either.
  */
 
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
 import {
   Report,
@@ -49,8 +50,14 @@ import { REGISTERED_PROFILES } from '../src/profiles.js';
  * Resolved by walking up from the compiled module until `corpus/conformance-corpus-1.0.json` is
  * found, so the runner works both from `dist/conformance/` and from a source-level runner, and so
  * no absolute path into anyone's working tree appears in this public repository.
+ *
+ * The directory comes from `fileURLToPath(import.meta.url)` rather than from `import.meta.dirname`,
+ * which Node added in v20.11. `package.json` declares `engines.node >= 18` because `src/` is what
+ * the package ships and it needs nothing newer, so reaching for the newer accessor here would have
+ * made the runner throw a bare `TypeError` out of `resolve()` on a runtime the package says it
+ * supports, before a single vector ran and with nothing tying the failure to the Node version.
  */
-const ROOT = findRepositoryRoot(import.meta.dirname);
+const ROOT = findRepositoryRoot(dirname(fileURLToPath(import.meta.url)));
 
 function findRepositoryRoot(from: string): string {
   let dir = from;
@@ -371,6 +378,20 @@ function runTypeMap(corpus: Corpus, report: Report): void {
 }
 
 /**
+ * Where a `recordVector.recordFile` was found, or WHY it was not.
+ *
+ * The two ways a class-10 vector cannot run are not the same problem and do not have the same
+ * remedy, so they are not the same report. `ROAX_REFERENCE_RECORDS` unset means the reference
+ * checkout has not been extracted at all; the variable set and the derived filename absent means it
+ * has been extracted under a different name, and the only remedy is knowing which name is expected.
+ * A single "set ROAX_REFERENCE_RECORDS" message told the second reader to do what they had already
+ * done.
+ */
+type RecordFileLocation =
+  | { readonly kind: 'found'; readonly path: string }
+  | { readonly kind: 'unavailable'; readonly reason: string };
+
+/**
  * Locates a `recordVector.recordFile`, or reports that it is unavailable.
  *
  * Class 10 names the three Singapore MOH samples inside a third-party checkout that this
@@ -378,22 +399,53 @@ function runTypeMap(corpus: Corpus, report: Report): void {
  * from one is placed in a scratch directory named by `ROAX_REFERENCE_RECORDS`, keyed by the
  * vector's `recordType`. Nothing is read from, or written into, this repository, and the absence
  * of the checkout is REPORTED rather than counted as a pass.
+ *
+ * **The filename inside that directory is a contract of this runner and not of the corpus**, since
+ * `recordVector` names only the path inside the reference checkout and
+ * `corpus/tools/extract_reference_record.py` writes wherever `--out` says. It is
+ * `<authority>.<profile>.json`, and it is stated in `src/README.md` as well as here so it is
+ * discoverable without reading this function.
  */
-function resolveRecordFile(recordFile: string): string | undefined {
+function resolveRecordFile(recordFile: string): RecordFileLocation {
   if (!recordFile.startsWith('references/')) {
-    return existsSync(resolve(ROOT, recordFile)) ? recordFile : undefined;
+    if (existsSync(resolve(ROOT, recordFile))) {
+      return { kind: 'found', path: recordFile };
+    }
+    return {
+      kind: 'unavailable',
+      reason: `the committed fixture ${recordFile} is missing from this checkout`,
+    };
   }
-  const dir = process.env['ROAX_REFERENCE_RECORDS'];
-  if (dir === undefined) {
-    return undefined;
-  }
-  // `.../<recordType>/<version>/sample-data.ts#<export>` -> `<dir>/<recordType>.json`.
+  // `.../<recordType>/<version>/sample-data.ts#<export>` -> `<dir>/<authority>.<profile>.json`.
   const withoutExport = recordFile.split('#')[0] as string;
   const parts = withoutExport.split('/');
   const profile = parts[parts.length - 3];
   const authority = parts.slice(3, parts.length - 3).join('.');
-  const candidate = resolve(dir, `${authority}.${profile}.json`);
-  return existsSync(candidate) ? candidate : undefined;
+  const expectedName = `${authority}.${profile}.json`;
+
+  const dir = process.env['ROAX_REFERENCE_RECORDS'];
+  if (dir === undefined) {
+    return {
+      kind: 'unavailable',
+      reason:
+        `ROAX_REFERENCE_RECORDS is not set, and the reference sample ${recordFile} lives in a ` +
+        'third-party checkout this repository deliberately does not vendor. Extract it with ' +
+        `corpus/tools/extract_reference_record.py --out <dir>/${expectedName} and set ` +
+        'ROAX_REFERENCE_RECORDS=<dir> to run this class.',
+    };
+  }
+  const candidate = resolve(dir, expectedName);
+  if (existsSync(candidate)) {
+    return { kind: 'found', path: candidate };
+  }
+  return {
+    kind: 'unavailable',
+    reason:
+      `ROAX_REFERENCE_RECORDS is set, and this runner probed ${candidate}, which does not exist. ` +
+      `The filename inside that directory MUST be ${expectedName}, derived from the vector's ` +
+      `recordFile ${recordFile}; corpus/tools/extract_reference_record.py accepts any --out path, ` +
+      'so an extraction under another name is not found.',
+  };
 }
 
 interface SaltsFile {
@@ -454,19 +506,16 @@ function runRecord(corpus: Corpus, report: Report, hash: ReturnType<typeof resol
       report.skip(v.class, `${v.name}: carried as an envelope file, which this runner does not read`);
       continue;
     }
-    const recordPath = resolveRecordFile(v.recordFile);
-    if (recordPath === undefined) {
+    const located = resolveRecordFile(v.recordFile);
+    if (located.kind === 'unavailable') {
       // Class 10 names the MOH samples in a checkout that lives outside this repository by
-      // design. Absence is REPORTED rather than hidden, and never reported as green.
-      report.skip(
-        v.class,
-        `${v.name}: the reference sample ${v.recordFile} is outside this repository. ` +
-          'Set ROAX_REFERENCE_RECORDS to a directory of extracted records to run it.',
-      );
+      // design. Absence is REPORTED rather than hidden, and never reported as green. The reason
+      // names WHICH of the two causes fired and what to do about that one.
+      report.skip(v.class, `${v.name}: NOT RUN. ${located.reason}`);
       continue;
     }
     try {
-      const commitment = commitRecord(readFixture(recordPath), {
+      const commitment = commitRecord(readFixture(located.path), {
         hash,
         resolver: resolverFor(v.recordType),
         identity: identityOf(v),
@@ -728,6 +777,27 @@ function printReport(report: Report, unicode: ReturnType<typeof describeUnicodeE
   console.log(
     `total: ${report.totalPassed} passed, ${report.totalFailed} failed, ${report.totalSkipped} skipped`,
   );
+  // Declared on EVERY run, beside the Unicode declaration and for the same reason: a total line a
+  // consumer reads on its own must not stand for a conformance claim the run did not make.
+  if (EMPTY_CONTAINER_POLICY === 'mechanical') {
+    console.log(
+      "DECLARED: this run used the empty-container policy 'mechanical', which takes tag 6 " +
+        'EMPTY_ARRAY or tag 7 EMPTY_OBJECT from the observed kind WITHOUT consulting the type ' +
+        "map. That is the committed corpus's rule and it is NOT specification section 3.3's, " +
+        'which requires the exact selected map to authorize the path and kind first. A green ' +
+        'total above is therefore evidence of agreement with the committed vectors and is NOT ' +
+        'evidence of conformance to section 3.3. Run ROAX_EMPTY_CONTAINERS=map-authorized for ' +
+        'the other reading; the two are mutually exclusive against this corpus, and the ' +
+        'measurement is in docs/typescript-implementation-findings.md finding 2.',
+    );
+  } else {
+    console.log(
+      "DECLARED: this run used the empty-container policy 'map-authorized', which is " +
+        'specification section 3.3. The committed class-5 empty-array and empty-object records ' +
+        'fail closed under it, so failures there are the documented corpus divergence rather ' +
+        'than a regression. See docs/typescript-implementation-findings.md finding 2.',
+    );
+  }
   if (!unicode.matchesPin) {
     console.log(
       `DECLARED: ROAX-CANON/1 pins Unicode ${unicode.pinnedByCanon}; this runtime's NFC tables ` +

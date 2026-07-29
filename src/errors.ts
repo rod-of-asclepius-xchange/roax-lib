@@ -56,9 +56,11 @@ export type RoaxErrorCode =
 /**
  * **Every rejection of INPUT is a `RoaxError` carrying one of the codes above.**
  *
- * A precondition violation by the CALLER is not, and there is exactly one of those in the package:
- * `inclusionProof` in `./tree.js` throws a `RangeError` for a leaf index outside the tree it was
- * handed. That is deliberately outside this taxonomy rather than an omission from it. These codes
+ * A precondition violation by the CALLER is not, and the package has exactly one such RULE: drawing
+ * an audit path for a leaf index outside the tree it was handed throws a `RangeError`. Three entry
+ * points reach it - `inclusionProof` and `MerkleTree.auditPath` in `./tree.js`, and
+ * `Commitment.auditPathFor` in `./commit.js`, which forwards to the second.
+ * That one rule is deliberately outside this taxonomy rather than an omission from it. These codes
  * are the conformance corpus's own reason strings emitted verbatim, which is what lets an envelope
  * vector assert a REASON rather than a boolean, so minting a code here to cover a caller's bad
  * argument would spend the one property that makes the taxonomy checkable against the corpus.

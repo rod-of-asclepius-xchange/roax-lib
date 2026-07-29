@@ -32,25 +32,91 @@ export function splitPoint(n: number): number {
   return k;
 }
 
+/**
+ * A tree whose subtree heads are computed ONCE and shared by every audit path drawn from it.
+ *
+ * The heads are addressed by the half-open leaf range `[lo, hi)` they cover, which is the same
+ * addressing the `MTH` recursion above already uses, so the value cached under a range is
+ * byte-identical to the one a fresh `MTH` over that range would produce. Every sibling an audit
+ * path needs is itself a node of this tree, so the descent below reads the cache the root
+ * computation already filled and hashes nothing further.
+ *
+ * That matters because `discloseFrom` draws one audit path per revealed leaf. Recomputing each
+ * sibling subtree from scratch makes a single path cost `O(n)` hashes and a fully disclosed record
+ * `O(n^2)`, which the 130-leaf ceiling of the committed corpus does not measure and a real FHIR
+ * bundle would.
+ */
+export interface MerkleTree {
+  readonly size: number;
+  readonly root: Uint8Array;
+  /**
+   * The RFC 9162 section 2.1.3.1 audit path for `index`, from the leaf outwards.
+   *
+   * Throws a `RangeError` for an index outside the tree, for the reason `inclusionProof` states.
+   */
+  auditPath(index: number): Uint8Array[];
+}
+
+export function buildMerkleTree(hash: HashFunction, leaves: readonly Uint8Array[]): MerkleTree {
+  const size = leaves.length;
+  const heads = new Map<number, Uint8Array>();
+
+  const head = (lo: number, hi: number): Uint8Array => {
+    if (hi - lo === 1) {
+      // `MTH([x]) = x`, NOT `H(0x00 ‖ x)`: the leaf-domain byte is already inside `leafHash`.
+      return leaves[lo] as Uint8Array;
+    }
+    const key = lo * (size + 1) + hi;
+    const cached = heads.get(key);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const k = lo + splitPoint(hi - lo);
+    const computed = hash.hash(
+      concatBytes([
+        Uint8Array.of(0x01), // RFC 9162 internal-node domain byte.
+        head(lo, k),
+        head(k, hi),
+      ]),
+    );
+    heads.set(key, computed);
+    return computed;
+  };
+
+  // Unreachable in a conforming implementation: the leaf set is the union of specification
+  // section 3.3, which always carries the reserved leaves, so `L` is never empty and its length is
+  // never below 6. The branch exists only so the function is total, which is easier to port than
+  // one with an undefined case.
+  const root = size === 0 ? hash.hash(new Uint8Array(0)) : head(0, size);
+
+  return {
+    size,
+    root,
+    auditPath(index: number): Uint8Array[] {
+      if (!Number.isInteger(index) || index < 0 || index >= size) {
+        throw new RangeError(`leaf index ${index} is outside a tree of ${size} leaves`);
+      }
+      const path: Uint8Array[] = [];
+      let lo = 0;
+      let hi = size;
+      while (hi - lo > 1) {
+        const k = lo + splitPoint(hi - lo);
+        if (index < k) {
+          path.push(head(k, hi));
+          hi = k;
+        } else {
+          path.push(head(lo, k));
+          lo = k;
+        }
+      }
+      // The descent runs root-first and `verifyInclusion` consumes the path leaf-first.
+      return path.reverse();
+    },
+  };
+}
+
 export function merkleTreeHead(hash: HashFunction, leaves: readonly Uint8Array[]): Uint8Array {
-  if (leaves.length === 0) {
-    // Unreachable in a conforming implementation: the leaf set is the union of specification
-    // section 3.3, which always carries the reserved leaves, so `L` is never empty and its length
-    // is never below 6. The branch exists only so the function is total, which is easier to port
-    // than one with an undefined case.
-    return hash.hash(new Uint8Array(0));
-  }
-  if (leaves.length === 1) {
-    return leaves[0] as Uint8Array;
-  }
-  const k = splitPoint(leaves.length);
-  return hash.hash(
-    concatBytes([
-      Uint8Array.of(0x01), // RFC 9162 internal-node domain byte.
-      merkleTreeHead(hash, leaves.slice(0, k)),
-      merkleTreeHead(hash, leaves.slice(k)),
-    ]),
-  );
+  return buildMerkleTree(hash, leaves).root;
 }
 
 /**
@@ -61,7 +127,11 @@ export function merkleTreeHead(hash: HashFunction, leaves: readonly Uint8Array[]
  * **Throws a `RangeError`, not a `RoaxError`, for an index outside the tree.** That is the one
  * throw in this package outside the error taxonomy, because an out-of-range argument is a caller
  * precondition violation rather than a rejection of record input; `./errors.js` gives the full
- * reasoning. A consumer catching only `RoaxError` does not catch this.
+ * reasoning. A consumer catching only `RoaxError` does not catch this. The range is checked before
+ * the tree is built, so an out-of-range call hashes nothing.
+ *
+ * A caller drawing MORE than one path over the same leaves should hold a `MerkleTree` from
+ * `buildMerkleTree` instead, which shares the subtree heads across paths.
  */
 export function inclusionProof(
   hash: HashFunction,
@@ -71,18 +141,7 @@ export function inclusionProof(
   if (!Number.isInteger(index) || index < 0 || index >= leaves.length) {
     throw new RangeError(`leaf index ${index} is outside a tree of ${leaves.length} leaves`);
   }
-  if (leaves.length === 1) {
-    return [];
-  }
-  const k = splitPoint(leaves.length);
-  if (index < k) {
-    const path = inclusionProof(hash, leaves.slice(0, k), index);
-    path.push(merkleTreeHead(hash, leaves.slice(k)));
-    return path;
-  }
-  const path = inclusionProof(hash, leaves.slice(k), index - k);
-  path.push(merkleTreeHead(hash, leaves.slice(0, k)));
-  return path;
+  return buildMerkleTree(hash, leaves).auditPath(index);
 }
 
 /**

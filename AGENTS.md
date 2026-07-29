@@ -66,6 +66,10 @@ Run it with `npm run conformance`. `ROAX_REFERENCE_RECORDS=<dir>` runs class 10 
 extracted from a reference checkout with `corpus/tools/extract_reference_record.py`, which is a
 data-extraction utility rather than a reference implementation and is therefore safe to read while
 building one. Without it class 10 reports SKIPPED and is never reported green unrun.
+**The filename inside that directory must be `<authority>.<profile>.json`**, for example
+`sg.gov.moh.recovery-healthcert.json`: the vector names only the path inside the reference checkout
+and the extraction utility writes wherever `--out` says, so the name is the runner's contract and a
+mismatch is reported as NOT RUN naming the exact path probed.
 
 ## This repository is PUBLIC
 

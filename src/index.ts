@@ -12,9 +12,10 @@
  *
  * **What this package throws.** Every rejection of input is a `RoaxError` carrying a
  * `RoaxErrorCode`, which is the conformance corpus's own reason string. The one exception is a
- * precondition violation by the caller: `inclusionProof`, and `Commitment.auditPathFor` which
- * forwards to it, throw a `RangeError` for a leaf index outside the tree. See `./errors.js` for
- * why that one is deliberately outside the taxonomy.
+ * precondition violation by the caller: drawing an audit path for a leaf index outside the tree
+ * throws a `RangeError`, whether through `inclusionProof`, `MerkleTree.auditPath` or
+ * `Commitment.auditPathFor`. See `./errors.js` for why that one is deliberately outside the
+ * taxonomy.
  */
 
 export { RoaxError, type RoaxErrorCode } from './errors.js';
@@ -66,7 +67,14 @@ export {
   type HashFunction,
 } from './hash.js';
 export { leafHash, SALT_LENGTH, type Leaf } from './leaf.js';
-export { merkleTreeHead, inclusionProof, verifyInclusion, splitPoint } from './tree.js';
+export {
+  merkleTreeHead,
+  buildMerkleTree,
+  inclusionProof,
+  verifyInclusion,
+  splitPoint,
+  type MerkleTree,
+} from './tree.js';
 export {
   flattenRecord,
   leafSet,

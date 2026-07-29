@@ -30,7 +30,7 @@ import {
 import { commitRecord, PathKeyedSalts, type SaltSource } from './commit.js';
 import type { EmptyContainerPolicy } from './flatten.js';
 import type { TypeTagResolver } from './typemap.js';
-import type { JsonValue } from './json.js';
+import type { JsonKind, JsonValue } from './json.js';
 import { floorFor, REGISTERED_PROFILES } from './profiles.js';
 
 export interface LeafSaltEntry {
@@ -111,7 +111,12 @@ export interface VerifierConfig {
   /** H2: the `(root, hashAlg)` pair the verifier's OWN anchoring registry records. */
   readonly anchoredRoot?: string | undefined;
   readonly anchoredHashAlg?: HashAlgName | undefined;
-  /** The registry the verifier is configured with. An envelope naming another is never read. */
+  /**
+   * The registry the verifier is configured with. An envelope naming another is never read.
+   *
+   * Both halves are the registry's identity and both are compared when configured: one contract
+   * address on two chains is two registries.
+   */
   readonly registryAddress?: string | undefined;
   readonly registryChainId?: number | undefined;
   /** Resolves the exact type map for a `recordType`, when this verifier has one. */
@@ -199,6 +204,16 @@ const KNOWN_DISCLOSED_LEAF = new Set([
 ]);
 const KNOWN_SALT_ENTRY = new Set(['segments', 'salt']);
 const KNOWN_SEGMENT = new Set(['key', 'index']);
+/**
+ * The BLOB_REF-shaped `value` of a disclosed leaf, which is the one object of the envelope reachable
+ * only through a type tag rather than through a named member.
+ *
+ * It is scanned for the same reason `disclosure` is: a leaf carrying
+ * `value: {blobByteLength, blobDigest, masterSalt}` parses, so without this the seed guard of
+ * section 7.3 rule 3 would never see the member and the envelope would be rejected under a code
+ * naming a different defect.
+ */
+const KNOWN_BLOB_REF_VALUE = new Set(['blobByteLength', 'blobDigest']);
 
 /**
  * Member names that would carry, or look like they carry, a value from which a withheld leaf's
@@ -230,6 +245,22 @@ function requiredString(object: JsonValue, name: string): string {
     fail('envelope-malformed', `the envelope member ${name} is missing or is not a string`);
   }
   return v.value;
+}
+
+/**
+ * Reads an OPTIONAL string member, or `undefined` if it is absent.
+ *
+ * **A present-but-non-string member reads as absent rather than as a rejection, and that leniency
+ * lives here alone.** Every one of these members - `issuer.keyId`, `anchor.txHash`,
+ * `anchor.anchoredAt` and a disclosed leaf's `displayPath` - is either a hint outside the root
+ * (specification section 11.3) or, in `keyId`'s case, the one conditional reserved leaf whose
+ * absence means no leaf rather than a NULL leaf. Three hand-rolled copies of this read had the
+ * leniency written into each of them, where a reader had to compare them to see it was the same
+ * rule.
+ */
+function optionalString(object: JsonValue, name: string): string | undefined {
+  const v = memberOf(object, name);
+  return v?.kind === 'string' ? v.value : undefined;
 }
 
 const INTEGER_LITERAL = /^(?:0|[1-9][0-9]*)$/;
@@ -314,7 +345,7 @@ function segmentsFrom(
   });
 }
 
-function carrierFrom(node: JsonValue, where: string): CarrierValue {
+function carrierFrom(node: JsonValue, where: string, unknown: UnknownMember[]): CarrierValue {
   switch (node.kind) {
     case 'string':
       return node.value;
@@ -330,6 +361,7 @@ function carrierFrom(node: JsonValue, where: string): CarrierValue {
       );
       break;
     case 'object': {
+      collectUnknown(node, where, KNOWN_BLOB_REF_VALUE, unknown);
       const length = memberOf(node, 'blobByteLength');
       const digest = memberOf(node, 'blobDigest');
       if (length?.kind === 'string' && digest?.kind === 'string') {
@@ -358,7 +390,6 @@ export function parseEnvelope(document: JsonValue): Envelope {
     fail('envelope-malformed', 'the envelope member issuer is missing or is not an object');
   }
   collectUnknown(issuerNode, 'issuer', KNOWN_ISSUER, unknownMembers);
-  const issuerKeyId = memberOf(issuerNode, 'keyId');
   const anchorNode = memberOf(document, 'anchor');
   collectUnknown(anchorNode, 'anchor', KNOWN_ANCHOR, unknownMembers);
   const saltsNode = memberOf(document, 'salts');
@@ -397,7 +428,7 @@ export function parseEnvelope(document: JsonValue): Envelope {
     leafCount: requiredCount(document, 'leafCount'),
     issuer: {
       id: requiredString(issuerNode, 'id'),
-      keyId: issuerKeyId?.kind === 'string' ? issuerKeyId.value : undefined,
+      keyId: optionalString(issuerNode, 'keyId'),
     },
     anchor:
       anchorNode === undefined
@@ -405,12 +436,8 @@ export function parseEnvelope(document: JsonValue): Envelope {
         : {
             chainId: requiredCount(anchorNode, 'chainId'),
             registry: requiredString(anchorNode, 'registry'),
-            txHash: memberOf(anchorNode, 'txHash')?.kind === 'string'
-              ? (memberOf(anchorNode, 'txHash') as { value: string }).value
-              : undefined,
-            anchoredAt: memberOf(anchorNode, 'anchoredAt')?.kind === 'string'
-              ? (memberOf(anchorNode, 'anchoredAt') as { value: string }).value
-              : undefined,
+            txHash: optionalString(anchorNode, 'txHash'),
+            anchoredAt: optionalString(anchorNode, 'anchoredAt'),
           },
     record: memberOf(document, 'record'),
     salts,
@@ -439,7 +466,6 @@ function parseDisclosure(
       fail('envelope-malformed', 'a disclosed leaf carries no valid tag');
     }
     const valueNode = memberOf(item, 'value');
-    const displayNode = memberOf(item, 'displayPath');
     const auditNode = memberOf(item, 'auditPath');
     if (auditNode === undefined || auditNode.kind !== 'array') {
       fail('envelope-malformed', 'a disclosed leaf carries no auditPath array');
@@ -447,10 +473,11 @@ function parseDisclosure(
     return {
       segments: segmentsFrom(memberOf(item, 'segments'), 'a disclosed leaf', unknown),
       // Display only, and never an input to anything the verifier computes (section 5.2).
-      displayPath: displayNode?.kind === 'string' ? displayNode.value : undefined,
+      displayPath: optionalString(item, 'displayPath'),
       index: requiredCount(item, 'index'),
       tag,
-      value: valueNode === undefined ? undefined : carrierFrom(valueNode, 'a disclosed value'),
+      value:
+        valueNode === undefined ? undefined : carrierFrom(valueNode, 'a disclosed value', unknown),
       hasValue: valueNode !== undefined,
       salt: requiredString(item, 'salt'),
       auditPath: auditNode.items.map((h) => {
@@ -469,8 +496,13 @@ export interface VerificationResult {
   readonly root: string;
   readonly leafCount: number;
   /**
-   * Steps the specification requires that this verifier could not discharge, each with its reason.
-   * An empty array means every applicable step ran.
+   * Steps the specification requires that this verifier could not discharge, each with its reason,
+   * and each named ONCE however many leaves it applies to.
+   *
+   * An empty array means every step this implementation implements and that applied to this
+   * envelope ran. It is not a claim of completeness against section 10: the reserved-leaf branch of
+   * step 1 - comparing a reserved leaf against the fixed table of section 11.2 - is not implemented
+   * and so is not reported here either. See the findings document, section 3.
    */
   readonly undischarged: readonly string[];
 }
@@ -607,18 +639,36 @@ export function verifyEnvelope(envelope: Envelope, config: VerifierConfig = {}):
   if (config.anchoredRoot !== undefined && config.anchoredRoot !== envelope.root) {
     fail('root-mismatch', 'the root is not the one the anchoring registry records');
   }
-  if (
-    config.registryAddress !== undefined &&
-    envelope.anchor !== undefined &&
-    envelope.anchor.registry !== config.registryAddress
-  ) {
+  if (envelope.anchor !== undefined) {
     // The dogtag `documentStore` bug in this design's shape: an attacker-supplied address that
     // answers "valid". The registry named in the envelope is NEVER read.
-    fail(
-      'envelope-malformed',
-      'the anchor block names a registry this verifier is not configured with; ' +
-        'a verifier resolves the anchoring layer from its own configuration',
-    );
+    //
+    // **The chain identifier is half of that identity and is checked on the same footing.** One
+    // contract address on two chains is two registries with two sets of contents, so a verifier
+    // that compared the address alone would accept an envelope routed at a chain it is not
+    // configured with. Each half is checked only when the verifier configures it, so a
+    // deployment that pins one and not the other keeps the behaviour it asked for.
+    if (
+      config.registryAddress !== undefined &&
+      envelope.anchor.registry !== config.registryAddress
+    ) {
+      fail(
+        'envelope-malformed',
+        'the anchor block names a registry this verifier is not configured with; ' +
+          'a verifier resolves the anchoring layer from its own configuration',
+      );
+    }
+    if (
+      config.registryChainId !== undefined &&
+      envelope.anchor.chainId !== config.registryChainId
+    ) {
+      fail(
+        'envelope-malformed',
+        `the anchor block names chain ${envelope.anchor.chainId} while this verifier is ` +
+          `configured with chain ${config.registryChainId}; the same registry address on ` +
+          'another chain is another registry',
+      );
+    }
   }
 
   const identity: RecordIdentity = {
@@ -729,6 +779,11 @@ function verifyDisclosedCopy(
   // A recomputed leaf hash is `0x00`-domained by construction and an internal node is
   // `0x01`-domained, so the substitution needs a second preimage.
   const committedByPath = new Map<string, DisclosedLeaf>();
+  // The step 1 report is about the VERIFIER's configuration rather than about any one leaf, so it
+  // is raised once after the loop. Pushing it per leaf returned the same sentence once per revealed
+  // record leaf, which a direct consumer of `VerificationResult` saw and the conformance runner's
+  // own deduplication hid.
+  let stepOneUndischarged = false;
   for (const leaf of disclosure.leaves) {
     // Section 6.5 states TWO rejections and this is the second: an implementation MUST reject a
     // record whose type map binds any path to tag 8, AND MUST reject an envelope carrying a tag-8
@@ -761,16 +816,27 @@ function verifyDisclosedCopy(
     }
     const isReserved = isReservedPath(leaf.segments);
     if (!isReserved && resolver !== undefined) {
-      // Step 1 of section 10: a record leaf's tag is checked against the exact selected map.
+      // Step 1 of section 10: a record leaf's tag is checked against the exact selected map. It
+      // runs for EVERY tag a record leaf can carry, because `observedKindForTag` is total over
+      // them and the map yields exactly one tag per (path, kind).
       const observed = observedKindForTag(leaf.tag);
-      if (observed !== undefined) {
-        const bound = resolver.resolve(leaf.segments, observed);
-        if (bound !== leaf.tag) {
-          fail(
-            'type-map-fail-closed',
-            `the map binds ${displayPath(leaf.segments)} to tag ${bound}, not ${leaf.tag}`,
-          );
-        }
+      if (observed === undefined) {
+        // Unreachable: tag 8 is the only tag with no observed JSON kind and it was rejected as the
+        // first check in this loop. Kept so that a later edit cannot turn the map check into a
+        // silent skip for a tag this function does not know how to invert.
+        fail(
+          'blob-ref-not-selectable',
+          `the disclosed leaf at ${displayPath(leaf.segments)} carries tag ${leaf.tag}, which ` +
+            'implies no observed JSON kind and so cannot be checked against the selected map',
+        );
+      }
+      const bound = resolver.resolve(leaf.segments, observed);
+      if (bound !== leaf.tag) {
+        fail(
+          'type-map-fail-closed',
+          `the map binds ${displayPath(leaf.segments)} at kind ${observed} to tag ${bound}, ` +
+            `not ${leaf.tag}`,
+        );
       }
     } else if (!isReserved && requireMap) {
       fail(
@@ -779,10 +845,7 @@ function verifyDisclosedCopy(
           `${displayPath(leaf.segments)} cannot be checked (specification section 10 step 1)`,
       );
     } else if (!isReserved) {
-      undischarged.push(
-        `section 10 step 1: no type map for ${envelope.recordType}, so disclosed record-leaf ` +
-          'tags were not checked against one.',
-      );
+      stepOneUndischarged = true;
     }
 
     const computed = leafHash(
@@ -808,6 +871,12 @@ function verifyDisclosedCopy(
       );
     }
     committedByPath.set(toHex(encodePath(leaf.segments)), leaf);
+  }
+  if (stepOneUndischarged) {
+    undischarged.push(
+      `section 10 step 1: no type map for ${envelope.recordType}, so disclosed record-leaf ` +
+        'tags were not checked against one.',
+    );
   }
 
   // ---- 5. Bind the outer identity to the reserved leaves the root commits ----------------------
@@ -921,23 +990,39 @@ function isReservedPath(path: Path): boolean {
 /**
  * The observed JSON kind a tag implies, for the section 10 step 1 tag check.
  *
- * `undefined` where the mapping is not one-to-one: kind `number` covers INTEGER and DECIMAL and
- * kind `string` covers STRING and BYTES, so checking those would need the value's own kind, which
- * a disclosed copy does not carry separately from its tag.
+ * **It is the tag -> kind direction, which is TOTAL, and not the kind -> tag direction, which is
+ * not.** Several tags share one kind - `number` carries INTEGER and DECIMAL, `string` carries
+ * STRING and BYTES - so no kind determines a tag. That does not obstruct the check: the map takes
+ * a path and a kind and yields exactly ONE tag, so a leaf's own tag names the kind to look the
+ * path up under, and the single tag that comes back either equals the leaf's tag or contradicts it.
+ * The mapping is the one `carrierFromJson` in `./value.js` already fixes at issuance, read the
+ * other way round.
+ *
+ * Skipping the numeric and BYTES tags for want of an inverse was the earlier reading and it was
+ * wrong on its own terms, since tag 2 STRING was checked through the very kind said to be
+ * ambiguous. Its cost was one-sided: a leaf mis-issued as BYTES at a path bound to STRING for kind
+ * `string` was accepted while the same mistake the other way round was caught.
+ *
+ * `undefined` is returned for tag 8 BLOB_REF alone, which implies no observed JSON kind at all.
  */
-function observedKindForTag(tag: TypeTagValue): 'string' | 'boolean' | 'null' | 'object' | 'array' | undefined {
+function observedKindForTag(tag: TypeTagValue): JsonKind | undefined {
   switch (tag) {
-    case 0:
+    case TypeTag.NULL:
       return 'null';
-    case 1:
+    case TypeTag.BOOL:
       return 'boolean';
-    case 2:
+    case TypeTag.STRING:
       return 'string';
-    case 6:
+    case TypeTag.INTEGER:
+    case TypeTag.DECIMAL:
+      return 'number';
+    case TypeTag.BYTES:
+      return 'string';
+    case TypeTag.EMPTY_ARRAY:
       return 'array';
-    case 7:
+    case TypeTag.EMPTY_OBJECT:
       return 'object';
-    default:
+    case TypeTag.BLOB_REF:
       return undefined;
   }
 }

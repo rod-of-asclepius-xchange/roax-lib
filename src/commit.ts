@@ -9,7 +9,7 @@ import { fail } from './errors.js';
 import { toHex, fromHex } from './bytes.js';
 import { encodePath, type Path } from './path.js';
 import { leafHash, SALT_LENGTH } from './leaf.js';
-import { merkleTreeHead, inclusionProof } from './tree.js';
+import { buildMerkleTree } from './tree.js';
 import type { HashFunction } from './hash.js';
 import type { RecordIdentity } from './reserved.js';
 import { flattenRecord, leafSet, type EmptyContainerPolicy, type OrderedLeaf } from './flatten.js';
@@ -124,8 +124,11 @@ export interface Commitment {
   /** The UNION count: record leaves plus reserved leaves (specification section 11.1). */
   readonly leafCount: number;
   /**
-   * Forwards to `inclusionProof`, so an index outside this tree surfaces its `RangeError` rather
-   * than a `RoaxError`. `discloseFrom` never reaches that: it passes indices taken from this
+   * Draws an audit path from the tree this commitment already built, so disclosing every leaf of
+   * an `n`-leaf record costs `O(n)` hashes in total rather than `O(n^2)`.
+   *
+   * An index outside this tree surfaces a `RangeError` rather than a `RoaxError`, exactly as
+   * `inclusionProof` does. `discloseFrom` never reaches that: it passes indices taken from this
    * commitment's own leaves.
    */
   auditPathFor(index: number): Uint8Array[];
@@ -152,14 +155,16 @@ export function commitRecord(record: JsonValue, options: CommitOptions): Commitm
     };
   });
 
-  const hashes = committed.map((l) => l.hash);
-  const root = merkleTreeHead(options.hash, hashes);
+  const tree = buildMerkleTree(
+    options.hash,
+    committed.map((l) => l.hash),
+  );
   return {
     leaves: committed,
-    root,
+    root: tree.root,
     leafCount: committed.length,
     auditPathFor(index: number): Uint8Array[] {
-      return inclusionProof(options.hash, hashes, index);
+      return tree.auditPath(index);
     },
   };
 }

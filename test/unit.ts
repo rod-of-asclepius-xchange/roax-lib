@@ -24,6 +24,11 @@ import {
   decodeBase64Strict,
   canonicalizeDecimal,
   resolveHashFunction,
+  merkleTreeHead,
+  buildMerkleTree,
+  inclusionProof,
+  verifyInclusion,
+  splitPoint,
   toHex,
   hexNibble,
   TypeTag,
@@ -392,6 +397,266 @@ test('hexNibble accepts one hexadecimal digit in either case and nothing else', 
   // bracket lowercase, '@' and 'G' bracket uppercase.
   for (const ch of ['/', ':', '`', '@']) {
     assert.equal(hexNibble(ch), -1, `${JSON.stringify(ch)} is adjacent to a range, not inside one`);
+  }
+});
+
+// ---------------------------------------------------------------------------------------------
+// Envelope-tree surgery, so the tests below can state what they are about rather than how they
+// rebuild a document. Every helper rebuilds a fresh node: a `JsonValue` is treated as immutable
+// everywhere else in this package.
+// ---------------------------------------------------------------------------------------------
+
+function memberValue(node: JsonValue, name: string): JsonValue {
+  assert.equal(node.kind, 'object');
+  const found = node.kind === 'object' ? node.members.find(([k]) => k === name) : undefined;
+  assert.ok(found !== undefined, `no member ${name}`);
+  return found[1];
+}
+
+function withMember(node: JsonValue, name: string, replacement: JsonValue): JsonValue {
+  assert.equal(node.kind, 'object');
+  const members = node.kind === 'object' ? node.members : [];
+  assert.ok(members.some(([k]) => k === name), `no member ${name} to replace`);
+  return {
+    kind: 'object',
+    members: members.map(([k, v]): [string, JsonValue] => (k === name ? [k, replacement] : [k, v])),
+  };
+}
+
+function mapDisclosedLeaves(envelope: JsonValue, f: (leaf: JsonValue) => JsonValue): JsonValue {
+  const disclosure = memberValue(envelope, 'disclosure');
+  const leaves = memberValue(disclosure, 'leaves');
+  assert.equal(leaves.kind, 'array');
+  const mapped: JsonValue = {
+    kind: 'array',
+    items: leaves.kind === 'array' ? leaves.items.map(f) : [],
+  };
+  return withMember(envelope, 'disclosure', withMember(disclosure, 'leaves', mapped));
+}
+
+/** The single KEY a disclosed leaf sits at, or `undefined` for any other shape. */
+function leafKey(leaf: JsonValue): string | undefined {
+  const segments = memberValue(leaf, 'segments');
+  if (segments.kind !== 'array' || segments.items.length !== 1) {
+    return undefined;
+  }
+  const segment = segments.items[0] as JsonValue;
+  if (segment.kind !== 'object') {
+    return undefined;
+  }
+  const key = segment.members.find(([k]) => k === 'key');
+  return key !== undefined && key[1].kind === 'string' ? key[1].value : undefined;
+}
+
+// The floor plus `dose`, which is the record's one NUMBER-kind leaf and therefore the only one that
+// reaches the numeric half of the section 10 step 1 tag check. `roax.issuer.keyId` stays withheld,
+// as it may (section 10.2).
+const REVEAL_WITH_NUMERIC_LEAF: Path[] = [
+  [{ key: 'roax.recordType' }],
+  [{ key: 'roax.schemaVersion' }],
+  [{ key: 'roax.typeMap.id' }],
+  [{ key: 'roax.recordId' }],
+  [{ key: 'roax.issuer.id' }],
+  [{ key: 'version' }],
+  [{ key: 'type' }],
+  [{ key: 'validFrom' }],
+  [{ key: 'dose' }],
+];
+
+// ---------------------------------------------------------------------------------------------
+// Section 10 step 1: a disclosed record leaf's tag against the exact selected map, for EVERY tag a
+// record leaf can carry. The corpus cannot see this - all 318 disclosed leaves in its 54 envelope
+// fixtures are tag 2 STRING - so these two are the only coverage of the numeric and BYTES tags.
+//
+// Both tamper only with the tag. That is deliberate: a tag that contradicts its own value would
+// also be caught downstream by `encodeValue`, so each test asserts that the MAP check fires first
+// and names the map rather than the carrier.
+// ---------------------------------------------------------------------------------------------
+
+test('a disclosed DECIMAL leaf retagged INTEGER is rejected against the map (section 10 step 1)', () => {
+  const disclosed = discloseFrom(issued(), { reveal: REVEAL_WITH_NUMERIC_LEAF });
+  // `dose` is bound at kind `number` to tag 4 DECIMAL. Tag 3 INTEGER is the same observed kind, so
+  // the map is the only thing that separates them and an uninverted check saw neither.
+  const tampered = mapDisclosedLeaves(disclosed, (leaf) =>
+    leafKey(leaf) === 'dose' ? withMember(leaf, 'tag', { kind: 'number', literal: '3' }) : leaf,
+  );
+  expectCode('type-map-fail-closed', () => verifyEnvelope(parseEnvelope(tampered), VERIFIER));
+});
+
+test('a disclosed leaf retagged BYTES at a STRING-bound path is rejected (section 10 step 1)', () => {
+  const disclosed = discloseFrom(issued(), { reveal: REVEAL_WITH_NUMERIC_LEAF });
+  // The asymmetry that was the whole exposure: STRING at a BYTES-bound path was caught and BYTES at
+  // a STRING-bound path was not, though both are one lookup under kind `string`.
+  const tampered = mapDisclosedLeaves(disclosed, (leaf) =>
+    leafKey(leaf) === 'type' ? withMember(leaf, 'tag', { kind: 'number', literal: '5' }) : leaf,
+  );
+  expectCode('type-map-fail-closed', () => verifyEnvelope(parseEnvelope(tampered), VERIFIER));
+});
+
+test('step 1 reports nothing undischarged when a map covers every disclosed leaf', () => {
+  const disclosed = discloseFrom(issued(), { reveal: REVEAL_WITH_NUMERIC_LEAF });
+  const result = verifyEnvelope(parseEnvelope(disclosed), VERIFIER);
+  assert.equal(result.kind, 'disclosed');
+  assert.deepEqual(
+    result.undischarged.filter((u) => u.includes('section 10 step 1')),
+    [],
+  );
+});
+
+test('the resolver-unavailable step 1 report is raised once rather than once per leaf', () => {
+  const disclosed = discloseFrom(issued(), { reveal: REVEAL_WITH_NUMERIC_LEAF });
+  const result = verifyEnvelope(parseEnvelope(disclosed), {
+    knownProfiles: REGISTERED_PROFILES,
+    requireTypeMapForDisclosedLeaves: false,
+  });
+  const stepOne = result.undischarged.filter((u) => u.includes('section 10 step 1'));
+  // Four record leaves are revealed, and the report is about the verifier rather than about any
+  // one of them.
+  assert.equal(stepOne.length, 1);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Section 11.3: the anchoring layer is resolved from the VERIFIER's configuration, and the
+// registry's identity is the address AND the chain.
+// ---------------------------------------------------------------------------------------------
+
+test('an anchor on another chain is refused even when the registry address matches (11.3)', () => {
+  const anchored = issueFullCopy({
+    record: RECORD,
+    identity: IDENTITY,
+    resolver: SYNTHETIC_MAP,
+    anchor: { chainId: 137, registry: '0xregistry' },
+  });
+  // One contract address on two chains is two registries with two sets of contents, so comparing
+  // the address alone accepts an envelope routed at a registry this verifier never configured.
+  expectCode('envelope-malformed', () =>
+    verifyEnvelope(parseEnvelope(anchored.document), {
+      ...VERIFIER,
+      registryAddress: '0xregistry',
+      registryChainId: 1,
+    }),
+  );
+  assert.equal(
+    verifyEnvelope(parseEnvelope(anchored.document), {
+      ...VERIFIER,
+      registryAddress: '0xregistry',
+      registryChainId: 137,
+    }).kind,
+    'full',
+  );
+  // A verifier configuring neither half keeps reading the anchor as the hint section 11.3 makes it.
+  assert.equal(verifyEnvelope(parseEnvelope(anchored.document), VERIFIER).kind, 'full');
+});
+
+// ---------------------------------------------------------------------------------------------
+// Section 7.3 rule 3: the seed guard covers every object the envelope schemas define, including the
+// one reachable through a type tag rather than through a named member.
+// ---------------------------------------------------------------------------------------------
+
+test("a seed inside a disclosed leaf's value object names rule 3 rather than the carrier", () => {
+  const disclosed = discloseFrom(issued(), { reveal: REVEAL_WITH_NUMERIC_LEAF });
+  const tampered = mapDisclosedLeaves(disclosed, (leaf) =>
+    leafKey(leaf) === 'type'
+      ? withMember(leaf, 'value', {
+          kind: 'object',
+          members: [
+            ['blobByteLength', { kind: 'string', value: '3' }],
+            ['blobDigest', { kind: 'string', value: 'ab'.repeat(32) }],
+            ['masterSalt', { kind: 'string', value: '00'.repeat(16) }],
+          ],
+        })
+      : leaf,
+  );
+  // The envelope was already rejected without this, but under `value-type-mismatch`, which names a
+  // different defect from the rule that was broken.
+  expectCode('master-salt-in-envelope', () => verifyEnvelope(parseEnvelope(tampered), VERIFIER));
+});
+
+test('a present-but-non-string optional member reads as absent, at every site', () => {
+  // The deliberate leniency of `optionalString`, pinned so that centralizing the three reads did
+  // not widen it and cannot later narrow it by accident. These members are hints outside the root
+  // (section 11.3), and `keyId` is the one conditional reserved leaf.
+  const full = issued();
+  const issuer = withMember(memberValue(full.document, 'issuer'), 'keyId', {
+    kind: 'number',
+    literal: '7',
+  });
+  const parsed = parseEnvelope(withMember(full.document, 'issuer', issuer));
+  assert.equal(parsed.issuer.keyId, undefined);
+  assert.deepEqual(parsed.unknownMembers, []);
+
+  const anchored = issueFullCopy({
+    record: RECORD,
+    identity: IDENTITY,
+    resolver: SYNTHETIC_MAP,
+    anchor: { chainId: 1, registry: '0xregistry', txHash: '0xdead' },
+  });
+  const anchor = withMember(memberValue(anchored.document, 'anchor'), 'txHash', {
+    kind: 'boolean',
+    value: true,
+  });
+  assert.equal(parseEnvelope(withMember(anchored.document, 'anchor', anchor)).anchor?.txHash, undefined);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Section 9: sharing the subtree heads across audit paths changes no byte.
+//
+// The naive forms below are the ones this package computed before the heads were shared, kept here
+// as the oracle. `docs/conformance-corpus.md` class 8 mandates the sizes: the RFC 9162 split rule
+// goes wrong only away from powers of two.
+// ---------------------------------------------------------------------------------------------
+
+test('shared subtree heads reproduce a per-proof recomputation at every index (section 9)', () => {
+  const hash = resolveHashFunction('SHA-256');
+  const node = (left: Uint8Array, right: Uint8Array): Uint8Array => {
+    const preimage = new Uint8Array(1 + left.length + right.length);
+    preimage[0] = 0x01;
+    preimage.set(left, 1);
+    preimage.set(right, 1 + left.length);
+    return hash.hash(preimage);
+  };
+  const naiveHead = (leaves: readonly Uint8Array[]): Uint8Array => {
+    if (leaves.length === 1) {
+      return leaves[0] as Uint8Array;
+    }
+    const k = splitPoint(leaves.length);
+    return node(naiveHead(leaves.slice(0, k)), naiveHead(leaves.slice(k)));
+  };
+  const naiveProof = (leaves: readonly Uint8Array[], index: number): Uint8Array[] => {
+    if (leaves.length === 1) {
+      return [];
+    }
+    const k = splitPoint(leaves.length);
+    if (index < k) {
+      const path = naiveProof(leaves.slice(0, k), index);
+      path.push(naiveHead(leaves.slice(k)));
+      return path;
+    }
+    const path = naiveProof(leaves.slice(k), index - k);
+    path.push(naiveHead(leaves.slice(0, k)));
+    return path;
+  };
+
+  for (const size of [1, 2, 3, 5, 7, 8, 9, 130]) {
+    const leaves = Array.from({ length: size }, (_, i) =>
+      hash.hash(Uint8Array.of(i & 0xff, (i >> 8) & 0xff)),
+    );
+    const tree = buildMerkleTree(hash, leaves);
+    const expectedRoot = toHex(naiveHead(leaves));
+    assert.equal(toHex(tree.root), expectedRoot, `root at size ${size}`);
+    assert.equal(toHex(merkleTreeHead(hash, leaves)), expectedRoot, `MTH at size ${size}`);
+    for (let i = 0; i < size; i += 1) {
+      const shared = tree.auditPath(i).map(toHex);
+      assert.deepEqual(shared, naiveProof(leaves, i).map(toHex), `path ${i} of ${size}`);
+      assert.deepEqual(inclusionProof(hash, leaves, i).map(toHex), shared);
+      assert.ok(
+        verifyInclusion(hash, leaves[i] as Uint8Array, i, size, tree.auditPath(i), tree.root),
+        `proof ${i} of ${size} verifies`,
+      );
+    }
+    // Still a `RangeError` and still raised before anything is hashed (`src/errors.js`).
+    assert.throws(() => inclusionProof(hash, leaves, size), RangeError);
+    assert.throws(() => tree.auditPath(-1), RangeError);
   }
 });
 
