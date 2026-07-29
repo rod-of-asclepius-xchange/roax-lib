@@ -28,9 +28,9 @@ vectors, 11 Merkle-root vectors and 110 inclusion vectors.
 
 ROAX additionally wants Go, and Go over UniFFI is awkward - UniFFI has no first-class Go backend.
 So if ROAX ships five genuinely independent libraries, **the corpus stops being a safety net and
-becomes the entire enforcement mechanism.** (Whether it does ship five is decision D, and it is
-open; but the corpus has to be built as though it will, because retrofitting it after divergence has
-shipped is far worse.)
+becomes the entire enforcement mechanism.**
+That is no longer conditional: decision D was ruled Da on 2026-07-29 to five independent, corpus-enforced libraries (`docs/decisions.md`, decision D).
+The corpus was already built as though it would be, because retrofitting it after divergence has shipped is far worse.
 
 **The review reason.** Stated in the standards research as a disqualifier rather than a nice-to-have:
 "we invented our own canonicalization without cross-language test vectors" fails healthcare security
@@ -87,10 +87,9 @@ carries per-leaf salts, which were expressible under either answer. The corpus t
 `masterSaltHex` on every `recordVector`, reproducing the same foreclosure one file over. Twice in the
 same design is a pattern, which is why the rule is written down rather than fixed case by case.
 
-**Decision D4 has since been ruled D4b**, so `masterSalt` no longer exists anywhere in the design and
-neither foreclosure is reachable today. That does not retire the rule. It retires this example,
-which is kept because it is the clearest one available and because the rule still binds on decisions
-A, C and D, all of which remain open (`docs/decisions.md` Part 1).
+**Decision D4 has since been ruled D4b**, so `masterSalt` no longer exists anywhere in the design and neither foreclosure is reachable today.
+That does not retire the rule.
+It retires this example, which is kept because it is the clearest one available and because the rule still binds on decisions A, C and D14, all of which remain open (`docs/decisions.md` Parts 1 and 2a).
 
 **This is a future-proofing constraint, not a tidiness one**, and it connects directly to
 specification section 12.2. A corpus that hard-codes one side of an open question is not upgradeable.
@@ -134,6 +133,25 @@ but they do share one author's reading of the specification.
 
 **A shared misreading is exactly the failure a corpus exists to catch, and five implementations by
 one author cannot catch it.** So gate 3 is a release gate, not a caveat.
+
+### 2.1 Gate 3 status: partially satisfied, ruled 2026-07-29
+
+**Gate 3 is PARTIALLY SATISFIED. It is not met, and it MUST NOT be recorded as met.**
+This subsection owns that status; other documents point here rather than restating it.
+
+**What the ruling credits.**
+The ROAX libraries written so far were each produced by a different team from the one that built the corpus.
+Each was explicitly instructed not to read [`corpus/tools/roax_ref.py`](../corpus/tools/roax_ref.py) or [`corpus/tools/roax_ref.mjs`](../corpus/tools/roax_ref.mjs) while implementing, and each was validated against the corpus only after it had been written.
+That is genuine independence from the corpus tooling, and independence from the corpus tooling is what gate 3 chiefly protects.
+The Rust library under [`rust/`](../rust) is the one of them that lives in this repository; the ruling also covers a TypeScript implementation, which does not.
+
+**What the ruling withholds.**
+A single briefing author wrote every implementation brief, and those briefs carried specific warnings: trailing zeros in a decimal are significant, the display path is never hashed, and an unbound path fails closed.
+A genuinely unrelated third party reading only the specification text would not have had those warnings.
+So a briefed implementation cannot demonstrate that the specification text alone carries those three rules, which is the demonstration gate 3 asks for.
+
+**Gate 3 is fully cleared only when an implementation passes that the same briefing author did not brief.**
+Until then the gate stays open, and no document may describe the corpus as validated in the sense gate 3 requires.
 
 ## 3. Mandatory vector classes
 
@@ -257,13 +275,11 @@ where a leaf should be.
 The internal-node case is dogtag's C1 hazard, which it demonstrates in its own test suite at
 `crates/dogtag-standard-rs/src/merkle.rs:196-229`.
 
-**Building this class produced a correction to the specification, and the corrected reasoning is what
-the class now tests.** An earlier version of this document said RFC 9162 rejects the internal-node
-case structurally because it is position-bound. It does not. RFC 9162 section 2.1.3.2 takes the tree
-size as an **input**, so an attacker who supplies both the leaf hash and the tree size can pick a
-shape that walks an internal node to the genuine root: on an 8-leaf tree, `MTH(L[0:4])` presented as
-the leaf at index 0 with a forged tree size of 2 and the audit path `[MTH(L[4:8])]` verifies. That
-was measured, and reproduced on Node v22.21.0; specification section 11.1 records it in full.
+**Building this class produced a correction to the specification, and the corrected reasoning is what the class is required to test.**
+An earlier version of this document said RFC 9162 rejects the internal-node case structurally because it is position-bound.
+It does not.
+RFC 9162 section 2.1.3.2 takes the tree size as an **input**, so an attacker who supplies both the leaf hash and the tree size can pick a shape that walks an internal node to the genuine root: on an 8-leaf tree, `MTH(L[0:4])` presented as the leaf at index 0 with a forged tree size of 2 and the audit path `[MTH(L[4:8])]` verifies.
+That was measured and reproduced on Node v22.21.0; specification section 11.1 records it in full.
 
 **What actually closes the case is the `0x00` leaf-domain byte plus specification section 10 step 2**,
 which requires a verifier to recompute the leaf hash from the disclosed path, tag, value and salt
@@ -274,6 +290,10 @@ rather than accept one. A recomputed leaf hash is `0x00`-domained and an interna
 verification path, not through a bare fold primitive. A runner that hands `verifyInclusion` a leaf
 hash directly is testing the primitive dogtag documents as proving nothing on its own
 (`merkle.rs:86-91`), and it will record a pass for an implementation that has no defence at all.
+
+**The committed 1.0 corpus does not yet meet that requirement.**
+Its two internal-node rows carry the honest tree sizes 8 and 130, no row carries attack `forged-tree-size`, and the `negativeProof` carrier supplies no structured path, tag, value or salt from which a verifier could recompute a leaf hash (`corpus/conformance-corpus-1.0.json`, `negative-internal-node-as-leaf` and `negative-internal-node-as-leaf-n130`; `schemas/conformance-corpus-1.0.json`, `$defs.negativeProofVector`).
+The class therefore remains a named release-gate gap until a corpus rebuild adds an expressible full-disclosure attack row.
 
 ### Class 10 - the three real MOH records
 

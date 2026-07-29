@@ -1,6 +1,8 @@
 # ROAX-CANON/1 - canonical serialization, commitment and selective disclosure
 
-**Status:** draft for review. Not frozen. No library code exists yet.
+**Status:** draft for review.
+Not frozen.
+The independent Rust implementation exists under `rust/`; the other four ruled independent libraries have not been added.
 **Version string:** `ROAX-CANON/1`
 **Date:** 2026-07-28
 
@@ -1916,7 +1918,7 @@ assumed. The four profile documents under `docs/profiles/` exist because of it.
 | Sorted-by-hash commutative tree with odd promotion | `merkle.rs:22-46` | **DEPARTED**, RFC 9162 | Position-bound, published, and no commutative-fold hazard. |
 | Stored 16-byte salt per leaf inside the document | `wrap.rs` | **ADOPTED**, section 7 | This reverses an earlier draft, which derived salts from a per-record master salt and departed from dogtag on size. Decision D4 was ruled D4b: dogtag's choice removes a silent cross-record linkage hazard that no MUST can reliably guard, and the storage it costs is about 1.4 KB on an 87-leaf record. dogtag reached the same answer for the same reason. |
 | Single hard-coded profile validator | `schema.rs:1-9`, `:159` | **DEPARTED**, per-family profiles | See section 14.1. |
-| Four-language agreement via two implementations plus FFI | Rust plus TypeScript are independent; Swift and Kotlin call Rust through UniFFI 0.28 (`Cargo.toml:33`; the generated Swift binding is `apps/ios/DogTag/dogtag_standard.swift`). There is no Swift or Kotlin Poseidon in the repository | **Structural lesson, decision D / D10 is OPEN** | See 14.3. |
+| Four-language agreement via two implementations plus FFI | Rust plus TypeScript are independent; Swift and Kotlin call Rust through UniFFI 0.28 (`Cargo.toml:33`; the generated Swift binding is `apps/ios/DogTag/dogtag_standard.swift`). There is no Swift or Kotlin Poseidon in the repository | **Structural lesson, decision D / D10 is ruled to five independent builds** | See 14.3. |
 
 ### 14.3 The structural lesson about five libraries
 
@@ -1939,21 +1941,21 @@ Rust one and the divergence is **recorded rather than fixed**, because it has no
 surface before reconciling it with the Rust implementation"). An independent implementation not
 covered by the corpus will drift.
 
-This is decision D / D10 and it is OPEN.
+This is decision D / D10 and it was ruled to five independent, corpus-enforced builds on 2026-07-29.
 
 ---
 
 ## 15. Decisions: what is ruled and what is still open
 
-**Three of the open decisions belong to the project owner.**
+**Two of the open decisions belong to the project owner.**
 This specification takes no position on any of them and defines nothing that depends on one.
-A fourth, D14, was identified after the engineering rulings below and is stated at the end of this
-section.
 
 - **A** - whether roax-lib needs EU recognition, which would mandate SD-JWT VC and ISO mdoc export
   profiles.
 - **C** - what happens to the Singapore healthcerts already issued under OpenAttestation.
-- **D** - five independent libraries versus a shared core over a binding layer.
+
+**D was ruled on 2026-07-29:** five independent, corpus-enforced libraries rather than a shared core over a binding layer.
+A further open question, D14, was identified after the engineering rulings below and is stated at the end of this section.
 
 **B is ruled and is no longer open in the "which one" sense.** ZK-friendly and non-ZK hashes are
 both first-class and selectable per record, permanently, via `hashAlg`. That ruling is what makes

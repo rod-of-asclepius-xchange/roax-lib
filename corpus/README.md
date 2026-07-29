@@ -1,6 +1,6 @@
 # The ROAX conformance corpus
 
-**Status:** first cut. 471 vectors, all 19 classes reachable, 15 complete and 4 partial.
+**Status:** first cut. 471 vectors, all 19 classes reachable, 14 complete, 4 partial and 1 stale.
 **Normative definition:** [`docs/conformance-corpus.md`](../docs/conformance-corpus.md).
 **Schema:** [`schemas/conformance-corpus-1.0.json`](../schemas/conformance-corpus-1.0.json).
 **Specification:** [`docs/spec/roax-canon-1.md`](../docs/spec/roax-canon-1.md), which governs where the
@@ -36,7 +36,7 @@ Both arguments are optional and their absence is reported rather than hidden.
 - Without `--references`, class 10 reports `SKIPPED - NOT RUN` and contributes zero assertions. It
   never reports green unrun.
 - Without `--modules` (holding `ajv@8` and `ajv-formats`), the JSON Schema validation step is
-  skipped and says so. The repository has no package manifest, deliberately.
+  skipped and says so. The repository has no npm package manifest, deliberately.
 
 `run.sh` does four things, and the third is the one that matters:
 
@@ -132,7 +132,7 @@ Counts are vectors in the file, measured by `build_corpus.py --report`.
 | 6 path | 40 | complete |
 | 7 type tags | 14 | complete |
 | 8 tree shape | 173 | complete |
-| 9 negative proof vectors | 11 | complete |
+| 9 negative proof vectors | 11 | **stale - the forged-size, full-disclosure row is absent** |
 | 10 the three real MOH records | 2 | **partial - 1 of 3 records** |
 | 11 the schema binding | 23 | complete. Includes the three unknown-algorithm and unknown-profile fail-closed vectors: specification section 12.2 calls that "the same rule section 4.2 applies to an unknown path, applied one level up", and section 4.2 is what this class tests. |
 | 12 cross-record unlinkability | 3 | complete. Behavioural rather than pinned: the runner draws and asserts. Detects a deterministic or reused salt; it CANNOT detect a weak CSPRNG, and no fixed vector file can. |
@@ -289,12 +289,10 @@ demonstration that these particular vectors are stable across that release bound
 demonstration that a version mismatch is detectable, which class 16 already says it is not, because
 no character whose NFC form changed between releases has been identified for this corpus.
 
-**Gate 3 of `docs/conformance-corpus.md` section 2 is NOT discharged.** That gate requires an
-implementation written by a different author, from the specification text alone, to pass the corpus
-unmodified. Both implementations here have one author, so they share one reading of the
-specification, and a shared misreading is exactly what a corpus exists to catch. What two
-implementations in two languages do catch is transcription slips and language-API divergence, and
-they caught one - see below. Scope the claim to that.
+**Both reference implementations here have one author**, so they share one reading of the specification, and a shared misreading is exactly what a corpus exists to catch.
+What two implementations in two languages do catch is transcription slips and language-API divergence, and they caught one - see below.
+Scope the claim to that.
+Nothing in this directory discharges gate 3 of `docs/conformance-corpus.md`, and section 2.1 of that document owns the gate's status.
 
 ### The prior canonicalization research was used narrowly, and here is exactly how
 
@@ -348,13 +346,14 @@ untagged where the gap check would not see them.
 Recorded rather than decided. Every one of them is unobservable across the shipped vectors, which is
 deliberate: a vector that discriminated would settle the question from inside the corpus.
 
-1. **The 1024-digit bound's scope.** Specification section 6.2 states it under *Canonical decimal*,
-   but its own justification paragraph counts "class 2's 40-digit integer" against it. Both
-   implementations apply it to INTEGER as well as DECIMAL. No vector discriminates.
-2. **What the 1024-digit bound counts.** "the expanded positional form" is read here as the padded
-   form *before* the output-grammar normalization, which is the literal reading and the
-   memory-safe one. Under the other reading `0e99999` canonicalizes to `0`; under this one it is
-   rejected. No vector carries `0e99999`.
+1. **The 1024-digit bound's scope.**
+   Specification section 6.2 states it under *Canonical decimal*, but its own justification paragraph counts "class 2's 40-digit integer" against it.
+   Both corpus reference implementations and the Rust implementation apply it to INTEGER as well as DECIMAL.
+   No vector discriminates.
+2. **What the 1024-digit bound counts.**
+   "The expanded positional form" is read here as the padded form *before* the output-grammar normalization, which is the literal reading and the memory-safe one.
+   Under the other reading `0e99999` canonicalizes to `0`; under this one it is rejected.
+   No vector carries `0e99999`.
 3. **Resolved and removed: the record identifier in the salt preimage.** This list previously
    recorded that section 7 wrote `RID = utf8(recordId)` rather than `utf8(NFC(recordId))`, while
    the reserved leaf `roax.recordId` is a STRING and therefore *is* normalized. Decision D4 was
@@ -371,6 +370,12 @@ deliberate: a vector that discriminated would settle the question from inside th
    `[` or `]` - keys section 5 deliberately admits with no rejection rule. `a.**` reaches such a key
    without the pattern language growing an escape, and both implementations reject an ambiguous
    pattern rather than mis-parse it.
+6. **NFC-colliding sibling keys with disjoint descendants are not ruled.**
+   Specification sections 3.2 and 3.3 require raw map keys to be unique and emit complete leaf paths, while section 5 normalizes each KEY segment, so `{"é":{"a":1},"é":{"b":2}}` has neither a duplicate raw key nor a duplicate complete encoded leaf path even though the two intermediate paths encode identically.
+   The Rust implementation accepts that shape, and no vector distinguishes acceptance from rejecting every intermediate-key collision.
+7. **Issuer-scope membership has no normalization rule.**
+   Specification section 10 requires a disclosed issuer identity to be a member of `scope.issuerIds`, but neither it nor `docs/type-maps.md` says whether that comparison uses the received strings or their NFC forms.
+   The executable extension checker compares the strings as received, while the Rust implementation rejects issuer child artifacts until parent/additivity support can make that choice observable.
 
 ## One substantive specification finding
 
@@ -391,9 +396,10 @@ one - plus second-preimage resistance, since the attacker would need a `(path, t
 hashing to the internal node. That defence is already normative and already load-bearing; the
 `leafCount` sentence overstates a second one that is not there.
 
-`negative-internal-node-as-leaf` and `negative-internal-node-as-leaf-n130` carry the honest form -
-the true tree size, where RFC 9162 does reject - because that is what the specification requires
-today. Changing the sentence in section 11.1 would be a specification change and is not made here.
+`negative-internal-node-as-leaf` and `negative-internal-node-as-leaf-n130` still carry the honest tree size, where the bare RFC 9162 fold rejects.
+No committed `negativeProof` row has attack `forged-tree-size`, and that carrier has only a supplied `leafHash`, not the path, tag, value and salt needed to drive the full disclosed-copy verification path required by `docs/conformance-corpus.md` class 9 and specification section 10 step 2.
+The coverage row above is therefore stale until the corpus is rebuilt with an expressible full-disclosure attack vector.
+An implementation-specific regression may demonstrate the defence, but it does not make the missing corpus release gate complete.
 
 ## Decisions this corpus does and does not presume
 

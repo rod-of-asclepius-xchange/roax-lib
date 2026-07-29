@@ -1,13 +1,12 @@
 # Decisions: settled, open, and the reasoning
 
-**Status:** four decisions are genuinely open. Three are in Part 1 and belong to the project owner -
-**A**, **C** and **D**. The fourth, **D14**, was identified on 2026-07-29 while building a
-conformance vector and is in Part 2a; it is open because nobody has ruled it, not because it is
-awaiting the owner specifically.
-Everything else has been ruled. **Decision B** was ruled earlier, with the residual open questions
-named inside it. The **ten engineering decisions in Part 2 - D3, D4, D5, D6, D7, D8, D9, D11, D12
-and D13 - were ruled on 2026-07-28**, and each carries its reasoning so that it can be overturned on
-the reasoning rather than on authority.
+**Status:** three decisions are genuinely open.
+Two are in Part 1 and belong to the project owner - **A** and **C**.
+The third, **D14**, was identified on 2026-07-29 while building a conformance vector and is in Part 2a; it is open because nobody has ruled it, not because it is awaiting the owner specifically.
+Everything else has been ruled.
+**Decision B** was ruled earlier, with the residual open questions named inside it.
+**Decision D** was ruled Da on 2026-07-29: five independent, corpus-enforced libraries.
+The **ten engineering decisions in Part 2 - D3, D4, D5, D6, D7, D8, D9, D11, D12 and D13 - were ruled on 2026-07-28**, and each carries its reasoning so that it can be overturned on the reasoning rather than on authority.
 
 Eight of those ten confirmed what the specification already recommended. Two changed it: **D4** moved
 to D4b, independently random per-leaf salts, and **D9** gained a content-addressed blob binding that
@@ -98,9 +97,8 @@ source-2 reproductions are carried from the audit and were not independently re-
 
 ## Part 1 - The four decisions that belong to the project owner
 
-Three of them - A, C and D - have not been ruled on.
-**B has been ruled**, and is kept here rather than moved to Part 3 because what remains open under
-it is substantive and is named in its own section.
+Two of them - A and C - have not been ruled on.
+**B and D have been ruled**, and are kept here rather than moved to Part 3 because the option records and their reasoning belong with the other owner decisions.
 
 ### Decision A - Does roax-lib need EU recognition? **OPEN**
 
@@ -283,10 +281,13 @@ See [`profiles/vaccination-healthcert.md`](profiles/vaccination-healthcert.md) s
 **This is a product and regulatory decision, not a technical one.** All three options are
 buildable. The question is who has to keep verifying what, for how long.
 
-### Decision D - Five independent libraries, or a shared core over a binding layer? **OPEN**
+### Decision D - Five independent libraries, or a shared core over a binding layer? **RULED Da**
 
-**Written into the spec:** nothing directly, but the conformance corpus is specified as though Da
-will be chosen, because that is the conservative assumption - see below.
+**Ruling (2026-07-29): Da.**
+ROAX will ship five independent, corpus-enforced libraries rather than a shared Rust core.
+Each implementation is written from `docs/spec/roax-canon-1.md`, and byte-identical corpus output is the release requirement under `docs/conformance-corpus.md` section 2.
+
+**Written into the spec:** the conformance corpus is the release gate for all five independent implementations, as specified in ROAX-CANON/1 section 1.1 and `docs/conformance-corpus.md` section 2.
 
 Both options are labelled with a letter suffix, matching every other decision in this document. They
 were previously `D1` and `D2`, which collided with the renumbering table above, where `D1` became
@@ -314,7 +315,8 @@ Da it is the only thing standing between five libraries and silent divergence. B
 Da standard costs more now and is correct under either ruling. Building it to the Db standard and
 then choosing Da means discovering the gap after divergence has already shipped.
 
-**This is a strategy call, not a technical one.** Both work.
+**The ruling accepts Da's cost knowingly.**
+The corpus is the entire cross-language enforcement mechanism, and a library that is not covered by it is not ready to claim conformance under `docs/conformance-corpus.md` section 2.
 
 ---
 
@@ -673,6 +675,8 @@ up moving at the speed of the slower one.
 **Identified on 2026-07-29 while building the conformance vector decision D12's ruling required.**
 It is recorded here rather than settled in passing, because settling it changes matching in both
 reference implementations and in the type-map tooling at once.
+It also reaches the Rust library, which takes neither side: `LookupKeyMode` has no default, and the construction and verification paths reject a key whose binding differs between the two readings rather than choosing one (`rust/README.md`).
+So a ruling retires that guard as well as changing the matchers.
 
 **Written into the spec:** nothing. Specification section 6.1 pins NFC for **hashing**, and section
 4.2 requires an uncovered path to fail closed. Neither says whether the type-map **lookup** that
