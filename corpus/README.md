@@ -134,12 +134,14 @@ Counts are vectors in the file, measured by `build_corpus.py --report`.
 | 9 negative proof vectors | 11 | complete |
 | 10 the three real MOH records | 2 | **partial - 1 of 3 records** |
 | 11 the schema binding | 23 | complete. Includes the three unknown-algorithm and unknown-profile fail-closed vectors: specification section 12.2 calls that "the same rule section 4.2 applies to an unknown path, applied one level up", and section 4.2 is what this class tests. |
-| 12 cross-record unlinkability | 9 | complete. Behavioural rather than pinned: the runner draws and asserts. Detects a deterministic or reused salt; it CANNOT detect a weak CSPRNG, and no fixed vector file can. |
+| 12 cross-record unlinkability | 3 | complete. Behavioural rather than pinned: the runner draws and asserts. Detects a deterministic or reused salt; it CANNOT detect a weak CSPRNG, and no fixed vector file can. |
 | 13 reference-schema hazards | 2 | **partial - the `$id` half is inexpressible** |
-| 14 minimum-disclosure floor | 38 | complete. The last four bind the envelope's OUTER identity to the reserved leaves committed inside the root - see below. |
+| 14 minimum-disclosure floor | 34 | complete. The four outer-identity vectors this row used to count are class 18 now - see below. |
 | 15 reserved-namespace guard | 20 | complete |
 | 16 Unicode version sensitivity | 20 | complete, at the strength class 16 itself states |
 | 17 withheld-leaf salt | 8 | complete |
+| 18 outside-the-root authority | 4 | **partial - the identity rows only; the registry rows are a named gap** |
+| 19 NFC end to end, with a root | 1 | **partial - the value site only; the key site is gated on decision D14** |
 
 ### Class 10 is partial, and the reason is a finding rather than an omission
 
@@ -166,8 +168,9 @@ blocking.
 
 ### The floor is over segments, and the outer identity does not select it alone
 
-Two things class 14 asserts that are easy to get wrong in the same place, both of them recorded here
-because a corpus is the only place they can be pinned.
+Two things that are easy to get wrong in the same place, and a corpus is the only place either can be pinned.
+The first is class 14's.
+The second is class 18's: the four identity vectors sat in class 14 only because class 18 did not exist yet, and they moved when decision D8 created it.
 
 **A floor path is SEGMENTS, never display notation.** `docs/profiles/vaccination-healthcert.md`
 section 4 writes `notarisationMetadata.reference`, and specification section 5.2 is explicit that a
@@ -186,6 +189,7 @@ expiry, and every inclusion proof still verifies against the genuine recovery ro
 `identity-outer-record-type-downgrade` carries exactly that copy and the other three carry a
 mismatch in each remaining reserved field; all four reject with `outer-identity-mismatch`. Measured:
 with the binding removed, all four are **accepted**.
+Those four are the whole of class 18 as built, and they carry no `verifierConfig` because the envelope alone determines each of them.
 
 #### The identity binding runs BEFORE the floor, and that order is required
 
@@ -246,6 +250,22 @@ asserting recovery's rules still apply despite its `$id` pointing at PDT's path 
 type that can express it. It is enforced in `tools/build_type_maps.py`, which resolves `$ref` by
 file path and never registers a schema by `$id`, and the two colliding `$id` values were confirmed
 by reading them.
+
+### Class 18 is partly built, and the unbuilt half is a named gap rather than an omission
+
+The four identity rows are built and are described above.
+The registry-dependent rows of `docs/conformance-corpus.md` class 18 are not, and they cannot be: each of them turns on what the verifier's own anchoring registry answers, and specification section 2.2 deliberately leaves that registry undesigned.
+Building them here would make the corpus invent that interface, which section 1.2 of the corpus document forbids for the same reason it forbids binding an unresolved path.
+That is why `schemas/conformance-corpus-1.0.json` PERMITS `envelopeVector.verifierConfig` at class 18 rather than requiring it: an earlier revision required it, and the four built vectors carry none because the envelope alone determines them, so the requirement rejected the committed corpus.
+The completeness rule the block exists for - a vector whose outcome turns on the verifier's configuration must state that configuration - is stated in the schema and is **not mechanically enforced today**, because the vectors that would need the check are exactly the ones that cannot be built yet.
+
+### Class 19 carries the value site only, and decision D14 is why
+
+The class defines two sites, a value and an object key, because an implementation can normalize one and not the other.
+Only the value site is built.
+A key-site vector has to resolve its key through the type map, and whether type-map matching normalizes the key it matches on is an open question - ambiguity 4 below, recorded as decision D14 in `docs/decisions.md` Part 2a.
+Both reference implementations match raw, so a built key-site vector would pass under one reading of that question and fail under the other, which settles it from inside a data file.
+The row stays in the class table in `docs/conformance-corpus.md` so that a passing class 19 does not read as coverage it does not have.
 
 ## What was actually measured, and what was not
 

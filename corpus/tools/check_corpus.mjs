@@ -250,6 +250,15 @@ for (const v of V.record ?? []) {
 }
 
 function loadRecord(v) {
+  // The corpus schema admits two carriers, and this runner consumes one of them. A full envelope
+  // copy carries the record body and its salts together and is a self-sufficient carrier, so the
+  // schema is right to permit it; nothing here unpacks one yet. Say so and skip, rather than
+  // dereferencing an absent recordFile and dying with a TypeError on a schema-valid vector.
+  if (v.recordFile === undefined) {
+    note(v.class, `record ${v.name} SKIPPED: carried as ${v.envelopeFile}, and this runner reads `
+      + `only the recordFile carrier`);
+    return null;
+  }
   // A corpus fixture lives in this repository. A MOH sample does not, by design, so it is named
   // by module and export and must be extracted first.
   if (v.recordFile.startsWith("corpus/")) {
@@ -280,6 +289,18 @@ function loadRecord(v) {
 // There is deliberately no within-issuance LEAF HASH check: two different paths carry different
 // encoded paths into the section 8 preimage, so their hashes differ whatever the salts do.
 for (const v of V.unlinkability ?? []) {
+  // Two entries that are different JSON text and the SAME path once NFC is applied pass the
+  // schema's uniqueItems (spec section 6.1), and the within-issuance assertion below would then
+  // compare a path a record can hold only once. encodePath normalizes, so comparing encoded forms
+  // is the duplicate-path rejection orderedLeaves makes over a record's union; this class issues
+  // no record and never reaches that one. A corpus carrying such a pair is defective rather than
+  // failing, so this throws instead of recording an assertion.
+  const encodedPaths = new Set(v.paths.map((p) => ref.encodePath(p).toString("hex")));
+  if (encodedPaths.size !== v.paths.length) {
+    throw new Error(`corpus defect: unlinkability vector ${v.name} names two paths that are `
+      + `equal once NFC is applied`);
+  }
+
   const saltsSeen = new Map();
   const hashesSeen = new Map();
   let withinOk = true;
@@ -410,7 +431,6 @@ if (EMIT) {
   for (const v of out.vectors.encodePath ?? []) { put(v, "encodedHex"); put(v, "displayPath"); }
   for (const v of out.vectors.encodeValue ?? []) put(v, "encodedHex");
   for (const v of out.vectors.reject ?? []) put(v, "reason");
-  for (const v of out.vectors.salt ?? []) put(v, "saltHex");
   for (const v of out.vectors.leaf ?? []) put(v, "leafHash");
   for (const v of out.vectors.tree ?? []) put(v, "root");
   for (const v of out.vectors.inclusion ?? []) {
@@ -424,12 +444,8 @@ if (EMIT) {
     else put(v, "expectFailClosed");
   }
   for (const v of out.vectors.record ?? []) { put(v, "leafCount"); put(v, "root"); }
-  for (const v of out.vectors.unlinkability ?? []) {
-    for (const side of ["recordA", "recordB"]) {
-      const got = byName.get(`${v.name} ${side}.leafHash`);
-      if (got !== undefined) v[side].leafHash = got;
-    }
-  }
+  // Class 12 and class 19 are absent from this list deliberately. Class 12 derives nothing to
+  // write back, and class 19's root is asserted above rather than recomputed into the file.
   for (const v of out.vectors.envelope ?? []) { put(v, "expectAccept"); put(v, "reason"); }
   fs.writeFileSync(EMIT, JSON.stringify(out, null, 2) + "\n");
   if (!QUIET) console.log(`  emitted ${EMIT}`);

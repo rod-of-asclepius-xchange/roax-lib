@@ -45,6 +45,13 @@ CORPUS_VERSION = "1.0.0"
 # report exists to prevent. 17 until the ten engineering decisions were ruled on 2026-07-28, which
 # added class 18 (outside-the-root authority, decision D8) and class 19 (NFC end to end, D12).
 CLASS_COUNT = 19
+# docs/conformance-corpus.md class 8 makes these leaf counts mandatory, and
+# schemas/conformance-corpus-1.0.json names this check as what enforces that, since a requirement
+# on the SET of tree vectors is not expressible per vector. Held separately from
+# `corpus_plan.TREE_SIZES` on purpose: a check reading the same constant the build iterates would
+# agree with any edit to it, including one that dropped a non-power-of-two size and left the split
+# rule untested.
+MANDATORY_TREE_SIZES = (1, 2, 3, 5, 7, 8, 9, 130)
 HASH_ALG = "SHA-256"
 # Section 6.1 pins Unicode 15.1. Implementation A runs Python's own tables; the value written
 # here is the pin, and `build_corpus.py --report` prints the tables actually used so a mismatch
@@ -193,6 +200,16 @@ def build_unlinkability():
     """
     out = []
     for name, cls, paths, tag, value, trials, record_ids in plan.UNLINKABILITY:
+        # Two entries that are different JSON text and the SAME path once NFC is applied pass the
+        # schema's uniqueItems (spec section 6.1), and the within-issuance assertion would then
+        # compare a path a record can hold only once. `encode_path` normalizes, so comparing
+        # encoded forms is the duplicate-path rejection `ordered_leaves` makes over a record's
+        # union; this class issues no record and never reaches that one.
+        if len({ref.encode_path(p) for p in paths}) != len(paths):
+            raise SystemExit(
+                f"corpus defect: unlinkability vector {name!r} names two paths that are equal "
+                f"once NFC is applied"
+            )
         seen_salts = set()
         seen_hashes = set()
         for trial in range(trials):
@@ -288,6 +305,12 @@ def synthetic_tree_leaves(n):
 
 
 def build_tree_and_inclusion():
+    missing = [n for n in MANDATORY_TREE_SIZES if n not in plan.TREE_SIZES]
+    if missing:
+        raise SystemExit(
+            f"corpus defect: class 8 requires leaf counts {list(MANDATORY_TREE_SIZES)} "
+            f"(docs/conformance-corpus.md class 8) and the plan omits {missing}"
+        )
     trees = []
     inclusions = []
     for n in plan.TREE_SIZES:
@@ -462,7 +485,7 @@ def serialize(corpus) -> str:
 
 
 def coverage(corpus):
-    """Which of the seventeen classes have vectors. A class with none is a coverage gap."""
+    """Which of the CLASS_COUNT classes have vectors. A class with none is a coverage gap."""
     seen = {}
     for kind, vectors in corpus["vectors"].items():
         for v in vectors:
@@ -471,17 +494,28 @@ def coverage(corpus):
     return seen
 
 
+def _is_external_record(vector):
+    """Whether a record vector's record lives outside this repository.
+
+    `recordFile` is one of the two carriers the corpus schema admits; the other is a full
+    envelope copy, which is always a fixture inside `corpus/` and therefore never external. A
+    vector carrying only `envelopeFile` must not be read as external here, and it must not raise
+    either: both callers walk the COMMITTED file, which a future vector may legitimately use that
+    carrier in.
+    """
+    return "recordFile" in vector and not vector["recordFile"].startswith("corpus/")
+
+
 def _external_record_vectors(corpus):
     """Names of record vectors whose record file lives outside this repository."""
-    return {v["name"] for v in corpus["vectors"].get("record", [])
-            if not v["recordFile"].startswith("corpus/")}
+    return {v["name"] for v in corpus["vectors"].get("record", []) if _is_external_record(v)}
 
 
 def _without_external_records(corpus):
     trimmed = dict(corpus)
     trimmed["vectors"] = dict(corpus["vectors"])
     trimmed["vectors"]["record"] = [
-        v for v in corpus["vectors"].get("record", []) if v["recordFile"].startswith("corpus/")
+        v for v in corpus["vectors"].get("record", []) if not _is_external_record(v)
     ]
     return json.dumps(trimmed, sort_keys=True)
 
@@ -530,7 +564,11 @@ def main():
                     help="draw fresh salt sets into corpus/fixtures/salts/ and exit. Run ONCE "
                          "and commit the result: under decision D4b a salt is an independent "
                          "random draw that nothing can re-derive, so a normal build reads the "
-                         "committed sets and never draws one (spec section 7).")
+                         "committed sets and never draws one (spec section 7). IT LEAVES THE "
+                         "TREE INCONSISTENT: drawing runs a full build, so every envelope and "
+                         "record fixture is rewritten under the new salts while the corpus file "
+                         "itself keeps its old roots, and --check fails until a normal build "
+                         "follows.")
     ap.add_argument("--check", action="store_true",
                     help="rebuild and compare the corpus AND every fixture against the "
                          "committed files instead of writing them; writes nothing")
@@ -552,6 +590,8 @@ def main():
         for name in drawn:
             print(f"  {name}")
         print("commit these; a normal build reads them and never draws.")
+        print("then run a normal build: every envelope and record fixture has just been "
+              "rewritten under the new salts and the corpus file still carries the old roots.")
         return
 
     notes = []

@@ -379,9 +379,9 @@ Five things to know if you touch them:
   compiles clean under strict mode. It is shorter than `"not": {"required": ["x"], "properties":
   {"x": true}}` and needs no `strictRequired` annotation, because it carries no `required`.
 - **A conditional keyed on a vector's `class` needs an instance test on BOTH sides.**
-  `envelopeVector` requires `verifierConfig` at class 18 and forbids it everywhere else. The
-  else-branch is the half a compile check cannot see, and it is the half that was missing when the
-  block was merely optional. Validate a class-18 instance without the block (MUST fail), one with an
-  empty block (MUST fail), and a class-14 instance carrying one (MUST fail). Do the same through a
-  whole corpus document, not only against the `$defs` subschema: compiling proves the `$ref`
-  resolves, and only a root-level instance proves the branch is reached by the path a runner takes.
+  `envelopeVector` PERMITS `verifierConfig` at class 18 and forbids it everywhere else.
+  It is not required there, and a revision that required it was reverted for rejecting the committed corpus: the four class-18 vectors are the identity rows, which the envelope alone determines, so a config on them would be inert.
+  The else-branch is the half a compile check cannot see.
+  Validate a class-18 instance without the block (MUST pass), one carrying a complete block (MUST pass), one carrying an empty or partial block (MUST fail, since the block's own `required` names four members), and a class-14 instance carrying one (MUST fail).
+  Do the same through a whole corpus document, not only against the `$defs` subschema: compiling proves the `$ref` resolves, and only a root-level instance proves the branch is reached by the path a runner takes.
+  The completeness rule that block exists for - a vector whose outcome turns on the verifier's configuration must carry one - is not mechanically enforced today, and the schema says so rather than naming an enforcer.
