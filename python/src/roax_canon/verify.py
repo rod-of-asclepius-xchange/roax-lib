@@ -69,6 +69,14 @@ from .value import BLOB_REF, BYTES, DECIMAL, INTEGER, STRING, TAG_NAMES, VALUELE
 
 __all__ = ["VerifierConfig", "VerificationResult", "verify_envelope"]
 
+#: Every object `schemas/envelope-1.0.json` closes with ``additionalProperties: false``,
+#: mirrored here so the closure holds at each depth rather than at the top level alone.
+#: The top-level set alone is not the defence it looks like: every nested object below is
+#: dereferenced by named key, so an extra member one level down is silently ignored, and a
+#: `disclosure` carrying its own `salts` array or an `issuer` carrying a `masterSalt`
+#: delivers the salt of an undisclosed leaf in an envelope that verifies correctly - the
+#: exact leak specification section 7.3 rule 3 forbids, one layer beneath where
+#: :data:`_SEED_MEMBERS` was being scanned for it.
 _TOP_LEVEL_MEMBERS = frozenset(
     {
         "canon",
@@ -85,6 +93,14 @@ _TOP_LEVEL_MEMBERS = frozenset(
         "record",
         "salts",
     }
+)
+_ISSUER_MEMBERS = frozenset({"id", "keyId"})
+_TYPE_MAP_MEMBERS = frozenset({"id", "version"})
+_ANCHOR_MEMBERS = frozenset({"chainId", "registry", "anchoredAt", "txHash"})
+_DISCLOSURE_MEMBERS = frozenset({"mode", "leaves"})
+_SALT_ENTRY_MEMBERS = frozenset({"segments", "salt"})
+_DISCLOSED_LEAF_MEMBERS = frozenset(
+    {"segments", "displayPath", "index", "tag", "value", "salt", "auditPath"}
 )
 
 # `schemas/envelope-1.0.json` pins a BYTES leaf value to this form. Anchored \A and \Z
@@ -142,9 +158,14 @@ class VerifierConfig:
     simply reads its own and never the one the document names.
 
     ``resolvers`` supplies a type map per ``recordType`` for **full copies only**.
-    A disclosed copy under `schemas/envelope-1.0.json` cannot select an exact map at all,
-    because the ``typeMap`` binding of specification section 4.2 arrived with
-    `schemas/envelope-2.0.json`; see :func:`verify_envelope`.
+    A disclosed copy under `schemas/envelope-1.0.json` has no exact map it can select.
+    That schema does carry a top-level ``typeMap`` object, but it is OPTIONAL there and
+    ``roax.typeMap.id`` is not one of that version's committed reserved leaves, so its
+    value is outside the root and is a hint rather than authority (specification section
+    11.3, and that member's own description in the schema).
+    The section 4.2 binding that makes it selectable arrived with
+    `schemas/envelope-2.0.json`, which requires the member and commits the leaf; see
+    :func:`verify_envelope`.
     """
 
     profiles: ProfileRegistry = DEFAULT_PROFILES
@@ -180,8 +201,37 @@ def _reject(code: str, detail: str = "") -> VerificationResult:
     return VerificationResult(False, code, detail)
 
 
+def _check_members(obj: Mapping[str, Any], allowed: frozenset[str], where: str) -> None:
+    """Reject a seed member and then any member the envelope schema does not declare.
+
+    The seed scan precedes the closure and skips a name the object legitimately declares,
+    and both halves of that are load-bearing.
+    Preceding it is what keeps `salt-leak-disclosed-copy-with-master-salt.json` reporting
+    `master-salt-in-envelope` rather than a generic unknown-member error, which is the
+    reason that vector exists.
+    Skipping a declared name is what lets the same scan run over a `salts` entry and a
+    disclosed leaf, where ``salt`` is the member being asked for rather than a leak.
+    """
+    for seed in _SEED_MEMBERS:
+        if seed in obj and seed not in allowed:
+            raise RoaxError(
+                ErrorCode.MASTER_SALT_IN_ENVELOPE,
+                f"{where} carries {seed!r}; no envelope may carry any value from which "
+                f"the salt of an undisclosed leaf could be obtained "
+                f"(specification section 7.3, rule 3)",
+            )
+    unknown = sorted(set(obj) - allowed)
+    if unknown:
+        raise RoaxError(ErrorCode.ENVELOPE_SHAPE, f"unknown {where} members {unknown}")
+
+
 def _hexbytes(text: Any, *, field_name: str, size: int) -> bytes:
-    if not isinstance(text, str) or len(text) != size * 2:
+    # `is_json_string` and not `isinstance(text, str)`: every hex field this reads is pinned
+    # to "type": "string" by `schemas/envelope-1.0.json`, and `JsonNumber` subclasses `str`
+    # so an all-digit even-length numeric literal would otherwise satisfy both tests here
+    # while any consumer re-reading the same bytes with a stdlib parser destroys them
+    # (specification section 6.4).
+    if not is_json_string(text) or len(text) != size * 2:
         raise RoaxError(ErrorCode.ENVELOPE_SHAPE, f"{field_name} must be {size * 2} hex characters")
     if any(ch not in "0123456789abcdef" for ch in text):
         raise RoaxError(ErrorCode.ENVELOPE_SHAPE, f"{field_name} must be lowercase hex")
@@ -204,7 +254,7 @@ def verify_envelope(
         return _verify(envelope, cfg)
     except RoaxError as exc:
         return _reject(exc.code, exc.detail)
-    except (TypeError, ValueError, AttributeError, KeyError, IndexError) as exc:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, RecursionError) as exc:
         # A backstop, and deliberately not the mechanism: every member shape this module
         # depends on is checked explicitly above, and each of those checks carries the
         # reason code the case is about. This clause exists because specification section
@@ -212,6 +262,11 @@ def verify_envelope(
         # anticipated MUST still leave this function returning a result rather than
         # raising into a verifier service. It is placed after the `RoaxError` clause so a
         # real rejection keeps its own code.
+        #
+        # `RecursionError` is named explicitly because it is a `RuntimeError` and so is
+        # caught by none of the others: `flatten.walk` and `jsonio._check_surrogates` both
+        # recurse once per nesting level of an attacker-supplied full-copy `record`, and a
+        # depth is as attacker-controlled as a shape.
         return _reject(
             ErrorCode.ENVELOPE_SHAPE,
             f"malformed envelope member ({type(exc).__name__})",
@@ -223,17 +278,7 @@ def _verify(env: Mapping[str, Any], cfg: VerifierConfig) -> VerificationResult:
     if not isinstance(env, Mapping):
         return _reject(ErrorCode.ENVELOPE_SHAPE, "envelope is not an object")
 
-    for seed in _SEED_MEMBERS:
-        if seed in env:
-            return _reject(
-                ErrorCode.MASTER_SALT_IN_ENVELOPE,
-                f"envelope carries {seed!r}; no envelope may carry any value from which "
-                f"the salt of an undisclosed leaf could be obtained "
-                f"(specification section 7.3, rule 3)",
-            )
-    unknown = sorted(set(env) - _TOP_LEVEL_MEMBERS)
-    if unknown:
-        return _reject(ErrorCode.ENVELOPE_SHAPE, f"unknown envelope members {unknown}")
+    _check_members(env, _TOP_LEVEL_MEMBERS, "envelope")
 
     for required in _REQUIRED_MEMBERS:
         if required not in env:
@@ -299,6 +344,7 @@ def _verify(env: Mapping[str, Any], cfg: VerifierConfig) -> VerificationResult:
     issuer = env["issuer"]
     if not isinstance(issuer, Mapping) or "id" not in issuer:
         return _reject(ErrorCode.ENVELOPE_SHAPE, "issuer.id is required")
+    _check_members(issuer, _ISSUER_MEMBERS, "issuer")
 
     # The outer identity members become reserved STRING leaves under specification section
     # 11.2 and are bound to them under section 11.3, so each MUST be a genuine JSON string
@@ -323,8 +369,19 @@ def _verify(env: Mapping[str, Any], cfg: VerifierConfig) -> VerificationResult:
     if type_map is not None:
         if not isinstance(type_map, Mapping):
             return _reject(ErrorCode.ENVELOPE_SHAPE, "`typeMap` must be an object")
+        _check_members(type_map, _TYPE_MAP_MEMBERS, "typeMap")
         if "id" in type_map and not is_json_string(type_map["id"]):
             return _reject(ErrorCode.ENVELOPE_SHAPE, "typeMap.id must be a JSON string")
+
+    # `anchor` is closed although no check in this module dereferences it. Being unread is
+    # what makes it a carrier: an unclosed routing hint is somewhere a producer can park a
+    # withheld leaf's salt with nothing ever looking at it (specification sections 7.3 and
+    # 11.3).
+    anchor = env.get("anchor")
+    if anchor is not None:
+        if not isinstance(anchor, Mapping):
+            return _reject(ErrorCode.ENVELOPE_SHAPE, "`anchor` must be an object")
+        _check_members(anchor, _ANCHOR_MEMBERS, "anchor")
 
     if has_record:
         return _verify_full_copy(env, cfg, hasher, root, leaf_count, record_type)
@@ -354,6 +411,7 @@ def _verify_full_copy(env, cfg, hasher, root, leaf_count, record_type) -> Verifi
     for entry in salts_raw:
         if not isinstance(entry, Mapping) or "segments" not in entry or "salt" not in entry:
             return _reject(ErrorCode.ENVELOPE_SHAPE, "each salts entry needs segments and salt")
+        _check_members(entry, _SALT_ENTRY_MEMBERS, "salts entry")
         encoded = encode_path(segments_from_json(entry["segments"]))
         if encoded in by_path:
             return _reject(
@@ -490,6 +548,7 @@ def _verify_disclosed_copy(env, cfg, hasher, root, leaf_count) -> VerificationRe
     disclosure = env["disclosure"]
     if not isinstance(disclosure, Mapping) or disclosure.get("mode") != "selective":
         return _reject(ErrorCode.ENVELOPE_SHAPE, "disclosure.mode must be 'selective'")
+    _check_members(disclosure, _DISCLOSURE_MEMBERS, "disclosure")
     leaves = disclosure.get("leaves")
     if not isinstance(leaves, list) or not leaves:
         return _reject(ErrorCode.ENVELOPE_SHAPE, "disclosure.leaves must be a non-empty array")
@@ -502,6 +561,7 @@ def _verify_disclosed_copy(env, cfg, hasher, root, leaf_count) -> VerificationRe
         for required in ("segments", "index", "tag", "salt", "auditPath"):
             if required not in raw:
                 return _reject(ErrorCode.ENVELOPE_SHAPE, f"disclosed leaf missing {required!r}")
+        _check_members(raw, _DISCLOSED_LEAF_MEMBERS, "disclosed leaf")
 
         segments = segments_from_json(raw["segments"])
         tag = as_int(raw["tag"], field="tag")
@@ -531,10 +591,12 @@ def _verify_disclosed_copy(env, cfg, hasher, root, leaf_count) -> VerificationRe
         #
         # THE RECORD-LEAF HALF IS NOT PERFORMABLE FOR THIS ENVELOPE VERSION, and that is
         # stated rather than skipped quietly. Step 1 checks a record leaf's tag against
-        # "the exact selected map", and the map is selected by `roax.typeMap.id` under
-        # specification section 4.2, which `schemas/envelope-1.0.json` does not carry at
-        # all. A verifier that picked a map by `recordType` alone would be resolving
-        # against an artifact the envelope never identified.
+        # "the exact selected map", and the map is selected by the content ID committed at
+        # `roax.typeMap.id` under specification section 4.2. `schemas/envelope-1.0.json`
+        # does carry an optional top-level `typeMap.id`, but that member sits outside the
+        # root and this version commits no such leaf, so selecting on it would be trusting
+        # an unauthenticated hint; a verifier that instead picked a map by `recordType`
+        # alone would be resolving against an artifact the envelope never identified.
         if len(segments) == 1 and isinstance(segments[0], Key) and nfc(
             segments[0].value, where="disclosed leaf key"
         ).startswith(RESERVED_KEY_PREFIX):

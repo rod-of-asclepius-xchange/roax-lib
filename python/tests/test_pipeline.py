@@ -508,7 +508,7 @@ class TestDisclosedCarrierIsTheCommittedValue(unittest.TestCase):
 class TestHostileEnvelopeMembers(unittest.TestCase):
     """Specification section 11.3 makes everything outside the root attacker-controlled.
 
-    Two properties are pinned here and neither is reachable from the committed corpus,
+    Three properties are pinned here and none is reachable from the committed corpus,
     because all 54 envelope fixtures are schema-valid.
 
     1. A member that is a JSON *number* where the envelope schema requires a JSON string
@@ -517,6 +517,10 @@ class TestHostileEnvelopeMembers(unittest.TestCase):
        envelope would verify against a genuine root.
     2. `verify_envelope` returns a `VerificationResult` for every input. A verifier
        service handed a hostile envelope must reject it, not crash.
+    3. Every object `schemas/envelope-1.0.json` closes is closed here too, at each depth.
+       A nested object is read by named key, so an extra member one level down would be
+       ignored, and one carrying a withheld leaf's salt would ride inside an envelope that
+       verifies `ok` (specification section 7.3, rule 3).
     """
 
     def setUp(self):
@@ -646,6 +650,78 @@ class TestHostileEnvelopeMembers(unittest.TestCase):
         self.assertEqual(
             verify_envelope(envelope, self.config).reason, ErrorCode.BLOB_REF_NOT_DECLARED
         )
+
+    def test_a_nested_object_carrying_a_withheld_salt_is_rejected(self):
+        # The leak the top-level scan alone does not close. Every nested object is read by
+        # named key, so a `salts` array parked inside `disclosure` is ignored while the
+        # envelope verifies `ok` - and it carries the salt of a leaf the holder chose to
+        # withhold, which is the dictionary search specification section 7.3 rule 3 and
+        # section 10.1 forbid.
+        withheld = (Key("amount"),)
+        leaked = self.built.salts[self.built.index_of(withheld)].hex()
+        hostile = self.disclosed()
+        hostile["disclosure"] = {
+            **hostile["disclosure"],
+            "salts": [{"segments": [{"key": "amount"}], "salt": leaked}],
+        }
+        self.assertEqual(verify_envelope(hostile, self.config).reason, ErrorCode.ENVELOPE_SHAPE)
+
+        # A seed member one level down keeps the reason the top-level scan gives it, at
+        # each closed object this module dereferences and at the one it never reads.
+        cases = {
+            "issuer": ("issuer", {"masterSalt": "00" * 32}),
+            "disclosure": ("disclosure", {"saltSeed": "00" * 32}),
+            "anchor": ("anchor", {"chainId": 1, "registry": "0x0", "kdfKey": "00" * 32}),
+        }
+        for where, (member, extra) in cases.items():
+            with self.subTest(where=where):
+                hostile = dict(self.disclosed())
+                hostile[member] = {**hostile.get(member, {}), **extra}
+                self.assertEqual(
+                    verify_envelope(hostile, self.config).reason,
+                    ErrorCode.MASTER_SALT_IN_ENVELOPE,
+                )
+
+        # `salt` is in the seed list and is legitimate on both leaf shapes, so the scan must
+        # skip a name the object itself declares; an undeclared member is still refused.
+        accepted = self.disclosed()
+        self.assertTrue(verify_envelope(accepted, self.config).accepted)
+        hostile = self.disclosed()
+        hostile["disclosure"]["leaves"][0] = {
+            **hostile["disclosure"]["leaves"][0],
+            "leafHash": "00" * 32,
+        }
+        self.assertEqual(verify_envelope(hostile, self.config).reason, ErrorCode.ENVELOPE_SHAPE)
+
+        hostile = self.full()
+        hostile["salts"] = [{**hostile["salts"][0], "seed": "00" * 32}] + hostile["salts"][1:]
+        self.assertEqual(
+            verify_envelope(hostile, self.config).reason, ErrorCode.MASTER_SALT_IN_ENVELOPE
+        )
+
+    def test_a_json_number_hex_field_is_rejected(self):
+        # `schemas/envelope-1.0.json` pins each of these to "type": "string", and an
+        # all-digit even-length numeric literal satisfies the hex test on its own. Neither
+        # is choosable by a producer - both are pinned by the honest commitment - so the
+        # discriminator is the reason: an unfixed `_hexbytes` accepts the carrier and the
+        # envelope fails later on the value instead of on its shape.
+        hostile = dict(self.full())
+        hostile["root"] = JsonNumber("1" * 64)
+        self.assertEqual(verify_envelope(hostile, self.config).reason, ErrorCode.ENVELOPE_SHAPE)
+
+        hostile = self.disclosed()
+        hostile["disclosure"]["leaves"][0] = {
+            **hostile["disclosure"]["leaves"][0],
+            "salt": JsonNumber("1" * 32),
+        }
+        self.assertEqual(verify_envelope(hostile, self.config).reason, ErrorCode.ENVELOPE_SHAPE)
+
+        hostile = self.disclosed()
+        hostile["disclosure"]["leaves"][0] = {
+            **hostile["disclosure"]["leaves"][0],
+            "auditPath": [JsonNumber("1" * 64)],
+        }
+        self.assertEqual(verify_envelope(hostile, self.config).reason, ErrorCode.ENVELOPE_SHAPE)
 
     def test_a_json_number_path_key_is_rejected(self):
         # The same collapse one layer down: {"key": 5} would encode identically to
