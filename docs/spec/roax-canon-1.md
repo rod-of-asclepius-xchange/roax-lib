@@ -1829,8 +1829,8 @@ healthcert already speaks, so it costs an adopter nothing, and the property that
 the digest rule being independent of the wire format - is what keeps a future binary transport from
 becoming a `canon` bump.
 
-> **Normative:** a serialization format MUST NOT become the digest rule. The leaf, salt and tree
-> constructions of sections 6 through 9 are defined over byte strings and are the only inputs to a
+> **Normative:** a serialization format MUST NOT become the digest rule. The value, leaf and tree
+> constructions of sections 6, 8 and 9 are defined over byte strings and are the only inputs to a
 > root. In particular, deterministic CBOR MAY be used to carry an envelope and MUST NOT be used to
 > compute one.
 
