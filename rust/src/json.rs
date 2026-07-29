@@ -57,9 +57,11 @@ impl PartialEq for JsonValue {
     }
 }
 
+/// Renders the format `#[derive(Debug)]` would produce, including the
+/// indentation of alternate `{:#?}` mode, without recursing per nesting level.
 impl fmt::Debug for JsonValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut pending = vec![DebugFrame::Value(self)];
+        let mut pending = vec![DebugFrame::Value(self, 0)];
         while let Some(frame) = pending.pop() {
             frame.write(f, &mut pending)?;
         }
@@ -67,80 +69,167 @@ impl fmt::Debug for JsonValue {
     }
 }
 
+const DEBUG_INDENT_CHUNK: &str = "                                ";
+
+fn write_debug_indent(f: &mut fmt::Formatter<'_>, depth: usize) -> fmt::Result {
+    f.write_str("\n")?;
+    let mut remaining = depth * 4;
+    while remaining >= DEBUG_INDENT_CHUNK.len() {
+        f.write_str(DEBUG_INDENT_CHUNK)?;
+        remaining -= DEBUG_INDENT_CHUNK.len();
+    }
+    f.write_str(&DEBUG_INDENT_CHUNK[..remaining])
+}
+
 enum DebugFrame<'a> {
-    Value(&'a JsonValue),
-    Array(&'a [JsonValue], usize),
-    Object(&'a [(String, JsonValue)], usize),
-    Literal(&'static str),
+    Value(&'a JsonValue, usize),
+    ArrayItems(&'a [JsonValue], usize, usize),
+    ObjectItems(&'a [(String, JsonValue)], usize, usize),
+    CloseTuple(usize),
+    ItemSeparator,
 }
 
 impl<'a> DebugFrame<'a> {
     fn write(self, f: &mut fmt::Formatter<'_>, pending: &mut Vec<Self>) -> fmt::Result {
         match self {
-            Self::Value(value) => Self::write_value(value, f, pending),
-            Self::Array(values, index) => Self::write_array(values, index, f, pending),
-            Self::Object(entries, index) => Self::write_object(entries, index, f, pending),
-            Self::Literal(text) => f.write_str(text),
+            Self::Value(value, depth) => Self::write_value(value, depth, f, pending),
+            Self::ArrayItems(values, index, depth) => {
+                Self::write_array_item(values, index, depth, f, pending)
+            }
+            Self::ObjectItems(entries, index, depth) => {
+                Self::write_object_item(entries, index, depth, f, pending)
+            }
+            Self::CloseTuple(depth) => {
+                if f.alternate() {
+                    f.write_str(",")?;
+                    write_debug_indent(f, depth)?;
+                }
+                f.write_str(")")
+            }
+            Self::ItemSeparator => {
+                if f.alternate() {
+                    f.write_str(",")?;
+                }
+                Ok(())
+            }
         }
     }
 
     fn write_value(
         value: &'a JsonValue,
+        depth: usize,
         f: &mut fmt::Formatter<'_>,
         pending: &mut Vec<Self>,
     ) -> fmt::Result {
         match value {
             JsonValue::Object(entries) => {
-                f.write_str("Object([")?;
-                pending.push(Self::Object(entries, 0));
+                Self::write_container_start("Object(", depth, f)?;
+                pending.push(Self::CloseTuple(depth));
+                pending.push(Self::ObjectItems(entries, 0, depth + 1));
                 Ok(())
             }
             JsonValue::Array(values) => {
-                f.write_str("Array([")?;
-                pending.push(Self::Array(values, 0));
+                Self::write_container_start("Array(", depth, f)?;
+                pending.push(Self::CloseTuple(depth));
+                pending.push(Self::ArrayItems(values, 0, depth + 1));
                 Ok(())
             }
-            JsonValue::String(value) => write!(f, "String({value:?})"),
-            JsonValue::Number(literal) => write!(f, "Number({literal:?})"),
-            JsonValue::Bool(value) => write!(f, "Bool({value:?})"),
+            JsonValue::String(value) => Self::write_scalar("String(", value, depth, f),
+            JsonValue::Number(literal) => Self::write_scalar("Number(", literal, depth, f),
+            JsonValue::Bool(value) => Self::write_scalar("Bool(", value, depth, f),
             JsonValue::Null => f.write_str("Null"),
         }
     }
 
-    fn write_array(
+    fn write_container_start(name: &str, depth: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(name)?;
+        if f.alternate() {
+            write_debug_indent(f, depth + 1)?;
+        }
+        f.write_str("[")
+    }
+
+    fn write_scalar(
+        name: &str,
+        value: &dyn fmt::Debug,
+        depth: usize,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
+        f.write_str(name)?;
+        if f.alternate() {
+            write_debug_indent(f, depth + 1)?;
+            write!(f, "{value:?}")?;
+            f.write_str(",")?;
+            write_debug_indent(f, depth)?;
+        } else {
+            write!(f, "{value:?}")?;
+        }
+        f.write_str(")")
+    }
+
+    fn write_array_item(
         values: &'a [JsonValue],
         index: usize,
+        depth: usize,
         f: &mut fmt::Formatter<'_>,
         pending: &mut Vec<Self>,
     ) -> fmt::Result {
         let Some(value) = values.get(index) else {
-            return f.write_str("])");
+            return Self::write_container_end(values.is_empty(), depth, f);
         };
-        if index != 0 {
-            f.write_str(", ")?;
-        }
-        pending.push(Self::Array(values, index + 1));
-        pending.push(Self::Value(value));
+        Self::write_item_start(index, depth, f)?;
+        pending.push(Self::ArrayItems(values, index + 1, depth));
+        pending.push(Self::ItemSeparator);
+        pending.push(Self::Value(value, depth + 1));
         Ok(())
     }
 
-    fn write_object(
+    fn write_object_item(
         entries: &'a [(String, JsonValue)],
         index: usize,
+        depth: usize,
         f: &mut fmt::Formatter<'_>,
         pending: &mut Vec<Self>,
     ) -> fmt::Result {
         let Some((key, value)) = entries.get(index) else {
-            return f.write_str("])");
+            return Self::write_container_end(entries.is_empty(), depth, f);
         };
-        if index != 0 {
-            f.write_str(", ")?;
+        Self::write_item_start(index, depth, f)?;
+        f.write_str("(")?;
+        if f.alternate() {
+            write_debug_indent(f, depth + 2)?;
+            write!(f, "{key:?}")?;
+            f.write_str(",")?;
+            write_debug_indent(f, depth + 2)?;
+        } else {
+            write!(f, "{key:?}, ")?;
         }
-        write!(f, "({key:?}, ")?;
-        pending.push(Self::Object(entries, index + 1));
-        pending.push(Self::Literal(")"));
-        pending.push(Self::Value(value));
+        pending.push(Self::ObjectItems(entries, index + 1, depth));
+        pending.push(Self::ItemSeparator);
+        pending.push(Self::CloseTuple(depth + 1));
+        pending.push(Self::Value(value, depth + 2));
         Ok(())
+    }
+
+    fn write_item_start(index: usize, depth: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if f.alternate() {
+            write_debug_indent(f, depth + 1)
+        } else if index == 0 {
+            Ok(())
+        } else {
+            f.write_str(", ")
+        }
+    }
+
+    fn write_container_end(
+        is_empty: bool,
+        depth: usize,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
+        if f.alternate() && !is_empty {
+            write_debug_indent(f, depth)?;
+        }
+        f.write_str("]")
     }
 }
 
@@ -786,6 +875,57 @@ mod tests {
     const DEEP_ARRAY_NESTING: usize = 20_000;
     const DEEP_OBJECT_NESTING: usize = 10_000;
 
+    /// Structural twin of [`JsonValue`] whose `Debug` is the compiler's derive.
+    #[derive(Debug)]
+    #[allow(dead_code)]
+    enum DerivedValue {
+        Object(Vec<(String, DerivedValue)>),
+        Array(Vec<DerivedValue>),
+        String(String),
+        Number(String),
+        Bool(bool),
+        Null,
+    }
+
+    fn derived(value: &JsonValue) -> DerivedValue {
+        match value {
+            JsonValue::Object(entries) => DerivedValue::Object(
+                entries
+                    .iter()
+                    .map(|(key, child)| (key.clone(), derived(child)))
+                    .collect(),
+            ),
+            JsonValue::Array(values) => DerivedValue::Array(values.iter().map(derived).collect()),
+            JsonValue::String(value) => DerivedValue::String(value.clone()),
+            JsonValue::Number(literal) => DerivedValue::Number(literal.clone()),
+            JsonValue::Bool(value) => DerivedValue::Bool(*value),
+            JsonValue::Null => DerivedValue::Null,
+        }
+    }
+
+    fn debug_fixture() -> JsonValue {
+        JsonValue::Object(vec![
+            (
+                "a".to_owned(),
+                JsonValue::Array(vec![
+                    JsonValue::Null,
+                    JsonValue::Bool(true),
+                    JsonValue::Number("1.0".to_owned()),
+                    JsonValue::Array(Vec::new()),
+                    JsonValue::Object(vec![(
+                        "nested".to_owned(),
+                        JsonValue::Array(vec![JsonValue::Object(vec![(
+                            "deep".to_owned(),
+                            JsonValue::Bool(false),
+                        )])]),
+                    )]),
+                ]),
+            ),
+            ("b".to_owned(), JsonValue::String("x\"y".to_owned())),
+            ("c".to_owned(), JsonValue::Object(Vec::new())),
+        ])
+    }
+
     #[test]
     fn debug_renders_every_variant() {
         let value = JsonValue::Object(vec![
@@ -804,6 +944,24 @@ mod tests {
             format!("{value:?}"),
             r#"Object([("a", Array([Null, Bool(true), Number("1.0")])), ("b", String("x\"y")), ("c", Object([]))])"#
         );
+    }
+
+    #[test]
+    fn debug_matches_the_derived_format_in_both_modes() {
+        let value = debug_fixture();
+        let reference = derived(&value);
+        assert_eq!(format!("{value:?}"), format!("{reference:?}"));
+        assert_eq!(format!("{value:#?}"), format!("{reference:#?}"));
+    }
+
+    #[test]
+    fn alternate_debug_matches_the_derived_format_when_nested() {
+        let mut value = JsonValue::Object(Vec::new());
+        for depth in 0..64 {
+            value = JsonValue::Object(vec![(format!("key{depth}"), JsonValue::Array(vec![value]))]);
+        }
+        let reference = derived(&value);
+        assert_eq!(format!("{value:#?}"), format!("{reference:#?}"));
     }
 
     #[test]
