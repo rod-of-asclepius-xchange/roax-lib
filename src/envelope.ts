@@ -129,15 +129,28 @@ export interface VerifierConfig {
    * Whether this verifier accepts ONLY envelopes that bind the exact type-map artifact
    * (specification section 11.2, `schemas/envelope-2.0.json`).
    *
-   * Defaults to `false`, which is the permissive reading and NOT an endorsement: a disclosed copy
-   * carrying neither an outer `typeMap` member nor a committed `roax.typeMap.id` leaf is reported
-   * as undischarged on every verification rather than passed silently. The default is permissive
-   * because `schemas/envelope-1.0.json` predates the binding, still governs every envelope issued
-   * under it, and is legitimately verifiable - so failing closed here would reject conforming
+   * **It governs BOTH copy kinds.** It is read once, beside the other allow-lists, and rejects any
+   * envelope carrying no outer `typeMap` member before either copy kind is verified - because like
+   * `hashAlgAllowList` and `knownProfiles` it settles whether this verifier can proceed at all
+   * rather than which policy to apply.
+   *
+   * Defaults to `false`, which is the permissive reading and NOT an endorsement: an envelope that
+   * binds no type-map artifact is reported as undischarged on every verification, full copy and
+   * disclosed copy alike, rather than passed silently. The default is permissive because
+   * `schemas/envelope-1.0.json` predates the binding, still governs every envelope issued under
+   * it, and is legitimately verifiable - so failing closed by default would reject conforming
    * documents rather than forged ones.
    *
+   * What the two copy kinds do NOT share is what is at stake, and the reports say so separately.
+   * In a full copy the binding is authenticated by the rebuild: the reserved leaves come from the
+   * identity, so removing the member removes a leaf and the copy fails closed on the derived leaf
+   * count, on the salts length or on the root, according to what else the edit changed. What is
+   * undischarged there is the absence of a binding rather than a possible holder edit. In a
+   * disclosed copy nothing is re-flattened, so an absent member and an absent leaf together are
+   * genuinely indistinguishable from a stripped pair.
+   *
    * A deployment that issues and accepts only envelope-2.0 documents sets this to `true` and
-   * closes the residue outright. See the findings document.
+   * closes both outright. See the findings document.
    */
   readonly requireTypeMapIdentity?: boolean | undefined;
   readonly emptyContainerPolicy?: EmptyContainerPolicy | undefined;
@@ -561,6 +574,17 @@ export function verifyEnvelope(envelope: Envelope, config: VerifierConfig = {}):
       `recordType ${JSON.stringify(envelope.recordType)} is not a profile this verifier knows`,
     );
   }
+  if (config.requireTypeMapIdentity === true && envelope.typeMap === undefined) {
+    // Read HERE rather than inside either copy-kind path, so that the option governs both. It is
+    // the verifier's own policy in the same sense the two allow-lists above are, and a policy that
+    // held for a disclosed copy and not for a full copy would tell a deployment it had opted out
+    // of `schemas/envelope-1.0.json` while it was still accepting one.
+    fail(
+      'outer-identity-mismatch',
+      'this verifier accepts only envelopes that bind the exact type-map artifact, and this ' +
+        'envelope carries no typeMap member',
+    );
+  }
   const hash = resolveHashFunction(envelope.hashAlg);
 
   // ---- 3. The anchoring layer, from the verifier's own configuration ---------------------------
@@ -622,6 +646,20 @@ function verifyFullCopy(
   undischarged: string[],
 ): VerificationResult {
   const saltEntries = envelope.salts as readonly LeafSaltEntry[];
+  if (identity.typeMapId === undefined) {
+    // The full-copy half of the section 11.2 residue, reported on the same footing as the
+    // disclosed-copy half so that neither copy kind passes an unbound envelope silently. What is
+    // at stake differs and the wording says which: the rebuild below takes the reserved leaves
+    // from the identity, so a member a holder removed removes a leaf with it and the copy fails
+    // closed further down. Nothing is waivable here; the binding is simply absent.
+    undischarged.push(
+      'section 11.2: this full copy carries no typeMap member, so it commits no roax.typeMap.id ' +
+        'leaf and the exact type-map artifact it was issued against is not authenticated by the ' +
+        'root. It was issued under schemas/envelope-1.0.json, which predates the binding. Unlike ' +
+        'a disclosed copy the member cannot be removed silently, because the rebuild would emit a ' +
+        'different leaf set. Set requireTypeMapIdentity to reject such an envelope outright.',
+    );
+  }
   // Checked BEFORE the tree is rebuilt, so a copy whose salts array simply has the wrong length is
   // rejected for that rather than for the derived-count disagreement it also causes.
   if (saltEntries.length !== envelope.leafCount) {
@@ -804,18 +842,15 @@ function verifyDisclosedCopy(
       'the disclosed copy commits roax.typeMap.id inside the root while the envelope carries no ' +
         'typeMap member, so the map identity the root authenticates is unbound',
     );
-  } else if (config.requireTypeMapIdentity === true) {
-    fail(
-      'outer-identity-mismatch',
-      'this verifier accepts only envelopes that bind the exact type-map artifact, and this copy ' +
-        'carries neither an outer typeMap member nor a committed roax.typeMap.id leaf',
-    );
   } else {
     // **The residue, and it is reported on every affected verification rather than waived.**
     // Both halves absent is the one case the two directions above cannot separate, because
     // specification section 11.1's envelope shape carries no discriminator for which schema
     // version a document was issued under: `canon` is `ROAX-CANON/1` under both, and the outer
     // `schemaVersion` is the RECORD profile's version rather than the envelope schema's.
+    //
+    // A verifier that has set `requireTypeMapIdentity` never reaches here: the option is read
+    // beside the allow-lists in step 2, so it rejects both copy kinds ahead of this.
     undischarged.push(
       'section 11.2: this copy carries neither an outer typeMap member nor a committed ' +
         'roax.typeMap.id leaf, so it was either issued under schemas/envelope-1.0.json, which ' +

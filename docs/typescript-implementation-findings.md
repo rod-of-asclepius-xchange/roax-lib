@@ -315,6 +315,24 @@ That knob defaults to permissive, and the default is a statement about envelope-
 about the binding: failing closed by default would reject conforming documents rather than forged
 ones, and `src/envelope.ts` reads both schema versions deliberately.
 
+**A FULL copy with no `typeMap` member reports too, and it is a different statement.**
+The option is read beside the verifier's other allow-lists rather than inside either copy-kind
+path, so a deployment that sets it refuses both kinds; scoping it to disclosed copies alone would
+have told that deployment it had opted out of `schemas/envelope-1.0.json` while it was still
+accepting one.
+What the two reports say differs, because what is at stake differs.
+A full copy is re-flattened, and the rebuild takes the reserved leaves from the identity, so
+removing the member removes a leaf with it.
+Measured on a copy this library issued, that fails with `leaf-count-mismatch`, because the derived
+count is checked before the root is; editing `leafCount` to match moves the rejection to
+`salts-length-not-leaf-count`, and dropping the corresponding salt entry moves it to
+`root-mismatch`.
+Which of the three fires depends on what else the edit changed, and all three are rejections.
+Nothing there is waivable by deletion, and the entry says so: what is undischarged is that the
+document binds no type-map artifact at all, not that one may have been removed.
+The stripped-versus-envelope-1.0 ambiguity is specific to a disclosed copy, which is never
+re-flattened.
+
 All 54 committed envelope fixtures carry no `typeMap` member and no `roax.typeMap.id` leaf, so what
 the corpus exercises today is the residue rather than either closed direction, and **neither closed
 direction is asserted by a vector.**
@@ -336,7 +354,7 @@ Node v22.21.0, TypeScript 5.9.3, `SHA-256`, corpus `1.0.0`.
 |---|---|
 | `npm test`, the default | **680 assertions, 0 failures, 2 SKIPPED** - class 10, whose records live outside this repository |
 | `ROAX_REFERENCE_RECORDS=<dir> npm run conformance` | **684 assertions, 0 failures, 0 skipped**, all 19 classes |
-| `test/unit.ts` | **21 tests, 0 failures** |
+| `test/unit.ts` | **22 tests, 0 failures** |
 
 **Both were run under `emptyContainerPolicy: 'mechanical'`, which is the corpus's rule and NOT
 specification section 3.3's.** Finding 2 above gives the measurement in full: under section 3.3 the
