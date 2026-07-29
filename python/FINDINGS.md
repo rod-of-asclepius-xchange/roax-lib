@@ -223,12 +223,28 @@ Recorded because the task named two of them and asked for the rest, and because 
 | `json.loads` accepts `NaN`, `Infinity`, `-Infinity` | produces floats | `parse_constant` raises `non-finite-number` |
 | a plain `dict` object hook drops duplicate keys | `{"a":1,"a":2}` becomes `{"a":2}` | `object_pairs_hook` raises `duplicate-key` |
 | **`parse_int=str, parse_float=str` collapses `5` and `"5"`** | the type map resolves the wrong tag | `JsonNumber` is a distinct `str` subclass; `json_kind` reads the type |
+| **`JsonNumber` subclasses `str`, so it passes `isinstance(x, str)` at every carrier boundary** | a JSON number reaches a member the envelope schema pins to a string, and the envelope still verifies | `jsonio.is_json_string`, applied at the outer identity members and `typeMap.id` (`verify.py`, `_verify`), at `KEY` path segments (`path.segments_from_json`), at a type-map `pattern` (`typemap.DisplayPatternTypeMap.__init__`) and at `disclosure.leaves[].value` for tags 2, 3, 4 and 5 (`verify._decode_carrier`) |
 | `$` in a regular expression also matches before a trailing newline | `"1.0\n"` is accepted and canonicalized | every grammar anchored `\A` and `\Z` |
 | `\d` matches non-ASCII decimal digits, and `int("１２")` is 12 | a fullwidth numeral canonicalizes | grammars spell `[0-9]` out; `isdigit`, `isdecimal`, `isnumeric` are never used |
 | `str` holds unpaired surrogates and `unicodedata.normalize` passes them through | fails later at `.encode("utf-8")`, after the guard has run | explicit check before normalization, `unpaired-surrogate` |
 | `bytes.fromhex` accepts uppercase and embedded spaces | `"AB CD"` decodes | envelope hex fields validated lowercase and fixed-length |
 | CPython 3.11+ caps `int()` conversion at 4300 digits | `1e` + 5000 digits raises `ValueError`, not the specification's bound | exponent refused by digit count first, `digit-bound-exceeded` |
 | `base64.b64decode(validate=True)` accepts non-canonical trailing bits | RFC 4648 section 3.5's non-canonical case passes | explicit final-quantum check |
+
+**The `JsonNumber` row is the residual of closing the row above it, and it is worth spelling out.**
+Both halves of `JsonNumber` are deliberate: subclassing `str` is what keeps the literal verbatim (specification section 6.4), and being a distinct type is what stops the JSON number `5` and the JSON string `"5"` collapsing at the type-map lookup (specification section 4.2).
+The first half is what makes it invisible to an `isinstance(x, str)` test, so every place this package requires a member to BE a string had to be moved onto `is_json_string` rather than left on `isinstance`.
+The one that mattered is `disclosure.leaves[].value`, because that carrier feeds the leaf hash directly: measured on CPython 3.13, a disclosed tag-4 leaf carrying `0.010` as a JSON number canonicalized to the same bytes the genuine leaf committed and verified `ok`, while any consumer re-reading the same envelope with a stdlib parser reads `0.01`.
+`schemas/envelope-1.0.json` pins that carrier to `"type": "string"` and says why in its own description, so this is a defect of this implementation rather than a finding against the specification.
+Closing it at the verifier exposed the same hazard on the encoder: `disclosed_copy` was emitting the record's `JsonNumber` straight into that carrier, so `_carrier_value` now converts tags 2, 3 and 4 to a plain `str`.
+The emitted bytes do not change, because a `str` subclass already serializes as a JSON string; what changes is the in-memory hand-off, which is what the unit tests and any caller that does not serialize in between actually use.
+The full-copy `record` body is deliberately NOT covered by any of this: specification section 7.3 has that body carry record numbers in their original JSON form, and the flattener resolves those through the observed JSON kind.
+No committed vector reaches any of these boundaries, so the unit tests are the only thing holding them.
+
+**One consequence of the same subclassing is left open, and it belongs to a caller rather than to this package.**
+`json.dumps` on a full copy serializes the record body's `JsonNumber` values as JSON **strings**, because `JsonNumber` subclasses `str`, so re-reading that text gives kind `string` where the type map expects kind `number` and the copy fails `type-unresolved`.
+This package ships no serializer and specification section 7.3 requires the record body to carry its numbers as numbers, so writing an envelope to the wire is a caller's job and a caller must emit those literals unquoted.
+Measured on CPython 3.13; it is unchanged by the fix above, since `full_copy` does not go through `_carrier_value`.
 
 **The Unicode line is clean and worth stating plainly.**
 CPython 3.13.5 ships `unicodedata.unidata_version == "15.1.0"`, which is exactly what `ROAX-CANON/1` pins.

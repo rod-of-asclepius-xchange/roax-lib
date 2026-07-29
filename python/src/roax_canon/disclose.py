@@ -30,7 +30,7 @@ from .path import Segment, display_path, encode_path, segments_to_json
 from .profiles import Profile
 from .record import RESERVED_V1, BuiltRecord, RecordIdentity
 from .tree import audit_path
-from .value import BYTES, VALUELESS_TAGS
+from .value import BYTES, DECIMAL, INTEGER, STRING, VALUELESS_TAGS
 
 __all__ = ["full_copy", "disclosed_copy"]
 
@@ -64,9 +64,26 @@ def _carrier_value(tag: int, value: Any) -> Any:
     `BYTES` travels as lowercase hex in the envelope, which is what
     `schemas/envelope-1.0.json` pins, and is distinct from the RFC 4648 base64 the
     *record* carries for the same field (specification section 6.3).
+
+    `STRING`, `INTEGER` and `DECIMAL` travel as a plain :class:`str`, and that conversion
+    is not cosmetic.
+    A record leaf at tag 3 or 4 holds a :class:`~roax_canon.jsonio.JsonNumber`, whose
+    purpose is to keep the literal verbatim, and `schemas/envelope-1.0.json` pins this
+    carrier to ``"type": "string"`` because a JSON number here would be read back through
+    a float by any ordinary consumer and ``0.010`` would become ``0.01`` (specification
+    section 6.4).
+    The emitted **bytes** are unchanged either way, since `JsonNumber` subclasses
+    :class:`str` and therefore already serializes as a JSON string; what this closes is
+    the in-memory hand-off, where the carrier would otherwise still be a `JsonNumber` and
+    :func:`roax_canon.verify.verify_envelope` would reject an envelope this module had
+    just built.
+    The value has already passed :func:`roax_canon.value.encode_value` at these tags by
+    the time a :class:`~roax_canon.record.BuiltRecord` exists, so it is a string here.
     """
     if tag == BYTES:
         return bytes(value).hex()
+    if tag in (STRING, INTEGER, DECIMAL):
+        return str(value)
     return value
 
 
