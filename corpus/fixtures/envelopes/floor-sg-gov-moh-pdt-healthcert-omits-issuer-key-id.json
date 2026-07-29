@@ -4,7 +4,7 @@
   "recordType": "sg.gov.moh.pdt-healthcert",
   "schemaVersion": "2.0",
   "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-  "root": "f0623a214dbd8b93dd8040f3e06b28e47517fe1155a4a9bc2b8aff3910a152cb",
+  "root": "a2990d46cdbed6c6ca5e052596a3010c5f0214f1d2b19c797d870bd79c208a5b",
   "leafCount": 12,
   "issuer": {
     "id": "did:web:corpus.roax.invalid",
@@ -23,12 +23,12 @@
         "index": 7,
         "tag": 2,
         "value": "sg.gov.moh.pdt-healthcert",
-        "salt": "27a58dcd092296f0704902ed8235d50f",
+        "salt": "e5d023bf82e35ddad1d83034a60c0b12",
         "auditPath": [
-          "97e8ff43f5ef4b04b3b2af220615b97352f706a615f3107db161d1729525f54c",
-          "06e0e99ff07d5cfe7646d3b8aee02dafb48c22b4757360696f1256469a486688",
-          "30a8ab02b396bc6a51fd1d6da7558158e57c27383ba4559677afdd6e571daa95",
-          "43ffb4a1c7bffba98dc1cd07277aeb0cf6b269730392f1d084387fff8efa376d"
+          "00b5ccc8ebdaeb983fc5e914bad35a1763b49a5d16eb53c07e6901a9cd938c04",
+          "2e3498a852247803287831d5aa2fd23f81d1ae70310718029c2b2839a56619d7",
+          "cdd3c8eaa36de722c07122ecd67c2a389f3f3b0cef5a6816217a17a059c35de4",
+          "d70d0e3d9a2653198993849d94cf75f7b405e88a877182de2ef5fc26dcee13f8"
         ]
       },
       {
@@ -41,11 +41,11 @@
         "index": 9,
         "tag": 2,
         "value": "2.0",
-        "salt": "1e313b7da0bc2e26c1cdda383f69dae5",
+        "salt": "8e53471df4a3d1852efa8e9ffb2f732f",
         "auditPath": [
-          "f0f59401ef29070d000095b588a31c7653259167239a34c4521d4d08fafad5f7",
-          "9e89cb72c32a3b7ceb308343b23ff3d2613d75fd87f1e1980944f77bf3a09115",
-          "619cc7a0c16199bcc51d24f6ea45790929e7779e49b46cf9a0e4e4473eea5855"
+          "0005d7a72d9e8f795d6aa1d61dee17996c5dedece6039c9464502098408a24ad",
+          "6d7c6570c82671e2ed9063dd40b6df7c9f3289cd5baa30ec6265b2706cb896b3",
+          "316a071c4db45f61cce2bf620030b29887f986fc8bebd366a068f3a3c8f1768c"
         ]
       },
       {
@@ -58,12 +58,12 @@
         "index": 5,
         "tag": 2,
         "value": "urn:uuid:11111111-1111-4111-8111-111111111111",
-        "salt": "cfd6efc562317238cd0c74e590010e07",
+        "salt": "44e95e95c7a97d6550722107f95ea33c",
         "auditPath": [
-          "5be7f0fc5d939fb9807e21ff461d67b241a144ea50290dbccc2a8b8db9dbb2a5",
-          "953a5ac41afc44a04293fa446e393cabf96e5bef8bd0ed2c3368f4e6c40de467",
-          "30a8ab02b396bc6a51fd1d6da7558158e57c27383ba4559677afdd6e571daa95",
-          "43ffb4a1c7bffba98dc1cd07277aeb0cf6b269730392f1d084387fff8efa376d"
+          "afbd9577fc0dbc72f813afc2a311d869571c5dbc0787474b6f69368215a95c06",
+          "7be94e138a792cea3ce07b5df427ab163a95fcb748f748e4f68eb5a2e8643b44",
+          "cdd3c8eaa36de722c07122ecd67c2a389f3f3b0cef5a6816217a17a059c35de4",
+          "d70d0e3d9a2653198993849d94cf75f7b405e88a877182de2ef5fc26dcee13f8"
         ]
       },
       {
@@ -76,12 +76,12 @@
         "index": 6,
         "tag": 2,
         "value": "did:web:corpus.roax.invalid",
-        "salt": "5d0336fc787a8a590d25f2024398253e",
+        "salt": "b69b420c494840dfb58251a4493a23b0",
         "auditPath": [
-          "8438c96c716c3c73a106c7848014cbea1c7eb98e537b0a4ac76d702453077398",
-          "06e0e99ff07d5cfe7646d3b8aee02dafb48c22b4757360696f1256469a486688",
-          "30a8ab02b396bc6a51fd1d6da7558158e57c27383ba4559677afdd6e571daa95",
-          "43ffb4a1c7bffba98dc1cd07277aeb0cf6b269730392f1d084387fff8efa376d"
+          "09fb92d70e8cf05e1e6302992c5a53384bea6cfb593ae0474e57822873a58d5b",
+          "2e3498a852247803287831d5aa2fd23f81d1ae70310718029c2b2839a56619d7",
+          "cdd3c8eaa36de722c07122ecd67c2a389f3f3b0cef5a6816217a17a059c35de4",
+          "d70d0e3d9a2653198993849d94cf75f7b405e88a877182de2ef5fc26dcee13f8"
         ]
       },
       {
@@ -94,12 +94,12 @@
         "index": 2,
         "tag": 2,
         "value": "pdt-healthcert-v2.0",
-        "salt": "7f5fd5ee2b5277e0a28fd8f897c4bafc",
+        "salt": "fb31885a88b450fcc23427b4e0875b27",
         "auditPath": [
-          "46e10c285e2ac86d8e1b035b860ab14ec6abb9584cfde300d8574bae536f55fd",
-          "2a4b479be089655c498b9accdfd12a3745791e04f760066d1d2f16b3e8ab4a94",
-          "9ca916bcebaffd327ceb47c94c1ce240ab5ad75d746ebed5e0ef251843196aaa",
-          "43ffb4a1c7bffba98dc1cd07277aeb0cf6b269730392f1d084387fff8efa376d"
+          "9cecb6f0a690301a738e7f02832bfed85c7a7fc45494c6bf49b1a14f398f602f",
+          "fdb5f526afd6e7424767b4e8f9a4efcde910fb68f9a39ea676864474aae84baf",
+          "d49796ab9072132f40a37efaac98f2cf0c7eaca630eae0e103a7a19f9a32e7c1",
+          "d70d0e3d9a2653198993849d94cf75f7b405e88a877182de2ef5fc26dcee13f8"
         ]
       },
       {
@@ -112,12 +112,12 @@
         "index": 1,
         "tag": 2,
         "value": "PCR",
-        "salt": "013a85465bfc5f717a10e13cd9207b6a",
+        "salt": "a7551d3646e1bfacf406dc575f8be7db",
         "auditPath": [
-          "c56f7d270cb62775aad787c968f198044cb09f05ad22296d01f9a3b6b90b7665",
-          "067c3514ed06bfddd7690695b30303d0f22cb1eb3456e2e488538d8e6a9acf95",
-          "9ca916bcebaffd327ceb47c94c1ce240ab5ad75d746ebed5e0ef251843196aaa",
-          "43ffb4a1c7bffba98dc1cd07277aeb0cf6b269730392f1d084387fff8efa376d"
+          "5e80b7f1cf86f544ef7bfe198de524c6b9a8d6315b887d63ac1c6784c23a1ddf",
+          "58e136c1ad7e51917c6b8c1fd04aab9a60999f80cc1f4abde595ff48e3baf05d",
+          "d49796ab9072132f40a37efaac98f2cf0c7eaca630eae0e103a7a19f9a32e7c1",
+          "d70d0e3d9a2653198993849d94cf75f7b405e88a877182de2ef5fc26dcee13f8"
         ]
       },
       {
@@ -130,12 +130,12 @@
         "index": 3,
         "tag": 2,
         "value": "2026-07-28T00:00:00Z",
-        "salt": "bbd3dbdf823bca36e297895701019010",
+        "salt": "d3b7a3ece6aea597c126e4b3fccea665",
         "auditPath": [
-          "cc9d28b666c9cedbd0127cd527dc871c0dbf54d7d9746f81bd1fd31bbf224534",
-          "2a4b479be089655c498b9accdfd12a3745791e04f760066d1d2f16b3e8ab4a94",
-          "9ca916bcebaffd327ceb47c94c1ce240ab5ad75d746ebed5e0ef251843196aaa",
-          "43ffb4a1c7bffba98dc1cd07277aeb0cf6b269730392f1d084387fff8efa376d"
+          "97a31d97a816b1b2ddf9067ff92378e34b5bfa826923dabdea6696530a5f6b9d",
+          "fdb5f526afd6e7424767b4e8f9a4efcde910fb68f9a39ea676864474aae84baf",
+          "d49796ab9072132f40a37efaac98f2cf0c7eaca630eae0e103a7a19f9a32e7c1",
+          "d70d0e3d9a2653198993849d94cf75f7b405e88a877182de2ef5fc26dcee13f8"
         ]
       }
     ]

@@ -1976,6 +1976,14 @@ rulings rather than on a recommendation. Eight confirmed what it already said; t
 | **D12** normalization | D12a, NFC pinned at Unicode 15.1, with an end-to-end corpus vector | 6.1 |
 | **D13** clinical validation | D13a at the protocol layer, plus a normative prohibition on claiming clinical facts from root validity | 2.3 |
 
+**One further question is open and was identified after these rulings, while building the vector
+D12 required: whether the type-map lookup matches over an NFC-normalized key or over the bytes as
+received.** Section 6.1 pins NFC for hashing and section 4.2 requires an uncovered path to fail
+closed; neither says which form the lookup that precedes hashing compares. Both reference
+implementations currently match raw, so a decomposed key is refused by the fail-closed rule while
+its composed twin commits, and the two render identically. That is decision D14 in
+`docs/decisions.md` and this document does not settle it.
+
 **All of them, with their alternatives, their reasoning and the constraints they were ruled under,
 are in [`docs/decisions.md`](../decisions.md).** A decision that looks settled here and still reads
 as open there is a defect in this documentation set, not a nuance; the two files move together.

@@ -5758,7 +5758,7 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "18a482eb63ba11042bd961f0e7a4e445f511b1dc037f0a9a004c780ff24ec1a0"
+        "root": "bbc2c37d82f2b03dceefe9742047658085b9416198b0d2b421566711e959b833"
       },
       {
         "name": "record-structure-empty-object",
@@ -5771,7 +5771,7 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "8738c9608bf73ac07e53cb65718260646fa6083655a43fb93fc3d242d144f58f"
+        "root": "0c8f3d521c04af6a02f14f452b67b948854488690263253998d0ebb484e70cc8"
       },
       {
         "name": "record-structure-explicit-null",
@@ -5784,7 +5784,7 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "ec7320ea89ae1760eea6d231ccc15ab593edc46032f0ad32b77cdebc1a426b09"
+        "root": "067e03416521fccc2258d7892a27532ccd7b7af87dba7d196bafc87836aba838"
       },
       {
         "name": "record-entry-layout-flattened",
@@ -5797,7 +5797,7 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 8,
-        "root": "1bc52dfc357180261658c6c8b2577e9ccab180c7e28dc045169e75599338ff79"
+        "root": "f792d98e2011b914d8661a43b306e272276d30d67c51798f4d104adec1de5176"
       },
       {
         "name": "record-entry-layout-normalized",
@@ -5810,7 +5810,7 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 8,
-        "root": "250fb92539cef2f36a6394008078d635157c47878172eb2345d2bc01c6d6a4d1"
+        "root": "8b338329fe325e0af8ca61ed1044142b88650ced964048071a04fc2945602781"
       },
       {
         "name": "record-guard-bare-roax",
@@ -5823,7 +5823,7 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "1dfa08f6d7f0fec6e7fdfc039b087372a76960243173f7011a3793b9cdce6411"
+        "root": "e210c4686e1c0ad825c2e165e8533a981fe049dd4945d8195f6c6b7ebeddfff1"
       },
       {
         "name": "record-guard-roax-x",
@@ -5836,7 +5836,7 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "01130aa7b5e1010510f2f823cf7db1e56e01dd712ad7b77e7af9eb033d34e392"
+        "root": "c0aa310b62653a6ed509b8bbd8a7c046a6930412e2e737b7365c5d962e301b1c"
       },
       {
         "name": "record-guard-nested-roax-dotted",
@@ -5849,7 +5849,7 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "7d6c7231ee4444fc42540a2a31766c4eab2e9d6ac71f13aadee2ef806f282e0d"
+        "root": "3d9bf0bec5cf85b63122b4bae73a5f6f29a12beb286ad3a2fd264f742e0ac592"
       },
       {
         "name": "record-guard-kelvin-key",
@@ -5862,7 +5862,7 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "0f32fe4874943e340762545c53a48b7862343d4aa5b18350504b5ada2de96331"
+        "root": "d913e52ad4c918f87466d9fbd40070119379f8d293ab85ce1a7ad50f79313107"
       },
       {
         "name": "record-typed-scalars",
@@ -5875,7 +5875,7 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 9,
-        "root": "918a53d3026bccfb2aad00ca31d29715478b15bd81c29adcb01cfffae1c86aa3"
+        "root": "7846cbd141f123da932004f049303eaa8bd7180d329bfc2c74d54f484f688c4f"
       },
       {
         "name": "record-typed-scalars-with-key-id",
@@ -5888,7 +5888,7 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 10,
-        "root": "c4de8c7671a3b9b918fe2744b953d70f8b1f367431f240019872beac05541f3e",
+        "root": "de356f8f967a2a166f012172e339df1ecc31b5a45f406fd8da03b3a6ca356953",
         "issuerKeyId": "did:web:corpus.roax.invalid#key-1"
       },
       {
@@ -5902,7 +5902,7 @@
         "saltPairing": "positional",
         "recordId": "urn:uuid:aaaaaaa3-0000-4000-8000-000000000003",
         "leafCount": 69,
-        "root": "1dc8fe35e7001a7615d4da962e3619f045a06856e8340a9d31b589ec2d9e9d46"
+        "root": "2cc986bb42bedfb35b5ec0490859b75a0d1744bfdad6d7278346833c925e42a1"
       },
       {
         "name": "record-sg.gov.moh.recovery-healthcert-with-key-id",
@@ -5916,7 +5916,7 @@
         "saltPairing": "positional",
         "recordId": "urn:uuid:aaaaaaa3-0000-4000-8000-000000000003",
         "leafCount": 70,
-        "root": "bf58769da173fc46b3582373ee80e81ce09d189b8a61221263028c249ee1a9cf"
+        "root": "bfb3cdf4016bdd0567612adc281f7522eae78bfba8ac43c12bc272235d0b26e7"
       }
     ],
     "unlinkability": [
@@ -6016,6 +6016,22 @@
         "expectDistinctSaltsWithinIssuance": true,
         "expectDistinctSaltsAcrossIssuances": true,
         "expectDistinctLeafHashesAcrossIssuances": true
+      }
+    ],
+    "normalization": [
+      {
+        "name": "normalization-nfc-value-end-to-end",
+        "class": 19,
+        "site": "value",
+        "recordFileNFD": "corpus/fixtures/records/nfc-value-nfd.json",
+        "recordFileNFC": "corpus/fixtures/records/nfc-value-nfc.json",
+        "saltsFile": "corpus/fixtures/salts/normalization-nfc-value.json",
+        "recordType": "org.roax.corpus.synthetic",
+        "schemaVersion": "1.0",
+        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
+        "issuerId": "did:web:corpus.roax.invalid",
+        "expectSameRoot": true,
+        "root": "bec3821d0d990e73f8985c240fec53b5bff44b6990938b31184c9df715fe3a71"
       }
     ],
     "envelope": [
@@ -6259,28 +6275,28 @@
       },
       {
         "name": "identity-outer-record-type-downgrade",
-        "class": 14,
+        "class": 18,
         "envelopeFile": "corpus/fixtures/envelopes/identity-outer-record-type-downgrade.json",
         "expectAccept": false,
         "reason": "outer-identity-mismatch"
       },
       {
         "name": "identity-outer-schema-version-mismatch",
-        "class": 14,
+        "class": 18,
         "envelopeFile": "corpus/fixtures/envelopes/identity-outer-schema-version-mismatch.json",
         "expectAccept": false,
         "reason": "outer-identity-mismatch"
       },
       {
         "name": "identity-outer-record-id-mismatch",
-        "class": 14,
+        "class": 18,
         "envelopeFile": "corpus/fixtures/envelopes/identity-outer-record-id-mismatch.json",
         "expectAccept": false,
         "reason": "outer-identity-mismatch"
       },
       {
         "name": "identity-outer-issuer-id-mismatch",
-        "class": 14,
+        "class": 18,
         "envelopeFile": "corpus/fixtures/envelopes/identity-outer-issuer-id-mismatch.json",
         "expectAccept": false,
         "reason": "outer-identity-mismatch"

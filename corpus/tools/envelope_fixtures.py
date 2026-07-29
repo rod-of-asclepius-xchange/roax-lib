@@ -286,8 +286,18 @@ def build_identity_binding_vectors(hash_alg):
                        for p in paths],
         }
         envelope.update(overrides)
-        return _vector(name, 14, _write(name, envelope), expect, reason)
+        return _vector(name, 18, _write(name, envelope), expect, reason)
 
+    # CLASS 18, not 14. These four are the decision-D8 assertion: an outside-the-root field is a
+    # hint and never authority (spec section 11.3), so a top-level identity field that disagrees
+    # with the reserved leaf committed INSIDE the root must be rejected. They carried class 14
+    # only because class 18 did not exist when they were written - the ruling that created it is
+    # the same one that mandated a vector which FAILS an implementation trusting an outside field,
+    # on the evidence that dogtag had the equivalent rule written down and shipped the bug anyway.
+    # They are not floor vectors: the floor is about a disclosed copy OMITTING a non-redactable
+    # path, and every one of these carries the whole floor precisely so it can fail only on the
+    # binding.
+    #
     # The whole recovery floor, so that these rows clear the floor and fail ONLY on the binding.
     # The accept side needs no vector of its own: all eight class 14 accepts already carry an
     # outer identity that agrees with its leaves, so a binding that over-tightens breaks them.

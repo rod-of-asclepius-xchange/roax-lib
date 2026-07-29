@@ -428,6 +428,7 @@ def build(references=None, notes=None, check=False):
     envelopes = build_envelope_fixtures(HASH_ALG)
 
     unlinkability = build_unlinkability()
+    normalization = synthetic_records.build_normalization_vectors()
 
     return {
         "corpusVersion": CORPUS_VERSION,
@@ -445,6 +446,7 @@ def build(references=None, notes=None, check=False):
             "typeMap": type_map_vectors + build_moh_type_map_vectors(notes),
             "record": records,
             "unlinkability": unlinkability,
+            "normalization": normalization,
             "envelope": envelopes,
         },
     }

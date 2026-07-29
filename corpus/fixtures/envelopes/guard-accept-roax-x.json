@@ -4,7 +4,7 @@
   "recordType": "org.roax.corpus.synthetic",
   "schemaVersion": "1.0",
   "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-  "root": "e682ad767387d4b8cbb2af722e510a51ef933da53cfe6ea4f5a6aa7cae1179ff",
+  "root": "cf1238b0e66afb347727b63e183062663647a6d88d7f743ab6fbb73d7f884d1c",
   "leafCount": 6,
   "issuer": {
     "id": "did:web:corpus.roax.invalid"
@@ -20,7 +20,7 @@
           "key": "marker"
         }
       ],
-      "salt": "48466d5c493b01b943392bf295369df0"
+      "salt": "152c63b17f14e3b016298bbe638bbd62"
     },
     {
       "segments": [
@@ -28,7 +28,7 @@
           "key": "roax.recordId"
         }
       ],
-      "salt": "0225959058be0fe7947f3f408df645d1"
+      "salt": "17e60bdcf7b118a39df7fad45a72f722"
     },
     {
       "segments": [
@@ -36,7 +36,7 @@
           "key": "roax.issuer.id"
         }
       ],
-      "salt": "89659599fcf9c7949fc1abcac9abde95"
+      "salt": "ea043a20432ae1df4a098343528443a3"
     },
     {
       "segments": [
@@ -44,7 +44,7 @@
           "key": "roax.recordType"
         }
       ],
-      "salt": "97bd94a3b763b21c8fc3ad13f49b543d"
+      "salt": "6c17bee9a0400c6656eb0f60861c1465"
     },
     {
       "segments": [
@@ -52,7 +52,7 @@
           "key": "roax.schemaVersion"
         }
       ],
-      "salt": "d6747597db680f4a7d51ae0634f8869e"
+      "salt": "986b91ee57d146f2484a750eaf50065a"
     },
     {
       "segments": [
@@ -63,7 +63,7 @@
           "key": "foo"
         }
       ],
-      "salt": "8f1ae0923b9dccd7b08fd46d6a1ec490"
+      "salt": "38057bcc3a17044df293c0e6228009e4"
     }
   ]
 }

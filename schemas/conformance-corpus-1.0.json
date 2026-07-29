@@ -526,12 +526,11 @@
         "required": ["class"]
       },
       "then": {
-        "description": "Class 18 is the outside-the-root authority class, so the verifier's own configuration is half of what determines the outcome and the file must state it.",
-        "required": ["verifierConfig"],
+        "description": "Class 18 is the outside-the-root authority class, and verifierConfig is PERMITTED here and nowhere else. STATED LIMIT, ENFORCED BY THE CORPUS BUILD RATHER THAN HERE: it is required for a vector whose outcome depends on what the VERIFIER is configured with, and inapplicable to one the envelope alone determines, and no keyword can tell those apart. An earlier revision required it on every class-18 vector, which was written when this class was expected to be the registry rows alone; the four identity rows that actually exist - a top-level recordType, schemaVersion, recordId or issuer.id disagreeing with the reserved leaf committed inside the root - are fully determined by the envelope, so requiring a config on them would have forced an inert block whose presence suggested the outcome turned on something it did not. That revision rejected the committed corpus, which is how it was found. The registry-dependent rows are NOT YET BUILT and are recorded as a named gap in docs/conformance-corpus.md class 18, because they need the anchoring registry that spec section 2.2 deliberately leaves undesigned, and building them here would make this corpus invent that interface - which section 1.2 of the corpus document forbids.",
         "properties": { "verifierConfig": true }
       },
       "else": {
-        "description": "Every other class in 13-17 is determined by the envelope alone, so a verifierConfig here would be inert and would suggest the outcome turns on something it does not.",
+        "description": "Every other class this carrier serves is determined by the envelope alone, so a verifierConfig here would be inert and would suggest the outcome turns on something it does not.",
         "properties": { "verifierConfig": false }
       }
     }

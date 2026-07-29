@@ -614,25 +614,44 @@ accept, excluded by configuration.
 passed by an implementation that rejects everything with an `anchor` mismatch including the case
 where nothing is wrong, and treating a routing hint as required is itself a way of depending on it.
 
-**What a runner needs that no other class needs.** These vectors are the only ones whose outcome
-depends on what the *verifier* is configured with rather than only on the envelope, so
+**What a runner needs that no other class needs.** The registry rows are the only vectors whose
+outcome depends on what the *verifier* is configured with rather than only on the envelope, so
 `envelopeVector` carries a `verifierConfig` block stating the anchored `(root, hashAlg)` pair, the
-allow-list and the configured registry in force for that vector. Without it the expected outcome is
-not determined by the file, so `schemas/conformance-corpus-1.0.json` **requires** the block at class
-18 and **forbids** it at every other class, and requires all four of its members rather than any
-subset. That is stricter than the three-branch `oneOf` on `typeMapVector` and for the same reason:
-this class's accept vector, the last row above, is only an accept if the anchored pair matches, the
-algorithm is on the list and the registry read is the verifier's own, so a partial block would let it
-pass or fail for a reason the file did not fix. The block was optional and unbound to any class until
-this was noticed, which made the one check in the corpus that cannot be expressed any other way a
-check that could not fail.
+allow-list and the configured registry. `schemas/conformance-corpus-1.0.json` permits that block at
+class 18 and **forbids** it at every other class, and requires all four members when it is present
+rather than any subset, so a partial block cannot let a vector pass or fail for a reason the file
+did not fix.
 
-**Stated precisely, because the first two rows are the exception that proves the requirement.** Their
-**reject** verdict is determined by the envelope alone, since the field and the committed leaf
-disagree with each other. What is not determined without the block is whether the record would have
-verified otherwise, and an implementation that rejects it for an unanchored root rather than for the
-disagreement passes the vector for the wrong reason. Requiring the block at every class-18 vector is
-what makes each row fail only for the mistake it names.
+**Whether a class-18 vector needs the block is a stated limit, not a structural rule.** It is
+required for a vector whose outcome turns on verifier configuration and inapplicable to one the
+envelope alone determines, and no JSON Schema keyword can tell those apart. The corpus build owns
+that check. An earlier revision required the block on *every* class-18 vector, written when this
+class was expected to be the registry rows alone; it rejected the committed corpus the moment the
+identity rows arrived, which is how the over-tightening was found.
+
+#### What is built, and the named gap
+
+**Built: the four identity rows.** A disclosed copy whose top-level `recordType`, `schemaVersion`,
+`recordId` or `issuer.id` disagrees with the reserved leaf committed inside the root is rejected,
+with every inclusion proof still verifying against the genuine root. Their **reject** verdict is
+determined by the envelope alone, since the field and the committed leaf disagree with each other,
+so they carry no `verifierConfig`. These four carried class 14 until the D8 ruling created this
+class; they were always this assertion, and the floor class is about a disclosed copy *omitting* a
+non-redactable path, which is a different property.
+
+> **NAMED GAP, blocked rather than merely unwritten: the registry rows.** The
+> `hashAlg`-from-registry row, the substituted-`anchor.registry` row and the absent-`anchor` accept
+> row are **not built**, and the blocker is a dependency rather than effort. This corpus models no
+> anchoring registry, because **specification section 2.2 deliberately leaves the anchoring registry
+> undesigned** and hands it forward as a stated requirement on that future work. Building these
+> vectors would make the corpus invent that interface, which section 1.2 of this document forbids
+> outright: the corpus may not require what the design has not decided. That rule has already been
+> broken twice in this project, both times over `masterSalt`, which is why it is not being broken a
+> third time for a class this project's own ruling mandated.
+>
+> **These rows become buildable the moment the anchoring registry is designed, and not before.**
+> Until then the H2 and H3 bindings of specification section 7.4 rest on the normative text alone,
+> and this paragraph is the record that they do.
 
 ### Class 19 - NFC normalization, end to end, with a root
 
