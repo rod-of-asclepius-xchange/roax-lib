@@ -5,12 +5,10 @@ release, architecture, and sharp-edge notes that should travel with the code.
 
 ## What this repository is right now
 
-Specification, schemas, and the conformance corpus. **No library code has been written, and that is
-deliberate.** The specifications exist so the design can be reviewed before five language
-implementations exist to be re-litigated.
+Specification, schemas, the conformance corpus, and the independent Rust implementation under `rust/`.
+Decision D was ruled to five independent, corpus-enforced libraries on 2026-07-29 (`docs/decisions.md`, decision D).
 
-Do not add a Rust crate, TypeScript package, Go module, Swift package or Kotlin library without an
-explicit instruction to do so.
+Do not add the TypeScript, Go, Swift or Kotlin library without an explicit instruction to do so.
 
 `corpus/tools/` holds two small reference implementations, in Python and in plain `.mjs`. **They are
 corpus tooling and they are not roax-lib.** They exist to generate and check the vectors and they
@@ -62,6 +60,14 @@ These are the things a future agent is most likely to get wrong.
   every evidence source by `sourceId`.
   Publication review still retrieves each source and verifies its commit or content digest.
   Its `--self-test` mode covers those rejections without any external artifact.
+
+- **The artifact schema's URI format and the executable checker do not accept exactly the same strings.**
+  Ajv accepts `https://` under the schema's `format: "uri"`, while the checker rejects it through WHATWG `new URL` (`schemas/type-map-artifact-1.0.json:171-174` and `:203-206`; `tools/check-type-map-extension.mjs:321-328`).
+  The Rust artifact loader follows the executable checker for that demonstrated edge (`rust/src/type_map.rs:1194-1196`; `rust/tests/published_type_maps.rs:518-532`).
+
+- **Issuer-scope membership does not state a Unicode comparison rule.**
+  The specification requires the disclosed issuer identity to be a member of `scope.issuerIds`, while the executable extension checker compares inherited scope strings byte-for-byte and neither source says whether to NFC-normalize the membership check (`docs/spec/roax-canon-1.md:1162-1164`; `tools/check-type-map-extension.mjs:890-900`).
+  The Rust loader rejects every issuer child artifact until it has exact parent/additivity inputs, so this ambiguity cannot silently select an issuer in the current API.
 
 - **An extension point does not open the whole subtree beneath it.** A `prefix` admits only two
   selector shapes: a segment the base map does not declare at that prefix state, and then anything
@@ -164,6 +170,10 @@ These are the things a future agent is most likely to get wrong.
 - **The display path is never hashed.** `a.b[0].c` is for humans. Hashing uses the length-prefixed
   structured encoding (spec section 5). Never reconstruct a path by parsing a display string.
 
+- **The specification does not say whether NFC-colliding sibling keys must be rejected when their descendant leaf paths remain distinct.**
+  It requires raw map keys to be unique and normalizes each encoded KEY segment, so `{"é":{"a":1},"é":{"b":2}}` has no duplicate raw key and no duplicate complete encoded leaf path (`docs/spec/roax-canon-1.md` sections 3.2, 3.3 and 5).
+  The Rust implementation rejects duplicate complete encoded leaf paths but accepts this disjoint-descendant shape, and no committed vector distinguishes that reading (`rust/src/commitment.rs:589-609`; `corpus/README.md`, specification ambiguity 6).
+
 - **The leaf set is a union, not the record.** Reserved `roax.*` leaves join the record's leaves
   before the sort (spec sections 3.3 and 11.2). A flattener that walks the record only produces a
   different root. Each reserved path is a **single `KEY` segment carrying the literal dotted name**,
@@ -197,10 +207,10 @@ These are the things a future agent is most likely to get wrong.
   Do NOT quietly bind `number` to a tag to make class 10 green: `docs/conformance-corpus.md` section 1.2 exists because that kind of fix decides an open question from inside a data file.
   Note the tool split when citing any of this: `corpus/tools/build_type_maps.py` is corpus-side and writes the vectors' maps, while the published `type-maps/` artifacts come from `tools/build-type-maps.mjs`.
 
-- **The corpus may not require what the design has not decided.** A required corpus field that
-  presumes one side of an open decision silently rules it (`docs/conformance-corpus.md` section
-  1.2). This happened twice with `masterSalt` before decision D4 was ruled. The rule still binds,
-  because decisions A, C and D are still open.
+- **The corpus may not require what the design has not decided.**
+  A required corpus field that presumes one side of an open decision silently rules it (`docs/conformance-corpus.md` section 1.2).
+  This happened twice with `masterSalt` before decision D4 was ruled.
+  The rule still binds, because decisions A, C and D14 are still open.
 
 - **There is no master salt and no KDF. Every salt is an independent CSPRNG draw of 16 bytes**
   (spec section 7, decision D4 ruled D4b on 2026-07-28). Do not reintroduce derivation, and do not
@@ -264,6 +274,10 @@ These are the things a future agent is most likely to get wrong.
   NFC on both sides: a STRING leaf commits its normalized form. `roax.issuer.keyId` MUST NOT be
   bound - it is the conditional leaf.
 
+- **A selective disclosure derives its context from the sealed commitment.**
+  Accepting a second caller-supplied context lets safe values from two issuances be mixed into an envelope that its own verifier rejects at outer-identity binding.
+  The Rust `Commitment` therefore retains its exact issuance context and `disclose` accepts no replacement (`rust/src/commitment.rs:236-288`; `rust/src/envelope.rs:402-417`; specification sections 10 and 11.3).
+
 - **The binding runs BEFORE the minimum-disclosure floor, and the floor is selected from the
   COMMITTED `roax.recordType` leaf.** Derived from section 11.3, not chosen: authority has to be
   established before an outer field selects anything, and floor-then-bind is trust-then-verify.
@@ -308,6 +322,10 @@ Both flags are optional and their absence is reported, never hidden. Things to k
   which is gated on decision D14. Do not fill any of them in without reading why they are short -
   building the unbuilt half of 18 or 19 decides an open question from inside a data file, which
   `docs/conformance-corpus.md` section 1.2 forbids.
+- **Class 9 is stale against its corrected requirement.**
+  The committed `negativeProof` rows use the honest tree size and carry only a supplied leaf hash, so they cannot exercise the forged-size internal-node attack through full disclosed-copy verification as `docs/conformance-corpus.md` class 9 now requires.
+  `corpus/README.md` records the exact missing row and carrier gap.
+  A library-local regression is useful evidence but does not complete the corpus release gate.
 - **`org.roax.corpus.synthetic` is a corpus-only `recordType`.** It is not in the `docs/profiles/`
   registry and must never be issued against. It exists so structural vectors do not borrow a real
   health authority's identifier and so authored type-map bindings never mix into a map that claims
@@ -332,13 +350,12 @@ Both flags are optional and their absence is reported, never hidden. Things to k
 `docs/decisions.md` holds four decisions belonging to the project owner (A, B, C, D), plus the ten
 engineering ones, plus D14 in part 2a.
 
-**Four are still open. Three are the owner's - A, C and D - and the fourth, D14, is not.** B was
-ruled earlier - both hash families are first-class and selectable per record - and what stays open
-under it is the `Poseidon-BN254` parameterization. **The ten engineering decisions D3 through D13
-were ruled on 2026-07-28** and the specification is written on those rulings rather than on a
-recommendation; see specification section 15 for the table of where each lands. Eight confirmed what
-the specification already said. Two changed it: D4 to independent per-leaf salts, and D9 gaining the
-`BLOB_REF` binding.
+**Three are still open. Two are the owner's - A and C - and the third, D14, is not.**
+B was ruled earlier - both hash families are first-class and selectable per record - and what stays open under it is the `Poseidon-BN254` parameterization.
+D was ruled on 2026-07-29 to five independent, corpus-enforced libraries.
+**The ten engineering decisions D3 through D13 were ruled on 2026-07-28** and the specification is written on those rulings rather than on a recommendation; see specification section 15 for the table of where each lands.
+Eight confirmed what the specification already said.
+Two changed it: D4 to independent per-leaf salts, and D9 gaining the `BLOB_REF` binding.
 
 **D14 asks whether the type-map LOOKUP matches over an NFC-normalized key or over the bytes as
 received, and it is open** (`docs/decisions.md` part 2a).
@@ -352,11 +369,9 @@ Adding an `nfc()` call to either side, or removing the one in the DFA's stated s
 silently - so do not, and note that the synthetic map carries the Kelvin key under both spellings
 precisely so no committed vector depends on the answer.
 
-**Do not resolve A, C, D or D14 in code or prose without an explicit ruling**, and if one is ruled,
-update `docs/decisions.md` in the same change rather than only the specification. A decision that
-looks settled in the spec but is still marked OPEN in the decisions document is worse than either.
-Part 1's A, C and D sections are the owner's and are not edited by ruling work elsewhere in the
-document.
+**Do not resolve A, C or D14 in code or prose without an explicit ruling**, and if one is ruled, update `docs/decisions.md` in the same change rather than only the specification.
+A decision that looks settled in the spec but is still marked OPEN in the decisions document is worse than either.
+Part 1's A and C sections are the owner's and are not edited by ruling work elsewhere in the document.
 
 ## Validating the schemas
 

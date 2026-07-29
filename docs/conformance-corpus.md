@@ -87,10 +87,9 @@ carries per-leaf salts, which were expressible under either answer. The corpus t
 `masterSaltHex` on every `recordVector`, reproducing the same foreclosure one file over. Twice in the
 same design is a pattern, which is why the rule is written down rather than fixed case by case.
 
-**Decision D4 has since been ruled D4b**, so `masterSalt` no longer exists anywhere in the design and
-neither foreclosure is reachable today. That does not retire the rule. It retires this example,
-which is kept because it is the clearest one available and because the rule still binds on decisions
-A, C and D, all of which remain open (`docs/decisions.md` Part 1).
+**Decision D4 has since been ruled D4b**, so `masterSalt` no longer exists anywhere in the design and neither foreclosure is reachable today.
+That does not retire the rule.
+It retires this example, which is kept because it is the clearest one available and because the rule still binds on decisions A, C and D14, all of which remain open (`docs/decisions.md` Parts 1 and 2a).
 
 **This is a future-proofing constraint, not a tidiness one**, and it connects directly to
 specification section 12.2. A corpus that hard-codes one side of an open question is not upgradeable.
@@ -257,13 +256,11 @@ where a leaf should be.
 The internal-node case is dogtag's C1 hazard, which it demonstrates in its own test suite at
 `crates/dogtag-standard-rs/src/merkle.rs:196-229`.
 
-**Building this class produced a correction to the specification, and the corrected reasoning is what
-the class now tests.** An earlier version of this document said RFC 9162 rejects the internal-node
-case structurally because it is position-bound. It does not. RFC 9162 section 2.1.3.2 takes the tree
-size as an **input**, so an attacker who supplies both the leaf hash and the tree size can pick a
-shape that walks an internal node to the genuine root: on an 8-leaf tree, `MTH(L[0:4])` presented as
-the leaf at index 0 with a forged tree size of 2 and the audit path `[MTH(L[4:8])]` verifies. That
-was measured, and reproduced on Node v22.21.0; specification section 11.1 records it in full.
+**Building this class produced a correction to the specification, and the corrected reasoning is what the class is required to test.**
+An earlier version of this document said RFC 9162 rejects the internal-node case structurally because it is position-bound.
+It does not.
+RFC 9162 section 2.1.3.2 takes the tree size as an **input**, so an attacker who supplies both the leaf hash and the tree size can pick a shape that walks an internal node to the genuine root: on an 8-leaf tree, `MTH(L[0:4])` presented as the leaf at index 0 with a forged tree size of 2 and the audit path `[MTH(L[4:8])]` verifies.
+That was measured and reproduced on Node v22.21.0; specification section 11.1 records it in full.
 
 **What actually closes the case is the `0x00` leaf-domain byte plus specification section 10 step 2**,
 which requires a verifier to recompute the leaf hash from the disclosed path, tag, value and salt
@@ -274,6 +271,10 @@ rather than accept one. A recomputed leaf hash is `0x00`-domained and an interna
 verification path, not through a bare fold primitive. A runner that hands `verifyInclusion` a leaf
 hash directly is testing the primitive dogtag documents as proving nothing on its own
 (`merkle.rs:86-91`), and it will record a pass for an implementation that has no defence at all.
+
+**The committed 1.0 corpus does not yet meet that requirement.**
+Its two internal-node rows carry the honest tree sizes 8 and 130, no row carries attack `forged-tree-size`, and the `negativeProof` carrier supplies no structured path, tag, value or salt from which a verifier could recompute a leaf hash (`corpus/conformance-corpus-1.0.json`, `negative-internal-node-as-leaf` and `negative-internal-node-as-leaf-n130`; `schemas/conformance-corpus-1.0.json`, `$defs.negativeProofVector`).
+The class therefore remains a named release-gate gap until a corpus rebuild adds an expressible full-disclosure attack row.
 
 ### Class 10 - the three real MOH records
 
