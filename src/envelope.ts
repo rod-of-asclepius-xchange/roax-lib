@@ -20,7 +20,13 @@ import {
   mandatoryReservedPaths,
   type RecordIdentity,
 } from './reserved.js';
-import { isTypeTag, tagCarriesNoValue, type CarrierValue, type TypeTagValue } from './value.js';
+import {
+  isTypeTag,
+  tagCarriesNoValue,
+  TypeTag,
+  type CarrierValue,
+  type TypeTagValue,
+} from './value.js';
 import { commitRecord, PathKeyedSalts, type SaltSource } from './commit.js';
 import type { EmptyContainerPolicy } from './flatten.js';
 import type { TypeTagResolver } from './typemap.js';
@@ -41,6 +47,20 @@ export interface DisclosedLeaf {
   readonly hasValue: boolean;
   readonly salt: string;
   readonly auditPath: readonly string[];
+}
+
+/**
+ * A member the envelope schemas do not define, together with where in the envelope it sat.
+ *
+ * The name is carried SEPARATELY from its location rather than joined into one dotted string,
+ * because a member name may itself contain a dot and the seed guard of section 7.3 rule 3 matches
+ * the name exactly. Joining them would force the guard to split a display string to recover the
+ * name, which is the section 5.2 trap one layer out from paths.
+ */
+export interface UnknownMember {
+  /** Where it sat, for the rejection message alone. Never parsed and never matched against. */
+  readonly where: string;
+  readonly name: string;
 }
 
 export interface Envelope {
@@ -64,8 +84,15 @@ export interface Envelope {
   readonly record?: JsonValue | undefined;
   readonly salts?: readonly LeafSaltEntry[] | undefined;
   readonly disclosure?: { readonly mode: string; readonly leaves: readonly DisclosedLeaf[] } | undefined;
-  /** Top-level members the schemas do not define. Every one of them is a rejection. */
-  readonly unknownMembers: readonly string[];
+  /**
+   * Members the schemas do not define, at EVERY depth the envelope itself owns. Every one of them
+   * is a rejection.
+   *
+   * `record` is deliberately not descended into: its members are the issuer's own record data,
+   * governed by the record profile rather than by the envelope schema, and a record field named
+   * `seed` is a clinical field rather than a salt seed.
+   */
+  readonly unknownMembers: readonly UnknownMember[];
 }
 
 /**
@@ -98,6 +125,21 @@ export interface VerifierConfig {
    * fixtures disclose a record leaf. See the findings document.
    */
   readonly requireTypeMapForDisclosedLeaves?: boolean | undefined;
+  /**
+   * Whether this verifier accepts ONLY envelopes that bind the exact type-map artifact
+   * (specification section 11.2, `schemas/envelope-2.0.json`).
+   *
+   * Defaults to `false`, which is the permissive reading and NOT an endorsement: a disclosed copy
+   * carrying neither an outer `typeMap` member nor a committed `roax.typeMap.id` leaf is reported
+   * as undischarged on every verification rather than passed silently. The default is permissive
+   * because `schemas/envelope-1.0.json` predates the binding, still governs every envelope issued
+   * under it, and is legitimately verifiable - so failing closed here would reject conforming
+   * documents rather than forged ones.
+   *
+   * A deployment that issues and accepts only envelope-2.0 documents sets this to `true` and
+   * closes the residue outright. See the findings document.
+   */
+  readonly requireTypeMapIdentity?: boolean | undefined;
   readonly emptyContainerPolicy?: EmptyContainerPolicy | undefined;
 }
 
@@ -119,6 +161,31 @@ const KNOWN_TOP_LEVEL = new Set([
   'record',
   'salts',
 ]);
+
+/**
+ * The members each NESTED object of the envelope defines.
+ *
+ * The top-level scan alone leaves a hole the seed guard below cannot see: `disclosure` is a known
+ * top-level member, so nothing would look inside it and an envelope carrying
+ * `disclosure: {mode, leaves, masterSalt}` would pass rule 3 entirely. A guard with a hole binds
+ * less than it claims, so every object the envelope schemas define is scanned to the same
+ * standard. `record` is the one exception and the reason is on the `unknownMembers` field.
+ */
+const KNOWN_TYPE_MAP = new Set(['id', 'version']);
+const KNOWN_ISSUER = new Set(['id', 'keyId']);
+const KNOWN_ANCHOR = new Set(['chainId', 'registry', 'txHash', 'anchoredAt']);
+const KNOWN_DISCLOSURE = new Set(['mode', 'leaves']);
+const KNOWN_DISCLOSED_LEAF = new Set([
+  'segments',
+  'displayPath',
+  'index',
+  'tag',
+  'value',
+  'salt',
+  'auditPath',
+]);
+const KNOWN_SALT_ENTRY = new Set(['segments', 'salt']);
+const KNOWN_SEGMENT = new Set(['key', 'index']);
 
 /**
  * Member names that would carry, or look like they carry, a value from which a withheld leaf's
@@ -152,29 +219,73 @@ function requiredString(object: JsonValue, name: string): string {
   return v.value;
 }
 
+const INTEGER_LITERAL = /^(?:0|[1-9][0-9]*)$/;
+const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
+
+/**
+ * Reads a STRUCTURAL integer - a count, an index, a chain identifier or a type tag.
+ *
+ * A structural integer is not a record value, so reading one is not the section 6.4 hazard. **It is
+ * not therefore uncommitted:** a `tag` is written into the leaf preimage as `Uint8Array.of(tag)`
+ * and an INDEX segment is written into `encodePath` as `u32be(i)`, so two of the four reach a hash.
+ * What makes that safe is exactness rather than irrelevance.
+ *
+ * The literal is checked against the integer grammar, converted with `BigInt`, which is exact for
+ * a digit string of any length, and only then narrowed - so the range check happens BEFORE any
+ * machine number exists rather than after one has already rounded. `Number(exact)` below is
+ * therefore lossless by construction, which `Number(literal)` followed by `Number.isSafeInteger`
+ * is not: the latter rounds a 20-digit literal first and asks afterwards.
+ *
+ * ONE function reads all four sites. They were four hand-rolled copies, and the copy that read a
+ * disclosed leaf's `tag` had neither the grammar check nor the range check, so `2.0`, `2e0` and
+ * `-0` were silently accepted as tags.
+ */
+function structuralInteger(literal: string, where: string): number {
+  if (!INTEGER_LITERAL.test(literal)) {
+    fail('envelope-malformed', `${where} is not a non-negative integer literal`);
+  }
+  const exact = BigInt(literal);
+  if (exact > MAX_SAFE) {
+    fail('envelope-malformed', `${where} is outside the safe integer range`);
+  }
+  return Number(exact);
+}
+
 function requiredCount(object: JsonValue, name: string): number {
   const v = memberOf(object, name);
   if (v === undefined || v.kind !== 'number') {
     fail('envelope-malformed', `the envelope member ${name} is missing or is not a number`);
   }
-  // A count, an index and a chain identifier are structural integers rather than record values, so
-  // reading them is not the section 6.4 hazard. The literal is still validated as an exact
-  // non-negative integer rather than parsed through a float and hoped for.
-  if (!/^(?:0|[1-9][0-9]*)$/.test(v.literal)) {
-    fail('envelope-malformed', `the envelope member ${name} is not a non-negative integer literal`);
-  }
-  const n = Number(v.literal);
-  if (!Number.isSafeInteger(n)) {
-    fail('envelope-malformed', `the envelope member ${name} is outside the safe integer range`);
-  }
-  return n;
+  return structuralInteger(v.literal, `the envelope member ${name}`);
 }
 
-function segmentsFrom(node: JsonValue | undefined, where: string): Path {
+/** Records every member of `node` that `known` does not define. Names only; values are not read. */
+function collectUnknown(
+  node: JsonValue | undefined,
+  where: string,
+  known: ReadonlySet<string>,
+  out: UnknownMember[],
+): void {
+  if (node === undefined || node.kind !== 'object') {
+    return;
+  }
+  for (const [name] of node.members) {
+    if (!known.has(name)) {
+      out.push({ where, name });
+    }
+  }
+}
+
+function segmentsFrom(
+  node: JsonValue | undefined,
+  where: string,
+  unknown: UnknownMember[],
+): Path {
   if (node === undefined || node.kind !== 'array') {
     fail('envelope-malformed', `${where} is missing or is not an array of segments`);
   }
   return node.items.map((item): PathSegment => {
+    collectUnknown(item, `${where} path segment`, KNOWN_SEGMENT, unknown);
     const key = memberOf(item, 'key');
     if (key !== undefined) {
       if (key.kind !== 'string') {
@@ -186,10 +297,7 @@ function segmentsFrom(node: JsonValue | undefined, where: string): Path {
     if (index === undefined || index.kind !== 'number') {
       fail('envelope-malformed', `${where} carries a segment that is neither a key nor an index`);
     }
-    if (!/^(?:0|[1-9][0-9]*)$/.test(index.literal)) {
-      fail('envelope-malformed', `${where} carries a non-integer index`);
-    }
-    return { index: Number(index.literal) };
+    return { index: structuralInteger(index.literal, `${where} index`) };
   });
 }
 
@@ -227,20 +335,19 @@ export function parseEnvelope(document: JsonValue): Envelope {
   if (document.kind !== 'object') {
     fail('envelope-malformed', 'an envelope is a JSON object');
   }
-  const unknownMembers: string[] = [];
-  for (const [key] of document.members) {
-    if (!KNOWN_TOP_LEVEL.has(key)) {
-      unknownMembers.push(key);
-    }
-  }
+  const unknownMembers: UnknownMember[] = [];
+  collectUnknown(document, 'the envelope', KNOWN_TOP_LEVEL, unknownMembers);
 
   const typeMapNode = memberOf(document, 'typeMap');
+  collectUnknown(typeMapNode, 'typeMap', KNOWN_TYPE_MAP, unknownMembers);
   const issuerNode = memberOf(document, 'issuer');
   if (issuerNode === undefined || issuerNode.kind !== 'object') {
     fail('envelope-malformed', 'the envelope member issuer is missing or is not an object');
   }
+  collectUnknown(issuerNode, 'issuer', KNOWN_ISSUER, unknownMembers);
   const issuerKeyId = memberOf(issuerNode, 'keyId');
   const anchorNode = memberOf(document, 'anchor');
+  collectUnknown(anchorNode, 'anchor', KNOWN_ANCHOR, unknownMembers);
   const saltsNode = memberOf(document, 'salts');
   const disclosureNode = memberOf(document, 'disclosure');
 
@@ -248,13 +355,17 @@ export function parseEnvelope(document: JsonValue): Envelope {
     saltsNode === undefined
       ? undefined
       : saltsNode.kind === 'array'
-        ? saltsNode.items.map((item) => ({
-            segments: segmentsFrom(memberOf(item, 'segments'), 'a salts entry'),
-            salt: requiredString(item, 'salt'),
-          }))
+        ? saltsNode.items.map((item) => {
+            collectUnknown(item, 'a salts entry', KNOWN_SALT_ENTRY, unknownMembers);
+            return {
+              segments: segmentsFrom(memberOf(item, 'segments'), 'a salts entry', unknownMembers),
+              salt: requiredString(item, 'salt'),
+            };
+          })
         : fail('envelope-malformed', 'salts is not an array');
 
-  const disclosure = disclosureNode === undefined ? undefined : parseDisclosure(disclosureNode);
+  const disclosure =
+    disclosureNode === undefined ? undefined : parseDisclosure(disclosureNode, unknownMembers);
 
   return {
     canon: requiredString(document, 'canon'),
@@ -295,14 +406,23 @@ export function parseEnvelope(document: JsonValue): Envelope {
   };
 }
 
-function parseDisclosure(node: JsonValue): { mode: string; leaves: DisclosedLeaf[] } {
+function parseDisclosure(
+  node: JsonValue,
+  unknown: UnknownMember[],
+): { mode: string; leaves: DisclosedLeaf[] } {
+  collectUnknown(node, 'disclosure', KNOWN_DISCLOSURE, unknown);
   const leavesNode = memberOf(node, 'leaves');
   if (leavesNode === undefined || leavesNode.kind !== 'array') {
     fail('envelope-malformed', 'disclosure.leaves is missing or is not an array');
   }
   const leaves = leavesNode.items.map((item): DisclosedLeaf => {
+    collectUnknown(item, 'a disclosed leaf', KNOWN_DISCLOSED_LEAF, unknown);
     const tagNode = memberOf(item, 'tag');
-    if (tagNode === undefined || tagNode.kind !== 'number' || !isTypeTag(Number(tagNode.literal))) {
+    if (tagNode === undefined || tagNode.kind !== 'number') {
+      fail('envelope-malformed', 'a disclosed leaf carries no valid tag');
+    }
+    const tag = structuralInteger(tagNode.literal, "a disclosed leaf's tag");
+    if (!isTypeTag(tag)) {
       fail('envelope-malformed', 'a disclosed leaf carries no valid tag');
     }
     const valueNode = memberOf(item, 'value');
@@ -312,11 +432,11 @@ function parseDisclosure(node: JsonValue): { mode: string; leaves: DisclosedLeaf
       fail('envelope-malformed', 'a disclosed leaf carries no auditPath array');
     }
     return {
-      segments: segmentsFrom(memberOf(item, 'segments'), 'a disclosed leaf'),
+      segments: segmentsFrom(memberOf(item, 'segments'), 'a disclosed leaf', unknown),
       // Display only, and never an input to anything the verifier computes (section 5.2).
       displayPath: displayNode?.kind === 'string' ? displayNode.value : undefined,
       index: requiredCount(item, 'index'),
-      tag: Number(tagNode.literal) as TypeTagValue,
+      tag,
       value: valueNode === undefined ? undefined : carrierFrom(valueNode, 'a disclosed value'),
       hasValue: valueNode !== undefined,
       salt: requiredString(item, 'salt'),
@@ -374,19 +494,24 @@ export function verifyEnvelope(envelope: Envelope, config: VerifierConfig = {}):
   if (envelope.canon !== CANON_VERSION) {
     fail('envelope-malformed', `canon is ${JSON.stringify(envelope.canon)}, not ${CANON_VERSION}`);
   }
+  // The seed guard runs over every unknown member at every depth the envelope owns, and it runs
+  // BEFORE the generic rejection so a seed keeps its own reason rather than being absorbed into
+  // "unknown member".
   for (const member of envelope.unknownMembers) {
-    if (SEED_SHAPED_MEMBERS.has(member)) {
+    if (SEED_SHAPED_MEMBERS.has(member.name)) {
       fail(
         'master-salt-in-envelope',
-        `the envelope carries ${member}, and no envelope may carry any value from which the ` +
-          'salt of an undisclosed leaf could be obtained (specification section 7.3 rule 3)',
+        `${member.where} carries ${member.name}, and no envelope may carry any value from which ` +
+          'the salt of an undisclosed leaf could be obtained (specification section 7.3 rule 3)',
       );
     }
   }
   if (envelope.unknownMembers.length > 0) {
     fail(
       'envelope-malformed',
-      `unknown top-level members: ${envelope.unknownMembers.join(', ')}`,
+      `unknown members: ${envelope.unknownMembers
+        .map((m) => `${m.name} in ${m.where}`)
+        .join(', ')}`,
     );
   }
   const hasRecord = envelope.record !== undefined;
@@ -567,6 +692,21 @@ function verifyDisclosedCopy(
   // `0x01`-domained, so the substitution needs a second preimage.
   const committedByPath = new Map<string, DisclosedLeaf>();
   for (const leaf of disclosure.leaves) {
+    // Section 6.5 states TWO rejections and this is the second: an implementation MUST reject a
+    // record whose type map binds any path to tag 8, AND MUST reject an envelope carrying a tag-8
+    // leaf. A full copy is covered by the first through `carrierFromJson`, which fails with this
+    // same code while re-flattening; a disclosed copy is never re-flattened, so without this the
+    // MUST held for one copy kind and not the other.
+    //
+    // It is the FIRST check in the loop deliberately. A tag-8 leaf carrying no value would
+    // otherwise surface as `disclosed-leaf-named-without-value`, which names a different defect.
+    if (leaf.tag === TypeTag.BLOB_REF) {
+      fail(
+        'blob-ref-not-selectable',
+        `the disclosed leaf at ${displayPath(leaf.segments)} carries tag 8 BLOB_REF, which no ` +
+          'version-1 profile selects (specification section 6.5)',
+      );
+    }
     if (!tagCarriesNoValue(leaf.tag) && !leaf.hasValue) {
       // A leaf named with a salt and no value is a withheld leaf's salt smuggled into a disclosed
       // copy. Nothing about the root check would notice.
@@ -644,8 +784,44 @@ function verifyDisclosedCopy(
     [[{ key: RESERVED_PATHS.recordId }], envelope.recordId, 'recordId'],
     [[{ key: RESERVED_PATHS.issuerId }], envelope.issuer.id, 'issuer.id'],
   ];
+  // **The type-map identity is decided from the COMMITTED side, in both directions.**
+  //
+  // Taking only its MEMBERSHIP from the outer `typeMap` member would be the trust-then-verify
+  // shape this function is otherwise written to avoid: the floor TABLE comes from the committed
+  // `roax.recordType` leaf at step 6 precisely so an outer field selects nothing before it has
+  // been authenticated, and a binding whose presence an outer field decides is the same defect one
+  // level down. A holder who deleted the outer member and withheld the leaf would otherwise waive
+  // a binding section 11.2 marks mandatory to disclose, on a copy that still verified.
+  const typeMapIdPath: Path = [{ key: RESERVED_PATHS.typeMapId }];
+  const committedTypeMapId = committedByPath.get(toHex(encodePath(typeMapIdPath)));
   if (identity.typeMapId !== undefined) {
-    bindings.push([[{ key: RESERVED_PATHS.typeMapId }], identity.typeMapId, 'typeMap.id']);
+    bindings.push([typeMapIdPath, identity.typeMapId, 'typeMap.id']);
+  } else if (committedTypeMapId !== undefined) {
+    // The other direction, and the half that was missing: the root authenticates a map identity
+    // and the envelope names none, so nothing outside the root can be checked against it.
+    fail(
+      'outer-identity-mismatch',
+      'the disclosed copy commits roax.typeMap.id inside the root while the envelope carries no ' +
+        'typeMap member, so the map identity the root authenticates is unbound',
+    );
+  } else if (config.requireTypeMapIdentity === true) {
+    fail(
+      'outer-identity-mismatch',
+      'this verifier accepts only envelopes that bind the exact type-map artifact, and this copy ' +
+        'carries neither an outer typeMap member nor a committed roax.typeMap.id leaf',
+    );
+  } else {
+    // **The residue, and it is reported on every affected verification rather than waived.**
+    // Both halves absent is the one case the two directions above cannot separate, because
+    // specification section 11.1's envelope shape carries no discriminator for which schema
+    // version a document was issued under: `canon` is `ROAX-CANON/1` under both, and the outer
+    // `schemaVersion` is the RECORD profile's version rather than the envelope schema's.
+    undischarged.push(
+      'section 11.2: this copy carries neither an outer typeMap member nor a committed ' +
+        'roax.typeMap.id leaf, so it was either issued under schemas/envelope-1.0.json, which ' +
+        'predates the binding, or had the binding stripped - and the envelope carries no ' +
+        'discriminator that separates the two. Set requireTypeMapIdentity to reject the pair.',
+    );
   }
   // `roax.issuer.keyId` is deliberately NOT bound. It is the one conditional leaf, and requiring
   // its disclosure would permanently bind an anchored record to the key it was issued under.
@@ -678,6 +854,11 @@ function verifyDisclosedCopy(
     // quietly restore the trust-then-verify shape.
     fail('profile-unknown', `no floor is registered for ${JSON.stringify(committedRecordType)}`);
   }
+  // `mandatoryReservedPaths` is keyed on the identity's `typeMapId`, and step 5 has just settled
+  // that member against the root in both directions: present means proved equal to the committed
+  // leaf, absent means the leaf is proved absent too. So the reserved half of this floor is
+  // selected from an authenticated fact rather than from an outer hint, exactly as its other half
+  // is selected from the committed `recordType` leaf above.
   const floorPaths: Path[] = [...mandatoryReservedPaths(identity), ...floor.profilePaths];
   for (const path of floorPaths) {
     if (!committedByPath.has(toHex(encodePath(path)))) {

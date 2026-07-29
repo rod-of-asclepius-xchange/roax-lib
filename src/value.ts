@@ -62,6 +62,15 @@ export function tagCarriesNoValue(tag: TypeTagValue): boolean {
  * the binding (specification section 6.5). The carrier form is pinned now so it does not have to
  * be retrofitted after five implementations exist; the prohibition lives at the issuance and
  * verification boundaries, which is where `schemas/conformance-corpus-1.0.json` also places it.
+ *
+ * Section 6.5 states the prohibition as two rejections, and BOTH are implemented rather than one:
+ *
+ * - a record whose map binds a path to tag 8 - `carrierFromJson` below, reached at issuance and
+ *   again whenever a full copy is re-flattened, plus the explicit sweep in `issueFullCopy` for a
+ *   resolver this library did not compile;
+ * - an envelope carrying a tag-8 leaf - the first check in the per-leaf loop of
+ *   `verifyDisclosedCopy`, because a disclosed copy is never re-flattened and would otherwise
+ *   reach `encodeValue` and verify.
  */
 export function encodeValue(tag: TypeTagValue, value: CarrierValue | undefined): Uint8Array {
   switch (tag) {

@@ -29,6 +29,7 @@ export {
   nfc,
   toHex,
   fromHex,
+  hexNibble,
   decodeBase64Strict,
   describeUnicodeEnvironment,
 } from './bytes.js';
@@ -105,6 +106,7 @@ export {
   type Envelope,
   type DisclosedLeaf,
   type LeafSaltEntry,
+  type UnknownMember,
   type VerifierConfig,
   type VerificationResult,
 } from './envelope.js';

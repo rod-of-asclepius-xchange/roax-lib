@@ -33,6 +33,8 @@ export function u64be(n: number | bigint): Uint8Array {
   const out = new Uint8Array(8);
   let rest = v;
   for (let i = 7; i >= 0; i -= 1) {
+    // A `BigInt` masked to one byte is exactly representable, so this narrowing is lossless. It is
+    // not a numeric literal being read: the value reached here as a `bigint` and stays exact.
     out[i] = Number(rest & 0xffn);
     rest >>= 8n;
   }
@@ -104,6 +106,7 @@ export function concatBytes(parts: readonly Uint8Array[]): Uint8Array {
 }
 
 const HEX = '0123456789abcdef';
+const HEX_UPPER = '0123456789ABCDEF';
 
 export function toHex(bytes: Uint8Array): string {
   let out = '';
@@ -114,13 +117,29 @@ export function toHex(bytes: Uint8Array): string {
   return out;
 }
 
+/**
+ * The value of one hexadecimal digit, in either case, or `-1` for anything else.
+ *
+ * A table lookup rather than `Number.parseInt(ch, 16)`, so that no path in this package converts
+ * text to a machine number through a general-purpose numeric parser. `parseInt` is also lenient in
+ * ways a decoder must not be: it stops at the first non-digit and returns what it read, so
+ * `parseInt('0x', 16)` is `0` rather than an error.
+ *
+ * Both cases are accepted because the two callers differ: `fromHex` admits lowercase only and
+ * rejects the rest before reaching here, while a JSON `\u` escape is case-insensitive by RFC 8259.
+ */
+export function hexNibble(ch: string): number {
+  const lower = HEX.indexOf(ch);
+  return lower >= 0 ? lower : HEX_UPPER.indexOf(ch);
+}
+
 export function fromHex(hex: string, where = 'value'): Uint8Array {
   if (!/^(?:[0-9a-f]{2})*$/.test(hex)) {
     fail('envelope-malformed', `${where} is not lowercase hex of even length`);
   }
   const out = new Uint8Array(hex.length / 2);
   for (let i = 0; i < out.length; i += 1) {
-    out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    out[i] = (hexNibble(hex[i * 2] as string) << 4) | hexNibble(hex[i * 2 + 1] as string);
   }
   return out;
 }

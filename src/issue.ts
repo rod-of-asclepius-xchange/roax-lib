@@ -187,8 +187,20 @@ export interface DiscloseOptions {
  * against the root, pass every inclusion proof, and leak every withheld field to a dictionary
  * search, with nothing about the verification result indicating a problem (section 10.1).
  *
- * The minimum-disclosure floor is enforced HERE as well as at verification, so a holder cannot
- * produce a copy that a conforming verifier will reject.
+ * The minimum-disclosure floor is enforced HERE as well as at verification, and the guarantee that
+ * buys is exactly this: **for a `recordType` in `PROFILE_FLOORS`, a holder cannot produce a copy
+ * that a conforming verifier rejects for omitting a non-redactable path.**
+ *
+ * It is stated that narrowly because it is not wider. For a `recordType` the registry does not
+ * carry, `floorFor` returns `undefined`, this function contributes the mandatory RESERVED paths
+ * and no profile paths, and the copy is produced - while `verifyEnvelope` fails it closed with
+ * `profile-unknown` under specification section 12.2, on its own profile allow-list. That is
+ * reachable today with `org.roax.corpus.synthetic`, which `issueFullCopy` deliberately permits.
+ *
+ * Failing closed here instead would be the wrong repair: it would refuse disclosure for every
+ * unregistered `recordType` that issuance intentionally allows, and the profile allow-list belongs
+ * to the VERIFIER rather than to the holder - a verifier configured with the corpus profile
+ * accepts the same copy (see `corpusVerifierConfig` in the conformance runner).
  */
 export function discloseFrom(full: FullCopy, options: DiscloseOptions): JsonValue {
   const byPath = new Map(full.commitment.leaves.map((l) => [toHex(encodePath(l.path)), l]));

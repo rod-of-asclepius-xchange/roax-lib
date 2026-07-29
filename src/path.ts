@@ -11,7 +11,7 @@
  */
 
 import { fail } from './errors.js';
-import { nfc, utf8, u32be } from './bytes.js';
+import { concatBytes, nfc, utf8, u32be } from './bytes.js';
 import { assertNoUnpairedSurrogate } from './json.js';
 
 export interface KeySegment {
@@ -71,20 +71,6 @@ export function encodePath(segments: Path): Uint8Array {
     }
   }
   return concatBytes(parts);
-}
-
-function concatBytes(parts: readonly Uint8Array[]): Uint8Array {
-  let total = 0;
-  for (const p of parts) {
-    total += p.length;
-  }
-  const out = new Uint8Array(total);
-  let at = 0;
-  for (const p of parts) {
-    out.set(p, at);
-    at += p.length;
-  }
-  return out;
 }
 
 /**

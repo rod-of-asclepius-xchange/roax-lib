@@ -23,6 +23,7 @@
  */
 
 import { fail } from './errors.js';
+import { hexNibble } from './bytes.js';
 
 /** A JSON number, held as the verbatim source literal. It is never parsed into a machine number. */
 export interface JsonNumber {
@@ -314,10 +315,17 @@ class Scanner {
           this.syntaxError('malformed \\u escape');
         }
         this.pos += 4;
+        // The four digits are combined by table lookup rather than by `Number.parseInt`, so no
+        // path in this package converts text to a machine number through a numeric parser. The
+        // regex above has already proved every digit is hexadecimal, so no nibble is `-1`.
+        let unit = 0;
+        for (const digit of hex) {
+          unit = (unit << 4) | hexNibble(digit);
+        }
         // The code unit is emitted as-is. Pairing is checked once, over the whole decoded
         // string, so an escaped high surrogate followed by a LITERAL low surrogate pairs
         // correctly and an escaped lone surrogate is caught.
-        return String.fromCharCode(Number.parseInt(hex, 16));
+        return String.fromCharCode(unit);
       }
       default:
         this.syntaxError(`unknown escape \\${c ?? ''}`);
