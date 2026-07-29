@@ -12,16 +12,18 @@ be agreed on by both implementations without either having computed it.
 Class numbers refer to `docs/conformance-corpus.md` section 3.
 """
 
-# Fixed inputs. The master salt is the value the prior canonicalization research used, kept so
-# that anyone comparing the two sets of numbers is comparing like with like.
-MASTER_SALT_A = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
-MASTER_SALT_B = "ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100"
+# Fixed inputs. THE TWO MASTER SALTS THAT SAT HERE ARE DELETED RATHER THAN LEFT UNUSED: decision
+# D4 is ruled D4b, so section 7 has no derivation and nothing can seed one (spec section 7.1), and
+# a committed 32-byte constant named MASTER_SALT is the readiest thing to reach for when
+# reintroducing the construction the ruling removed. The class 12 note below records what the
+# deleted salt vectors asserted and why nothing replaces them in kind.
 RECORD_ID_A = "urn:uuid:11111111-1111-4111-8111-111111111111"
 RECORD_ID_B = "urn:uuid:22222222-2222-4222-8222-222222222222"
 
-# Leaf vectors use a FIXED salt rather than a derived one, so that class 1, 2, 4, 5, 6 and 7
-# test leaf construction in isolation. Salt derivation is pinned separately by the salt
-# vectors, and conflating the two would mean a derivation bug showed up as a leaf failure.
+# Leaf vectors use a FIXED salt, so that class 1, 2, 4, 5, 6 and 7 test leaf construction in
+# isolation. It is fixed rather than derived because under D4b there is nothing to derive it
+# from, and each leaf vector carries the salt it was built with, so a leaf failure stays a leaf
+# failure.
 LEAF_SALT = "000102030405060708090a0b0c0d0e0f"
 
 # A single path shared by the discrimination leaves, so that any difference between two of them
