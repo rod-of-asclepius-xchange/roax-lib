@@ -219,10 +219,9 @@ def _verify_full(envelope, hash_alg, root, identity, type_maps):
 def _ordering_only_master_salt():
     """A full copy carries per-leaf salts, so no master salt is needed to REBUILD one.
 
-    Decision D4 was ruled D4b on 2026-07-28, so there is no derivation left to work under: every
-    salt is an independent CSPRNG draw carried by the envelope, and this verifier reads every one
-    of them from the `salts` array. This value only feeds the ordering pass inside build_tree, and
-    leaf order is a function of paths alone.
+    Decision D4 is OPEN and this verifier must work under either answer, so it never derives a
+    salt for verification: every salt is read from the `salts` array. This value only feeds the
+    ordering pass inside build_tree, and leaf order is a function of paths alone.
     """
     return b"\x00" * 32
 

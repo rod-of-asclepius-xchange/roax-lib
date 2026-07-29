@@ -1,6 +1,6 @@
 # The ROAX conformance corpus
 
-**Status:** first cut. 476 vectors reaching classes 1 through 17, 15 complete and 2 partial.
+**Status:** first cut. 476 vectors, all 17 classes reachable, 15 complete and 2 partial.
 **Normative definition:** [`docs/conformance-corpus.md`](../docs/conformance-corpus.md).
 **Schema:** [`schemas/conformance-corpus-1.0.json`](../schemas/conformance-corpus-1.0.json).
 **Specification:** [`docs/spec/roax-canon-1.md`](../docs/spec/roax-canon-1.md), which governs where the
@@ -119,13 +119,6 @@ named `tree-n<size>`.
 
 Counts are vectors in the file, measured by `build_corpus.py --report`.
 
-**`docs/conformance-corpus.md` section 3 now mandates nineteen classes, and this file covers the
-first seventeen.**
-Classes 18 and 19 arrived with the 2026-07-28 rulings, after these vectors were built, and that
-document states the gap and which schema version each needs.
-`build_corpus.py --report` still enumerates seventeen, so it does not yet report 18 and 19 as the
-gaps they are.
-
 | Class | Vectors | Status |
 |---:|---:|---|
 | 1 FHIR decimals | 44 | complete |
@@ -231,10 +224,8 @@ Two consequences an implementer needs, and unlike step 3 both ARE observable in 
   that enforces the floor first fails exactly those 16, and the cause is the ordering, not the
   floor table. The class 14 requirement is unchanged: each reserved path omitted in turn is still
   rejected, only the code differs. `_floor_for` still carries the four reserved paths, because
-  `docs/conformance-corpus.md` class 14 defines the floor as the reserved paths plus what the
-  profile adds and that definition should stay readable in the code. Class 14 now names **five**
-  reserved paths, `roax.typeMap.id` having become an always-emitted leaf after these vectors were
-  built, so the four here are what the committed corpus covers rather than the current floor.
+  `docs/conformance-corpus.md` class 14 defines the floor as those plus what the profile adds and
+  that definition should stay readable in the code.
 - **The reason code is the honest one.** A copy that withholds `roax.recordType` never told the
   verifier what it is, so no floor could be selected for it; `minimum-disclosure-floor` would claim
   a floor was chosen and then missed.
@@ -355,17 +346,6 @@ deliberate: a vector that discriminated would settle the question from inside th
    without the pattern language growing an escape, and both implementations reject an ambiguous
    pattern rather than mis-parse it.
 
-**Numbers 3, 4 and 5 have since been answered outside this corpus, and the answers are recorded
-where they belong rather than restated here.**
-Decision D4 was ruled D4b on 2026-07-28, so specification section 7 has no salt preimage and no
-`RID` term for number 3 to be about.
-Numbers 4 and 5 are answered by specification section 4.2 and `docs/type-maps.md` section 3: the
-operative matcher is a structured-path DFA that resolves NFC-normalized KEY segments and never
-parses a display path.
-The maps in `corpus/type-maps/` and both reference implementations still carry the superseded
-display-pattern form of `schemas/type-map-1.0.json`, so those two entries describe this artifact
-accurately and no longer describe the design.
-
 ## One substantive specification finding
 
 **Specification section 11.1's claim that `leafCount` is self-binding in a disclosed copy does not
@@ -387,24 +367,19 @@ hashing to the internal node. That defence is already normative and already load
 
 `negative-internal-node-as-leaf` and `negative-internal-node-as-leaf-n130` carry the honest form -
 the true tree size, where RFC 9162 does reject - because that is what the specification requires
-today. **The specification has since been corrected**: section 11.1 now states that `leafCount` is
-not authenticated in a disclosed copy and records this measurement, and
-`docs/conformance-corpus.md` class 9 adds the forged-tree-size row the corpus does not yet carry.
+today. Changing the sentence in section 11.1 would be a specification change and is not made here.
 
 ## Decisions this corpus does and does not presume
 
 `docs/conformance-corpus.md` section 1.2 requires a field-by-field audit. Done once, here.
-**D4, D5, D7 and D12 have since been ruled**, on 2026-07-28, so the four rows naming them record what
-this artifact was built under rather than a live question; `docs/decisions.md` part 2 holds each
-ruling. The rule itself still binds, because decisions A, C and D remain open.
 
 | Field | Presumes | Resolution |
 |---|---|---|
-| `recordVector.masterSaltHex` | D4 salt strategy | **OPTIONAL** and left optional. It is present on every vector because these vectors were built under D4a, and a D4b implementation reads the salts from the record's envelope and ignores it. D4 is now ruled D4b, so nothing derives a salt from it at all. |
-| `saltVector.masterSaltHex`, `unlinkabilitySide.masterSaltHex` | D4 | **REQUIRED**, correctly, for the mechanism these vectors test. That mechanism is gone with the D4b ruling: `docs/conformance-corpus.md` section 1.2 records that its testing-a-mechanism exception now has no instance, and class 12 asserts distinct salts across independent trials instead. |
-| Leaf ordering in every `record`, `tree` and `envelope` vector | D5 leaf ordering | Encoded-path order, per specification section 9. There is no root without an ordering, so class 8 and class 10 are inexpressible otherwise. The specification governs (section 1.1) and this is derived from it, not decided here. D5 is ruled D5a, which is the same answer. |
-| `typeMapVector.expectFailClosed` | D7 unknown paths | Fail-closed, per specification section 4.2. D7 is ruled D7a, so that is a ruling rather than the recommended answer it was when these vectors were built. Same resolution as D5. |
-| NFC in every string and key vector | D12 normalization | NFC with a pinned Unicode version, per specification section 6.1. D12 is ruled D12a. Same resolution. |
+| `recordVector.masterSaltHex` | D4 salt strategy | **OPTIONAL** and left optional. It is present on every vector because these vectors were built under D4a, and a D4b implementation reads the salts from the record's envelope and ignores it. |
+| `saltVector.masterSaltHex`, `unlinkabilitySide.masterSaltHex` | D4 | **REQUIRED**, correctly. Class 12 is the class where master-salt freshness *is* the assertion, so the value is its subject rather than an assumption. |
+| Leaf ordering in every `record`, `tree` and `envelope` vector | D5 leaf ordering | Encoded-path order, per specification section 9. There is no root without an ordering, so class 8 and class 10 are inexpressible otherwise. The specification governs (section 1.1) and this is derived from it, not decided here. |
+| `typeMapVector.expectFailClosed` | D7 unknown paths | Fail-closed, per specification section 4.2, which states the rule normatively and records that it is the recommended answer to D7. Same resolution as D5. |
+| NFC in every string and key vector | D12 normalization | NFC with a pinned Unicode version, per specification section 6.1. Same resolution. |
 | `hashAlg` | B, ruled | `SHA-256`. See below. |
 
 Nothing here binds a `number` to a numeric tag, adds a default tag, or requires `masterSalt` in any
