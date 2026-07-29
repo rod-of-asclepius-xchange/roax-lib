@@ -13,7 +13,7 @@ No library code has been written, deliberately.
 
 | Read | For |
 |---|---|
-| [`docs/decisions.md`](docs/decisions.md) | **The decisions, ruled and open, each with its reasoning.** Three are still open and all three belong to the project owner. Start here if you are reviewing rather than implementing. |
+| [`docs/decisions.md`](docs/decisions.md) | **The decisions, ruled and open, each with its reasoning.** Four are still open: three belong to the project owner, and D14 was identified afterwards while building a conformance vector. Start here if you are reviewing rather than implementing. |
 | [`docs/spec/roax-canon-1.md`](docs/spec/roax-canon-1.md) | The protocol. Precise enough to implement from. Section 2 says what it does not solve; section 14 reconciles it against dogtag. |
 | [`docs/profiles/`](docs/profiles/) | One document per record family, because the four families do **not** share one concrete object. |
 | [`docs/type-maps.md`](docs/type-maps.md) | The published type-map artifacts, exact coverage, unresolved schema gaps and issuer extension lifecycle. |
@@ -64,6 +64,10 @@ CSPRNG draw per leaf with no master salt and no derivation, and a content-addres
 defined without being selected by any version-1 profile. Specification section 15 tables where each
 ruling lands, and `docs/decisions.md` part 2 gives every one of them with its reasoning, so any of
 them can be overturned on the reasoning rather than on authority.
+
+**One further question was identified after those rulings and is open: D14** - whether the type-map
+lookup matches over an NFC-normalized key or over the bytes as received. It belongs to nobody in
+particular and is in `docs/decisions.md` part 2a.
 
 ## Repository layout
 

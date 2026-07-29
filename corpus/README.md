@@ -1,6 +1,6 @@
 # The ROAX conformance corpus
 
-**Status:** first cut. 476 vectors, all 17 classes reachable, 15 complete and 2 partial.
+**Status:** first cut. 471 vectors, all 19 classes reachable, 15 complete and 4 partial.
 **Normative definition:** [`docs/conformance-corpus.md`](../docs/conformance-corpus.md).
 **Schema:** [`schemas/conformance-corpus-1.0.json`](../schemas/conformance-corpus-1.0.json).
 **Specification:** [`docs/spec/roax-canon-1.md`](../docs/spec/roax-canon-1.md), which governs where the
@@ -44,7 +44,9 @@ Both arguments are optional and their absence is reported rather than hidden.
    files, writing nothing;
 2. implementation B recomputes every derived value in the corpus and rewrites it;
 3. the two files are compared byte for byte;
-4. every artifact is validated against the repository's JSON Schemas.
+4. every artifact is validated against the repository's JSON Schemas, and both directions of the
+   schemas' conditionals are probed with synthesized whole-corpus documents, because a conditional
+   that never fires compiles perfectly and asserts nothing.
 
 Step 1 alone would only prove that one program is self-consistent.
 
@@ -88,14 +90,13 @@ means operationally. The procedure per class:
 | `encodeValue` | `encodeValue(tag, input)` equals `encodedHex`. |
 | `reject` | The input MUST error. The `reason` is the reference reason code; an implementation with its own taxonomy should map to it rather than ignore it. |
 | `leaf` | `leafHash(segments, tag, value, saltHex)` equals `leafHash`. The salt is an INPUT: decision D4 is ruled D4b, so nothing derives one (specification section 7). |
-| `record` | Flatten the record, union the reserved leaves, order by encoded path, take each leaf's salt from the set `saltsFile` names in the shape `saltPairing` declares, and the root equals `root`. |
+| `record` | Flatten the record, union the reserved leaves, order by encoded path, take each leaf's salt from the set `saltsFile` names in the shape `saltPairing` declares; the leaf count then equals `leafCount` and the root equals `root`. A vector may instead carry the whole thing as one full envelope copy, naming `envelopeFile` and no salt set; `check_corpus.mjs` reports that carrier SKIPPED rather than reading it. |
 | `unlinkability` | Perform `trials` independent issuances at the paths given, with YOUR OWN generator, and assert the three relations. Nothing is compared against a pinned value, because under D4b there is none to pin. |
 | `tree` | `MTH(leafHashes)` equals `root`. |
 | `inclusion` | Verifying `(leafHash, index, treeSize, auditPath, root)` returns `expect`. Generating the audit path for `index` reproduces `auditPath`. |
 | `negativeProof` | Verification MUST fail. |
 | `typeMap` | Resolving `segments` at `jsonKind` against `type-maps/<recordType>.json` yields `expectTag`, or fails closed when `expectFailClosed`. |
-| `record` | Building the tree over `recordFile` yields `leafCount` and `root`. |
-| `unlinkability` | Each side's leaf hash matches, and the two differ. |
+| `normalization` | Build a root over `recordFileNFD` and over `recordFileNFC`, both under the ONE salt set `saltsFile` names, so any difference between the two roots is normalization and nothing else. The two agree iff `expectSameRoot`, and the root equals `root`. |
 | `envelope` | Verifying `envelopeFile` returns `expectAccept`, **and rejects for `reason`**. The reason is not decoration here: several fixtures are rejectable for more than one cause, so a boolean alone would pass an implementation that never ran the check the vector is about. `guard-reject-reserved-collision` is the clearest case - the record it carries cannot be hashed at all, so its envelope holds a placeholder root, and an implementation that skips the reserved-namespace guard rejects it on `root-mismatch` and looks correct. |
 
 ### Input escape forms
@@ -362,8 +363,8 @@ deliberate: a vector that discriminated would settle the question from inside th
 4. **Type-map matching is not stated to be over normalized keys.** Section 11.2's general rule -
    "check the bytes you commit, not the bytes you received" - suggests it should be, but the
    specification does not say so, and both implementations compare a pattern token against a
-   segment key **raw**, with no `nfc()` on either side (`_match_from`, `roax_ref.py:715`;
-   `matchPattern`, `roax_ref.mjs:564`). The synthetic type map therefore
+   segment key **raw**, with no `nfc()` on either side (`_match_from`, `roax_ref.py:776`;
+   `matchPattern`, `roax_ref.mjs:619`). The synthetic type map therefore
    carries the Kelvin key under **both** spellings, so that `record-guard-kelvin-key` resolves
    identically under either reading and no vector settles the question.
 5. **The type-map `pattern` field is display notation**, so it cannot address a key containing `.`,

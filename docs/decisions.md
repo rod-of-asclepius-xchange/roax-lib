@@ -695,6 +695,12 @@ invisible to whoever typed the value.
 in for a decision, and it is why no existing vector settles the question.
 `corpus/README.md` records the same gap in its specification-reading notes.
 
+**The two matchers in this repository already answer it differently, and that is the substance of the question rather than a detail of it.**
+`docs/type-maps.md` section 3 step 2 requires a conforming resolver of the published DFA artifacts to NFC-normalize a KEY segment before taking its transition, so those artifacts are already described as reading D14a.
+The corpus reference implementations are display-pattern matchers over `corpus/type-maps/` rather than the DFA, and they compare raw, as above.
+Neither document is wrong about the thing it owns, and neither is the specification, which says nothing.
+What is open is which reading the specification states for both, and until it does, the cost line below understates D14b: matching raw normatively would also change the resolver semantics `docs/type-maps.md` section 3 already publishes, not only leave the corpus matchers alone.
+
 | Option | Consequence |
 |---|---|
 | **D14a. Match over NFC-normalized keys** | Follows specification section 11.2's general rule, "check the bytes you commit, not the bytes you received", and makes the two spellings behave identically end to end. Cost: every type map and both implementations change together, and a pattern authored in one form silently starts matching the other. |

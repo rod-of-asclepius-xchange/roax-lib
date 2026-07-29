@@ -1945,8 +1945,10 @@ This is decision D / D10 and it is OPEN.
 
 ## 15. Decisions: what is ruled and what is still open
 
-**Three decisions are still open, and all three belong to the project owner.**
+**Three of the open decisions belong to the project owner.**
 This specification takes no position on any of them and defines nothing that depends on one.
+A fourth, D14, was identified after the engineering rulings below and is stated at the end of this
+section.
 
 - **A** - whether roax-lib needs EU recognition, which would mandate SD-JWT VC and ISO mdoc export
   profiles.
