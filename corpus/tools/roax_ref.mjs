@@ -11,7 +11,7 @@
 //
 // Section references are to docs/spec/roax-canon-1.md.
 
-import { createHash, createHmac } from "node:crypto";
+import { createHash } from "node:crypto";
 
 export const CANON = "ROAX-CANON/1";
 
@@ -253,35 +253,51 @@ export function encodeValue(tag, value) {
 }
 
 // -------------------------------------------------------------------------------------------
-// Salt derivation (section 7)
+// Salts (section 7)
 // -------------------------------------------------------------------------------------------
+//
+// Decision D4 is ruled D4b, so there is NOTHING TO DERIVE HERE. A salt is 16 bytes drawn
+// independently from a CSPRNG at issuance, with at least 128 bits of entropy; there is no key
+// derivation function, no master secret and no salt preimage in this design (spec section 7).
+//
+// A salt is an INPUT to this implementation rather than something it computes, which is what
+// makes a fixed vector file possible: the corpus build draws each salt once and commits it, and
+// both implementations read the committed set. An earlier version of this file derived salts by
+// HMAC-SHA-256 over a master salt and a preimage carrying the record identifier - the D4a
+// construction the ruling deleted.
 
-const SALT_LABEL = Buffer.from("/salt", "ascii");
+export const SALT_BYTES = 16;
 
-// Section 7. Every component is length-prefixed, exactly as in section 8.
-// Note the specification writes RID as utf8(recordId), not utf8(NFC(recordId)), while the
-// reserved leaf roax.recordId IS normalized. Every corpus record identifier is ASCII, so the
-// readings agree on every vector; the divergence is reported, not decided by a vector.
-export function saltPreimage(hashAlg, recordId, segments) {
-  const dom = domain(hashAlg);
-  const rid = Buffer.from(recordId, "utf8");
-  const p = encodePath(segments);
-  return Buffer.concat([
-    u32be(dom.length), dom,
-    u32be(SALT_LABEL.length), SALT_LABEL,
-    u32be(rid.length), rid,
-    u32be(p.length), p,
-  ]);
-}
+// The committed salt of every leaf of one record, addressed by its structured path. This is the
+// `salts` array of schemas/envelope-1.0.json, in memory. Pairing is by ENCODED PATH and not by
+// position: a positional array would make salt-to-leaf pairing depend on reproducing the
+// section 9 sort before the salts could be read at all, which is the cross-implementation
+// divergence this corpus exists to prevent (spec section 7.2).
+export class SaltSet {
+  constructor(entries) {
+    this.byPath = new Map();
+    for (const entry of entries) {
+      const salt = Buffer.from(entry.salt, "hex");
+      if (salt.length !== SALT_BYTES) throw new RoaxError("salt-length", String(salt.length));
+      const key = encodePath(entry.segments).toString("hex");
+      if (this.byPath.has(key)) throw new RoaxError("duplicate-salt-path", "");
+      this.byPath.set(key, salt);
+    }
+  }
 
-// Section 7 and 8: HMAC-SHA-256 under every hashAlg. A salt is a secret input generated once at
-// issuance, never recomputed inside a proof circuit, so it gains nothing from being ZK-friendly.
-export function deriveSalt(hashAlg, masterSalt, recordId, segments) {
-  if (masterSalt.length !== 32) throw new RoaxError("master-salt-length", String(masterSalt.length));
-  return createHmac("sha256", masterSalt)
-    .update(saltPreimage(hashAlg, recordId, segments))
-    .digest()
-    .subarray(0, 16);
+  // Fail closed rather than draw one on demand. A drawn salt would give this implementation a
+  // root no other implementation could reproduce, which is the silent divergence the corpus is
+  // the enforcement mechanism against.
+  forLeaf(segments) {
+    const key = encodePath(segments).toString("hex");
+    const salt = this.byPath.get(key);
+    if (salt === undefined) throw new RoaxError("salt-missing", displayPath(segments));
+    return salt;
+  }
+
+  get size() {
+    return this.byPath.size;
+  }
 }
 
 // -------------------------------------------------------------------------------------------
@@ -472,9 +488,16 @@ export function reservedLeaves({ recordType, schemaVersion, recordId, issuerId, 
   return out;
 }
 
-// Sections 3.3, 7, 8 and 9. The union is formed BEFORE the sort, so reserved and record leaves
+// Sections 3.3 and 9. The leaf set in encodePath order, WITHOUT any salt.
+//
+// Split out of buildTree when decision D4 was ruled D4b. Leaf order is a function of the path
+// set alone (spec section 9), so it is computable before a salt exists - which is what lets a
+// caller draw a salt set for a record, and what lets the envelope verifier recover leaf order
+// without inventing salt values to get it.
+//
+// The union of the reserved leaves and the record's own is formed BEFORE the sort, so the two
 // are ordered together and are indistinguishable to the tree function.
-export function buildTree(hashAlg, record, typeMap, masterSalt, identity) {
+export function orderedLeaves(record, typeMap, identity) {
   const recordLeaves = flatten(record, typeMap);
   if (recordLeaves.length === 0) throw new RoaxError("record-contributes-no-leaves", "");
 
@@ -489,10 +512,17 @@ export function buildTree(hashAlg, record, typeMap, masterSalt, identity) {
   }
 
   encoded.sort((a, b) => Buffer.compare(a.enc, b.enc));
-  const ordered = encoded.map((e) => e.leaf);
-  const salts = ordered.map((leaf) => deriveSalt(hashAlg, masterSalt, identity.recordId, leaf.segments));
-  const hashes = ordered.map((leaf, i) => leafHash(hashAlg, leaf.segments, leaf.tag, leaf.value, salts[i]));
-  return { root: mth(hashAlg, hashes), leaves: ordered, salts, hashes };
+  return encoded.map((e) => e.leaf);
+}
+
+// Sections 3.3, 7, 8 and 9. `salts` is a SaltSet and is an INPUT: under decision D4b nothing
+// here derives a salt (spec section 7), and a leaf with no committed salt is an error rather
+// than a fresh draw.
+export function buildTree(hashAlg, record, typeMap, salts, identity) {
+  const ordered = orderedLeaves(record, typeMap, identity);
+  const leafSalts = ordered.map((leaf) => salts.forLeaf(leaf.segments));
+  const hashes = ordered.map((leaf, i) => leafHash(hashAlg, leaf.segments, leaf.tag, leaf.value, leafSalts[i]));
+  return { root: mth(hashAlg, hashes), leaves: ordered, salts: leafSalts, hashes };
 }
 
 // -------------------------------------------------------------------------------------------
