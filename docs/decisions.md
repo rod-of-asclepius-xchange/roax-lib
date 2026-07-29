@@ -675,6 +675,8 @@ up moving at the speed of the slower one.
 **Identified on 2026-07-29 while building the conformance vector decision D12's ruling required.**
 It is recorded here rather than settled in passing, because settling it changes matching in both
 reference implementations and in the type-map tooling at once.
+It also reaches the Rust library, which takes neither side: `LookupKeyMode` has no default, and the construction and verification paths reject a key whose binding differs between the two readings rather than choosing one (`rust/README.md`).
+So a ruling retires that guard as well as changing the matchers.
 
 **Written into the spec:** nothing. Specification section 6.1 pins NFC for **hashing**, and section
 4.2 requires an uncovered path to fail closed. Neither says whether the type-map **lookup** that

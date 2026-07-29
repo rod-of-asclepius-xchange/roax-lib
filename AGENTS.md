@@ -7,6 +7,7 @@ release, architecture, and sharp-edge notes that should travel with the code.
 
 Specification, schemas, the conformance corpus, and the independent Rust implementation under `rust/`.
 Decision D was ruled to five independent, corpus-enforced libraries on 2026-07-29 (`docs/decisions.md`, decision D).
+`rust/README.md` owns that crate's protocol boundaries, its build, test and lint commands, and the open-decision behaviour it preserves.
 
 Do not add the TypeScript, Go, Swift or Kotlin library without an explicit instruction to do so.
 
@@ -375,7 +376,7 @@ Part 1's A and C sections are the owner's and are not edited by ruling work else
 
 ## Validating the schemas
 
-There is no CI and no package manifest. The JSON Schemas were checked with Ajv 8 in **strict mode**
+There is no CI and no npm package manifest. The JSON Schemas were checked with Ajv 8 in **strict mode**
 plus `ajv-formats`, and all seven compile clean. Re-check after any edit: install `ajv` and
 `ajv-formats` outside the tree, then `new Ajv2020({strict: true}).compile()` each of the seven files,
 using the `ajv/dist/2020.js` entry point because they are draft 2020-12. Compiling is not enough on

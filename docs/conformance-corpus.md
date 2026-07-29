@@ -28,9 +28,9 @@ vectors, 11 Merkle-root vectors and 110 inclusion vectors.
 
 ROAX additionally wants Go, and Go over UniFFI is awkward - UniFFI has no first-class Go backend.
 So if ROAX ships five genuinely independent libraries, **the corpus stops being a safety net and
-becomes the entire enforcement mechanism.** (Whether it does ship five is decision D, and it is
-open; but the corpus has to be built as though it will, because retrofitting it after divergence has
-shipped is far worse.)
+becomes the entire enforcement mechanism.**
+That is no longer conditional: decision D was ruled Da on 2026-07-29 to five independent, corpus-enforced libraries (`docs/decisions.md`, decision D).
+The corpus was already built as though it would be, because retrofitting it after divergence has shipped is far worse.
 
 **The review reason.** Stated in the standards research as a disqualifier rather than a nice-to-have:
 "we invented our own canonicalization without cross-language test vectors" fails healthcare security

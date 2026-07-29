@@ -1,6 +1,6 @@
 # The ROAX conformance corpus
 
-**Status:** first cut. 471 vectors, all 19 classes reachable, 15 complete and 4 partial.
+**Status:** first cut. 471 vectors, all 19 classes reachable, 14 complete, 4 partial and 1 stale.
 **Normative definition:** [`docs/conformance-corpus.md`](../docs/conformance-corpus.md).
 **Schema:** [`schemas/conformance-corpus-1.0.json`](../schemas/conformance-corpus-1.0.json).
 **Specification:** [`docs/spec/roax-canon-1.md`](../docs/spec/roax-canon-1.md), which governs where the
@@ -36,7 +36,7 @@ Both arguments are optional and their absence is reported rather than hidden.
 - Without `--references`, class 10 reports `SKIPPED - NOT RUN` and contributes zero assertions. It
   never reports green unrun.
 - Without `--modules` (holding `ajv@8` and `ajv-formats`), the JSON Schema validation step is
-  skipped and says so. The repository has no package manifest, deliberately.
+  skipped and says so. The repository has no npm package manifest, deliberately.
 
 `run.sh` does four things, and the third is the one that matters:
 
