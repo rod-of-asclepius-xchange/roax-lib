@@ -204,10 +204,25 @@ class DisplayPatternTypeMap:
         if not isinstance(raw_entries, list) or not raw_entries:
             raise RoaxError(ErrorCode.TYPE_MAP_REJECTED, f"{source}: type map has no entries")
 
-        from .jsonio import as_int
+        from .jsonio import as_int, is_json_string
 
         entries: list[_Entry] = []
         for raw in raw_entries:
+            # This is the fail-closed artifact-loading surface, so every field of an entry
+            # is validated and every rejection carries the same stable code. A `pattern`
+            # read by a bare subscript would raise `KeyError` out of `from_file` instead,
+            # and `is_json_string` rather than `isinstance(pattern, str)` because a
+            # `JsonNumber` pattern would bind the key its literal spells.
+            if not isinstance(raw, dict):
+                raise RoaxError(
+                    ErrorCode.TYPE_MAP_REJECTED, f"{source}: entry is not an object: {raw!r}"
+                )
+            pattern = raw.get("pattern")
+            if not is_json_string(pattern):
+                raise RoaxError(
+                    ErrorCode.TYPE_MAP_REJECTED,
+                    f"{source}: entry carries no `pattern` string: {raw!r}",
+                )
             try:
                 # A tag is an artifact field rather than a record value, so converting it
                 # from the literal-preserving reader's carrier is correct here.
@@ -221,15 +236,13 @@ class DisplayPatternTypeMap:
             if tag == 8:
                 raise RoaxError(
                     ErrorCode.TYPE_MAP_REJECTED,
-                    f"{source}: binds {raw.get('pattern')!r} to tag 8 BLOB_REF, which no "
+                    f"{source}: binds {pattern!r} to tag 8 BLOB_REF, which no "
                     f"version-1 profile declares (specification section 6.5)",
                 )
             kind = raw.get("jsonKind")
             if kind is not None and kind not in JSON_KINDS:
                 raise RoaxError(ErrorCode.TYPE_MAP_REJECTED, f"{source}: bad jsonKind {kind!r}")
-            entries.append(
-                _Entry(parse_pattern(raw["pattern"]), kind, tag, raw["pattern"])
-            )
+            entries.append(_Entry(parse_pattern(pattern), kind, tag, pattern))
         self.entries = tuple(entries)
 
     @classmethod

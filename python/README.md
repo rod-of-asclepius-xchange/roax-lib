@@ -66,7 +66,7 @@ Without `--references` class 10 reports SKIPPED and contributes no assertions; i
 PYTHONPATH=python/src python3 -m unittest discover -s python/tests -t python
 ```
 
-75 tests, standard library `unittest`.
+81 tests, standard library `unittest`.
 They cover what the corpus reaches plus the Python-specific traps it cannot see, because a trap closed by accident reopens on the next edit.
 
 ## Unicode
