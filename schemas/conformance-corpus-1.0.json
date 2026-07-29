@@ -131,8 +131,7 @@
         "class": { "$ref": "#/$defs/classRef" },
         "tag": { "$ref": "#/$defs/tagRef" },
         "input": {
-          "description": "The input that MUST error, in carrier form. A JSON NUMBER IS NOT A LEGITIMATE REJECTION INPUT, and this was considered rather than inherited: most of the class-3 rejection inputs are not valid JSON numbers in the first place - `01`, `1.`, `.5`, `+1`, `NaN` and `Infinity` cannot be written as JSON number tokens at all (docs/conformance-corpus.md class 3) - and the one that can, `1.4e+9999`, is precisely the case a float-based parser turns into Infinity before the runner ever hands it to the implementation under test, so writing it as a number would delete the vector's own subject. Carrying these as strings is not a workaround: spec section 6.4 requires an implementation to read a number's SOURCE BYTES rather than a parsed value, so the string IS the faithful representation of what the implementation is given.",
-          "$ref": "#/$defs/carrierValue"
+          "description": "The input that MUST error. UNCONSTRAINED, and deliberately so: this is a RAW INPUT UNDER TEST, not a record value in carrier form, and the two are different things. An earlier revision applied #/$defs/carrierValue here on the reasoning that no JSON number is ever a legitimate rejection input. THAT REASONING WAS WRONG, and the corpus itself is the counterexample: the class-6 vectors reject-index-at-2-32 and reject-index-beyond-2-32 carry {\"$segments\": [{\"index\": 4294967296}]}, and that index MUST be a JSON number to express what the vector tests, which is an array index at and beyond 2^32 that spec section 5 requires an implementation to reject. Carried as a string it is a different test and does not exercise the rule at all. What survives from that reasoning, and is still true, is narrower: the class-3 NUMERIC rejection inputs are carried as strings, because `01`, `1.`, `.5`, `+1`, `NaN` and `Infinity` are not valid JSON number tokens in the first place, and the one that is, `1.4e+9999`, is precisely the case a float-based parser turns into Infinity before the runner hands it to the implementation under test, which would delete the vector's own subject (docs/conformance-corpus.md class 3). That is a fact about those particular vectors rather than a constraint this field can carry, because a constraint here cannot tell a numeric literal under test from a path index under test. The no-JSON-number guard belongs on the genuine value carriers, where it is enforced: encodeValueVector.input, leafVector.value and unlinkabilityVector.value."
         },
         "segments": { "$ref": "#/$defs/segments" },
         "reason": { "type": "string", "minLength": 1 }
@@ -398,7 +397,7 @@
     "normalizationVector": {
       "description": "Class 19. One record whose string differs before and after NFC, carried in BOTH forms, asserting that the two produce the SAME root (spec section 6.1, decision D12 ruled D12a). Class 4 already asserts NFC against NFD at LEAF level in values and keys; this class asserts the property of the whole pipeline over the union of spec section 3.3, which is where the routes a leaf-level vector misses actually are - a key compared before normalization, a reserved-leaf value written straight from the envelope, a path segment re-encoded from a cached form. THE ASSERTION IS EQUALITY, so the vector is complete without a pinned root: what it fixes is that both forms yield one value and that it is the same one. The optional root pins that value once the corpus file exists, as a regression against normalization silently changing. Use a string whose NFC form is stable across recent Unicode versions - the version pin is class 16's subject, and class 16 is explicit about what it can and cannot demonstrate.",
       "type": "object",
-      "required": ["name", "class", "site", "recordFileNFD", "recordFileNFC", "saltsFile", "expectSameRoot"],
+      "required": ["name", "class", "site", "recordFileNFD", "recordFileNFC", "saltsFile", "recordType", "schemaVersion", "recordId", "issuerId", "expectSameRoot"],
       "additionalProperties": false,
       "properties": {
         "name": { "$ref": "#/$defs/name" },
@@ -410,6 +409,30 @@
         "site": {
           "description": "Where the differing sequence sits. Both are required by docs/conformance-corpus.md class 19, because an implementation can normalize values and not keys. STATED LIMIT: that is a requirement on the SET of class-19 vectors and not on any one of them, so it is enforced by the corpus build alongside the class-coverage check classRef describes. It is left there rather than expressed as a pair of contains keywords on vectors.normalization, because that would half-enforce it - an absent array escapes entirely - and would make one class of nineteen carry its coverage rule in a different place from the other eighteen.",
           "enum": ["value", "key"]
+        },
+        "recordType": {
+          "description": "Committed as the reserved leaf roax.recordType. REQUIRED here for exactly the reason recordVector requires it: the leaf set is the UNION of the record's own leaves and the reserved roax.* leaves (spec sections 3.3 and 11.2), so a runner holding only the two record files and the salt set cannot reconstruct the union and therefore cannot recompute the root this vector asserts. An earlier revision of this definition named only the record files and saltsFile, which left its own root unrecomputable by the same argument recordVector already states about itself.",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "description": "Committed as the reserved leaf roax.schemaVersion. OPAQUE, exactly as in the envelope and for the same reason (spec section 12.1): defined by the profile rather than by this project, so it is matched for equality and never parsed.",
+          "type": "string",
+          "minLength": 1
+        },
+        "recordId": {
+          "description": "Committed as the reserved leaf roax.recordId. BOTH forms are issued under this one identifier, and that is the point rather than an economy: a differing identifier changes a reserved leaf, so the two roots would then differ for a reason that has nothing to do with normalization and expectSameRoot would be asserting the wrong thing.",
+          "type": "string",
+          "minLength": 1
+        },
+        "issuerId": {
+          "description": "Committed as the reserved leaf roax.issuer.id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "issuerKeyId": {
+          "description": "Committed as the reserved leaf roax.issuer.keyId. OPTIONAL, and its ABSENCE is meaningful rather than a default: an absent issuerKeyId emits NO leaf, which changes the union and therefore the root, and it MUST NOT be substituted with a NULL leaf or an empty string (spec section 11.2).",
+          "type": "string",
+          "minLength": 1
         },
         "recordFileNFD": { "type": "string" },
         "recordFileNFC": { "type": "string" },
