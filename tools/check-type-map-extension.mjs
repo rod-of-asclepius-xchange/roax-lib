@@ -478,7 +478,7 @@ function bindingSortKey(binding) {
 }
 
 function unresolvedSortKey(row) {
-  return `${row.jsonKinds.join(",")}\n${row.reason}\n${row.sources.join(",")}`;
+  return JSON.stringify([row.jsonKinds, row.reason, row.sources]);
 }
 
 function validateAutomaton(artifact, sources, label) {
@@ -921,10 +921,14 @@ function bindingMap(state) {
   return new Map((state.bindings ?? []).map((binding) => [binding.jsonKind, binding]));
 }
 
+function unresolvedRowIdentity(row) {
+  return JSON.stringify([row.reason, row.sources]);
+}
+
 function unresolvedKindsByRow(state) {
   const rows = new Map();
   for (const row of state?.unresolved ?? []) {
-    const rowKey = `${row.reason}\n${row.sources.join(",")}`;
+    const rowKey = unresolvedRowIdentity(row);
     if (!rows.has(rowKey)) {
       rows.set(rowKey, new Set());
     }
@@ -1561,6 +1565,74 @@ function selfTest() {
       child.coverage.structurallyUntypedObjectSourceNodes = 1;
     },
   );
+  for (const collision of [
+    {
+      name: "sourceId containing a comma impersonates a two-source row",
+      parentSources: ["alpha", "beta"],
+      parentReason: "The base schema does not choose one numeric ROAX tag.",
+      childSources: ["alpha,beta"],
+      childReason: "The base schema does not choose one numeric ROAX tag.",
+    },
+    {
+      name: "newline in a sourceId impersonates a newline in the reason",
+      parentSources: ["gamma\ndelta"],
+      parentReason: "The base schema does not choose one numeric ROAX tag.",
+      childSources: ["delta"],
+      childReason: "The base schema does not choose one numeric ROAX tag.\ngamma",
+    },
+  ]) {
+    expectReject(
+      collision.name,
+      /unresolved number row is not inherited/,
+      (_parent, child) => {
+        child.addedSelectors = child.addedSelectors.slice(0, 1);
+        child.automaton.states[2].bindings = [
+          structuredClone(child.automaton.states[2].bindings[1]),
+        ];
+        child.automaton.states[2].unresolved = [
+          {
+            jsonKinds: ["number"],
+            reason: collision.childReason,
+            sources: collision.childSources,
+          },
+        ];
+        refreshCoverage(child);
+        child.coverage.structurallyUntypedObjectSourceNodes = 1;
+      },
+      (parent, child) => {
+        const declare = (sourceIds, digestByte) =>
+          sourceIds.map((sourceId) => ({
+            sourceId,
+            kind: "content",
+            uri: "https://example.invalid/gap-evidence.json",
+            digest: `sha256:${digestByte.repeat(32)}`,
+          }));
+        parent.sourceSchemas = [
+          ...parent.sourceSchemas,
+          ...declare(collision.parentSources, "44"),
+        ];
+        parent.automaton.states[1].unresolved = [
+          {
+            jsonKinds: ["number"],
+            reason: collision.parentReason,
+            sources: collision.parentSources,
+          },
+        ];
+        refreshCoverage(parent);
+        parent.coverage.structurallyUntypedObjectSourceNodes = 1;
+        child.sourceSchemas = [
+          ...parent.sourceSchemas,
+          ...child.sourceSchemas.filter((source) => source.sourceId === "supplement"),
+          ...declare(
+            collision.childSources.filter(
+              (sourceId) => !collision.parentSources.includes(sourceId),
+            ),
+            "55",
+          ),
+        ];
+      },
+    );
+  }
   expectReject(
     "inherited unresolved row dropped without a binding",
     /inherited unresolved number row is dropped without a binding/,

@@ -483,6 +483,10 @@ function classifyNode(store, node) {
   };
 }
 
+function unresolvedSortKey(row) {
+  return JSON.stringify([row.jsonKinds, row.reason, row.sources]);
+}
+
 function admitsEmptyObject(node) {
   return (
     (!Array.isArray(node.required) || node.required.length === 0) &&
@@ -714,11 +718,9 @@ function compileAutomaton(store, rootNode) {
         reason: item.reason,
         sources: item.source === "(combined state)" ? [] : [item.source],
       }))
-      .sort((left, right) => {
-        const leftKey = `${left.jsonKinds.join(",")}\n${left.reason}\n${left.sources.join(",")}`;
-        const rightKey = `${right.jsonKinds.join(",")}\n${right.reason}\n${right.sources.join(",")}`;
-        return compareUtf8(leftKey, rightKey);
-      });
+      .sort((left, right) =>
+        compareUtf8(unresolvedSortKey(left), unresolvedSortKey(right)),
+      );
 
     built.push({
       id: `s${index}`,

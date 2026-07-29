@@ -421,7 +421,7 @@ node tools/build-type-maps.mjs \
   --out type-maps
 ```
 
-**That command currently fails, and the four published artifacts cannot be regenerated from the pinned checkout.**
+**That command currently fails, and the four published artifacts can be neither regenerated nor `--check`ed from the pinned checkout.**
 The generator refuses to guess an empty-container tag when merged branches disagree about admitting the empty value, and that refusal now covers objects as well as arrays, because EMPTY_OBJECT is a distinct leaf under ROAX-CANON/1 section 6.1 and a permissive union silently widens the map.
 Measured against commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`, the object rejection fires on 34 states: 30 in full FHIR, 2 in PDT, 2 in recovery and none in vaccination.
 The first is the state that merges `#/definitions/ImplementationGuide_Definition`, which requires `resource`, with `#/definitions/Reference`, which admits `{}`.
@@ -441,7 +441,7 @@ The generator resolves cross-file references by file path and does not inspect `
 Each generated source record also names the public `https://github.com/Open-Attestation/schemata.git` repository, its repository-relative path and the complete commit, so a relative path is never interpreted against an unspecified repository.
 For a `kind: "content"` source, `digest` is SHA-256 over the exact retrieved bytes with no domain prefix or JSON reserialization, as defined by `schemas/type-map-artifact-1.0.json`.
 
-The checked-in files can be compared without rewriting them:
+The same generator is also meant to compare the checked-in files without rewriting them:
 
 ```sh
 node tools/build-type-maps.mjs \
@@ -450,8 +450,12 @@ node tools/build-type-maps.mjs \
   --check
 ```
 
-Both generator invocations need the reference checkout, which `.gitignore` excludes.
-The published artifacts and the registry are therefore also checked directly from the committed tree, with no reference checkout:
+**That comparison currently fails too, on exactly the same 34 states.**
+`--check` only changes what happens after a profile is compiled, and the object rejection fires inside compilation, so `--check` never reaches the committed bytes either.
+Neither generator invocation can therefore detect drift between the four committed artifacts and the generator that produced them, which is the cost of the fail-closed ruling above.
+
+Both generator invocations need the reference checkout, which `.gitignore` excludes, and both fail closed on those 34 states even once it is present.
+The published artifacts and the registry are therefore checked directly from the committed tree instead, with no reference checkout and no dependency on the generator:
 
 ```sh
 ROAX_AJV=/tmp/roax-ajv node tools/check-type-maps.mjs

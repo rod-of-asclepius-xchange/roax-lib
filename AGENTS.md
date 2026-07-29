@@ -34,10 +34,13 @@ Consequences that have already bitten once during authoring:
 
 These are the things a future agent is most likely to get wrong.
 
-- **Four base type maps are published in `type-maps/`.** They are generated from the pinned
+- **Four base type maps are published in `type-maps/`.** They were generated from the pinned
   reference checkout by `tools/build-type-maps.mjs`, which loads schemas by file path rather than
-  `$id`. Their exact coverage and unresolved paths are in `docs/type-maps.md`. Do not infer a tag
-  syntactically for any unbound path - decision D7 requires it to fail closed.
+  `$id`. Neither regeneration nor `--check` runs today - both fail closed on the object-branch
+  disagreements described below - so the committed bytes are authoritative and
+  `tools/check-type-maps.mjs` is what verifies them. Their exact coverage and unresolved paths are
+  in `docs/type-maps.md`. Do not infer a tag syntactically for any unbound path - decision D7
+  requires it to fail closed.
 
 - **The operative type-map matcher is a structured-path DFA, not a display-pattern table.**
   Resolve NFC-normalized KEY and INDEX segments, then select one output by observed JSON kind.
@@ -76,7 +79,8 @@ These are the things a future agent is most likely to get wrong.
   it did not resolve. Do not describe them as purely non-operative anywhere.
 
 - **`tools/check-type-maps.mjs` is the only checker that runs against the committed tree.**
-  `build-type-maps.mjs --check` needs the gitignored reference checkout; this one does not.
+  `build-type-maps.mjs --check` needs the gitignored reference checkout and still fails closed on
+  the 34 object-branch disagreements once it has one; this one needs neither and passes.
   It recomputes the content IDs, validates the four artifacts and the registry against their JSON
   Schemas, exercises both branches of the artifact schema's `parentTypeMapId` conditional in both
   directions, reuses `validateArtifact` from the extension checker rather than re-encoding the
@@ -100,8 +104,10 @@ These are the things a future agent is most likely to get wrong.
   EMPTY_ARRAY and EMPTY_OBJECT are distinct leaves, so a permissive union is silent widening.
   `--self-test` proves both rejections against constructed schemas and needs no reference checkout.
 
-- **The object rejection above means the four published artifacts cannot currently be regenerated,
-  and that is the ruled trade.** Measured on the pinned checkout, it fires on 34 states: 30 full
+- **The object rejection above means the four published artifacts can currently be neither
+  regenerated nor `--check`ed, and that is the ruled trade.** `--check` compiles before it
+  compares, so it fails on the same states.
+  Measured on the pinned checkout, it fires on 34 states: 30 full
   FHIR, 2 PDT, 2 recovery, 0 vaccination. The first merges `ImplementationGuide_Definition`, which
   requires `resource`, with `Reference`, which admits `{}`. Do not "fix" this by restoring the
   permissive union - that ruling was raised with this measurement and reaffirmed. The committed
