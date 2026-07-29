@@ -771,6 +771,7 @@ const BYTES_MAP = LegacyPatternTypeMap.compile({
     { pattern: 'validFrom', jsonKind: 'string', tag: 2 },
     { pattern: 'attachment', jsonKind: 'string', tag: 5 },
     { pattern: 'emptyAttachment', jsonKind: 'string', tag: 5 },
+    { pattern: 'lettersAttachment', jsonKind: 'string', tag: 5 },
   ],
 });
 
@@ -778,12 +779,18 @@ const BYTES_MAP = LegacyPatternTypeMap.compile({
 // section 6.3 test above; `emptyAttachment` is the empty-bytes case, which has to travel the whole
 // way rather than only through `encodeValue`, because `value: ""` is what interacts with the
 // disclosed-leaf `hasValue` rule.
+//
+// **`lettersAttachment` is `0xAB 0xCD 0xEF`, and it is here because every other BYTES value in
+// this file spells out to letter-free hex.** `00010203` and `""` are identical under
+// `toUpperCase`, so a `toHex` that emitted uppercase nibbles would satisfy both assertions below
+// and the live tag-5 schema pattern as well. `hexNibble` has already been wrong once, so the
+// emitted carrier needs at least one value whose spelling can distinguish the two cases.
 const BYTES_RECORD = readJson(
   '{"version":"pdt-healthcert-v2.0","type":"PCR","validFrom":"2026-07-28T00:00:00Z",' +
-    '"attachment":"AAECAw==","emptyAttachment":""}',
+    '"attachment":"AAECAw==","emptyAttachment":"","lettersAttachment":"q83v"}',
 );
 
-// The pdt floor - `version`, `type`, `validFrom` plus the reserved paths - and the two BYTES
+// The pdt floor - `version`, `type`, `validFrom` plus the reserved paths - and the three BYTES
 // leaves. Revealing less would be rejected for the floor rather than for anything about BYTES.
 const REVEAL_WITH_BYTES: Path[] = [
   [{ key: 'roax.recordType' }],
@@ -796,6 +803,7 @@ const REVEAL_WITH_BYTES: Path[] = [
   [{ key: 'validFrom' }],
   [{ key: 'attachment' }],
   [{ key: 'emptyAttachment' }],
+  [{ key: 'lettersAttachment' }],
 ];
 
 const BYTES_VERIFIER = {
@@ -828,6 +836,9 @@ test('a BYTES leaf issues, discloses as hex, parses and verifies (sections 6.3, 
   // The assertion the finding is about: `00010203`, not `AAECAw==`.
   assert.equal(disclosedValueAt(disclosed, 'attachment'), '00010203');
   assert.equal(disclosedValueAt(disclosed, 'emptyAttachment'), '');
+  // The one carrier here whose hex has letters, so it is the only assertion in this file that
+  // fails if the emitted spelling is uppercase. `q83v` is `0xAB 0xCD 0xEF`.
+  assert.equal(disclosedValueAt(disclosed, 'lettersAttachment'), 'abcdef');
 
   // And the disclosed copy verifies against the root of the full copy, so the hex carrier
   // reconstructs the same leaf hash the base64 record committed.
@@ -844,7 +855,11 @@ test('the disclosed BYTES carrier matches the tag-5 pattern of both live envelop
     issueFullCopy({ record: BYTES_RECORD, identity: IDENTITY, resolver: BYTES_MAP }),
     { reveal: REVEAL_WITH_BYTES },
   );
-  const values = ['attachment', 'emptyAttachment'].map((k) => disclosedValueAt(disclosed, k));
+  // `lettersAttachment` is in this list for the reason given at the fixture: the schema pattern is
+  // case-sensitive, and the other two carriers cannot tell the two cases apart.
+  const values = ['attachment', 'emptyAttachment', 'lettersAttachment'].map((k) =>
+    disclosedValueAt(disclosed, k),
+  );
 
   for (const schema of ['schemas/envelope-1.0.json', 'schemas/envelope-2.0.json']) {
     const file = resolve(REPO_ROOT, schema);
