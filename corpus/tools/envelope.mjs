@@ -98,7 +98,10 @@ function verifyInner(envelope, typeMaps) {
   const hashAlg = get(envelope, "hashAlg");
   if (!ALLOWED_HASH_ALGS.includes(hashAlg)) return [false, "hash-alg-not-allowed"];
 
-  // Section 7.3 rule 3.
+  // Section 7.3 rule 3: no envelope may carry any value from which an undisclosed leaf's salt
+  // could be obtained. Vacuous under D4b, since no such value exists in the design; kept because
+  // rule 3 binds any future revision that reintroduces derivation, and a seed in an envelope
+  // would let every holder recompute every withheld salt in a copy that still verified.
   if (has(envelope, "masterSalt")) return [false, "master-salt-in-envelope"];
 
   const hasRecord = has(envelope, "record");
@@ -138,10 +141,14 @@ function verifyFull(envelope, hashAlg, root, identity, typeMaps) {
   const saltEntries = get(envelope, "salts");
 
   // The reserved-namespace guard, duplicate-key rejection and fail-closed type-map lookup all
-  // live inside buildTree, so this call is what makes class 15's reject row fire before
+  // live inside orderedLeaves, so this call is what makes class 15's reject row fire before
   // anything is compared against the root.
-  const { leaves } = ref.buildTree(hashAlg, get(envelope, "record"), typeMap,
-    Buffer.alloc(32), identity);
+  //
+  // orderedLeaves rather than buildTree: a full copy carries the salt of every leaf, so a
+  // verifier needs the leaf ORDER and never a salt it did not read from the envelope. Under the
+  // deleted D4a construction this passed a zero-filled master salt purely to reach the ordering
+  // pass, which is the awkwardness the split removed.
+  const leaves = ref.orderedLeaves(get(envelope, "record"), typeMap, identity);
 
   // Section 11.1: a derived count disagreeing with the declared one MUST be a rejection.
   if (saltEntries.length !== leafCount) return [false, "salts-length-not-leaf-count"];
