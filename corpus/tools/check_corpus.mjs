@@ -313,6 +313,33 @@ for (const v of V.unlinkability ?? []) {
     v.expectDistinctLeafHashesAcrossIssuances);
 }
 
+// Class 19. The two forms share ONE salt set, so any root difference is normalization and
+// nothing else. Only the value case exists: whether the TYPE-MAP LOOKUP matches over normalized
+// keys is an open question (docs/decisions.md), and a key-case vector would settle it.
+for (const v of V.normalization ?? []) {
+  const map = typeMaps[v.recordType];
+  if (map === undefined) {
+    note(v.class, `normalization ${v.name}: type map ${v.recordType} not found`);
+    continue;
+  }
+  const identity = {
+    recordType: v.recordType,
+    schemaVersion: v.schemaVersion,
+    recordId: v.recordId,
+    issuerId: v.issuerId,
+    issuerKeyId: v.issuerKeyId,
+  };
+  const saltDoc = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, v.saltsFile), "utf8"));
+  const roots = [v.recordFileNFD, v.recordFileNFC].map((file) => {
+    const record = parseRecord(fs.readFileSync(path.join(REPO_ROOT, file), "utf8"));
+    const ordered = ref.orderedLeaves(record, map, identity);
+    const salts = ref.saltSetFromDocument(saltDoc, ordered);
+    return ref.buildTree(HASH_ALG, record, map, salts, identity).root.toString("hex");
+  });
+  check(v, "expectSameRoot", roots[0] === roots[1], v.expectSameRoot);
+  if ("root" in v) check(v, "root", roots[0], v.root);
+}
+
 for (const v of V.envelope ?? []) {
   const file = path.join(REPO_ROOT, v.envelopeFile);
   const envelope = parseRecord(fs.readFileSync(file, "utf8"));

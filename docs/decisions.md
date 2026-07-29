@@ -1,6 +1,9 @@
 # Decisions: settled, open, and the reasoning
 
-**Status:** three decisions are genuinely open and they are all in Part 1: **A**, **C** and **D**.
+**Status:** four decisions are genuinely open. Three are in Part 1 and belong to the project owner -
+**A**, **C** and **D**. The fourth, **D14**, was identified on 2026-07-29 while building a
+conformance vector and is in Part 2a; it is open because nobody has ruled it, not because it is
+awaiting the owner specifically.
 Everything else has been ruled. **Decision B** was ruled earlier, with the residual open questions
 named inside it. The **ten engineering decisions in Part 2 - D3, D4, D5, D6, D7, D8, D9, D11, D12
 and D13 - were ruled on 2026-07-28**, and each carries its reasoning so that it can be overturned on
@@ -14,6 +17,9 @@ The protocol specification is **written on the recommended answer to each decisi
 open**, so that it is concrete and readable rather than hedged into uselessness. That is a drafting
 choice, not a ruling. A specification that hides a live decision behind confident prose is worse than
 one that names it, so each is named here with its alternatives and their consequences.
+
+`docs/conformance-corpus.md` class 19 records the vector that would settle D14 and states why it is
+deliberately not built.
 
 **A decision that looks settled in the specification but is still marked OPEN here is worse than
 either**, so the two documents move together in one change. That warning is in this document because
@@ -655,6 +661,46 @@ That split gets the honesty immediately, keeps the canonicalization layer clean,
 later as an additive layer without touching a single byte of the digest rule. Merging the two would
 put clinical governance on the critical path of a cryptographic specification, which is how both end
 up moving at the speed of the slower one.
+
+---
+
+## Part 2a - Newly identified, and genuinely open
+
+### D14 - Does type-map matching normalize the key it matches on? **OPEN**
+
+**Identified on 2026-07-29 while building the conformance vector decision D12's ruling required.**
+It is recorded here rather than settled in passing, because settling it changes matching in both
+reference implementations and in the type-map tooling at once.
+
+**Written into the spec:** nothing. Specification section 6.1 pins NFC for **hashing**, and section
+4.2 requires an uncovered path to fail closed. Neither says whether the type-map **lookup** that
+runs *before* hashing compares a normalized key or the bytes as received.
+
+**Why it is not academic.** Both reference implementations currently match **raw**, with no `nfc()`
+on either the pattern token or the segment key (`corpus/tools/roax_ref.py` `_match_from`;
+`corpus/tools/roax_ref.mjs` `matchPattern`). So a record whose key is written decomposed fails the
+lookup and is **refused outright by the fail-closed rule**, while the identical record written
+composed resolves and commits. The two render identically to a human.
+
+**That is the invisible-divergence failure D12 exists to prevent, arriving one layer up.** D12
+reasoned that a record passing through a normalizing form field must not get a different root; under
+raw matching it does not get a different root, it gets rejected instead, and the rejection is just as
+invisible to whoever typed the value.
+
+**The evidence that this is unresolved rather than merely undocumented.** The synthetic type map in
+`corpus/tools/synthetic_records.py` carries the Kelvin key under **both** spellings, so
+`record-guard-kelvin-key` resolves identically under either reading. That is a workaround standing
+in for a decision, and it is why no existing vector settles the question.
+`corpus/README.md` records the same gap in its specification-reading notes.
+
+| Option | Consequence |
+|---|---|
+| **D14a. Match over NFC-normalized keys** | Follows specification section 11.2's general rule, "check the bytes you commit, not the bytes you received", and makes the two spellings behave identically end to end. Cost: every type map and both implementations change together, and a pattern authored in one form silently starts matching the other. |
+| **D14b. Match raw, and say so normatively** | No code changes. Cost: the divergence above becomes a specified behaviour rather than an accident, and every type map must enumerate every spelling it intends to accept - which is what the Kelvin workaround already does by hand. |
+
+**Not ruled here, and the conformance vector that would settle it is deliberately not built.**
+`docs/conformance-corpus.md` class 19 carries the **value** case only and says why the **key** case
+is absent: building it would decide this question rather than test a decided one.
 
 ---
 

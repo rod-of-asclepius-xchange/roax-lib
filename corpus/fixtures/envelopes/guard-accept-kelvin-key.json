@@ -4,7 +4,7 @@
   "recordType": "org.roax.corpus.synthetic",
   "schemaVersion": "1.0",
   "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-  "root": "d0f1837372b5be6a7aba9344ee7fb947c6c4929eeebdbcf3ff9e118a26d0339f",
+  "root": "51cde2227c0babcb09c532f1ca6f18d1b072f26987014e1a146b049ec0dd9aa6",
   "leafCount": 6,
   "issuer": {
     "id": "did:web:corpus.roax.invalid"
@@ -20,7 +20,7 @@
           "key": "Kelvin"
         }
       ],
-      "salt": "19d9c4bbddc5533c1e0531e62e8b5392"
+      "salt": "fe35c46d7e7eb99d14670d2873bf832b"
     },
     {
       "segments": [
@@ -28,7 +28,7 @@
           "key": "marker"
         }
       ],
-      "salt": "5fda5a48f05a20efec940db056d7a4bd"
+      "salt": "5388abf01448b9a7c4b6daf87afa75c5"
     },
     {
       "segments": [
@@ -36,7 +36,7 @@
           "key": "roax.recordId"
         }
       ],
-      "salt": "1d2c984fa5cffac8ca071ed312a03f4d"
+      "salt": "3fa6336dceed7bd9908d44f30a6232bd"
     },
     {
       "segments": [
@@ -44,7 +44,7 @@
           "key": "roax.issuer.id"
         }
       ],
-      "salt": "b987844f2cc5a86024a735fdd683318f"
+      "salt": "bca60801c71b37a9e4ff677b5cbe7796"
     },
     {
       "segments": [
@@ -52,7 +52,7 @@
           "key": "roax.recordType"
         }
       ],
-      "salt": "3fe485d0c9534a79c1374805a114362b"
+      "salt": "4418f1b78770b424fc4b1fc4684a5b86"
     },
     {
       "segments": [
@@ -60,7 +60,7 @@
           "key": "roax.schemaVersion"
         }
       ],
-      "salt": "48701b759aede53a4e29b692bb6bb37a"
+      "salt": "abc2c8ab6c2d2d81653c7d937b9655b7"
     }
   ]
 }

@@ -53,6 +53,10 @@ SYNTHETIC_TYPE_MAP = {
         # consult this map at all.
         {"pattern": "a.b", "jsonKind": "null", "tag": ref.TAG_NULL, "source": AUTHORED},
         {"pattern": "marker", "jsonKind": "string", "tag": ref.TAG_STRING, "source": AUTHORED},
+        # Class 19's value pair. The PATTERN is ASCII, so type-map matching is not implicated;
+        # only the VALUE differs between the two forms, which is what keeps this vector about
+        # normalization in the hashing path and nothing else.
+        {"pattern": "accented", "jsonKind": "string", "tag": ref.TAG_STRING, "source": AUTHORED},
 
         # Class 13. Both FHIR entry layouts, so that the same clinical content under the two
         # shapes can be shown to produce different roots.
@@ -97,6 +101,14 @@ SYNTHETIC_TYPE_MAP = {
 # (fixture file name, record body). Written as JSON text so that no re-serializer ever touches a
 # numeric literal.
 RECORD_FIXTURES = {
+    # Class 19. The SAME record twice, differing only in whether the accented value is written
+    # decomposed or composed. Section 6.1 normalizes a value to NFC before encoding, so the two
+    # must produce ONE root. The path is deliberately ASCII: the KEY case is a separate vector
+    # this corpus does not carry, because whether the TYPE-MAP LOOKUP normalizes is an open
+    # question (docs/decisions.md, "Type-map matching over normalized keys") and building it
+    # would decide it.
+    "nfc-value-nfd.json": '{\n  "marker": "structure",\n  "accented": "e\\u0301"\n}\n',
+    "nfc-value-nfc.json": '{\n  "marker": "structure",\n  "accented": "\\u00e9"\n}\n',
     # Class 5: three siblings differing at exactly one path.
     "structure-empty-array.json": '{\n  "a": { "b": [] },\n  "marker": "structure"\n}\n',
     "structure-empty-object.json": '{\n  "a": { "b": {} },\n  "marker": "structure"\n}\n',
@@ -264,6 +276,67 @@ def build_record_vectors():
     if roots["record-entry-layout-flattened"] == roots["record-entry-layout-normalized"]:
         raise SystemExit("corpus defect: class 13 entry layouts produce the same root")
     return out
+
+
+def build_normalization_vectors():
+    """Class 19. One record in both Unicode forms, asserting ONE root.
+
+    Class 4 asserts NFC against NFD at LEAF level. This asserts it end to end, over the union of
+    specification section 3.3, which is where the routes a leaf-level vector misses actually are:
+    a reserved-leaf value written straight from the envelope, or a path segment re-encoded from a
+    cached form. Both forms share ONE salt set, because two sets would make the roots differ for
+    a reason that has nothing to do with normalization (spec section 7, decision D4b).
+
+    ONLY THE VALUE CASE IS CARRIED. docs/conformance-corpus.md class 19 wants a key case too, and
+    it is not built here on purpose: the specification does not say whether the TYPE-MAP LOOKUP
+    matches over normalized keys, and both reference implementations currently match RAW, so an
+    NFD-spelled key would fail the lookup while its NFC twin resolved. Building it would settle
+    that question rather than test a settled one. It is recorded in docs/decisions.md as a
+    newly identified open question.
+    """
+    import json_literal
+
+    emit_fixtures()
+    type_map = synthetic_type_map()
+    identity = (SYNTHETIC_RECORD_TYPE, SYNTHETIC_SCHEMA_VERSION, RECORD_ID_A, ISSUER_ID, None)
+
+    # ONE salt set, resolved ONCE and used for both forms. Drawing inside the loop would give
+    # each form its own set under --draw-salts, and the two roots would then differ for a reason
+    # that has nothing to do with normalization - which is exactly what the guard below caught
+    # the first time this was written. The two forms have identical ENCODED paths, since
+    # encode_path normalizes each key, so one set pairs against both.
+    first = json_literal.loads(RECORD_FIXTURES["nfc-value-nfd.json"])
+    ordered = ref.ordered_leaves(first, type_map, *identity)
+    salt_doc = _salt_doc("normalization-nfc-value", ordered)
+
+    roots = []
+    for fixture in ("nfc-value-nfd.json", "nfc-value-nfc.json"):
+        record = json_literal.loads(RECORD_FIXTURES[fixture])
+        form_ordered = ref.ordered_leaves(record, type_map, *identity)
+        salts = ref.salt_set_from_document(salt_doc, form_ordered)
+        root, _leaves, _s, _h = ref.build_tree("SHA-256", record, type_map, salts, *identity)
+        roots.append(root.hex())
+
+    if roots[0] != roots[1]:
+        raise SystemExit(
+            "corpus defect: the NFD and NFC forms of the class-19 record produced different "
+            f"roots ({roots[0]} vs {roots[1]}); section 6.1 requires one"
+        )
+
+    return [{
+        "name": "normalization-nfc-value-end-to-end",
+        "class": 19,
+        "site": "value",
+        "recordFileNFD": "corpus/fixtures/records/nfc-value-nfd.json",
+        "recordFileNFC": "corpus/fixtures/records/nfc-value-nfc.json",
+        "saltsFile": salt_sets.reference_for("normalization-nfc-value"),
+        "recordType": SYNTHETIC_RECORD_TYPE,
+        "schemaVersion": SYNTHETIC_SCHEMA_VERSION,
+        "recordId": RECORD_ID_A,
+        "issuerId": ISSUER_ID,
+        "expectSameRoot": True,
+        "root": roots[0],
+    }]
 
 
 def build_type_map_vectors():
