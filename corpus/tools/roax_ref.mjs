@@ -300,6 +300,31 @@ export class SaltSet {
   }
 }
 
+// Load a committed corpus salt set, in either of the two carriers class 10 needs.
+//
+// pairing "path" is the shape schemas/envelope-1.0.json defines and everything else uses:
+// explicit segments per entry, self-describing.
+//
+// pairing "positional" is a bare array in encodePath order, and it is a CORPUS-ONLY carrier that
+// MUST NEVER become an envelope shape. Spec section 7.2 rejects it for an envelope because it
+// makes pairing depend on reproducing the section 9 sort before the salts can be read at all; in
+// a corpus vector reproducing that sort is the thing under test, so a mispairing fails the vector
+// rather than yielding a silently wrong root. It exists because the class-10 records are
+// third-party reference samples at 69 and 70 leaves, and a path-keyed set would enumerate every
+// path of one into a public repository, which the references policy forbids. A positional array
+// discloses only the leaf count, which the vector already publishes as leafCount.
+// See docs/conformance-corpus.md class 10.
+export function saltSetFromDocument(doc, ordered) {
+  if (doc.pairing === "path") return new SaltSet(doc.salts);
+  if (doc.pairing === "positional") {
+    if (doc.salts.length !== ordered.length) {
+      throw new RoaxError("salt-count-mismatch", `${doc.salts.length} salts for ${ordered.length} leaves`);
+    }
+    return new SaltSet(ordered.map((leaf, i) => ({ segments: leaf.segments, salt: doc.salts[i] })));
+  }
+  throw new RoaxError("salt-pairing-unknown", JSON.stringify(doc.pairing));
+}
+
 // -------------------------------------------------------------------------------------------
 // Leaf construction (section 8)
 // -------------------------------------------------------------------------------------------
