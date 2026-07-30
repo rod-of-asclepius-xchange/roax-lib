@@ -8,7 +8,7 @@ release, architecture, and sharp-edge notes that should travel with the code.
 Specification, schemas, the conformance corpus, and three of the five ruled libraries: the independent Rust implementation under `rust/`, the independent TypeScript implementation under `src/`, and the independent Python implementation under `python/`.
 Decision D was ruled to five independent, corpus-enforced libraries on 2026-07-29 (`docs/decisions.md`, decision D).
 The specifications came first so the design could be reviewed before five language implementations existed to be re-litigated, and that ordering held.
-`rust/README.md` owns that crate's protocol boundaries, its build, test and lint commands, and the open-decision behaviour it preserves.
+`rust/README.md` owns that crate's protocol boundaries, its build, test and lint commands, and what ruled decisions D13a and D14a mean for its surface.
 `python/README.md` owns that package's surface, its standalone corpus runner, its test commands and its per-class figures, and `python/FINDINGS.md` records what that build found.
 
 Do not add the Go, Swift or Kotlin library without an explicit instruction to do so.
@@ -79,6 +79,10 @@ counted as passed.
 `sg.gov.moh.recovery-healthcert.json`: the vector names only the path inside the reference checkout
 and the extraction utility writes wherever `--out` says, so the name is the runner's contract and a
 mismatch is reported as NOT RUN naming the exact path probed.
+**Class 10 now needs TWO records**, recovery and `sg.gov.moh.vaccination-healthcert.json`, since the
+vaccination bindings were ruled. Rust's corpus test reads the same directory but names each file by
+its EXPORT instead - `sampleDocument.json` and `sampleVaccineHealthCert.json` - through
+`ROAX_EXTRACTED_RECORDS`; the two conventions are separate and a directory can satisfy both.
 
 ## This repository is PUBLIC
 
@@ -266,19 +270,47 @@ These are the things a future agent is most likely to get wrong.
   dotted-numeric pattern accepts even FHIR's own 22 `fhirVersion` values. ROAX's own artifacts,
   `corpusVersion` and `typeMapVersion`, keep semver. Do not harmonize the two groups.
 
-- **An unresolved path is bound by a ruling, not by a resolver improvement.**
-  Under the fail-closed rule of specification section 4.2, two of the three real MOH samples are uncommittable today.
-  Vaccination is blocked on `dose`, declared `"type": "number"` where ROAX has two numeric tags, and on `expiryDateTime`, declared with a `format` and examples and no `type` at all (`docs/type-maps.md` section 1.1).
-  PDT is blocked on the 20 endorsed-sample `(pattern, kind)` pairs its open root leaves undeclared (`docs/type-maps.md` section 1.2).
-  Recovery is the one whose sample commits, which is why class 10 has a vector for it alone (`corpus/README.md`), and that is a statement about the sample rather than about full coverage: the recovery base map carries the same five unresolved lite-FHIR slots as PDT (`docs/type-maps.md` sections 1.3 and 2.2).
-  A ruling lands in `docs/decisions.md` and the type map together.
-  Do NOT quietly bind `number` to a tag to make class 10 green: `docs/conformance-corpus.md` section 1.2 exists because that kind of fix decides an open question from inside a data file.
+- **An unresolved path is bound by a ruling, not by a resolver improvement, and five were RULED on
+  2026-07-30.** Each ruling carries an EVIDENCE GRADE and the grades are load-bearing: keep them
+  when you cite one, because a Moderate ruling and a Decisive one must not read alike.
+  `dose` INTEGER (Strong) plus a positive-integer profile narrowing; `expiryDateTime` STRING
+  (Moderate, resting on a profile declaration and NOT on the schema); FHIR `base64Binary` BYTES over
+  the decoded octets (Strong); FHIR `Narrative.div` STRING over the escaped XHTML text, unparsed
+  (Decisive); FHIR primitive-array null placeholders getting NO NULL binding and the record REJECTED
+  (Decisive). Full evidence in `docs/type-maps.md` sections 1.1 and 1.3.
+  **The two vaccination rulings are operative and unblocked its sample**, so class 10 is 2 of 3
+  records. **The three FHIR rulings are NOT in the published artifacts yet**, because regeneration is
+  blocked on the 34 merged object states below; `docs/type-maps.md` section 1.6 states why
+  hand-editing a generated artifact is the wrong fix and what the next change must do. Do not
+  "finish" them by editing artifact bytes.
+  **PDT is still uncommittable**, on the 20 endorsed-sample `(pattern, kind)` pairs its open root
+  leaves undeclared (`docs/type-maps.md` section 1.2). Those need a versioned composition profile
+  rather than 20 authored bindings, and nobody has ruled one.
+  A ruling lands in `docs/decisions.md` or a profile document and the type map together.
+  Do NOT quietly bind an unruled path to make class 10 green: `docs/conformance-corpus.md` section
+  1.2 exists because that kind of fix decides an open question from inside a data file.
+  `corpus/tools/build_type_maps.py` holds its rulings apart from the schema walk and refuses to
+  build if one names a path the walk did not independently report unbound, or collides with a binding
+  the schema determines. Keep that guard.
   Note the tool split when citing any of this: `corpus/tools/build_type_maps.py` is corpus-side and writes the vectors' maps, while the published `type-maps/` artifacts come from `tools/build-type-maps.mjs`.
+
+- **A value-domain rule is NOT a type map and NOT in the canonicalization layer, and that is ruled.**
+  The `dose` ruling narrows the field to a positive integer, which no tag can express. Specification
+  section 4.2 orders profile validation BEFORE map resolution, and decision D13a keeps value-domain
+  validation in "a separate, independently versioned conformance layer". So the rule is declared by
+  `docs/profiles/vaccination-healthcert.md` section 6, executable in `corpus/tools/profile_rules.py`
+  and `profile_rules.mjs`, self-tested by `run.sh` step 5, and demonstrated through Rust's
+  `SchemaValidator` seam. Do not move it into a type map, into `roax_ref.*`, or into any of the three
+  libraries: that merges two layers a ruling separated. The discriminating values are `0` and the
+  negatives, because a fractional value is already refused by the section 6.2 INTEGER grammar.
 
 - **The corpus may not require what the design has not decided.**
   A required corpus field that presumes one side of an open decision silently rules it (`docs/conformance-corpus.md` section 1.2).
   This happened twice with `masterSalt` before decision D4 was ruled.
-  The rule still binds, because decisions A, C and D14 are still open.
+  The rule still binds, because decisions A and C are still open.
+  D14 is the case that shows it working end to end: the class-19 key vector was withheld while D14
+  was open and built under the ruling on 2026-07-30, so no implementation ever inherited an unruled
+  answer from a data file.
 
 - **There is no master salt and no KDF. Every salt is an independent CSPRNG draw of 16 bytes**
   (spec section 7, decision D4 ruled D4b on 2026-07-28). Do not reintroduce derivation, and do not
@@ -312,7 +344,12 @@ These are the things a future agent is most likely to get wrong.
   profile declares the binding (spec section 6.5). Same treatment as `Poseidon-BN254`: registered,
   forbidden in issuance. Base64 is pinned to RFC 4648 section 4 with padding and no line wrapping,
   and that governs `BYTES` and `BLOB_REF` rather than the explicitly typed healthcert fields bound
-  as STRING. FHIR `base64Binary` remains unresolved between STRING and BYTES.
+  as STRING. **FHIR `base64Binary` is RULED BYTES over the decoded octets** (grade Strong,
+  2026-07-30), which makes the pinned base64 form an INPUT-ADMISSIBILITY condition rather than the
+  committed value: the octets are hashed, and a spelling outside the pinned form is rejected before
+  it is decoded. Both reference implementations decode at the record boundary now, each by a
+  different mechanism, and `roax_ref.mjs` deliberately does NOT use `Buffer.from(text, "base64")`,
+  which is permissive and accepts all four forms section 6.3 requires rejecting.
 
 - **The vaccination healthcert's `fhirBundle.entry[]` is flattened pseudo-FHIR**, not a real FHIR
   Bundle. Normalizing it to the genuine `entry[i].resource` shape changes every path and therefore
@@ -385,13 +422,15 @@ not mean the gate failed. `corpus/README.md` owns that status table. Things to k
 - **Python's `$` also matches before a trailing newline; JavaScript's does not.** Anchor every
   grammar in section 6.2 with `\A`/`\Z`. The first draft of implementation A accepted `"1.0\n"` and
   canonicalized it. `reject-decimal-trailing-newline` pins it.
-- **Four classes are deliberately short, and each is short for a reason recorded in
-  `corpus/README.md`: 10, 13, 18 and 19.** Class 10 is 1 of 3 records and class 13 is half. Class 18
-  carries the four identity rows and not the registry rows, which need an anchoring registry that
-  specification section 2.2 leaves undesigned. Class 19 carries the value site and not the key site,
-  which is gated on decision D14. Do not fill any of them in without reading why they are short -
-  building the unbuilt half of 18 or 19 decides an open question from inside a data file, which
-  `docs/conformance-corpus.md` section 1.2 forbids.
+- **Three classes are deliberately short, and each is short for a reason recorded in
+  `corpus/README.md`: 10, 13 and 18.** Class 10 is 2 of 3 records - PDT stays uncommittable on its
+  20 endorsed-sample pairs, which need a versioned composition profile nobody has ruled - and class
+  13 is half. Class 18 carries the four identity rows and not the registry rows, which need an
+  anchoring registry that specification section 2.2 leaves undesigned. Do not fill either in without
+  reading why it is short - building the unbuilt half of 18 decides an open question from inside a
+  data file, which `docs/conformance-corpus.md` section 1.2 forbids.
+  **Class 19 is complete now.** It carried the value site alone while D14 was open, and its key site
+  was built under ruled D14a on 2026-07-30; `build_corpus.py` fails if either site is missing.
 - **Class 9 is stale against its corrected requirement.**
   The committed `negativeProof` rows use the honest tree size and carry only a supplied leaf hash, so they cannot exercise the forged-size internal-node attack through full disclosed-copy verification as `docs/conformance-corpus.md` class 9 now requires.
   `corpus/README.md` records the exact missing row and carrier gap.
@@ -420,26 +459,28 @@ not mean the gate failed. `corpus/README.md` owns that status table. Things to k
 `docs/decisions.md` holds four decisions belonging to the project owner (A, B, C, D), plus the ten
 engineering ones, plus D14 in part 2a.
 
-**Three are still open. Two are the owner's - A and C - and the third, D14, is not.**
+**Two are still open, and both are the owner's - A and C.**
 B was ruled earlier - both hash families are first-class and selectable per record - and what stays open under it is the `Poseidon-BN254` parameterization.
 D was ruled on 2026-07-29 to five independent, corpus-enforced libraries.
 **The ten engineering decisions D3 through D13 were ruled on 2026-07-28** and the specification is written on those rulings rather than on a recommendation; see specification section 15 for the table of where each lands.
 Eight confirmed what the specification already said.
 Two changed it: D4 to independent per-leaf salts, and D9 gaining the `BLOB_REF` binding.
 
-**D14 asks whether the type-map LOOKUP matches over an NFC-normalized key or over the bytes as
-received, and it is open** (`docs/decisions.md` part 2a).
-The specification pins NFC for hashing and is silent on the lookup that precedes it, so a decomposed
-key is refused by the fail-closed rule while its composed twin commits and the two render
-identically.
-The matchers in this tree already disagree: `docs/type-maps.md` section 3 step 2 requires the
-published DFA to normalize, and the display-pattern matchers of `corpus/tools/roax_ref.py`,
-`corpus/tools/roax_ref.mjs`, `src/typemap.ts` and `python/src/roax_canon/typemap.py` compare raw.
-Adding an `nfc()` call to either side, or removing the one in the DFA's stated semantics, rules D14
-silently - so do not, and note that the synthetic map carries the Kelvin key under both spellings
-precisely so no committed vector depends on the answer.
+**D14 asked whether the type-map LOOKUP matches over an NFC-normalized key or over the bytes as
+received, and it was RULED D14a, NORMALIZE, on 2026-07-30** (`docs/decisions.md` part 2a,
+specification section 4.2, `docs/type-maps.md` section 3.1).
+An earlier version of this file told you not to add an `nfc()` call to a matcher. **That instruction
+is superseded and the opposite is now true:** every matcher in this tree normalizes both the pattern
+token and the segment key, and removing one of those calls unrules a decision.
+The sites are `corpus/tools/roax_ref.py`, `corpus/tools/roax_ref.mjs`, `src/typemap.ts`,
+`python/src/roax_canon/typemap.py`, `rust/src/type_map.rs` and the legacy adapter in
+`rust/tests/conformance_corpus.rs`.
+The Kelvin workaround in the synthetic map is gone, and two committed vectors now fail closed under
+raw matching, so the corpus catches a regression rather than tolerating it.
+Rust's `LookupKeyMode`, `TypeResolver::ensure_lookup_decision_independent` and
+`Error::LookupNormalizationUndecided` were deleted with the ruling; do not reintroduce a mode enum.
 
-**Do not resolve A, C or D14 in code or prose without an explicit ruling**, and if one is ruled, update `docs/decisions.md` in the same change rather than only the specification.
+**Do not resolve A or C in code or prose without an explicit ruling**, and if one is ruled, update `docs/decisions.md` in the same change rather than only the specification.
 A decision that looks settled in the spec but is still marked OPEN in the decisions document is worse than either.
 Part 1's A and C sections are the owner's and are not edited by ruling work elsewhere in the document.
 
@@ -467,6 +508,11 @@ That rule was structural in the corpus schema and prose-only here until it was n
 The same-change rule in specification section 1.1 and `docs/conformance-corpus.md` section 1.1 is why: a canonicalization change lands with the vectors that assert it, and leaving the deleted derivation expressible in the file that governs the artifact would have left the corpus implementing a construction the specification no longer has.
 So what still makes the corpus successor a MAJOR bump is the type-map binding alone: it requires the exact artifact identity on the type-map and record vectors, which the committed corpus does not carry.
 Do not tighten the 1.0 files any further without rebuilding what they govern in the same change.
+Both corpus schemas gained `rejectVector.recordType` on 2026-07-30, and that is a WIDENING rather
+than a tightening: a reject vector carrying it is a whole-record rejection flattened through that
+profile's committed map, which is the only shape that can reach the rulings stated as rejections
+rather than as tags. The input-shape constraint is stated structurally, and `corpus/README.md` says
+why a permissive stand-in map would make those vectors unfalsifiable.
 The schema version is not the canonicalization version - both envelope schemas pin `canon` to `ROAX-CANON/1`.
 
 Five things to know if you touch them:

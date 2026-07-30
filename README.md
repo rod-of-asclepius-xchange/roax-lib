@@ -19,7 +19,7 @@ The Go, Swift and Kotlin libraries have not been added.
 |---|---|
 | [`src/README.md`](src/README.md) | The TypeScript library: what it is, how to run it, and the four traps JavaScript sets for this design. |
 | [`docs/typescript-implementation-findings.md`](docs/typescript-implementation-findings.md) | **Where that independent build disagreed with the corpus, and where the specification admitted two honest readings.** Worth more than the code. |
-| [`docs/decisions.md`](docs/decisions.md) | **The decisions, ruled and open, each with its reasoning.** Three are still open: A and C belong to the project owner, and D14 was identified afterwards while building a conformance vector. Start here if you are reviewing rather than implementing. |
+| [`docs/decisions.md`](docs/decisions.md) | **The decisions, ruled and open, each with its reasoning.** Two are still open, A and C, and both belong to the project owner. Start here if you are reviewing rather than implementing. |
 | [`docs/spec/roax-canon-1.md`](docs/spec/roax-canon-1.md) | The protocol. Precise enough to implement from. Section 2 says what it does not solve; section 14 reconciles it against dogtag. |
 | [`docs/profiles/`](docs/profiles/) | One document per record family, because the four families do **not** share one concrete object. |
 | [`docs/type-maps.md`](docs/type-maps.md) | The published type-map artifacts, exact coverage, unresolved schema gaps and issuer extension lifecycle. |
@@ -74,9 +74,17 @@ defined without being selected by any version-1 profile. Specification section 1
 ruling lands, and `docs/decisions.md` part 2 gives every one of them with its reasoning, so any of
 them can be overturned on the reasoning rather than on authority.
 
-**One further question was identified after those rulings and is open: D14** - whether the type-map
-lookup matches over an NFC-normalized key or over the bytes as received. It belongs to nobody in
-particular and is in `docs/decisions.md` part 2a.
+**One further question was identified after those rulings and was ruled on 2026-07-30: D14** -
+whether the type-map lookup matches over an NFC-normalized key or over the bytes as received. It is
+ruled D14a, normalize, because section 11.2's rule is "check the bytes you commit" and a raw
+comparison would let two records that render identically diverge, with one refused outright. It is in
+`docs/decisions.md` part 2a.
+
+**The five undetermined type bindings were ruled in the same change**, each with an evidence grade:
+vaccination `dose` INTEGER plus a positive-integer profile narrowing, `expiryDateTime` STRING, FHIR
+`base64Binary` BYTES over the decoded octets, FHIR `Narrative.div` STRING over the escaped XHTML
+text, and FHIR primitive-array null placeholders rejected rather than bound. `docs/type-maps.md`
+section 1 holds the evidence and states which rulings are operative where.
 
 ## Repository layout
 

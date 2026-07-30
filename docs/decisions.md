@@ -1,8 +1,8 @@
 # Decisions: settled, open, and the reasoning
 
-**Status:** three decisions are genuinely open.
-Two are in Part 1 and belong to the project owner - **A** and **C**.
-The third, **D14**, was identified on 2026-07-29 while building a conformance vector and is in Part 2a; it is open because nobody has ruled it, not because it is awaiting the owner specifically.
+**Status:** two decisions are genuinely open.
+Both are in Part 1 and belong to the project owner - **A** and **C**.
+**D14** was identified on 2026-07-29 while building a conformance vector and was ruled D14a on 2026-07-30; it is in Part 2a with its reasoning.
 Everything else has been ruled.
 **Decision B** was ruled earlier, with the residual open questions named inside it.
 **Decision D** was ruled Da on 2026-07-29: five independent, corpus-enforced libraries.
@@ -17,8 +17,8 @@ open**, so that it is concrete and readable rather than hedged into uselessness.
 choice, not a ruling. A specification that hides a live decision behind confident prose is worse than
 one that names it, so each is named here with its alternatives and their consequences.
 
-`docs/conformance-corpus.md` class 19 records the vector that would settle D14 and states why it is
-deliberately not built.
+`docs/conformance-corpus.md` class 19 defines the vector that settles D14, and it is built now that
+D14 is ruled; `corpus/README.md` records the two vectors that discriminate the two readings.
 
 **A decision that looks settled in the specification but is still marked OPEN here is worse than
 either**, so the two documents move together in one change. That warning is in this document because
@@ -668,53 +668,47 @@ up moving at the speed of the slower one.
 
 ---
 
-## Part 2a - Newly identified, and genuinely open
+## Part 2a - Newly identified after the engineering rulings, and now ruled
 
-### D14 - Does type-map matching normalize the key it matches on? **OPEN**
+### D14 - Does type-map matching normalize the key it matches on? **RULED 2026-07-30: D14a, normalize, on both sides of the comparison**
 
-**Identified on 2026-07-29 while building the conformance vector decision D12's ruling required.**
-It is recorded here rather than settled in passing, because settling it changes matching in both
-reference implementations and in the type-map tooling at once.
-It also reaches the Rust library, which takes neither side: `LookupKeyMode` has no default, and the construction and verification paths reject a key whose binding differs between the two readings rather than choosing one (`rust/README.md`).
-So a ruling retires that guard as well as changing the matchers.
-It reaches the TypeScript and Python libraries too, and each of those compares a display pattern against a segment key raw today, with no `nfc()` on either side and a note at the site saying that adding one would rule D14 silently (`src/typemap.ts:182-191`; `python/src/roax_canon/typemap.py:25-33` and `:195`).
-That is a statement of what those two do while the decision is open rather than a reading of it, and neither exposes a switch, so a ruling lands in both of them: as an edit under D14a and as specified behaviour under D14b.
+**Identified on 2026-07-29 while building the conformance vector decision D12's ruling required, and ruled the next day.**
+It was recorded here rather than settled in passing because settling it changes matching in both reference implementations, in the type-map tooling and in all three libraries at once, and a tree where one matcher normalizes and the other does not is worse than either consistent answer.
 
-**Written into the spec:** nothing. Specification section 6.1 pins NFC for **hashing**, and section
-4.2 requires an uncovered path to fail closed. Neither says whether the type-map **lookup** that
-runs *before* hashing compares a normalized key or the bytes as received.
-
-**Why it is not academic.** Both reference implementations currently match **raw**, with no `nfc()`
-on either the pattern token or the segment key (`corpus/tools/roax_ref.py` `_match_from`;
-`corpus/tools/roax_ref.mjs` `matchPattern`). So a record whose key is written decomposed fails the
-lookup and is **refused outright by the fail-closed rule**, while the identical record written
-composed resolves and commits. The two render identically to a human.
-
-**That is the invisible-divergence failure D12 exists to prevent, arriving one layer up.** D12
-reasoned that a record passing through a normalizing form field must not get a different root; under
-raw matching it does not get a different root, it gets rejected instead, and the rejection is just as
-invisible to whoever typed the value.
-
-**The evidence that this is unresolved rather than merely undocumented.** The synthetic type map in
-`corpus/tools/synthetic_records.py` carries the Kelvin key under **both** spellings, so
-`record-guard-kelvin-key` resolves identically under either reading. That is a workaround standing
-in for a decision, and it is why no existing vector settles the question.
-`corpus/README.md` records the same gap in its specification-reading notes.
-
-**The matchers in this repository already answer it differently, and that is the substance of the question rather than a detail of it.**
-`docs/type-maps.md` section 3 step 2 requires a conforming resolver of the published DFA artifacts to NFC-normalize a KEY segment before taking its transition, so those artifacts are already described as reading D14a.
-The corpus reference implementations are display-pattern matchers over `corpus/type-maps/` rather than the DFA, and they compare raw, as above.
-Neither document is wrong about the thing it owns, and neither is the specification, which says nothing.
-What is open is which reading the specification states for both, and until it does, the cost line below understates D14b: matching raw normatively would also change the resolver semantics `docs/type-maps.md` section 3 already publishes, not only leave the corpus matchers alone.
+**Written into the spec:** section 4.2 now states that the type-map lookup compares the NFC-normalized key.
+Section 6.1 already pinned NFC for hashing and section 4.2 already required an uncovered path to fail closed; what was missing was the lookup that runs *before* hashing, and that is what the ruling supplies.
 
 | Option | Consequence |
 |---|---|
-| **D14a. Match over NFC-normalized keys** | Follows specification section 11.2's general rule, "check the bytes you commit, not the bytes you received", and makes the two spellings behave identically end to end. Cost: every type map and both implementations change together, and a pattern authored in one form silently starts matching the other. |
-| **D14b. Match raw, and say so normatively** | No code changes. Cost: the divergence above becomes a specified behaviour rather than an accident, and every type map must enumerate every spelling it intends to accept - which is what the Kelvin workaround already does by hand. |
+| **D14a. Match over NFC-normalized keys** | **RULED.** Follows specification section 11.2's general rule, "check the bytes you commit, not the bytes you received", and makes the two spellings behave identically end to end. Cost: every type map and every implementation change together, and a pattern authored in one form also matches the other. |
+| **D14b. Match raw, and say so normatively** | Rejected. No code changes, but the divergence below becomes specified behaviour rather than an accident, every type map must enumerate every spelling it intends to accept, and the resolver semantics `docs/type-maps.md` section 3 already published would have had to be withdrawn. |
 
-**Not ruled here, and the conformance vector that would settle it is deliberately not built.**
-`docs/conformance-corpus.md` class 19 carries the **value** case only and says why the **key** case
-is absent: building it would decide this question rather than test a decided one.
+**The first reason: a raw comparison checks bytes no part of the record commits.**
+A STRING leaf commits `utf8(NFC(s))` under specification section 6.1, and an encoded KEY segment commits `NFC(key)` under section 5.1.
+The lookup was therefore the only place in the pipeline that would have decided admissibility on a spelling the root never records.
+Section 11.2's rule is exactly "check the bytes you commit", and matching raw is the one thing in the pipeline that did not.
+
+**The second reason, and it is what makes the first more than a preference: raw matching is the invisible divergence D12 was ruled to prevent, arriving one layer up.**
+Under raw matching a record whose key is written decomposed fails the lookup and is **refused outright by the fail-closed rule**, while the identical record written composed resolves and commits.
+The two render identically to a human.
+D12 reasoned that a record passing through a normalizing form field must not get a different root; under raw matching it does not get a different root, it gets rejected instead, and the rejection is just as invisible to whoever typed the value.
+So ruling D14b would have reintroduced at the type-map layer the precise hazard already ruled out at the leaf layer, which is not a coherent pair of rulings to hold at once.
+
+**What the ruling retired.**
+
+The Rust library took neither side while this was open: `LookupKeyMode` had no default and the construction and verification paths refused a key whose binding differed between the two readings.
+That guard existed to refuse a lookup whose answer depended on the open question, and with one reading there is nothing for it to refuse, so `LookupKeyMode`, `TypeResolver::ensure_lookup_decision_independent` and `Error::LookupNormalizationUndecided` are deleted rather than reduced to a single-variant enum, which would invite the other variant back.
+
+The corpus's synthetic type map carried the Kelvin key under **both** spellings so that `record-guard-kelvin-key` resolved under either reading.
+That was a workaround standing in for this decision, and it is removed: the map now declares the ASCII spelling alone, so that vector reaches its binding only through normalization and has become a discriminator.
+
+`docs/conformance-corpus.md` class 19 defines a key-site vector and it was deliberately unbuilt, because resolving a decomposed KEY through the type map would have settled this question from inside a data file.
+It is built now, and it tests a decided question rather than deciding one.
+
+**What was measured.**
+Rebuilding the committed corpus under D14a changed **zero** existing vectors and added one.
+Encoded paths already normalized every KEY segment, so the leaf bytes were always NFC and the ruling moves no root; a moved root would have been a bug rather than a rebuild.
+Under raw matching the two discriminating vectors both fail with `type-map-uncovered-path`.
 
 ---
 
@@ -743,7 +737,7 @@ Recorded so that nobody mistakes a gap for a conclusion.
 
 | Gap | Status |
 |---|---|
-| **Some reference-schema paths remain untyped.** | Four executable base maps and their issuer extension mechanism are published. The remaining gap is evidence, not machinery: vaccination `dose` and `expiryDateTime`, PDT's 20 endorsed-sample path-kind pairs, FHIR XHTML, `base64Binary` and null placeholders remain unbound and fail closed. `docs/type-maps.md` sections 1 and 2 give the evidence and exact coverage. |
+| **Some reference-schema paths remain untyped.** | **Mostly closed on 2026-07-30.** Five undetermined bindings were ruled with their evidence grades: vaccination `dose` INTEGER plus a positive-integer profile narrowing (Strong), `expiryDateTime` STRING by profile declaration (Moderate), FHIR `base64Binary` BYTES over the decoded octets (Strong), FHIR `Narrative.div` STRING over the escaped XHTML text (Decisive), and FHIR primitive-array null placeholders publishing no NULL binding and rejecting the record (Decisive). What remains open is PDT's 20 endorsed-sample path-kind pairs, which need a versioned composition profile rather than 20 authored bindings and have no ruling, so the PDT sample stays uncommittable. Two of the five rulings are operative in the corpus maps; the three FHIR rulings are not yet in the published artifacts because regeneration is blocked, which `docs/type-maps.md` section 1.6 states along with what the next change must do. |
 | **Kotlin/JVM literal-preserving JSON is unverified.** | Every other target language has a confirmed mechanism. Kotlin was not tested by any research leg. |
 | **The five reference implementations share one author.** | They do not share a JSON parser, number representation, Unicode API, map or sort. They do share one reading of the specification. Hence gate 3 in the corpus. |
 | **No character with version-dependent NFC has been identified.** | The Unicode pin is inferred from dogtag having found it necessary in code, not from an exhibited failing character. Conformance class 16 says so explicitly. |

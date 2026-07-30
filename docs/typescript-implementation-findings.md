@@ -222,13 +222,13 @@ demonstration, and this is the declaration.
 
 These were reached independently and agree with the readings `corpus/README.md` already records.
 Agreement reached separately is corroboration; it is not a second opinion on whether the
-specification is clear, and none of them is settled by a vector.
+specification is clear. None was settled by a vector when this was written; row 3 has since been ruled and is now pinned by two.
 
 | # | Ambiguity | Reading taken here | Why |
 |---|---|---|---|
 | 1 | Does the 1024-digit bound govern INTEGER as well as DECIMAL? Section 6.2 states it under *Canonical decimal* and its own justification counts "class 2's 40-digit integer" against it. | Applied to both. | An unbounded INTEGER is an unbounded allocation on hostile input. No vector discriminates. |
 | 2 | What does the bound count - the padded form, or the form after output-grammar normalization? | The padded form, BEFORE normalization. | The literal reading, and the memory-safe one. Under it `0e99999` is rejected; under the other it canonicalizes to `0`. No vector carries `0e99999`. Pinned at the edge by `1e1023` accepted and `1e1024` rejected. |
-| 3 | Does type-map LOOKUP match over an NFC-normalized key or over the bytes as received? This is decision D14 and it is OPEN. | Raw, with no `nfc()` on either side. | Adding one would rule D14 silently. The synthetic map carries the Kelvin key under both spellings so nothing depends on the answer. |
+| 3 | **RESOLVED.** Does type-map LOOKUP match over an NFC-normalized key or over the bytes as received? This was decision D14, and it was ruled **D14a, normalize, on 2026-07-30**. | NFC, on BOTH sides: `compilePattern` normalizes the pattern token and `matches` normalizes the segment key. | Specification section 4.2 now states it. This library compared RAW while the ambiguity stood, because adding an `nfc()` then would have ruled D14 silently and the synthetic map's two Kelvin spellings meant nothing depended on the answer. Both of those are gone: the duplicate spelling was removed and the class-19 key site was built, so two committed vectors now fail closed under raw matching. |
 | 4 | The type-map `pattern` field is display notation, so it cannot address a key containing `.`, `[` or `]` - keys section 5 deliberately admits. | An ambiguous pattern is REJECTED at map-compile time rather than guessed at. | A guess binds the wrong path silently. |
 
 One reading was taken that the corpus does not record: **`**` stands for one or more remaining
