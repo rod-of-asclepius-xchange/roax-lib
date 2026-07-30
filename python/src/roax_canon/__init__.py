@@ -35,6 +35,20 @@ CPython ships one table version per build and offers no way to select another.
 
 from __future__ import annotations
 
+import sys as _sys
+
+if _sys.version_info < (3, 10):
+    raise RuntimeError(
+        "roax-canon requires CPython 3.10 or later; this interpreter is "
+        f"{_sys.version_info.major}.{_sys.version_info.minor}."
+        " The package uses `dataclass(slots=True)` and the runtime `X | Y` union, both of"
+        " which are 3.10 features, so the submodule imports below would otherwise fail"
+        " with an unrelated TypeError. Rerun the documented commands naming a 3.10+"
+        " interpreter, for example `PYTHONPATH=python/src python3.13 -m unittest discover"
+        " -s python/tests -t python`. `python/pyproject.toml` declares the same floor as"
+        ' `requires-python = ">=3.10"`.'
+    )
+
 from .disclose import disclosed_copy, full_copy
 from .errors import (
     EnvelopeError,

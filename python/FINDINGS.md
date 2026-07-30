@@ -66,8 +66,8 @@ Confirmed from the fixtures rather than assumed: `corpus/fixtures/envelopes/guar
 `AGENTS.md` already records this and calls closing it corpus-rebuild work.
 It is repeated here only because it is the single thing that would silently break a reader who implemented section 11.2 as written and then ran the corpus: **every** record and envelope vector fails, on leaf count and on root.
 
-`roax_canon.reserved_leaves` models both structural sets and defaults to `RESERVED_V1`, because that is the set every committed artifact uses (`python/src/roax_canon/record.py:50-63` and `:89-113`).
-The package cannot issue, emit or verify envelope 2.0 yet: exact structured-path DFA artifact loading and content-ID reproduction are deliberately not implemented, so those operations reject with `type-map-rejected` rather than trusting the display-pattern corpus resolver by `recordType` (`python/src/roax_canon/record.py:242-252`; `python/src/roax_canon/disclose.py:47-56`; `python/src/roax_canon/verify.py:404-410`; specification section 4.2).
+`roax_canon.reserved_leaves` models both structural sets and defaults to `RESERVED_V1`, because that is the set every committed artifact uses (`python/src/roax_canon/record.py:50-65` and `:138-162`).
+The package cannot issue, emit or verify envelope 2.0 yet: exact structured-path DFA artifact loading and content-ID reproduction are deliberately not implemented, so those operations reject with `type-map-rejected` rather than trusting the display-pattern corpus resolver by `recordType` (`python/src/roax_canon/record.py:363-369`; `python/src/roax_canon/disclose.py:47-56`; `python/src/roax_canon/verify.py:514-520`; specification section 4.2).
 No committed vector exercises the structural 2.0 leaf set.
 
 ---

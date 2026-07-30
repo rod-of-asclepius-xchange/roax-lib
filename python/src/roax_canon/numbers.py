@@ -195,7 +195,11 @@ def canonical_decimal(text: str) -> str:
     if sign and not magnitude_is_zero:
         out = "-" + out
 
-    # A defect here would corrupt a root silently, so the output grammar is asserted
+    # A defect here would corrupt a root silently, so the output grammar is checked
     # rather than assumed. This is the same grammar the envelope schema pins.
-    assert DECIMAL_OUTPUT_GRAMMAR.match(out) is not None, out
+    if DECIMAL_OUTPUT_GRAMMAR.match(out) is None:
+        raise GrammarError(
+            ErrorCode.DECIMAL_GRAMMAR,
+            f"canonicalization produced a non-canonical DECIMAL {out!r} from {text!r}",
+        )
     return out

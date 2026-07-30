@@ -9,7 +9,8 @@ No network, no chain reads, no key management.
 Nothing here needs installing to run.
 `pyproject.toml` declares no runtime dependencies and the tests add none, so a bare CPython checkout runs both the unit suite and the corpus runner.
 
-Requires CPython 3.10 or later for the `X | Y` type syntax; developed and measured on 3.13.5.
+Requires CPython 3.10 or later for the runtime `X | Y` union and for `dataclass(slots=True)`; developed and measured on 3.13.5.
+Importing the package on an older interpreter raises a `RuntimeError` naming that floor rather than failing with an unrelated `TypeError` (`src/roax_canon/__init__.py:40-50`).
 
 ## Read this first
 
@@ -207,4 +208,4 @@ roax.verify_envelope(partial, config).reason     # 'ok'
 The structured-path DFA artifacts in `type-maps/`, content-ID reproduction, issuer extensions and any anchoring registry read.
 [`FINDINGS.md`](FINDINGS.md) item 13 states each with its reason.
 The short version: no committed corpus vector exercises them, and adding a large unexercised surface to a library whose acceptance criterion is byte-identical agreement on the corpus would be adding untested code, not coverage.
-Consequently `RESERVED_V2` is structural only: `reserved_leaves` can model the extra committed selector leaf, while issuance, envelope emission and verification reject with `type-map-rejected` until an artifact-aware resolver can reproduce and select the exact content ID (`src/roax_canon/record.py:53-63` and `:242-252`; `src/roax_canon/disclose.py:47-56`; `src/roax_canon/verify.py:404-410`; specification section 4.2).
+Consequently `RESERVED_V2` is structural only: `reserved_leaves` can model the extra committed selector leaf, while issuance, envelope emission and verification reject with `type-map-rejected` until an artifact-aware resolver can reproduce and select the exact content ID (`src/roax_canon/record.py:53-65` and `:363-369`; `src/roax_canon/disclose.py:47-56`; `src/roax_canon/verify.py:514-520`; specification section 4.2).
