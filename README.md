@@ -71,7 +71,7 @@ docs/type-maps.md   type-map coverage, gaps and issuer extensions
 docs/conformance-corpus.md
 schemas/            JSON Schemas
 type-maps/          immutable generated base maps and their registry
-tools/              type-map reproduction and integrity checks
+tools/              type-map reproduction and integrity checks, and the Markdown reflow check
 corpus/             the conformance corpus, its fixtures and its two reference implementations
 rust/               independent Rust implementation of ROAX-CANON/1
 src/                independent TypeScript implementation of ROAX-CANON/1
