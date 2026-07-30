@@ -64,7 +64,7 @@ class RunnerStatusTests(unittest.TestCase):
             )
             self.assertIn(
                 "RESULT: INCOMPLETE / NOT RUN "
-                "(734 assertions passed; 2 not run; 18/19 classes passed)",
+                "(736 assertions passed; 2 not run; 18/19 classes passed)",
                 result.stdout,
             )
             self.assertNotIn("RESULT: PASS", result.stdout)
@@ -101,7 +101,7 @@ class RunnerStatusTests(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "RESULT: FAIL " "(734 passed; 2 failed; 0 not run; 18/19 classes passed)",
+                "RESULT: FAIL " "(736 passed; 2 failed; 0 not run; 18/19 classes passed)",
                 result.stdout,
             )
             self.assertNotIn("Traceback", result.stdout + result.stderr)

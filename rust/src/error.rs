@@ -74,9 +74,6 @@ pub enum Error {
     #[error("type map has no binding for {path} observed as {kind:?}")]
     UnknownTypeBinding { path: Path, kind: JsonKind },
 
-    #[error("type-map lookup depends on open decision D14 at path {0}")]
-    LookupNormalizationUndecided(Path),
-
     #[error("invalid type-map artifact: {0}")]
     InvalidTypeMap(String),
 
@@ -178,7 +175,6 @@ impl Error {
             Self::SaltGeneration(_) => "salt-generation",
             Self::EmptyRecordContribution => "empty-record",
             Self::UnknownTypeBinding { .. } => "type-map-fail-closed",
-            Self::LookupNormalizationUndecided(_) => "decision-d14-open",
             Self::InvalidTypeMap(_) => "type-map-invalid",
             Self::TypeMapIdMismatch => "type-map-id-mismatch",
             Self::TypeMapIdentityMismatch => "type-map-identity-mismatch",

@@ -22,15 +22,19 @@ building an artifact loader would add a large unexercised surface to a library w
 acceptance criterion is byte-identical agreement on the corpus.
 :class:`TypeResolver` is the seam a DFA resolver drops into unchanged.
 
-**Decision D14 is open and this module must not settle it.**
-Whether the lookup matches over an NFC-normalized key or over the bytes as received is
-unresolved (`docs/decisions.md` part 2a).
-Both existing reference implementations compare **raw**, and the corpus's synthetic map
-carries the Kelvin key under both spellings precisely so that no vector depends on the
-answer.
-:meth:`DisplayPatternTypeMap.resolve` therefore compares raw, with no ``nfc()`` on either
-side.
-Adding one here would rule D14 silently.
+**Decision D14 is ruled D14a: the lookup matches over NFC-normalized keys, on both sides.**
+Ruled on 2026-07-30 (`docs/decisions.md` part 2a).
+:func:`parse_pattern` normalizes each pattern token and :func:`_match` normalizes each
+segment key, so a key written decomposed resolves to the same binding as its composed twin.
+
+Two reasons, and the second is what makes the first more than a preference.
+Specification section 11.2's rule is "check the bytes you commit, not the bytes you
+received", and a STRING leaf commits ``utf8(NFC(s))`` while an encoded KEY segment commits
+``NFC(key)`` (section 5.1), so a raw comparison checks bytes no part of the record commits.
+And under a raw comparison two records that **render identically** diverge: the composed
+spelling resolves and commits while the decomposed one is refused outright by the
+fail-closed rule of section 4.2.
+That is the invisible divergence decision D12 was ruled to prevent, arriving one layer up.
 """
 
 from __future__ import annotations
@@ -41,6 +45,7 @@ from typing import Any, Protocol, Sequence
 
 from .errors import ErrorCode, RoaxError, TypeResolutionError
 from .path import Index, Key, Segment, display_path
+from .text import nfc
 
 __all__ = [
     "TypeResolver",
@@ -138,6 +143,9 @@ def parse_pattern(pattern: str) -> tuple[PatternToken, ...]:
     The pattern language cannot address a key containing ``.``, ``[`` or ``]``, which
     specification section 5 deliberately admits with no rejection rule, so ``a.**`` is how
     such a key is reached.
+
+    A key token is NFC-normalized here under ruled decision D14a, so a pattern authored in
+    either spelling denotes the same path language.
     """
     if not isinstance(pattern, str) or pattern == "":
         raise RoaxError(ErrorCode.TYPE_MAP_REJECTED, "type-map pattern must be a non-empty string")
@@ -164,7 +172,7 @@ def parse_pattern(pattern: str) -> tuple[PatternToken, ...]:
                 ErrorCode.TYPE_MAP_REJECTED,
                 f"ambiguous type-map pattern component {component!r} in {pattern!r}",
             )
-        tokens.append(KeyToken(name))
+        tokens.append(KeyToken(nfc(name, where="type-map pattern token")))
         tokens.extend(IndexToken() for _ in range(len(m.group("indices")) // 3))
     return tuple(tokens)
 
@@ -175,6 +183,9 @@ def _match(tokens: Sequence[PatternToken], segments: Sequence[Segment]) -> bool:
     Specification section 5.2 forbids reasoning over display paths; the pattern is
     authored in display notation for readability and is compiled to tokens before it
     touches a path.
+
+    ``segments`` arrives already NFC-normalized from :meth:`DisplayPatternTypeMap.resolve`,
+    so the comparison below is normalized on both sides under ruled decision D14a.
     """
     if not tokens:
         return not segments
@@ -192,7 +203,6 @@ def _match(tokens: Sequence[PatternToken], segments: Sequence[Segment]) -> bool:
         return False
     seg = segments[0]
     if isinstance(head, KeyToken):
-        # RAW comparison. Decision D14 is open; see the module docstring.
         if not isinstance(seg, Key) or seg.value != head.name:
             return False
     else:
@@ -371,8 +381,17 @@ class DisplayPatternTypeMap:
 
         Fails closed for an uncovered path AND for a covered path with no output at the
         observed kind, which are the two cases specification section 4.2 names.
+
+        Every KEY segment is NFC-normalized once here rather than inside the per-entry
+        comparison, under ruled decision D14a.
+        Once, because that gives the normalization one rejection point for an unpaired
+        surrogate rather than one per candidate entry, and because a pattern token was
+        already normalized at parse time so the comparison is normalized on both sides.
         """
-        segments = tuple(segments)
+        segments = tuple(
+            Key(nfc(seg.value, where="type-map lookup key")) if isinstance(seg, Key) else seg
+            for seg in segments
+        )
         for entry in self.entries:
             if entry.json_kind is not None and entry.json_kind != kind:
                 continue

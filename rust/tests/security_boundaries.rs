@@ -25,14 +25,6 @@ impl TypeResolver for StringProfile {
             })
         }
     }
-
-    fn ensure_lookup_decision_independent(
-        &self,
-        _path: &Path,
-        _kind: JsonKind,
-    ) -> roax_canon::Result<()> {
-        Ok(())
-    }
 }
 
 impl Profile for StringProfile {
@@ -72,14 +64,6 @@ impl SchemaValidator for ReservedFloorProfile {
 impl TypeResolver for ReservedFloorProfile {
     fn resolve(&self, path: &Path, kind: JsonKind) -> roax_canon::Result<TypeTag> {
         StringProfile.resolve(path, kind)
-    }
-
-    fn ensure_lookup_decision_independent(
-        &self,
-        path: &Path,
-        kind: JsonKind,
-    ) -> roax_canon::Result<()> {
-        StringProfile.ensure_lookup_decision_independent(path, kind)
     }
 }
 

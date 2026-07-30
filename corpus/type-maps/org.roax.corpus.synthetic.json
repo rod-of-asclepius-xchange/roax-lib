@@ -28,6 +28,12 @@
       "source": "corpus fixture: authored declaration, not derived from any reference schema"
     },
     {
+      "pattern": "é",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
       "pattern": "fhirBundle.resourceType",
       "jsonKind": "string",
       "tag": 2,
@@ -77,12 +83,6 @@
     },
     {
       "pattern": "a.**",
-      "jsonKind": "string",
-      "tag": 2,
-      "source": "corpus fixture: authored declaration, not derived from any reference schema"
-    },
-    {
-      "pattern": "Kelvin",
       "jsonKind": "string",
       "tag": 2,
       "source": "corpus fixture: authored declaration, not derived from any reference schema"

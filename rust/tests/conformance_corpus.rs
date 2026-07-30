@@ -245,15 +245,6 @@ impl TypeResolver for LegacyTypeMap {
         }
         Ok(first.tag)
     }
-
-    fn ensure_lookup_decision_independent(
-        &self,
-        _path: &Path,
-        _kind: JsonKind,
-    ) -> roax_canon::Result<()> {
-        // The 1.0 corpus carries both Kelvin spellings and no key-root vector.
-        Ok(())
-    }
 }
 
 fn compile_legacy_pattern(pattern: &str) -> Result<Vec<LegacyPatternSegment>, String> {
@@ -332,15 +323,6 @@ impl TypeResolver for DisclosureResolver {
                 path: path.clone(),
                 kind,
             })
-    }
-
-    fn ensure_lookup_decision_independent(
-        &self,
-        _path: &Path,
-        _kind: JsonKind,
-    ) -> roax_canon::Result<()> {
-        // This adapter is built from already-disclosed structured paths.
-        Ok(())
     }
 }
 

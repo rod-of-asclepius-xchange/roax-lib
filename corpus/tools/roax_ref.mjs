@@ -557,6 +557,11 @@ export function buildTree(hashAlg, record, typeMap, salts, identity) {
 // Section 4. Keyed by (path pattern, observed JSON kind); first matching entry wins. Unknown
 // paths fail closed: there is no default tag and no fallback to the observed JSON kind, because
 // either would let two libraries with different maps produce different roots silently.
+//
+// The lookup matches over NFC-normalized keys on BOTH sides (section 4.2, decision D14 ruled
+// D14a on 2026-07-30): `parsePattern` normalizes each pattern token and `matchPattern`
+// normalizes each segment key. Section 11.2's rule is "check the bytes you commit", and a
+// STRING leaf commits its NFC form, so matching raw would check bytes the record never commits.
 export class TypeMap {
   constructor(doc) {
     this.doc = doc;
@@ -578,6 +583,9 @@ export class TypeMap {
 // `*` matches one array index, `**` matches any run of segments. Because the pattern is written
 // in display notation it cannot address a key containing `.`, `[` or `]`, which section 5
 // deliberately admits; those are rejected here rather than silently mis-parsed.
+//
+// A key token is NFC-normalized here under ruled decision D14a, so a pattern authored in either
+// spelling denotes the same path language.
 export function parsePattern(pattern) {
   const out = [];
   let i = 0;
@@ -598,7 +606,7 @@ export function parsePattern(pattern) {
     const token = pattern.slice(i, j);
     if (token === "**") out.push({ kind: "any", value: null });
     else if (token === "" || token.includes("]")) throw new RoaxError("type-map-pattern", pattern);
-    else out.push({ kind: "key", value: token });
+    else out.push({ kind: "key", value: nfc(token) });
     i = j;
     if (pattern[i] === ".") i++;
   }
@@ -616,7 +624,11 @@ export function matchPattern(pattern, segments) {
       if (si >= segments.length) return false;
       const seg = segments[si];
       if (kind === "key") {
-        if (!Object.prototype.hasOwnProperty.call(seg, "key") || seg.key !== value) return false;
+        // Ruled decision D14a: compare the NFC-normalized key, which is the key the leaf
+        // actually commits (section 11.2), rather than the bytes as received.
+        if (!Object.prototype.hasOwnProperty.call(seg, "key") || nfc(seg.key) !== value) {
+          return false;
+        }
       } else {
         if (!Object.prototype.hasOwnProperty.call(seg, "index")) return false;
         if (value !== null && seg.index !== value) return false;
