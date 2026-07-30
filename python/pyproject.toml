@@ -1,11 +1,12 @@
 # Packaging metadata for the Python implementation of ROAX-CANON/1.
 #
 # This manifest is scoped to `python/` deliberately, as `rust/Cargo.toml` is to `rust/`.
-# The repository root carries none and still should not, because a manifest there would
-# read as the beginning of a shared library. The project owner ruled for five independent
-# builds on 2026-07-29 (`docs/decisions.md`, decision D), so a per-language manifest is
-# correct; nothing here makes `corpus/tools/` installable, and those two files remain
-# corpus tooling rather than roax-lib.
+# The root `package.json` is the TypeScript library's own manifest rather than a shared one
+# (`AGENTS.md`, "Validating the schemas"), so no manifest in this repository describes a
+# shared library. The project owner ruled for five independent builds on 2026-07-29
+# (`docs/decisions.md`, decision D), so a per-language manifest is correct; nothing here
+# makes `corpus/tools/` installable, and those two files remain corpus tooling rather than
+# roax-lib.
 #
 # There are NO runtime dependencies and there will not be any. Every hazard this library
 # exists to close is in the standard library's own defaults, so a dependency that wrapped

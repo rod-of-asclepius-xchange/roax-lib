@@ -33,8 +33,9 @@ for cross-checking, add another single-file one.
 **`package.json` and `tsconfig.json` now exist, and an earlier version of this file gave their
 absence as a rule.** That rule was "a TypeScript package here would read as the beginning of a
 library", and it is superseded because the library is now deliberate rather than accidental. It is
-superseded **only for the two libraries that exist**, Rust and TypeScript: adding a `go.mod`, a
-`Package.swift` or a Gradle build is still the thing not to do without an instruction. The package
+superseded **only for the three libraries that exist**, whose manifests are `rust/Cargo.toml`, the
+root `package.json` and `python/pyproject.toml`: adding a `go.mod`, a `Package.swift` or a Gradle
+build is still the thing not to do without an instruction. The package
 is zero-dependency at
 runtime - `node:crypto` supplies SHA-256 and the CSPRNG - and TypeScript plus `@types/node` are the
 only devDependencies. Ajv is still installed OUTSIDE the tree and named by `ROAX_AJV`, as the
