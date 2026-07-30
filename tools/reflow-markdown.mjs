@@ -12,6 +12,11 @@
 //   node tools/reflow-markdown.mjs --verify-render # additionally compare rendered HTML
 //   node tools/reflow-markdown.mjs --line-map out.json
 //
+// Exit codes: 0 every file conforms, 1 a file would change, was refused, or rendered differently,
+// 2 NOT RUN because an optional dependency is absent, 64 EX_USAGE for a usage error such as an
+// unrecognised flag. A caller honouring this repository's NOT RUN convention may continue past 2,
+// which is exactly why a usage error must not share it.
+//
 // It is zero-dependency for everything except --verify-render, which needs markdown-it installed
 // OUTSIDE this tree and named by ROAX_MARKDOWN_IT, exactly as tools/check-type-maps.mjs takes Ajv
 // from ROAX_AJV. A missing renderer is reported NOT RUN and exits 2, which is neither a pass nor a
@@ -705,6 +710,11 @@ function normalizeHtml(html) {
     .trim();
 }
 
+// The conventional EX_USAGE. Kept distinct from 2, which means NOT RUN because an optional
+// dependency was absent and which a caller following corpus/tools/run.sh's convention may continue
+// past: sharing the two would let that caller walk straight through a mistyped flag.
+const EX_USAGE = 64;
+
 const KNOWN_FLAGS = new Set([
   '--self-test',
   '--write',
@@ -889,13 +899,13 @@ function main(argv) {
   if (unknown.length > 0) {
     for (const flag of unknown) console.log(`REJECTED unknown flag ${flag}`);
     console.log(`         known flags: ${[...KNOWN_FLAGS].join(' ')}`);
-    return 2;
+    return EX_USAGE;
   }
   // `--line-map` takes its path as the next argument, so a missing or flag-shaped one would leave
   // the map unwritten just as quietly.
   if (mapIndex >= 0 && (mapPath === undefined || mapPath.startsWith('--'))) {
     console.log('REJECTED --line-map needs a path argument');
-    return 2;
+    return EX_USAGE;
   }
 
   if (flags.has('--self-test')) return runSelfTest();

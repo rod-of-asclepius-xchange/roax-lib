@@ -323,11 +323,13 @@ Things to know:
 - In long Markdown, put each full sentence on its own line.
   It keeps diffs readable when a single sentence changes.
   **Every Markdown file in the tree now holds to this**, measured at zero prose lines carrying more than one sentence, against 934 before the tree was reflowed; code blocks, tables and headings are excluded from that measure because a line of code and a table row are not sentences.
-  The zero was re-measured by a scan written independently of the tool's own sentence splitter, since a count produced by the splitter that made the split proves only internal consistency.
+  That count comes from the same sentence splitter that made the split, so it demonstrates internal consistency and idempotence rather than independent correctness.
+  The independent evidence is `node tools/reflow-markdown.mjs --verify-render`, which compares the rendered HTML before and after each reflow, so reproducing the measurement means running it over the pre-reflow baseline rather than over the conforming tree, where every file is compared with itself.
   An earlier version of this section described the convention as a target that the repository did not yet meet, and it was true when written.
   `tools/reflow-markdown.mjs` is the executable form of the rule rather than a description of it, so what gets applied is readable rather than reconstructed from a diff.
   Run `node tools/reflow-markdown.mjs` to check and `--write` to apply, `--self-test` for the sentence-splitter cases, and `--verify-render` to additionally compare rendered HTML before and after.
   It is zero-dependency except for `--verify-render`, which takes markdown-it 14 from `ROAX_MARKDOWN_IT` outside the tree exactly as the schema tooling takes Ajv 8 from `ROAX_AJV`, and reports NOT RUN with exit 2 when it is absent.
+  A usage error exits 64 rather than 2, so a caller that continues past NOT RUN does not also continue past a mistyped flag.
   The reflow was verified against markdown-it 14.3.0, so name the major version when you re-run it: a later one could move the comparison baseline without saying so.
   It fails closed on any construct it does not model rather than guessing at one, and a second run is a no-op, so it does not churn future diffs.
   **One line is exempt from the join half of the rule: a metadata field, whose content opens with a bold label ending in a colon, as `**Status:**` does.**
