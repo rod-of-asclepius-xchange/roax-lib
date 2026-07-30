@@ -19,6 +19,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import build_type_maps  # noqa: E402
+import profile_rules  # noqa: E402
 import roax_ref as ref  # noqa: E402
 from corpus_plan import ISSUER_ID, ISSUER_KEY_ID  # noqa: E402
 import salt_sets  # noqa: E402
@@ -134,6 +135,11 @@ def build_record_vectors(references):
         try:
             identity = (record_type, profile["schemaVersion"], record_id, ISSUER_ID)
             ordered = ref.ordered_leaves(record, type_map, *identity)
+            # Specification section 4.2 step 1, and this build is the issuer. A declared profile
+            # value rule is checked before any salt is drawn or any root computed, so a record
+            # violating one is refused rather than committed. See profile_rules for why the rule
+            # lives there and not in the canonicalization layer (ruled decision D13a).
+            profile_rules.check_record(record_type, ordered)
             salts = ref.salt_set_from_document(_salt_doc(name_no_key, ordered), ordered)
             root, leaves, _salts, _hashes = ref.build_tree(
                 "SHA-256", record, type_map, salts, *identity
@@ -147,6 +153,15 @@ def build_record_vectors(references):
                 f"The unbound paths are class 11 fail-closed vectors instead."
             )
             continue
+        except profile_rules.ProfileRuleError as exc:
+            # NOT an omission note. An unbound path is a gap in the schema; a shipped sample
+            # violating a rule its own profile declares is a conflict between the ruling and the
+            # sample, and quietly dropping the vector would hide it.
+            raise SystemExit(
+                f"class 10 FAILED for {record_type}: the shipped sample violates profile value "
+                f"rule {exc.rule_id} at {exc.path} ({exc.detail}). Either the ruling or the "
+                f"profile declaration is wrong, and that is a decision rather than a build fix."
+            ) from exc
 
         vectors.append({
             "name": name_no_key,
@@ -169,6 +184,7 @@ def build_record_vectors(references):
         name_with_key = f"record-{record_type}-with-key-id"
         identity2 = (record_type, profile["schemaVersion"], record_id, ISSUER_ID, ISSUER_KEY_ID)
         ordered2 = ref.ordered_leaves(record, type_map, *identity2)
+        profile_rules.check_record(record_type, ordered2)
         salts2 = ref.salt_set_from_document(_salt_doc(name_with_key, ordered2), ordered2)
         root2, leaves2, _s2, _h2 = ref.build_tree(
             "SHA-256", record, type_map, salts2, *identity2

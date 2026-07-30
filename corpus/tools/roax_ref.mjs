@@ -117,6 +117,61 @@ export function nfc(s) {
   return s.normalize("NFC");
 }
 
+// Section 6.3. Decode base64 in the ONE form ROAX-CANON/1 pins, or reject.
+//
+// RFC 4648 section 4: the standard alphabet, with padding, and no line wrapping. Four things are
+// refused - the URL-safe alphabet of RFC 4648 section 5, absent or excess padding, any character
+// outside the alphabet including a line break, and a final quantum whose UNUSED BITS ARE NON-ZERO.
+// RFC 4648 section 3.5 names that last case and it matters because two different strings otherwise
+// decode to the same bytes, so two implementations can disagree about whether the record is
+// admissible at all.
+//
+// DELIBERATELY NOT `Buffer.from(text, "base64")`. That is the trap on this platform: Node's base64
+// decoder is permissive by design - it ignores characters outside the alphabet, accepts missing
+// padding, and silently discards non-zero pad bits - so it accepts every one of the four forms the
+// specification requires an implementation to reject. This decodes by hand from the alphabet index
+// instead, which also makes the mechanism genuinely different from implementation A's regular
+// expression plus an explicit pad-bit test.
+const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+export function decodeCanonicalBase64(text) {
+  if (typeof text !== "string") throw new RoaxError("base64-not-canonical", String(text));
+  if (text.length % 4 !== 0) throw new RoaxError("base64-not-canonical", text);
+
+  let padding = 0;
+  while (padding < 2 && text.endsWith("=".repeat(padding + 1))) padding++;
+  const body = padding === 0 ? text : text.slice(0, -padding);
+  // A `=` anywhere but in the final quantum's tail is excess or misplaced padding.
+  if (body.includes("=")) throw new RoaxError("base64-not-canonical", text);
+  // Two `=` need two alphabet characters before them and one needs three, so a quantum of
+  // padding alone is not a valid final quantum.
+  if (padding !== 0 && body.length % 4 === 0) throw new RoaxError("base64-not-canonical", text);
+
+  const sextets = [];
+  for (const character of body) {
+    const value = BASE64_ALPHABET.indexOf(character);
+    if (value < 0) throw new RoaxError("base64-not-canonical", text);
+    sextets.push(value);
+  }
+
+  // Each character carries 6 bits. With one `=` the final quantum keeps 16 of its 18 bits, so the
+  // last character's low 2 bits are unused; with two `=` it keeps 8 of 12 and the low 4 are
+  // unused. Every unused bit MUST be zero.
+  if (padding !== 0) {
+    const unusedBits = padding === 1 ? 2 : 4;
+    const last = sextets[sextets.length - 1];
+    if ((last & ((1 << unusedBits) - 1)) !== 0) throw new RoaxError("base64-not-canonical", text);
+  }
+
+  const out = [];
+  for (let i = 0; i + 1 < sextets.length; i += 4) {
+    out.push(((sextets[i] << 2) | (sextets[i + 1] >> 4)) & 0xff);
+    if (i + 2 < sextets.length) out.push(((sextets[i + 1] << 4) | (sextets[i + 2] >> 2)) & 0xff);
+    if (i + 3 < sextets.length) out.push(((sextets[i + 2] << 6) | sextets[i + 3]) & 0xff);
+  }
+  return Buffer.from(out);
+}
+
 // -------------------------------------------------------------------------------------------
 // Path encoding (section 5)
 // -------------------------------------------------------------------------------------------
@@ -466,7 +521,18 @@ export function carrier(tag, node) {
       }
       throw new RoaxError("tag-value-mismatch", TAG_NAME[tag]);
     case TAG.BYTES:
-      throw new RoaxError("bytes-binding-unsupported", "v1 binds base64 fields as STRING");
+      // Section 6.3, and ruled 2026-07-30 for FHIR `base64Binary`: BYTES commits the DECODED
+      // OCTETS, and the canonical RFC 4648 section 4 spelling is an INPUT-ADMISSIBILITY
+      // condition rather than the committed value. The decode happens here, once, at the record
+      // boundary, so the carrier encodeValue receives is already the octets in hex.
+      //
+      // A base64 field a profile binds STRING is a different thing and is unchanged: it commits
+      // its base64 TEXT under NFC and no base64 rule enters its digest.
+      if (node instanceof NumberLiteral) {
+        throw new RoaxError("tag-value-mismatch", "BYTES at a JSON number");
+      }
+      if (typeof node !== "string") throw new RoaxError("tag-value-mismatch", "BYTES");
+      return decodeCanonicalBase64(node).toString("hex");
     default:
       throw new RoaxError("tag-unknown", String(tag));
   }
@@ -557,6 +623,11 @@ export function buildTree(hashAlg, record, typeMap, salts, identity) {
 // Section 4. Keyed by (path pattern, observed JSON kind); first matching entry wins. Unknown
 // paths fail closed: there is no default tag and no fallback to the observed JSON kind, because
 // either would let two libraries with different maps produce different roots silently.
+//
+// The lookup matches over NFC-normalized keys on BOTH sides (section 4.2, decision D14 ruled
+// D14a on 2026-07-30): `parsePattern` normalizes each pattern token and `matchPattern`
+// normalizes each segment key. Section 11.2's rule is "check the bytes you commit", and a
+// STRING leaf commits its NFC form, so matching raw would check bytes the record never commits.
 export class TypeMap {
   constructor(doc) {
     this.doc = doc;
@@ -578,6 +649,9 @@ export class TypeMap {
 // `*` matches one array index, `**` matches any run of segments. Because the pattern is written
 // in display notation it cannot address a key containing `.`, `[` or `]`, which section 5
 // deliberately admits; those are rejected here rather than silently mis-parsed.
+//
+// A key token is NFC-normalized here under ruled decision D14a, so a pattern authored in either
+// spelling denotes the same path language.
 export function parsePattern(pattern) {
   const out = [];
   let i = 0;
@@ -598,7 +672,7 @@ export function parsePattern(pattern) {
     const token = pattern.slice(i, j);
     if (token === "**") out.push({ kind: "any", value: null });
     else if (token === "" || token.includes("]")) throw new RoaxError("type-map-pattern", pattern);
-    else out.push({ kind: "key", value: token });
+    else out.push({ kind: "key", value: nfc(token) });
     i = j;
     if (pattern[i] === ".") i++;
   }
@@ -616,7 +690,11 @@ export function matchPattern(pattern, segments) {
       if (si >= segments.length) return false;
       const seg = segments[si];
       if (kind === "key") {
-        if (!Object.prototype.hasOwnProperty.call(seg, "key") || seg.key !== value) return false;
+        // Ruled decision D14a: compare the NFC-normalized key, which is the key the leaf
+        // actually commits (section 11.2), rather than the bytes as received.
+        if (!Object.prototype.hasOwnProperty.call(seg, "key") || nfc(seg.key) !== value) {
+          return false;
+        }
       } else {
         if (!Object.prototype.hasOwnProperty.call(seg, "index")) return false;
         if (value !== null && seg.index !== value) return false;

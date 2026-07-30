@@ -718,6 +718,27 @@
         "encodedHex": "313030"
       },
       {
+        "name": "bytes-decoded-octets",
+        "class": 7,
+        "tag": 5,
+        "input": "48656c6c6f2c20524f415821",
+        "encodedHex": "48656c6c6f2c20524f415821"
+      },
+      {
+        "name": "string-base64-text",
+        "class": 7,
+        "tag": 2,
+        "input": "SGVsbG8sIFJPQVgh",
+        "encodedHex": "534756736247387349464a5051566768"
+      },
+      {
+        "name": "bytes-empty",
+        "class": 7,
+        "tag": 5,
+        "input": "",
+        "encodedHex": ""
+      },
+      {
         "name": "null-value",
         "class": 5,
         "tag": 0,
@@ -995,6 +1016,60 @@
           ]
         },
         "reason": "reserved-namespace"
+      },
+      {
+        "name": "reject-bytes-base64-unpadded",
+        "class": 3,
+        "recordType": "org.roax.corpus.synthetic",
+        "input": {
+          "$jsonText": "{\"blob\": {\"bytes\": \"SGVsbG8sIFJPQVg\", \"text\": \"x\"}, \"marker\": \"m\"}"
+        },
+        "reason": "base64-not-canonical"
+      },
+      {
+        "name": "reject-bytes-base64-url-safe-alphabet",
+        "class": 3,
+        "recordType": "org.roax.corpus.synthetic",
+        "input": {
+          "$jsonText": "{\"blob\": {\"bytes\": \"-_8=\", \"text\": \"x\"}, \"marker\": \"m\"}"
+        },
+        "reason": "base64-not-canonical"
+      },
+      {
+        "name": "reject-bytes-base64-nonzero-pad-bits",
+        "class": 3,
+        "recordType": "org.roax.corpus.synthetic",
+        "input": {
+          "$jsonText": "{\"blob\": {\"bytes\": \"aGl=\", \"text\": \"x\"}, \"marker\": \"m\"}"
+        },
+        "reason": "base64-not-canonical"
+      },
+      {
+        "name": "reject-bytes-base64-line-wrapped",
+        "class": 3,
+        "recordType": "org.roax.corpus.synthetic",
+        "input": {
+          "$jsonText": "{\"blob\": {\"bytes\": \"SGVs\\nbG8=\", \"text\": \"x\"}, \"marker\": \"m\"}"
+        },
+        "reason": "base64-not-canonical"
+      },
+      {
+        "name": "reject-bytes-observed-kind-not-string",
+        "class": 3,
+        "recordType": "org.roax.corpus.synthetic",
+        "input": {
+          "$jsonText": "{\"blob\": {\"bytes\": 5, \"text\": \"x\"}, \"marker\": \"m\"}"
+        },
+        "reason": "type-map-uncovered-path"
+      },
+      {
+        "name": "reject-fhir-primitive-array-null-placeholder",
+        "class": 5,
+        "recordType": "org.roax.corpus.synthetic",
+        "input": {
+          "$jsonText": "{\"name\": [{\"given\": [\"Ada\", null]}], \"marker\": \"m\"}"
+        },
+        "reason": "type-map-uncovered-path"
       }
     ],
     "leaf": [
@@ -1673,6 +1748,45 @@
         "value": "100",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
         "leafHash": "6dcd3433668f8d2b3f0fa76ebe79fb108724f20352176aaf458116ebf2ec2f2b"
+      },
+      {
+        "name": "leaf-bytes-decoded-octets",
+        "class": 7,
+        "segments": [
+          {
+            "key": "value"
+          }
+        ],
+        "tag": 5,
+        "value": "48656c6c6f2c20524f415821",
+        "saltHex": "000102030405060708090a0b0c0d0e0f",
+        "leafHash": "3b9b457b26684b1c626afc9d8acd64b86d1b782ba6a822850616ce58105bd547"
+      },
+      {
+        "name": "leaf-string-base64-text",
+        "class": 7,
+        "segments": [
+          {
+            "key": "value"
+          }
+        ],
+        "tag": 2,
+        "value": "SGVsbG8sIFJPQVgh",
+        "saltHex": "000102030405060708090a0b0c0d0e0f",
+        "leafHash": "f93975fa8179c9a6784a31e677cb0d2327cad3b3c6959179eb32f1a0349bf674"
+      },
+      {
+        "name": "leaf-bytes-empty",
+        "class": 7,
+        "segments": [
+          {
+            "key": "value"
+          }
+        ],
+        "tag": 5,
+        "value": "",
+        "saltHex": "000102030405060708090a0b0c0d0e0f",
+        "leafHash": "3aac49d92c6323e33eddc5f2e78eaa9e338503f69dcb770ce3e1f8dfee4b3319"
       },
       {
         "name": "leaf-null-value",
@@ -5641,7 +5755,7 @@
         "expectTag": 2
       },
       {
-        "name": "typemap-vaccination-dose-fails-closed",
+        "name": "typemap-vaccination-dose-ruled-integer",
         "class": 11,
         "recordType": "sg.gov.moh.vaccination-healthcert",
         "segments": [
@@ -5659,10 +5773,10 @@
           }
         ],
         "jsonKind": "number",
-        "expectFailClosed": true
+        "expectTag": 3
       },
       {
-        "name": "typemap-vaccination-expiry-fails-closed",
+        "name": "typemap-vaccination-expiry-ruled-string",
         "class": 11,
         "recordType": "sg.gov.moh.vaccination-healthcert",
         "segments": [
@@ -5677,6 +5791,27 @@
           },
           {
             "key": "expiryDateTime"
+          }
+        ],
+        "jsonKind": "string",
+        "expectTag": 2
+      },
+      {
+        "name": "typemap-vaccination-dose-other-kind-fails-closed",
+        "class": 11,
+        "recordType": "sg.gov.moh.vaccination-healthcert",
+        "segments": [
+          {
+            "key": "notarisationMetadata"
+          },
+          {
+            "key": "signedEuHealthCerts"
+          },
+          {
+            "index": 0
+          },
+          {
+            "key": "dose"
           }
         ],
         "jsonKind": "string",
@@ -5865,6 +6000,19 @@
         "root": "d913e52ad4c918f87466d9fbd40070119379f8d293ab85ce1a7ad50f79313107"
       },
       {
+        "name": "record-fhir-ruled-bindings",
+        "class": 7,
+        "recordType": "org.roax.corpus.synthetic",
+        "schemaVersion": "1.0",
+        "issuerId": "did:web:corpus.roax.invalid",
+        "recordFile": "corpus/fixtures/records/fhir-ruled-bindings.json",
+        "saltsFile": "corpus/fixtures/salts/record-fhir-ruled-bindings.json",
+        "saltPairing": "path",
+        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
+        "leafCount": 8,
+        "root": "36025461595b5ed9d9d01576fa2f7350fcc3cbe9e4495baa8a3e9d421ae96178"
+      },
+      {
         "name": "record-typed-scalars",
         "class": 7,
         "recordType": "org.roax.corpus.synthetic",
@@ -5890,6 +6038,33 @@
         "leafCount": 10,
         "root": "de356f8f967a2a166f012172e339df1ecc31b5a45f406fd8da03b3a6ca356953",
         "issuerKeyId": "did:web:corpus.roax.invalid#key-1"
+      },
+      {
+        "name": "record-sg.gov.moh.vaccination-healthcert-no-key-id",
+        "class": 10,
+        "recordType": "sg.gov.moh.vaccination-healthcert",
+        "schemaVersion": "1.0",
+        "issuerId": "did:web:corpus.roax.invalid",
+        "recordFile": "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/sample-data.ts#sampleVaccineHealthCert",
+        "saltsFile": "corpus/fixtures/salts/record-sg.gov.moh.vaccination-healthcert-no-key-id.json",
+        "saltPairing": "positional",
+        "recordId": "urn:uuid:aaaaaaa1-0000-4000-8000-000000000001",
+        "leafCount": 91,
+        "root": "0006a8bb35adada03b698db10929ed4191291d7b0d51278dbfb09564c102cc47"
+      },
+      {
+        "name": "record-sg.gov.moh.vaccination-healthcert-with-key-id",
+        "class": 10,
+        "recordType": "sg.gov.moh.vaccination-healthcert",
+        "schemaVersion": "1.0",
+        "issuerId": "did:web:corpus.roax.invalid",
+        "issuerKeyId": "did:web:corpus.roax.invalid#key-1",
+        "recordFile": "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/sample-data.ts#sampleVaccineHealthCert",
+        "saltsFile": "corpus/fixtures/salts/record-sg.gov.moh.vaccination-healthcert-with-key-id.json",
+        "saltPairing": "positional",
+        "recordId": "urn:uuid:aaaaaaa1-0000-4000-8000-000000000001",
+        "leafCount": 92,
+        "root": "b69865a8b8482969907993a2de31664e7c100fcf990116bda33d837786f4f7d6"
       },
       {
         "name": "record-sg.gov.moh.recovery-healthcert-no-key-id",
@@ -6032,6 +6207,20 @@
         "issuerId": "did:web:corpus.roax.invalid",
         "expectSameRoot": true,
         "root": "bec3821d0d990e73f8985c240fec53b5bff44b6990938b31184c9df715fe3a71"
+      },
+      {
+        "name": "normalization-nfc-key-end-to-end",
+        "class": 19,
+        "site": "key",
+        "recordFileNFD": "corpus/fixtures/records/nfc-key-nfd.json",
+        "recordFileNFC": "corpus/fixtures/records/nfc-key-nfc.json",
+        "saltsFile": "corpus/fixtures/salts/normalization-nfc-key.json",
+        "recordType": "org.roax.corpus.synthetic",
+        "schemaVersion": "1.0",
+        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
+        "issuerId": "did:web:corpus.roax.invalid",
+        "expectSameRoot": true,
+        "root": "15b5cc28b423f333117d36965366711c2b8dbc4a145ba9a9bbd5966d7a6cb1fb"
       }
     ],
     "envelope": [

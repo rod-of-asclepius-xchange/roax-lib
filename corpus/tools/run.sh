@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
 # Check the ROAX conformance corpus end to end, and print what was actually measured.
 #
-# Four steps, in the order that makes a failure legible:
+# Five steps, in the order that makes a failure legible:
 #
 #   1. implementation A rebuilds the corpus and compares it with the committed file;
 #   2. implementation B recomputes the derived fields of every runnable committed vector;
 #   3. its emitted file is compared byte for byte, excluding copied-through NOT RUN vectors
 #      from the cross-implementation claim;
-#   4. every artifact is validated against the repository's JSON Schemas.
+#   4. every artifact is validated against the repository's JSON Schemas;
+#   5. both implementations' declared profile value rules are self-tested.
 #
 # Step 3 is the cross-implementation comparison.
 # Step 1 alone only proves one program is self-consistent.
+#
+# Step 5 is separate from the corpus on purpose. Ruled decision D13a keeps value-domain
+# validation out of the canonicalization layer, so those rules are the profile layer's and a
+# corpus vector would demand them from implementations that by that ruling do not carry them.
+# The corpus pins the accept case through class 10; step 5 pins the refusals.
 #
 # Usage:
 #   corpus/tools/run.sh [--references DIR] [--modules NODE_MODULES]
@@ -101,7 +107,8 @@ if cmp -s "$CORPUS_DIR/conformance-corpus-1.0.json" "$WORK/corpus-b.json"; then
     echo "  NOT CHECKED: copied-through fields are not a cross-implementation assertion"
   fi
   # A byte comparison can say nothing about rows that were never generated into the committed
-  # corpus, including the two class-10 records blocked by unresolved type-map paths.
+  # corpus, including the class-10 PDT record, which stays blocked on the 20 endorsed-sample
+  # path-kind pairs its base map leaves undeclared.
   echo "  scope: rows not generated into the committed corpus are not cross-checked here"
 else
   echo "  FAIL: the two implementations disagree"
@@ -123,6 +130,13 @@ else
   echo "  NOT RUN: rerun with --modules <node_modules-with-ajv@8-and-ajv-formats>"
   record_status 2
 fi
+
+echo
+echo "=== 5. declared profile value rules (both implementations)"
+python3 "$HERE/profile_rules.py"
+record_status $?
+node "$HERE/profile_rules.mjs"
+record_status $?
 
 echo
 case "$status" in

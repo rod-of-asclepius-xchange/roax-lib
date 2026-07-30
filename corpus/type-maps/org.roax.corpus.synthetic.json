@@ -1,5 +1,5 @@
 {
-  "typeMapVersion": "1.0.0",
+  "typeMapVersion": "2.0.0",
   "recordType": "org.roax.corpus.synthetic",
   "schemaVersion": "1.0",
   "sourceSchemas": [
@@ -23,6 +23,12 @@
     },
     {
       "pattern": "accented",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "é",
       "jsonKind": "string",
       "tag": 2,
       "source": "corpus fixture: authored declaration, not derived from any reference schema"
@@ -82,13 +88,31 @@
       "source": "corpus fixture: authored declaration, not derived from any reference schema"
     },
     {
-      "pattern": "Kelvin",
+      "pattern": "Kelvin",
       "jsonKind": "string",
       "tag": 2,
       "source": "corpus fixture: authored declaration, not derived from any reference schema"
     },
     {
-      "pattern": "Kelvin",
+      "pattern": "blob.bytes",
+      "jsonKind": "string",
+      "tag": 5,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "blob.text",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "narrative.div",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "name[*].given[*]",
       "jsonKind": "string",
       "tag": 2,
       "source": "corpus fixture: authored declaration, not derived from any reference schema"

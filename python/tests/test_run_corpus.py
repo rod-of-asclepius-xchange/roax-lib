@@ -27,6 +27,24 @@ REFERENCE_MODULE = (
     / "2.0"
     / "sample-data.ts"
 )
+# Class 10 covers two profiles since the vaccination bindings were ruled, and a fixture that
+# supplies only one of them leaves the other genuinely NOT RUN. That would blur the parse-failure
+# test below, whose whole point is that an unparseable module is reported as a FAILURE and never
+# as a missing reference.
+VACCINATION_MODULE = (
+    Path("schemata")
+    / "src"
+    / "sg"
+    / "gov"
+    / "moh"
+    / "vaccination-healthcert"
+    / "1.0"
+    / "sample-data.ts"
+)
+UNPARSEABLE_EXPORTS = (
+    (REFERENCE_MODULE, "sampleDocument"),
+    (VACCINATION_MODULE, "sampleVaccineHealthCert"),
+)
 
 
 class RunnerStatusTests(unittest.TestCase):
@@ -56,7 +74,9 @@ class RunnerStatusTests(unittest.TestCase):
             first_attempt = Path(directory) / REFERENCE_MODULE
             fallback_attempt = Path(directory) / Path(*REFERENCE_MODULE.parts[1:])
             self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-            self.assertIn("10       0       0        2  NOT RUN", result.stdout)
+            # Four rather than two: class 10 gained the vaccination record once its two
+            # unresolved paths were ruled (`docs/type-maps.md` section 1.1).
+            self.assertIn("10       0       0        4  NOT RUN", result.stdout)
             self.assertIn(f"attempted {first_attempt} and {fallback_attempt}", result.stdout)
             self.assertIn(
                 "rerun with --references /path/to/schemata",
@@ -64,7 +84,7 @@ class RunnerStatusTests(unittest.TestCase):
             )
             self.assertIn(
                 "RESULT: INCOMPLETE / NOT RUN "
-                "(734 assertions passed; 2 not run; 18/19 classes passed)",
+                "(751 assertions passed; 4 not run; 18/19 classes passed)",
                 result.stdout,
             )
             self.assertNotIn("RESULT: PASS", result.stdout)
@@ -81,33 +101,41 @@ class RunnerStatusTests(unittest.TestCase):
 
     def test_reference_parse_failure_is_a_failure_instead_of_a_crash(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            module = Path(directory) / REFERENCE_MODULE
-            module.parent.mkdir(parents=True)
-            module.write_text(
-                "export const sampleDocument = makeDocument();\n",
-                encoding="utf-8",
-            )
+            # BOTH class-10 modules, so nothing in the class is NOT RUN for an unrelated
+            # reason. The assertion below is that an unparseable module is reported as a
+            # FAILURE and never as a missing reference, and a half-populated checkout would
+            # put the missing-reference hint in the output legitimately and blur exactly that.
+            modules = []
+            for relative, export in UNPARSEABLE_EXPORTS:
+                module = Path(directory) / relative
+                module.parent.mkdir(parents=True, exist_ok=True)
+                module.write_text(f"export const {export} = makeDocument();\n", encoding="utf-8")
+                modules.append((module, export))
 
             result = self.run_runner("--references", directory)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(
-                f"could not extract 'sampleDocument' from reference module {module}",
-                result.stdout,
-            )
+            for module, export in modules:
+                self.assertIn(
+                    f"could not extract {export!r} from reference module {module}",
+                    result.stdout,
+                )
             self.assertIn("ValueError: unsupported literal", result.stdout)
             self.assertNotIn(
                 "rerun with --references /path/to/schemata",
                 result.stdout,
             )
             self.assertIn(
-                "RESULT: FAIL " "(734 passed; 2 failed; 0 not run; 18/19 classes passed)",
+                "RESULT: FAIL " "(751 passed; 4 failed; 0 not run; 18/19 classes passed)",
                 result.stdout,
             )
             self.assertNotIn("Traceback", result.stdout + result.stderr)
 
     def test_unsupported_reject_shape_is_a_failure(self) -> None:
         results = run_corpus.Results()
+
+        def unreachable_maps(record_type: str):
+            raise AssertionError(f"a shapeless reject vector must not resolve {record_type}")
 
         run_corpus.run_reject(
             [
@@ -118,6 +146,7 @@ class RunnerStatusTests(unittest.TestCase):
                     "reason": "invalid-json",
                 }
             ],
+            unreachable_maps,
             results,
         )
 

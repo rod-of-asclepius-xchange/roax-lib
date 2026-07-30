@@ -44,7 +44,11 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 // divergence and the undetermined type bindings, and that work reflows its own prose to this same
 // convention. Rewriting it here would collide. Remove the entry once that lands; --no-exclusions
 // overrides it for a one-off run.
-const EXCLUDED = new Set(['docs/type-maps.md']);
+// Empty, and it stayed empty on purpose. `docs/type-maps.md` was excluded while a parallel change
+// owned it, so the two did not fight over the same lines. That change has landed and the file
+// already conforms, so it is checked like every other document now: an exclusion that outlives
+// its reason is a document the convention silently stops applying to.
+const EXCLUDED = new Set();
 
 // ---------------------------------------------------------------------------------------------
 // Sentence boundaries

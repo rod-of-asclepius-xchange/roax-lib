@@ -510,9 +510,7 @@ pub fn verify_disclosed(
     for leaf in &disclosure.leaves {
         if reserved_leaf_name(&leaf.path, disclosure.context.reserved_leaf_set).is_none() {
             let kind = observed_kind_from_tag(leaf.tag)?;
-            let resolver = profile.resolver();
-            resolver.ensure_lookup_decision_independent(&leaf.path, kind)?;
-            let expected = resolver.resolve(&leaf.path, kind)?;
+            let expected = profile.resolver().resolve(&leaf.path, kind)?;
             if expected != leaf.tag {
                 return Err(Error::TypeMismatch { tag: leaf.tag });
             }

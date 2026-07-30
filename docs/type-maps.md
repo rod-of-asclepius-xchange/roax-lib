@@ -1,46 +1,86 @@
 # ROAX type maps, coverage and issuer extensions
 
-**Status:** base artifacts published at `typeMapVersion: 1.0.0`, with unresolved paths failing closed.
+**Status:** base artifacts published at `typeMapVersion: 1.0.0`.
+The five undetermined bindings were ruled on 2026-07-30 and the lookup normalizes its key under ruled decision D14a.
+Two of the five rulings are operative in the corpus-side maps; none of the four that are bindings is yet in the four published artifacts, for the reason section 1.6 states.
+Every path outside those five still fails closed.
 
 This document defines the type-map artifact lifecycle required by decision D7 and reports exactly what the pinned reference schemas do and do not type.
 The operative artifacts are in `type-maps/`, and their format is defined by `schemas/type-map-artifact-1.0.json`.
 
-## 1. What could not be typed confidently
+## 1. The five undetermined bindings, ruled
 
-These are not bindings in the shipped maps.
-Each path fails closed until a profile ruling or issuer extension supplies evidence that determines one ROAX tag, as required by ROAX-CANON/1 section 4.2 and ruled decision D7.
+**All five were ruled on 2026-07-30.**
+Before that they failed closed, because ROAX-CANON/1 section 4.2 and ruled decision D7 admit a binding only where evidence determines one ROAX tag, and the pinned reference schemas determine none of these five.
+A ruling is what binds such a path, and a ruling lands in a document rather than in a resolver improvement.
 
-The open questions and the non-operative proposals are separate:
+**Each ruling carries its evidence grade, and the grades are not decoration.**
+A Decisive ruling has a governing standard or a validation order that leaves no remaining type choice.
+A Strong one rests on external evidence that the selected schema does not itself state.
+A Moderate one rests on a profile declaration rather than on any schema, which is a materially weaker footing and must not read like the others to whoever revisits it.
+
+| Binding | Ruling | Grade | What the ruling rests on |
+|---|---|---|---|
+| Vaccination signed-certificate `dose` | **INTEGER**, plus a profile narrowing to a positive integer | Strong | The EU Digital COVID Certificate these certificates mirror defines its dose-sequence number as a positive integer. The pinned schema says only `type: "number"` and chooses neither ROAX numeric tag. See section 1.1. |
+| FHIR `base64Binary` | **BYTES** over the decoded octets, with canonical RFC 4648 base64 as an input-admissibility condition | Strong | FHIR R4 defines the datatype as a stream of bytes and its JSON form as base64 text, so BYTES commits the value rather than the transport spelling. See section 1.3. |
+| Signed-certificate `expiryDateTime` | **STRING**, by explicit profile declaration | Moderate | The field name, both examples and the standard meaning of `date-time`. **Not the schema**, which carries a `format` and no `type` and formally admits every JSON kind. See section 1.1. |
+| FHIR `Narrative.div` | **STRING** over the escaped XHTML text, without parsing or reserializing it | Decisive | FHIR R4's normative JSON representation states that `Narrative.div` is one escaped XHTML string. See section 1.3. |
+| FHIR primitive-array null placeholders | **No NULL binding**, and **reject** such records until a versioned schema and type-map revision admits the FHIR representation | Decisive | Complete profile validation runs before map resolution under ROAX-CANON/1 section 4.2, so a map may not widen a record its own selected schema refuses. See section 1.3. |
+
+**Two of the five reach the corpus as operative bindings today, and three do not.**
+`dose` and `expiryDateTime` are operative in `corpus/type-maps/sg.gov.moh.vaccination-healthcert.json`, which is what class 10 resolves against, and the shipped vaccination sample commits as a result.
+The three FHIR rulings are recorded here and pinned as tag semantics by corpus vectors over the synthetic profile, while the four published artifacts in `type-maps/` still carry their pre-ruling `unresolved` rows.
+Section 1.6 states exactly why and what the next change must do.
+
+What remains genuinely unbound is a different list, and none of it was ruled here:
 
 | Classification | Paths | Current result |
 |---|---|---|
-| Genuinely ambiguous tag | Vaccination signed-certificate `dose`; FHIR `base64Binary` | `dose` has INTEGER and DECIMAL candidates, while `base64Binary` has STRING and BYTES candidates. No candidate wins. |
-| Schema-versus-standard admission question | FHIR primitive-array null placeholders | The FHIR prose permits placeholders that the pinned schemas reject. The maps follow the schemas and emit no NULL binding. |
-| Schema-silent, with one proposed tag | Signed-certificate `expiryDateTime`; FHIR `Narrative.div` | STRING is proposed from external semantic evidence and is not operative. |
-| Outside the selected base-schema scope | The 20 PDT endorsed-sample path-kind pairs | Each proposed STRING binding is listed with its composition-schema evidence in section 1.2, but the PDT base profile selects none of them. |
+| Outside the selected base-schema scope | The 20 PDT endorsed-sample path-kind pairs | Each proposed STRING binding is listed with its composition-schema evidence in section 1.2, but the PDT base profile selects none of them, and the clean answer is a versioned composition profile rather than 20 authored bindings. Nobody has ruled one, so the PDT sample stays uncommittable. |
 | Structurally underconstrained | The full and lite FHIR object-applicator definitions in section 1.5 | KEY traversal is retained, while non-object tags are never inferred from `properties`, `required` or `additionalProperties`. |
 | Structurally underconstrained | The 26 vaccination object-intended patterns in section 1.4 | Object child traversal is supported, while every non-object alternative remains unbound. |
 
-### 1.1 Vaccination signed EU certificate fields
+### 1.1 Vaccination signed EU certificate fields, RULED
 
-`notarisationMetadata.signedEuHealthCerts[*].dose` is unresolved for observed JSON kind `number`.
+#### `dose` is INTEGER, grade Strong, plus a profile narrowing to a positive integer
+
 The source says only `type: "number"` and carries no integer or decimal constraint at `references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/signedEuHealthCerts/items/anyOf/0/properties/dose`, read at upstream commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`.
-JSON Schema `number` admits both integral and fractional values, while ROAX-CANON/1 section 6.1 has distinct INTEGER and DECIMAL tags.
+JSON Schema Core draft-07 section 4.2.1 models `number` as an arbitrary-precision base-10 value and places lexical distinctions outside its data model, so `type: "number"` chooses neither of the distinct INTEGER and DECIMAL tags ROAX-CANON/1 section 6.1 defines.
+The schema therefore settles nothing and the ruling comes from outside it.
 
-Two candidate rulings exist, and neither is applied:
+The European Commission's EU Digital COVID Certificate JSON Schema Specification 1.3.0 calls both the dose-sequence number `v/dn` and the series total `v/sd` positive integers, and the authoritative schema at tag `1.3.0`, commit `a603410d760fefc9073931c8c807759d9714c136`, makes both reference `dose_posint`, which is `integer` with minimum 1.
 
-- INTEGER is supported by the field's ordinal meaning and the shipped examples `1` and `2`, but an observed sample is not schema evidence and the schema admits fractions.
-- DECIMAL covers the complete numeric domain admitted by the schema, but that would turn a generic JSON Schema constraint into a semantic ruling that the source never made.
+**The grade is Strong rather than Decisive for a specific reason.**
+The EU DCC is a different specification, and the Singapore wrapper never states that its wrapper-level `dose` is the EU DCC `dn` field: the wrapper carries the signed DCC in `qr`, while `dose` is adjacent wrapper metadata.
+The correspondence is a well-supported inference and not a declared mapping.
 
-`notarisationMetadata.signedEuHealthCerts[*].expiryDateTime` is unresolved for every observed JSON kind.
-Its two source branches carry `format: "date-time"` and string examples but no `type` at `references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/signedEuHealthCerts/items/anyOf`, read at the same upstream commit.
-Under JSON Schema Validation draft-07 section 7.3.1, `format` is an annotation unless validation behavior is explicitly enabled, and it does not supply the missing instance type.
+**The ruling is INTEGER plus a positive-integer profile narrowing, and the second half is not optional.**
+A bare type-map edit would leave `0` and every negative value formally valid under the selected profile, because both are grammar-valid ROAX INTEGERs.
+A fractional value is already refused one layer down by the section 6.2 INTEGER grammar, so the narrowing is about `0` and the negatives and about nothing else.
 
-The proposed ruling is STRING because the field is named as a date-time, every example and fixture is a string, and RFC 3339 date-time values have a string representation.
-That proposal is not operative because the reference schema formally admits other JSON kinds.
+**The narrowing is not in the type map and not in the canonicalization layer, and that placement is itself ruled.**
+A type map answers which tag a structured path and observed kind select; a value-domain constraint is a different question, and ROAX-CANON/1 section 4.2 puts it in a different place and a different order, requiring complete profile validation before map resolution.
+Decision D13 was ruled D13a with a split that keeps value-domain validation in "a separate, independently versioned conformance layer" and rejected merging it into the protocol layer explicitly, because that puts profile governance on the critical path of a cryptographic specification (`docs/decisions.md`, D13).
+So the rule is declared by `docs/profiles/vaccination-healthcert.md` section 6, enforced by the profile validator, and executable in `corpus/tools/profile_rules.py` and `profile_rules.mjs`, which run as the issuer's half of section 4.2 step 1 before any leaf is built.
+`corpus/tools/run.sh` step 5 self-tests both, and `rust/tests/dfa_profile_protocol.rs` pins the layering through the `SchemaValidator` seam by showing the ruled profile refuse `0` while the bare canonicalization layer accepts it.
 
-These two gaps make the shipped vaccination sample uncommittable under fail-closed today.
-That result is intentional and is safer than freezing a guessed root.
+#### `expiryDateTime` is STRING, grade Moderate, by explicit profile declaration
+
+Both source branches carry `format: "date-time"` and a string example and declare **no instance type** at `references/schemata/src/sg/gov/tech/notarise/1.0/schema.json#/properties/notarisationMetadata/properties/signedEuHealthCerts/items/anyOf`, read at the same upstream commit.
+Under JSON Schema Validation draft-07 sections 7.2 and 7.3.1, `format` is an annotation unless validation behaviour is explicitly enabled, and a `date-time` format attribute applies to string instances, so the keyword neither creates a string type nor rejects a non-string instance.
+The schema formally admits every JSON kind.
+
+**This ruling therefore rests on a profile declaration and not on the schema, which is exactly what its Moderate grade records.**
+The supporting evidence is the field name, both shipped examples and the standard meaning of `date-time`, and no separate governing specification for this wrapper field was found.
+That is materially weaker than the `dose` ruling, which has an external standard behind it, and weaker again than the Decisive FHIR rulings in section 1.3.
+The declaration is in `docs/profiles/vaccination-healthcert.md` section 6, and a future upstream `type: "string"` correction would upgrade the footing without changing the tag.
+
+#### What the two rulings unblocked
+
+The shipped vaccination sample now commits, at 91 leaves without an issuer key identifier and 92 with one, and class 10 goes from 1 of 3 records to 2 of 3 (`corpus/README.md`).
+It commits against the CORPUS-SIDE map, which carries both bindings; the published `type-maps/sg.gov.moh.vaccination-healthcert-1.0.json` still declares both slots `unresolved`, as section 1.6 states.
+Both rulings are held apart from the schema walk in `corpus/tools/build_type_maps.py`, which refuses to build if a ruling names a path the walk did not independently report unbound, or collides with a binding the schema determines.
+That guard is what keeps a ruling able only to resolve a measured gap rather than to change a derived tag.
 
 ### 1.2 PDT fields present in the endorsed sample but absent from the base schema
 
@@ -77,21 +117,49 @@ Each candidate below proposes STRING and remains non-operative:
 The clean ruling is to register distinct PDT base, clinic and endorsed profile variants, or to declare their union explicitly and version that profile decision.
 Until that happens, the base PDT map accepts its seven declared fields and its lite FHIR Bundle, while those 20 sample pairs fail closed under ROAX-CANON/1 section 4.2.
 
-### 1.3 FHIR XHTML, base64Binary and null placeholders
+### 1.3 FHIR XHTML, base64Binary and null placeholders, RULED
 
-`Narrative.div` resolves to `#/definitions/xhtml`, whose reference definition has a description and no JSON kind.
-FHIR R4 JSON section 2.6.2 separately describes the narrative as escaped XHTML text, so STRING is a reasonable proposal, but the pinned reference schema does not establish it.
-The base maps leave it unresolved.
+#### `base64Binary` is BYTES over the decoded octets, grade Strong
 
-FHIR `base64Binary` is also unresolved deliberately.
-The reference schema exposes a JSON string, while ROAX-CANON/1 section 6.3 permits a profile to choose either STRING over the base64 text or BYTES over the decoded bytes.
+The pinned full and lite FHIR schemas define `base64Binary` as a JSON string and describe its semantic value as a stream of bytes, at `references/schemata/src/sg/gov/moh/fhir/4.0.1/schema.json#/definitions/base64Binary` and `references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/base64Binary`, both read at upstream commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`.
+FHIR R4 defines the datatype as a stream of bytes encoded using base64 while identifying its JSON representation as a JSON string containing base64 text.
+That value-versus-serialization distinction is exactly the choice ROAX-CANON/1 section 6.3 leaves to a profile, between STRING over the base64 text and BYTES over the decoded bytes.
+
+**BYTES is ruled because it commits the FHIR value, the decoded octet sequence, rather than the transport spelling used to carry it.**
 Full FHIR has six reachable schema-local `base64Binary` slots and lite FHIR has four.
-No version-1 FHIR profile ruling chooses between tags 2 and 5, so the map chooses neither.
 
-The reference schemas admit no `null` type.
-FHIR R4 JSON section 2.6.2.3 separately permits null placeholders in repeating primitive arrays to align values with `_foo` extension arrays.
-The full schema has 175 schema-local primitive-array slots and the lite schema has 12, but their `items` declarations reject null.
-The maps follow the pinned schemas and fail closed on those nulls rather than silently resolving a schema-versus-standard conflict.
+**The grade is Strong rather than Decisive because STRING remains a legitimate profile choice elsewhere.**
+A profile is permitted to commit a serialization as STRING when preserving that exact spelling is itself the intended semantics, and the explicitly typed healthcert blob fields still bind as STRING for that reason (ROAX-CANON/1 section 6.3).
+So this ruling says what FHIR `base64Binary` means, and it does not say that base64 is always BYTES.
+
+**The canonical base64 form is an INPUT-ADMISSIBILITY condition and never the committed value, and the distinction is load-bearing.**
+ROAX-CANON/1 section 6.3 already pins RFC 4648 section 4: the standard alphabet, with padding, and no line wrapping, rejecting the URL-safe alphabet of RFC 4648 section 5, absent or excess padding, any character outside the alphabet including a line break, and a final quantum whose unused bits are non-zero.
+That pin has to survive a BYTES ruling rather than become redundant under it.
+RFC 4648 section 3.5 explains why: without it, several spellings decode to the same octets, so two implementations can agree about the bytes while disagreeing about whether the record is admissible at all.
+Three of the four rejection vectors added for this ruling decode to the accepted fixture's octets under a permissive decoder, which is that hazard exhibited rather than described.
+
+#### `Narrative.div` is STRING over the escaped XHTML text, grade Decisive
+
+`Narrative.div` resolves to `#/definitions/xhtml`, whose reference definition carries a description and no JSON instance type, at `references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/xhtml`, read at the same upstream commit.
+FHIR R4's normative JSON representation states that XHTML is represented as an escaped string and that the `Narrative.div` element is represented as one escaped XHTML string.
+
+**That directly governing rule leaves no remaining type choice, which is what makes this ruling Decisive where the two above are not.**
+The tag is a carrier type and nothing more: STRING selects `utf8(NFC(s))` under ROAX-CANON/1 section 6.1, so an implementation MUST NOT parse the XHTML, normalize it as markup, or reserialize it for commitment.
+A separate FHIR validator may still enforce the allowed XHTML content rules, because a carrier type does not validate markup structure.
+
+#### Primitive-array null placeholders publish no NULL binding and reject the record, grade Decisive
+
+FHIR R4's normative JSON representation uses JSON nulls in paired repeating primitive and `_foo` arrays so that values, ids and extensions stay aligned by index, including a null in the value array where a repeating primitive has metadata but no value.
+The pinned schemas reject at least the value-array half of that representation, because primitive array items reference a non-null primitive type: `HumanName.given[]` references the FHIR string definition with no null branch at `references/schemata/src/sg/gov/moh/fhir/4.0.1/lite-schema.json#/definitions/HumanName/properties/given`, read at the same upstream commit.
+The full schema has 175 schema-local primitive-array slots and the lite schema has 12.
+
+**This is a schema-versus-standard admission conflict and not an ambiguous type, which is why it is Decisive.**
+ROAX-CANON/1 section 4.2 requires complete profile validation before map resolution, so the exact selected schema wins for the current artifacts and the map may not widen a record its own schema refuses.
+Adding NULL to the map alone would contradict the schema rather than resolve it.
+
+**The ruling is therefore expressed as an absence, and an absence needs a vector or it is unfalsifiable.**
+`corpus/type-maps/org.roax.corpus.synthetic.json` binds `name[*].given[*]` for `string` and declares nothing for `null`, and `reject-fhir-primitive-array-null-placeholder` asserts that a record carrying the placeholder is refused.
+If standard-conformant placeholders are later required, governance publishes a new schema and profile version that explicitly admits null at the paired primitive-array item sites, together with the exact corresponding type map carrying NULL outputs, in one change.
 
 ### 1.4 Vaccination object-intended schemas that omit `type: "object"`
 
@@ -153,6 +221,41 @@ The artifacts do not guess tags for any of these schema-silent non-object cases.
 They retain the KEY transitions needed for object instances, mark each affected DFA state with non-operative `structurallyUntypedObject: true`, and emit no scalar, array or null output merely because an object keyword is inapplicable.
 Complete profile validation still decides whether a particular context admits the observed non-object value before map resolution, under ROAX-CANON/1 section 4.2.
 
+### 1.6 Where the five rulings have and have not landed
+
+**Stated plainly, because a ruling recorded as if it were operative is worse than one recorded as open.**
+The five rulings of sections 1.1 and 1.3 are made: vaccination `dose` INTEGER and `expiryDateTime` STRING, and the three FHIR ones for `base64Binary`, `Narrative.div` and the primitive-array null placeholders.
+
+**Four of the five rulings are bindings, and not one of those four is in the four published artifacts.**
+All four artifacts lag, not three.
+`type-maps/hl7.fhir.bundle-4.0.1.json`, `sg.gov.moh.pdt-healthcert-2.0.json` and `sg.gov.moh.recovery-healthcert-2.0.json` still carry their pre-ruling `unresolved` rows for `base64Binary` and `Narrative.div`, and `type-maps/sg.gov.moh.vaccination-healthcert-1.0.json` still carries them for `dose` and `expiryDateTime` at states `s64` and `s65`.
+The coverage figures in section 2 are measured on those bytes and still count every one of them as unresolved.
+The fifth ruling is the exception in kind rather than in status: the primitive-array null-placeholder outcome IS "publish no NULL binding", so the artifacts already satisfy it by carrying no NULL output, and nothing has to land for it.
+
+**The two vaccination rulings ARE operative, in a different artifact.**
+`corpus/tools/build_type_maps.py` holds them in its `RULED_BINDINGS` table and writes them into `corpus/type-maps/sg.gov.moh.vaccination-healthcert.json`, which is the corpus-side map conformance class 10 resolves the shipped vaccination sample against.
+That is why the sample commits at all, at the 91 leaves section 1.1 reports, and why class 10 moved from 1 of 3 records to 2 of 3.
+The corpus-side map and the published artifact are separate bytes with separate version lines, so the sample committing is not evidence that a published artifact carries a binding.
+
+The reason the published side lags is section 6: those four artifacts can currently be neither regenerated nor `--check`ed, because the generator fails closed on 34 merged object states.
+`tools/build-type-maps.mjs` also has no ruling mechanism at all - nothing corresponding to the corpus-side `RULED_BINDINGS` - so even an unblocked regeneration would reproduce every one of those `unresolved` rows today.
+Hand-editing a generated artifact would replace a regeneration blocked by a recorded ruling with one that is unreproducible in principle, and it would move four content IDs, the registry, the section 2.1 identity table and the IDs pinned in `rust/tests/published_type_maps.rs` on bytes no generator can reproduce.
+`tools/check-type-maps.mjs` passing on the untouched artifacts is the signal that this is still the safe regime.
+
+**What is pinned today, and what it does and does not prove.**
+The ruled tag SEMANTICS of the three FHIR rulings are exercised by corpus vectors over the synthetic profile: BYTES committing decoded octets and refusing four non-canonical spellings, STRING committing escaped XHTML unparsed, and the null placeholder failing closed.
+Those hold five independent implementations to what each ruling means.
+They are **not** the FHIR profile binding, and `corpus/README.md` says the same where the vectors live.
+
+**What the next change must do**, in one change so that no intermediate state has a ruling in prose and a contradicting artifact:
+
+1. Resolve the 34 merged object states combinator-aware, so the generator runs again.
+2. Give `tools/build-type-maps.mjs` a ruling table held apart from the schema walk, under the same guards as the corpus-side one: a ruling may only resolve a path the walk independently reported unbound, and may never overwrite a tag the schema determines.
+3. Regenerate all four artifacts with the four ruled bindings applied, which converts the affected `unresolved` rows into bindings; the null-placeholder ruling needs no row and must stay an absence.
+4. Bump `typeMapVersion` by MINOR under section 5.2 on each artifact that gained a binding, since the change is additive and makes previously rejected records issuable.
+5. Update the section 2.1 identity table, `type-maps/registry-1.0.0.json`, the section 2 coverage figures and the pinned IDs in `rust/tests/published_type_maps.rs`.
+6. Delete this section.
+
 ## 2. Published artifacts and finite coverage
 
 Concrete path counts are infinite because arrays admit arbitrary indexes and FHIR resource and extension definitions recurse.
@@ -211,9 +314,10 @@ The map reaches 678 of 680 definitions; unused named primitives `oid` and `uuid`
 
 Full FHIR's 574 scalar outputs are 34 BOOL, 458 STRING, 61 INTEGER and 21 DECIMAL.
 PDT and recovery each expose 7 BOOL, 80 STRING, 9 INTEGER and 2 DECIMAL outputs.
-Vaccination exposes 81 STRING outputs and no numeric output because `dose` is unresolved.
+Vaccination exposes 81 STRING outputs and no numeric output, and every figure in this table is measured on the PUBLISHED artifact bytes, which do not carry the 2026-07-30 rulings.
+So `dose` is still counted unresolved here even though it is ruled INTEGER, and the corpus-side map class 10 resolves against does carry it; section 1.6 owns that difference.
 No artifact emits NULL, BYTES or BLOB_REF.
-No version-1 profile selects BLOB_REF, as ruled by decision D9 and defined in ROAX-CANON/1 section 6.5.
+That sentence is measured rather than aspirational, and it remains true after the rulings for three different reasons: the ruled FHIR primitive-array null-placeholder outcome IS "publish no NULL binding", so the absence of NULL is the ruling being in force; BYTES is absent because the `base64Binary` ruling is not in these bytes yet; and no version-1 profile selects BLOB_REF, as ruled by decision D9 and defined in ROAX-CANON/1 section 6.5.
 
 The earlier estimate of 15 lite-FHIR decimal sites omitted inline `Extension.valueDecimal`.
 The audited source has 15 decimal `$ref` slots plus that inline field, for 16 schema-local decimal slots.
@@ -227,11 +331,39 @@ A conforming resolver MUST perform these steps, in this order, under ROAX-CANON/
 
 1. Start at `automaton.start`, which is `s0`.
 2. For a KEY segment, NFC-normalize the key under the pinned Unicode version and take the one transition whose `key` equals it.
+   This is ruled decision D14a; the paragraphs below state why it is the rule rather than one of two readings.
 3. For an INDEX segment, take `anyIndex`.
 4. Fail closed immediately if the required transition is absent.
 5. At a scalar or empty-container leaf, select the one binding whose `jsonKind` equals the observed JSON kind.
 6. Fail closed if the binding is absent, even when the tag seems mechanically obvious from JSON syntax.
 7. Emit the binding's tag and continue with ROAX-CANON/1 section 6.
+
+### 3.1 Step 2 normalizes, and decision D14 is why that is a rule rather than a choice
+
+**Decision D14 asked whether the lookup matches over an NFC-normalized key or over the bytes as received, and it was ruled D14a, NORMALIZE, on 2026-07-30** (`docs/decisions.md` part 2a).
+Step 2 above described a normalizing resolver before the ruling, while both corpus reference implementations, the TypeScript library and the Python library compared raw, so one logical question had two answers in one tree.
+The ruling is now stated by ROAX-CANON/1 section 4.2 and every matcher in this repository follows it.
+
+Two reasons, and the second is what makes the first more than a preference.
+
+**A raw comparison checks bytes no part of the record commits.**
+Section 11.2's general rule is "check the bytes you commit, not the bytes you received".
+A STRING leaf commits `utf8(NFC(s))` under section 6.1, and an encoded KEY segment commits `NFC(key)` under section 5.1.
+So the lookup is the only place in the pipeline that would have looked at an unnormalized key, and it would have decided admissibility on a spelling the root never records.
+
+**Under a raw comparison two records that render identically diverge, and one of them is refused outright.**
+A key written decomposed fails the lookup and is refused by the fail-closed rule of section 4.2, while its composed twin resolves and commits.
+Nothing distinguishes the two to whoever typed the key.
+That is precisely the invisible-divergence failure decision D12 was ruled to prevent, arriving one layer up: D12 reasoned that a record passing through a normalizing form field must not get a different root, and under raw matching it does not get a different root, it gets rejected instead, just as invisibly.
+Ruling raw would have reintroduced at the type-map layer the exact hazard already ruled out at the leaf layer.
+
+**Both sides of the comparison normalize, not only the segment key.**
+A published artifact's transition keys are validated NFC at load, so the DFA needs no further work; a display-pattern matcher normalizes its pattern token at parse time.
+Normalizing only the segment key would leave a decomposed pattern permanently dead rather than provably redundant.
+
+**Normalizing does not widen a map.**
+Fail-closed still applies to any key whose NFC form is not a declared transition, and a ruling on the lookup changes no leaf bytes: rebuilding the committed corpus under D14a changed zero existing vectors, because encoded paths already normalized every KEY segment.
+`corpus/README.md` records the two vectors that discriminate the readings, both of which fail closed under raw matching.
 
 Path authorization MUST happen before the flattener assigns EMPTY_ARRAY or EMPTY_OBJECT, under ruled decision D7 and ROAX-CANON/1 section 3.3.
 Otherwise an unknown issuer extension containing only an empty container bypasses the fail-closed allowlist.

@@ -3,7 +3,8 @@
 **`recordType`:** `hl7.fhir.bundle`
 **`schemaVersion`:** `4.0.1` (see the caution in section 6 about what this string means)
 **Status:** published as [`type-maps/hl7.fhir.bundle-4.0.1.json`](../../type-maps/hl7.fhir.bundle-4.0.1.json) at exact artifact ID `sha256:0e9e642bc89c081e2e6faf651acdc25c46fac83201248ef53a7c812181279807`.
-Six schema-local `base64Binary` slots and `Narrative.div` remain unresolved, null placeholders admitted by FHIR but rejected by the pinned schema fail closed, and 659 object-applicator source nodes omit an object type, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.3, 1.5 and 2.
+`base64Binary`, `Narrative.div` and the FHIR null-placeholder conflict were **ruled on 2026-07-30** with their evidence grades, and 659 object-applicator source nodes still omit an object type, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.3, 1.5 and 2.
+**The published artifact does not yet carry the two new bindings**: it still declares those slots `unresolved`, because regeneration is blocked on 34 merged object states, and section 1.6 of that document states why hand-editing a generated artifact is the wrong fix and what the next change must do.
 
 ---
 
@@ -80,6 +81,7 @@ The full-FHIR artifact reaches 678 of 680 definitions and carries 2,663 states, 
 The two unused named definitions are `oid` and `uuid`, while their inline value fields remain covered, as reported in the same audit.
 The finite scalar audit counts 3,345 schema-local slots, of which 3,264 are confident, 74 use an operative FHIR element-name inference and seven remain unresolved, as reported in [`docs/type-maps.md`](../type-maps.md) section 2.2.
 Those seven source slots collapse to two unresolved DFA states because six `base64Binary` occurrences share a definition and `Narrative.div` supplies the other state, as reported in [`docs/type-maps.md`](../type-maps.md) sections 1.3 and 2.3.
+Both are ruled - `base64Binary` BYTES over the decoded octets at grade Strong, `Narrative.div` STRING over the escaped XHTML text at grade Decisive - and both figures above still count them unresolved because the artifact does not yet carry the rulings.
 Separately, 659 reached object-applicator source nodes collapse to 504 marked DFA states because the FHIR definitions omit `type: "object"`, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.5 and 2.3.
 
 The lite schema omits `Immunization` and `ImmunizationRecommendation` entirely, while the full schema has them and the vaccination healthcert defines its own flattened variants.
@@ -105,7 +107,17 @@ Every emitted leaf still requires an output for its observed JSON kind, so recur
 Every occurrence of `additionalProperties` in the lite schema is `false` - 66 of them, all `false`.
 
 That makes unknown KEY paths genuine errors rather than ordinary additional properties.
-It does not settle the six `base64Binary` choices, the untyped `Narrative.div`, or the FHIR null-placeholder conflict, all of which remain fail-closed gaps under [`docs/type-maps.md`](../type-maps.md) section 1.3.
+It did not settle the six `base64Binary` slots, the untyped `Narrative.div`, or the FHIR null-placeholder conflict, and nothing in a schema could have: each needed a ruling, and all three were ruled on 2026-07-30 under [`docs/type-maps.md`](../type-maps.md) section 1.3.
+
+- **`base64Binary` is BYTES over the decoded octets**, grade Strong, because FHIR R4 defines the datatype as a stream of bytes while identifying its JSON form as base64 text, so BYTES commits the value rather than the transport spelling.
+  The canonical RFC 4648 section 4 form specification section 6.3 pins is an input-admissibility condition and never the committed value.
+- **`Narrative.div` is STRING over the escaped XHTML text**, grade Decisive, because FHIR R4's normative JSON representation states it is one escaped XHTML string.
+  An implementation MUST NOT parse, normalize as markup, or reserialize the XHTML for commitment: STRING selects `utf8(NFC(s))` and nothing more, and a separate FHIR validator still owns the XHTML content rules.
+- **Primitive-array null placeholders get NO NULL binding and the record is REJECTED**, grade Decisive, until a versioned schema and type-map revision admits the FHIR representation.
+  Specification section 4.2 runs complete profile validation before map resolution, so the pinned schema wins and the map may not widen a record its own schema refuses; adding NULL to the map alone would contradict the schema rather than resolve it.
+
+The third ruling is operative today, because it is expressed as an absence and the artifacts already carry no NULL output.
+The first two are not yet in the artifact, for the reason section 1.6 gives.
 
 ### 4.4 Polymorphic fields are real and already present
 

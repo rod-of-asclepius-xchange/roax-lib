@@ -27,6 +27,7 @@ import { fileURLToPath } from "node:url";
 
 import * as env from "./envelope.mjs";
 import { parse as parseRecord } from "./json_literal.mjs";
+import * as profileRules from "./profile_rules.mjs";
 import * as ref from "./roax_ref.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -309,6 +310,18 @@ for (const v of V.reject ?? []) {
 function runReject(v) {
   const raw = v.input;
   const resolved = resolveInput(raw);
+  // A `recordType` makes this a WHOLE-RECORD rejection: flatten through that profile's COMMITTED
+  // map, never `structuralOnlyTypeMap`. Several of these vectors assert that a path has no
+  // binding for an observed kind - the ruled FHIR primitive-array null placeholder is one - and a
+  // resolve-everything map makes exactly those unfalsifiable.
+  if (v.recordType !== undefined) {
+    const map = typeMaps[v.recordType];
+    if (map === undefined) {
+      throw new Error(`corpus defect: reject ${v.name} names missing type map ${v.recordType}`);
+    }
+    ref.flatten(parseRecord(resolved), map);
+    return;
+  }
   if (raw !== null && typeof raw === "object" && "$segments" in raw) {
     ref.checkReservedNamespace(resolved);
     ref.encodePath(resolved);
@@ -438,6 +451,11 @@ for (const v of V.record ?? []) {
   // is declared rather than sniffed: guessing wrong would pair a real salt with the wrong leaf
   // and yield a plausible wrong root instead of an error.
   const ordered = ref.orderedLeaves(loaded, map, identity);
+  // Specification section 4.2 step 1, and this runner is the issuer when it recomputes a
+  // record. A declared profile value rule is checked before any salt is paired or root
+  // computed, so a record violating one is refused rather than committed. profile_rules.mjs
+  // states why such a rule lives there and not in the canonicalization layer (ruled D13a).
+  profileRules.checkRecord(v.recordType, ordered);
   const saltDoc = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, v.saltsFile), "utf8"));
   if (saltDoc.pairing !== v.saltPairing) {
     throw new Error(`corpus defect: record ${v.name} declares saltPairing ${v.saltPairing}, `
@@ -537,8 +555,10 @@ for (const v of V.unlinkability ?? []) {
 }
 
 // Class 19. The two forms share ONE salt set, so any root difference is normalization and
-// nothing else. Only the value case exists: whether the TYPE-MAP LOOKUP matches over normalized
-// keys is an open question (docs/decisions.md), and a key-case vector would settle it.
+// nothing else. Both sites exist, and the key site additionally resolves its differing key
+// through the type map, which is what makes it the vector that pins ruled decision D14a: the
+// synthetic map declares the composed spelling alone, so a matcher comparing raw fails closed on
+// the decomposed twin instead of producing the one root asserted here.
 for (const v of V.normalization ?? []) {
   const map = typeMaps[v.recordType];
   if (map === undefined) {

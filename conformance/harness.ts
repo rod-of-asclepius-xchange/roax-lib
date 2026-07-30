@@ -107,7 +107,27 @@ export function expectEqual(
   }
 }
 
-/** Asserts that `body` throws a `RoaxError` whose code equals `reason`. */
+/**
+ * Reference reason codes this library spells differently, and the measurement behind each.
+ *
+ * **A corpus `reason` is the REFERENCE implementations' spelling, not a normative code**, and
+ * every reject vector agreed with this library's spelling until the record-shaped reject vectors
+ * of the 2026-07-30 type rulings arrived. Those are the first whose reason is a FAIL-CLOSED, and
+ * the four implementations name that one condition four ways:
+ * `corpus/tools/roax_ref.py` and `roax_ref.mjs` say `type-map-uncovered-path`, this library says
+ * `type-map-fail-closed`, `python/src/roax_canon/errors.py` says `type-unresolved`, and
+ * `rust/src/error.rs` says `type-map-fail-closed`. `corpus/README.md` records that divergence.
+ *
+ * This table is therefore a DECLARED equivalence and not a way to pass: it maps one reference
+ * code to the one local code that means the same condition, so a rejection for a DIFFERENT reason
+ * still fails. Adding an entry is a claim that the two codes name one condition, and it belongs
+ * beside the measurement rather than inside a comparison.
+ */
+const REFERENCE_REASON_ALIASES: ReadonlyMap<string, string> = new Map([
+  ['type-map-uncovered-path', 'type-map-fail-closed'],
+]);
+
+/** Asserts that `body` throws a `RoaxError` whose code equals `reason` or its declared alias. */
 export function expectReject(
   report: Report,
   cls: number,
@@ -129,8 +149,10 @@ export function expectReject(
     report.fail(cls, `${name}: threw a non-RoaxError: ${String(threw)}`);
     return;
   }
-  if (threw.code !== reason) {
-    report.fail(cls, `${name}: expected reason ${reason}, got ${threw.code}`);
+  const expected = REFERENCE_REASON_ALIASES.get(reason) ?? reason;
+  if (threw.code !== expected) {
+    const alias = expected === reason ? '' : ` (this library's spelling of ${reason})`;
+    report.fail(cls, `${name}: expected reason ${expected}${alias}, got ${threw.code}`);
     return;
   }
   report.pass(cls);

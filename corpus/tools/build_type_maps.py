@@ -61,7 +61,60 @@ FHIR_DECIMAL_PATTERNS = {
     r"^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$",
 }
 
-TYPE_MAP_VERSION = "0.1.0"
+# The corpus type maps carry a MINOR bump for the two ruled vaccination bindings, which is
+# additive and makes a previously rejected record issuable (`docs/type-maps.md` section 5.2).
+TYPE_MAP_VERSION = "0.2.0"
+
+# ---------------------------------------------------------------------------------------------
+# Ruled profile bindings
+# ---------------------------------------------------------------------------------------------
+#
+# A path the pinned schema does not determine fails closed, and only a RULING binds it
+# (specification section 4.2, `docs/type-maps.md` section 1). These are those rulings, made on
+# 2026-07-30 and recorded in `docs/type-maps.md` section 1.1 with their evidence and grade.
+#
+# They are held HERE, apart from `derive`, and every one of them is required to be a path
+# `derive` independently reported as unbound. That is what keeps the split honest: a ruling can
+# only resolve a gap the schema walk actually found, so a typo or a drifted upstream schema
+# produces a loud failure rather than a binding nobody derived and nobody ruled. A ruled binding
+# is also never allowed to overwrite a derived one, because that would let this table silently
+# change a tag the schema determines.
+#
+# `grade` is carried into the emitted `source` string on purpose. A Moderate ruling and a
+# Decisive one must not read identically to whoever revisits them.
+#
+# (recordType, display pattern, observed JSON kind) -> (tag, grade, evidence)
+RULED_BINDINGS = {
+    ("sg.gov.moh.vaccination-healthcert",
+     "notarisationMetadata.signedEuHealthCerts[*].dose", "number"): (
+        3,
+        "Strong",
+        "RULED INTEGER 2026-07-30. The pinned schema declares only `type: \"number\"`, which "
+        "JSON Schema draft-07 section 4.2.1 models as an arbitrary-precision base-10 value and "
+        "which therefore chooses neither ROAX numeric tag. The EU Digital COVID Certificate "
+        "these certificates mirror defines its dose-sequence number `v/dn` as a positive "
+        "integer through `dose_posint`, which is `integer` with minimum 1 (EU DCC JSON Schema "
+        "Specification 1.3.0, eu-dcc-schema commit "
+        "a603410d760fefc9073931c8c807759d9714c136). Strong rather than decisive: the Singapore "
+        "wrapper never states that its `dose` IS the EU DCC `dn` field. The ruling also carries "
+        "a positive-integer narrowing, which is a profile-validation rule and NOT a tag - see "
+        "`docs/profiles/vaccination-healthcert.md` section 6.",
+    ),
+    ("sg.gov.moh.vaccination-healthcert",
+     "notarisationMetadata.signedEuHealthCerts[*].expiryDateTime", "string"): (
+        2,
+        "Moderate",
+        "RULED STRING 2026-07-30 BY EXPLICIT PROFILE DECLARATION, not by the schema. Both "
+        "pinned signed-certificate branches attach `format: \"date-time\"` and a string example "
+        "and declare NO instance type, and JSON Schema Validation draft-07 sections 7.2 and "
+        "7.3.1 make `format` an annotation that neither creates a string type nor rejects a "
+        "non-string instance. The schema therefore formally admits every JSON kind and settles "
+        "nothing. Moderate: this rests on the profile declaration at "
+        "`docs/profiles/vaccination-healthcert.md` section 6 plus the field name, both examples "
+        "and the standard meaning of `date-time`. No separate governing specification for this "
+        "wrapper field was found.",
+    ),
+}
 
 PROFILES = [
     {
@@ -289,7 +342,47 @@ def derive(profile, src_root, record):
         else:
             unbound[key] = reasons[0] if reasons else "no scalar declaration reachable"
 
+    apply_rulings(profile["recordType"], entries, unbound)
     return entries, unbound
+
+
+def apply_rulings(record_type, entries, unbound):
+    """Move each ruled binding out of `unbound` and into `entries`, or fail loudly.
+
+    Two guards, and each of them exists so that this table can only ever resolve a gap the
+    schema walk independently reported:
+
+      - a ruling that collides with a DERIVED entry is a build failure, so this table can never
+        silently change a tag the schema determines;
+      - a ruling whose path the walk did NOT report unbound is a build failure, which covers
+        both a typo or a drifted upstream schema and a ruling the sample never reaches, since a
+        corpus map is shaped by the schema and the sample together and a dead ruling is a stale
+        one.
+    """
+    for (ruled_type, pattern, kind), (tag, grade, evidence) in RULED_BINDINGS.items():
+        if ruled_type != record_type:
+            continue
+        key = (pattern, kind)
+        if key in entries:
+            raise SystemExit(
+                f"{record_type}: ruled binding {pattern!r} at kind {kind!r} collides with a "
+                f"binding the schema already determines - a ruling may resolve a gap and MUST "
+                f"NOT change a derived tag"
+            )
+        if key not in unbound:
+            raise SystemExit(
+                f"{record_type}: ruled binding {pattern!r} at kind {kind!r} is not a path this "
+                f"build reported unbound, so there is no gap for it to resolve - either the "
+                f"pattern or kind is wrong, the upstream schema drifted, or the sample no longer "
+                f"reaches this path and the ruling is stale"
+            )
+        del unbound[key]
+        entries[key] = {
+            "pattern": pattern,
+            "jsonKind": kind,
+            "tag": tag,
+            "source": f"ruled profile binding, evidence grade {grade}. {evidence}",
+        }
 
 
 def build(references, out_dir, report=False):

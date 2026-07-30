@@ -16,8 +16,18 @@ It is not disclosure verification because both the alleged leaf hash and tree si
 Envelope generation 1 and 2 have different reserved leaf sets.
 Callers select `ReservedLeafSet::EnvelopeV1` only for the committed legacy corpus and envelope 1.0 compatibility, while current issuance uses `ReservedLeafSet::EnvelopeV2` and commits the exact `roax.typeMap.id` leaf under ROAX-CANON/1 sections 4.2 and 11.2.
 
-Decision D14 remains open, so `LookupKeyMode` has no default.
-The high-level construction and verification paths reject a key whose binding changes between raw and NFC-normalized lookup rather than deciding D14 inside this library (`docs/decisions.md`, D14; ROAX-CANON/1 section 4.2).
+Decision D14 was ruled D14a on 2026-07-30: the type-map lookup compares the NFC-normalized key (ROAX-CANON/1 section 4.2; `docs/decisions.md`, D14).
+`DfaTypeMap::resolve` normalizes a KEY segment before taking its transition, and a loaded artifact's transition keys are already validated NFC, so both sides of the comparison are normalized.
+
+**`LookupKeyMode`, `TypeResolver::ensure_lookup_decision_independent` and `Error::LookupNormalizationUndecided` are gone.**
+While D14 was open this crate took neither side: the mode had no default and the construction and verification paths refused a key whose binding differed between the two readings.
+That guard existed to refuse a lookup whose answer depended on the open question, and with one reading there is nothing for it to refuse.
+It was deleted rather than reduced to a single-variant enum, which would have invited the other variant back.
+
+Normalizing does not widen a map: a key whose NFC form is not a declared transition still fails closed with `Error::UnknownTypeBinding`.
+
+This crate carries no value-domain rule such as the vaccination `dose` positive-integer narrowing, and that is ruled rather than an omission: ROAX-CANON/1 section 4.2 orders profile validation before map resolution, and decision D13a keeps value-domain validation in a separate, independently versioned layer.
+`SchemaValidator` is the seam an application supplies one through, and `tests/dfa_profile_protocol.rs` shows a profile using it to refuse `dose: 0` while the bare canonicalization layer accepts the same value.
 
 `DfaTypeMap::from_exact_bytes` loads validated base artifacts.
 It rejects issuer child artifacts because proving their parent identity and logical additivity requires the exact parent and the executable checks in `docs/type-maps.md` section 5; accepting a child without that input would violate the fail-closed rule in ROAX-CANON/1 section 4.2.
@@ -34,8 +44,10 @@ ROAX_EXTRACTED_RECORDS="$(pwd -P)/schemata/extracted" \
   cargo clippy --manifest-path rust/Cargo.toml --all-targets -- -D warnings
 ```
 
-Class 10 needs the recovery sample extracted from the gitignored Open-Attestation schemata checkout at commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`, as cited by `corpus/conformance-corpus-1.0.json`.
-The integration test fails visibly instead of reporting a complete pass when that sample is absent.
+Class 10 needs two samples extracted from the gitignored Open-Attestation schemata checkout at commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`, as cited by `corpus/conformance-corpus-1.0.json`: the recovery healthcert, and the vaccination healthcert its two 2026-07-30 bindings made committable.
+Inside `ROAX_EXTRACTED_RECORDS` this test names each file by the vector's EXPORT rather than by its profile, so they are `sampleDocument.json` and `sampleVaccineHealthCert.json` (`tests/conformance_corpus.rs:1030-1031`); the TypeScript runner's `<authority>.<profile>.json` convention is a separate contract and one directory can satisfy both.
+With neither sample supplied the integration test fails visibly instead of reporting a complete pass.
+With one of the two, class 10 reports `PASS WITH SKIPS` and names each vector it could not run, which is a partial run rather than a failure (`tests/conformance_corpus.rs:99-120`).
 
 The committed class-9 rows all match, but the corpus currently lacks the forged-size, full-disclosure row required by `docs/conformance-corpus.md` class 9.
 `tests/security_boundaries.rs` pins the Rust defence locally, while `corpus/README.md` records why that does not complete the cross-language release gate.

@@ -128,6 +128,16 @@ ENCODE_VALUE = [
     ("bool-true", 7, 1, True),
     ("bool-false", 7, 1, False),
     ("integer-100", 7, 3, "100"),
+    # Class 7, the RULED `base64Binary` -> BYTES semantics, isolated from any record. These two
+    # carry the SAME logical content under the two possible readings: the octets that
+    # `SGVsbG8sIFJPQVgh` decodes to, and that base64 TEXT itself. The BYTES carrier is lowercase
+    # hex of the decoded octets, so an implementation that hashed the base64 characters at a
+    # BYTES-bound path produces the STRING row's bytes for the BYTES row. build_corpus asserts
+    # the two encoded values differ.
+    ("bytes-decoded-octets", 7, 5, "48656c6c6f2c20524f415821"),
+    ("string-base64-text", 7, 2, "SGVsbG8sIFJPQVgh"),
+    ("bytes-empty", 7, 5, ""),
+
     ("null-value", 5, 0, None),
     ("empty-array-value", 5, 6, None),
     ("empty-object-value", 5, 7, None),
@@ -246,6 +256,56 @@ REJECT = [
 ]
 
 # ---------------------------------------------------------------------------------------------
+# Reject vectors driven through a WHOLE RECORD and a real type map
+# ---------------------------------------------------------------------------------------------
+#
+# (name, class, recordType, record JSON text). These carry a `recordType` and are flattened
+# through that profile's committed type map, which is what the entries above cannot do: a
+# tag-bearing reject vector is fed to the value encoder in its CARRIER form, so it can never
+# exercise a rejection that happens where a RECORD value is converted into that carrier.
+#
+# Every rejection below lives exactly there. Flattening needs no record identity, so these
+# vectors carry none: what they assert is a rejection at the record boundary and not a tree.
+#
+# They exist because three of the five type bindings ruled on 2026-07-30 are stated as
+# rejections rather than as tags, and a ruling with no vector is a place five independent builds
+# diverge silently.
+REJECT_RECORD = [
+    # The RULED `base64Binary` -> BYTES binding commits the DECODED OCTETS, and the canonical
+    # RFC 4648 section 4 spelling is an INPUT-ADMISSIBILITY condition (specification section
+    # 6.3). Each of these four spells admissible-looking base64 that is not the pinned form, and
+    # the first three decode to the same octets as the accepted fixture under a permissive
+    # decoder. That is the whole hazard: two implementations disagreeing about whether the record
+    # is admissible while agreeing about the bytes.
+    ("reject-bytes-base64-unpadded", 3, SYNTHETIC_RECORD_TYPE,
+     {"$jsonText": '{"blob": {"bytes": "SGVsbG8sIFJPQVg", "text": "x"}, "marker": "m"}'}),
+    ("reject-bytes-base64-url-safe-alphabet", 3, SYNTHETIC_RECORD_TYPE,
+     {"$jsonText": '{"blob": {"bytes": "-_8=", "text": "x"}, "marker": "m"}'}),
+    ("reject-bytes-base64-nonzero-pad-bits", 3, SYNTHETIC_RECORD_TYPE,
+     {"$jsonText": '{"blob": {"bytes": "aGl=", "text": "x"}, "marker": "m"}'}),
+    ("reject-bytes-base64-line-wrapped", 3, SYNTHETIC_RECORD_TYPE,
+     {"$jsonText": '{"blob": {"bytes": "SGVs\\nbG8=", "text": "x"}, "marker": "m"}'}),
+    # A JSON number at the BYTES-bound path. The map is keyed by (path, OBSERVED KIND), so a
+    # number where the ruling bound `string` has no binding at all and fails closed - it is not
+    # coerced into a byte string, and it does not reach the base64 decoder either. That ordering
+    # is the point: fail-closed comes first, so the ruling widens exactly one observed kind.
+    ("reject-bytes-observed-kind-not-string", 3, SYNTHETIC_RECORD_TYPE,
+     {"$jsonText": '{"blob": {"bytes": 5, "text": "x"}, "marker": "m"}'}),
+
+    # The RULED FHIR primitive-array null placeholder outcome, which is stated as a REJECTION:
+    # publish no NULL binding and refuse the record until a versioned schema and type-map
+    # revision admits the FHIR representation. FHIR R4 JSON section 2.6.2.3 uses a null in a
+    # repeating primitive array to keep values index-aligned with a paired `_foo` array; the
+    # pinned schemas reject that, and a map may not widen a record its own schema refuses.
+    #
+    # The synthetic map binds `name[*].given[*]` for `string` and declares nothing for `null`, so
+    # the placeholder fails closed. This vector is what makes that ABSENCE checkable, and a
+    # matcher that added a `null` row to make it pass would have ruled the question the other way.
+    ("reject-fhir-primitive-array-null-placeholder", 5, SYNTHETIC_RECORD_TYPE,
+     {"$jsonText": '{"name": [{"given": ["Ada", null]}], "marker": "m"}'}),
+]
+
+# ---------------------------------------------------------------------------------------------
 # Class 12 - cross-record unlinkability under independent per-leaf salts
 # ---------------------------------------------------------------------------------------------
 #
@@ -328,22 +388,39 @@ MOH_TYPE_MAP_VECTORS = [
     ("typemap-pdt-polymorphic-type", "sg.gov.moh.pdt-healthcert",
      [{"key": "type"}], "string"),
 
+    # The two RULED vaccination bindings. Both were fail-closed rows until 2026-07-30, and the
+    # rows are kept at the same paths rather than deleted so the change of verdict is visible in
+    # the corpus rather than only in a document. Neither tag is written here: like every other
+    # row in this file the expected outcome is COMPUTED against the committed type map, so what
+    # this pins is that the ruling reached the map that class 10 resolves against.
+    #
+    #   dose            RULED INTEGER, Strong. `type: "number"` chooses neither ROAX numeric
+    #                   tag; the EU DCC dose-sequence number these certificates mirror is a
+    #                   positive integer. The positive-integer half is a profile-validation rule
+    #                   rather than a tag - see corpus/tools/profile_rules.py.
+    #   expiryDateTime  RULED STRING, Moderate, by explicit profile declaration rather than by
+    #                   the schema, which carries a `format` and `examples` and no `type` at all
+    #                   and therefore formally admits every JSON kind.
+    ("typemap-vaccination-dose-ruled-integer", "sg.gov.moh.vaccination-healthcert",
+     [{"key": "notarisationMetadata"}, {"key": "signedEuHealthCerts"}, {"index": 0},
+      {"key": "dose"}], "number"),
+    ("typemap-vaccination-expiry-ruled-string", "sg.gov.moh.vaccination-healthcert",
+     [{"key": "notarisationMetadata"}, {"key": "signedEuHealthCerts"}, {"index": 0},
+      {"key": "expiryDateTime"}], "string"),
+    # A ruling binds ONE observed kind and widens nothing else. `dose` arriving as a JSON string
+    # still fails closed, which is what separates a ruled binding from a coercion.
+    ("typemap-vaccination-dose-other-kind-fails-closed", "sg.gov.moh.vaccination-healthcert",
+     [{"key": "notarisationMetadata"}, {"key": "signedEuHealthCerts"}, {"index": 0},
+      {"key": "dose"}], "string"),
+
     # Fail-closed, on paths that are genuinely present in the shipped samples and that the
     # reference schemas do not determine a ROAX tag for. These are not invented gaps.
     #
-    #   dose            declared "type": "number" with no pattern. ROAX has two numeric tags
-    #                   and JSON Schema's `number` chooses neither. FHIR's own lite schema
-    #                   distinguishes `integer` from `decimal` by PATTERN, both being
-    #                   "type": "number"; the notarise schema carries no such pattern.
-    #   expiryDateTime  declared with a `format` and `examples` and no `type` at all.
     #   issuers[*].name PDT's root object declares no `issuers` member and does not close
-    #                   itself, so the member is permitted and undeclared.
-    ("typemap-vaccination-dose-fails-closed", "sg.gov.moh.vaccination-healthcert",
-     [{"key": "notarisationMetadata"}, {"key": "signedEuHealthCerts"}, {"index": 0},
-      {"key": "dose"}], "number"),
-    ("typemap-vaccination-expiry-fails-closed", "sg.gov.moh.vaccination-healthcert",
-     [{"key": "notarisationMetadata"}, {"key": "signedEuHealthCerts"}, {"index": 0},
-      {"key": "expiryDateTime"}], "string"),
+    #                   itself, so the member is permitted and undeclared. The 20 PDT
+    #                   endorsed-sample pairs are NOT ruled: `docs/type-maps.md` section 1.2
+    #                   records that the clean answer is a versioned composition profile rather
+    #                   than 20 authored bindings, and nobody has ruled one.
     ("typemap-pdt-issuers-fails-closed", "sg.gov.moh.pdt-healthcert",
      [{"key": "issuers"}, {"index": 0}, {"key": "name"}], "string"),
     ("typemap-pdt-template-fails-closed", "sg.gov.moh.pdt-healthcert",

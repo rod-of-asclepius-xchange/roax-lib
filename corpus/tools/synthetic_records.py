@@ -35,11 +35,25 @@ TYPE_MAP_DIR = os.path.join(CORPUS_DIR, "type-maps")
 
 AUTHORED = "corpus fixture: authored declaration, not derived from any reference schema"
 
-# U+212A KELVIN SIGN followed by "elvin". Its NFC form is ASCII "Kelvin".
-KELVIN_KEY = "Kelvin"
+# Class 19's key site: `é` composed, whose decomposed twin `e\u0301` renders identically.
+#
+# The map declares ONE spelling, the composed one, and that is what makes the key-site vector
+# discriminate ruled decision D14a rather than agree with either reading of it. The decomposed
+# twin is deliberately NOT a constant here: it lives in the committed fixture text as the
+# escape `\u0301`, so nothing between this module and those bytes can quietly compose it. The
+# U+212A KELVIN SIGN key is the same situation now that its duplicate pattern is gone: the map
+# below declares the ASCII spelling ALONE, so `\u212Aelvin` reaches it only through NFC and
+# `record-guard-kelvin-key` discriminates D14a instead of resolving under either reading.
+KEY_ACCENTED_NFC = "é"
 
 SYNTHETIC_TYPE_MAP = {
-    "typeMapVersion": "1.0.0",
+    # MAJOR under `docs/type-maps.md` section 5.2, because this revision REMOVED a selector:
+    # the duplicate U+212A Kelvin pattern that stood in for decision D14 while it was open.
+    # That section governs the published `type-maps/` artifacts, and this map is corpus-only
+    # and listed by no registry, so the rule binds it by analogy rather than by governance. It
+    # is worth following anyway: nothing else tells a reader comparing two checkouts of this
+    # file that the selector set changed.
+    "typeMapVersion": "2.0.0",
     "recordType": SYNTHETIC_RECORD_TYPE,
     "schemaVersion": SYNTHETIC_SCHEMA_VERSION,
     "sourceSchemas": [{
@@ -57,6 +71,15 @@ SYNTHETIC_TYPE_MAP = {
         # only the VALUE differs between the two forms, which is what keeps this vector about
         # normalization in the hashing path and nothing else.
         {"pattern": "accented", "jsonKind": "string", "tag": ref.TAG_STRING, "source": AUTHORED},
+        # Class 19's KEY pair, and the one entry in this map that discriminates ruled decision
+        # D14a. The pattern is authored in the COMPOSED spelling ONLY. The two key fixtures
+        # differ in nothing else, so a matcher comparing raw resolves the composed record and
+        # fails closed on the decomposed one, while a matcher comparing NFC resolves both to the
+        # same tag and therefore to one root. Do not add the decomposed spelling as a second
+        # entry: that is the Kelvin workaround this map used to carry, and its whole purpose was
+        # to stop a vector depending on an answer nobody had given.
+        {"pattern": KEY_ACCENTED_NFC, "jsonKind": "string", "tag": ref.TAG_STRING,
+         "source": AUTHORED},
 
         # Class 13. Both FHIR entry layouts, so that the same clinical content under the two
         # shapes can be shown to produce different roots.
@@ -82,11 +105,44 @@ SYNTHETIC_TYPE_MAP = {
         # `**` reaches it without the pattern language having to grow an escape. This limit is
         # recorded in corpus/README.md rather than worked around silently.
         {"pattern": "a.**", "jsonKind": "string", "tag": ref.TAG_STRING, "source": AUTHORED},
-        # Both spellings of the Kelvin key, so that the vector does not depend on whether an
-        # implementation normalizes a type-map pattern before matching it. The specification
-        # does not say which, and the corpus must not decide it - see corpus/README.md.
-        {"pattern": KELVIN_KEY, "jsonKind": "string", "tag": ref.TAG_STRING, "source": AUTHORED},
+        # The ASCII spelling of the Kelvin key ONLY. Under ruled decision D14a the lookup
+        # matches over NFC-normalized keys, so `record-guard-kelvin-key`, whose record key is
+        # `\u212Aelvin`, reaches this entry through normalization. The U+212A duplicate this
+        # map carried while D14 was open is removed rather than kept as a belt: keeping it would
+        # leave the vector passing under either reading, which is the whole reason it proved
+        # nothing before.
         {"pattern": "Kelvin", "jsonKind": "string", "tag": ref.TAG_STRING, "source": AUTHORED},
+
+        # The three RULED FHIR bindings of `docs/type-maps.md` section 1.3, exercised here on the
+        # SYNTHETIC profile. These rows assert the ruled TAG SEMANTICS and they are NOT the FHIR
+        # profile binding: the published FHIR artifacts still carry their pre-ruling `unresolved`
+        # rows, because regeneration is blocked on the 34 merged object states of
+        # `docs/type-maps.md` section 6 and hand-editing a generated artifact would replace a
+        # blocked regeneration with an unreproducible one. corpus/README.md says the same.
+        #
+        # base64Binary -> BYTES, over the DECODED OCTETS. The canonical RFC 4648 section 4
+        # spelling is an input-admissibility condition rather than the committed value, so a
+        # non-canonical spelling of the same bytes is refused before it can be committed
+        # (specification section 6.3).
+        {"pattern": "blob.bytes", "jsonKind": "string", "tag": ref.TAG_BYTES, "source": AUTHORED},
+        # And the same base64 TEXT at a STRING-bound path, which is the OTHER half of the ruling:
+        # a profile that means the transport spelling gets the spelling, so the two paths carry
+        # identical record text and commit different bytes. Without this pair, "BYTES commits the
+        # decoded octets" is a claim no vector separates from "BYTES commits the text".
+        {"pattern": "blob.text", "jsonKind": "string", "tag": ref.TAG_STRING, "source": AUTHORED},
+        # Narrative.div -> STRING over the ESCAPED XHTML TEXT, with no parsing and no
+        # reserialization. STRING selects `utf8(NFC(s))` and nothing else, so the markup travels
+        # as characters (specification section 6.1).
+        {"pattern": "narrative.div", "jsonKind": "string", "tag": ref.TAG_STRING,
+         "source": AUTHORED},
+        # FHIR primitive-array null placeholders -> RULED: publish NO NULL binding, and REJECT a
+        # record carrying one until a versioned schema and type-map revision admits the FHIR
+        # representation. The ruling is expressed by an ABSENCE, so the entry below binds `string`
+        # and deliberately declares nothing for `null`, and the reject vector over this path is
+        # what makes that absence checkable. Adding a `null` row here would rule the question the
+        # other way from inside a data file.
+        {"pattern": "name[*].given[*]", "jsonKind": "string", "tag": ref.TAG_STRING,
+         "source": AUTHORED},
 
         # Scalars for the type-tag and numeric classes inside a whole record.
         {"pattern": "counts.integer", "jsonKind": "number", "tag": ref.TAG_INTEGER,
@@ -101,14 +157,25 @@ SYNTHETIC_TYPE_MAP = {
 # (fixture file name, record body). Written as JSON text so that no re-serializer ever touches a
 # numeric literal.
 RECORD_FIXTURES = {
-    # Class 19. The SAME record twice, differing only in whether the accented value is written
-    # decomposed or composed. Section 6.1 normalizes a value to NFC before encoding, so the two
-    # must produce ONE root. The path is deliberately ASCII: the KEY case is a separate vector
-    # this corpus does not carry, because whether the TYPE-MAP LOOKUP normalizes is an open
-    # question (docs/decisions.md, "Type-map matching over normalized keys") and building it
-    # would decide it.
+    # Class 19's VALUE site. The SAME record twice, differing only in whether the accented value
+    # is written decomposed or composed. Section 6.1 normalizes a value to NFC before encoding,
+    # so the two must produce ONE root. The path is deliberately ASCII, so this pair is about
+    # normalization in the hashing path and about nothing else.
     "nfc-value-nfd.json": '{\n  "marker": "structure",\n  "accented": "e\\u0301"\n}\n',
     "nfc-value-nfc.json": '{\n  "marker": "structure",\n  "accented": "\\u00e9"\n}\n',
+
+    # Class 19's KEY site, which decision D14a is what made buildable. The same record twice,
+    # differing only in whether the accented KEY is written decomposed or composed. The VALUE is
+    # ASCII and identical, so nothing but the key spelling can move the root.
+    #
+    # This pair is the corpus's discriminator for D14a, and it discriminates in both directions.
+    # The synthetic map declares the composed key alone, so a matcher comparing raw resolves
+    # `nfc-key-nfc` and fails closed on `nfc-key-nfd` with `type-map-uncovered-path`, and the
+    # vector's expectSameRoot is unreachable. A matcher comparing NFC resolves both, and because
+    # encode_path already normalizes each KEY segment (section 5.1) the two encode to the same
+    # leaf path and therefore to ONE root.
+    "nfc-key-nfd.json": '{\n  "marker": "structure",\n  "e\\u0301": "same"\n}\n',
+    "nfc-key-nfc.json": '{\n  "marker": "structure",\n  "\\u00e9": "same"\n}\n',
     # Class 5: three siblings differing at exactly one path.
     "structure-empty-array.json": '{\n  "a": { "b": [] },\n  "marker": "structure"\n}\n',
     "structure-empty-object.json": '{\n  "a": { "b": {} },\n  "marker": "structure"\n}\n',
@@ -155,6 +222,26 @@ RECORD_FIXTURES = {
     "guard-nested-roax-dotted.json": '{\n  "a": { "roax.foo": "ordinary" },\n  "marker": "guard"\n}\n',
     "guard-kelvin-key.json": '{\n  "\\u212Aelvin": "ordinary",\n  "marker": "guard"\n}\n',
 
+    # The three RULED FHIR bindings of `docs/type-maps.md` section 1.3, over the synthetic
+    # profile. `bytes` and `text` carry the SAME base64 characters at differently bound paths, so
+    # the pair separates "BYTES commits the decoded octets" from "BYTES commits the text": a
+    # runner that hashed the base64 characters at the BYTES path would give the two leaves equal
+    # value bytes. `div` carries escaped XHTML, which STRING commits as characters with no
+    # parsing and no reserialization.
+    "fhir-ruled-bindings.json": (
+        '{\n'
+        '  "blob": {\n'
+        '    "bytes": "SGVsbG8sIFJPQVgh",\n'
+        '    "text": "SGVsbG8sIFJPQVgh"\n'
+        '  },\n'
+        '  "narrative": {\n'
+        '    "div": '
+        '"<div xmlns=\\"http://www.w3.org/1999/xhtml\\">a &amp; b &lt;ok&gt;</div>"\n'
+        '  },\n'
+        '  "marker": "typed"\n'
+        '}\n'
+    ),
+
     # Class 15 reject row: a record key that IS a reserved path.
     "guard-reserved-collision.json": '{\n  "roax.recordId": "squatted",\n  "marker": "guard"\n}\n',
 
@@ -180,6 +267,7 @@ RECORD_VECTOR_PLAN = [
     ("record-guard-roax-x", 15, "guard-roax-x.json", None),
     ("record-guard-nested-roax-dotted", 15, "guard-nested-roax-dotted.json", None),
     ("record-guard-kelvin-key", 15, "guard-kelvin-key.json", None),
+    ("record-fhir-ruled-bindings", 7, "fhir-ruled-bindings.json", None),
     ("record-typed-scalars", 7, "typed-scalars.json", None),
     ("record-typed-scalars-with-key-id", 7, "typed-scalars.json",
      "did:web:corpus.roax.invalid#key-1"),
@@ -278,21 +366,33 @@ def build_record_vectors():
     return out
 
 
+# Class 19. (vector name, site, salt-set name, NFD fixture, NFC fixture).
+#
+# BOTH SITES ARE BUILT. docs/conformance-corpus.md class 19 always required both, because an
+# implementation can normalize values and not keys; the key row was withheld while decision D14
+# was open, since resolving a decomposed KEY through the type map settles whether the lookup
+# normalizes. D14 is ruled D14a, so the row now tests a decided question instead of deciding one.
+NORMALIZATION_SITES = [
+    ("normalization-nfc-value-end-to-end", "value", "normalization-nfc-value",
+     "nfc-value-nfd.json", "nfc-value-nfc.json"),
+    ("normalization-nfc-key-end-to-end", "key", "normalization-nfc-key",
+     "nfc-key-nfd.json", "nfc-key-nfc.json"),
+]
+
+
 def build_normalization_vectors():
-    """Class 19. One record in both Unicode forms, asserting ONE root.
+    """Class 19. One record in both Unicode forms at each site, asserting ONE root.
 
     Class 4 asserts NFC against NFD at LEAF level. This asserts it end to end, over the union of
     specification section 3.3, which is where the routes a leaf-level vector misses actually are:
     a reserved-leaf value written straight from the envelope, or a path segment re-encoded from a
-    cached form. Both forms share ONE salt set, because two sets would make the roots differ for
-    a reason that has nothing to do with normalization (spec section 7, decision D4b).
+    cached form. Both forms of a site share ONE salt set, because two sets would make the roots
+    differ for a reason that has nothing to do with normalization (spec section 7, decision D4b).
 
-    ONLY THE VALUE CASE IS CARRIED. docs/conformance-corpus.md class 19 wants a key case too, and
-    it is not built here on purpose: the specification does not say whether the TYPE-MAP LOOKUP
-    matches over normalized keys, and both reference implementations currently match RAW, so an
-    NFD-spelled key would fail the lookup while its NFC twin resolved. Building it would settle
-    that question rather than test a settled one. It is recorded in docs/decisions.md as a
-    newly identified open question.
+    The KEY site additionally resolves its differing key through the type map, so it is the
+    vector that pins ruled decision D14a: the synthetic map declares the composed spelling
+    alone, and a matcher comparing raw fails closed on the decomposed twin instead of producing
+    the one root asserted here.
     """
     import json_literal
 
@@ -300,43 +400,58 @@ def build_normalization_vectors():
     type_map = synthetic_type_map()
     identity = (SYNTHETIC_RECORD_TYPE, SYNTHETIC_SCHEMA_VERSION, RECORD_ID_A, ISSUER_ID, None)
 
-    # ONE salt set, resolved ONCE and used for both forms. Drawing inside the loop would give
-    # each form its own set under --draw-salts, and the two roots would then differ for a reason
-    # that has nothing to do with normalization - which is exactly what the guard below caught
-    # the first time this was written. The two forms have identical ENCODED paths, since
-    # encode_path normalizes each key, so one set pairs against both.
-    first = json_literal.loads(RECORD_FIXTURES["nfc-value-nfd.json"])
-    ordered = ref.ordered_leaves(first, type_map, *identity)
-    salt_doc = _salt_doc("normalization-nfc-value", ordered)
+    out = []
+    for name, site, salt_name, nfd_fixture, nfc_fixture in NORMALIZATION_SITES:
+        # ONE salt set per site, resolved ONCE and used for both forms. Drawing inside the loop
+        # would give each form its own set under --draw-salts, and the two roots would then
+        # differ for a reason that has nothing to do with normalization - which is exactly what
+        # the guard below caught the first time this was written. The two forms have identical
+        # ENCODED paths, since encode_path normalizes each key, so one set pairs against both.
+        first = json_literal.loads(RECORD_FIXTURES[nfd_fixture])
+        ordered = ref.ordered_leaves(first, type_map, *identity)
+        salt_doc = _salt_doc(salt_name, ordered)
 
-    roots = []
-    for fixture in ("nfc-value-nfd.json", "nfc-value-nfc.json"):
-        record = json_literal.loads(RECORD_FIXTURES[fixture])
-        form_ordered = ref.ordered_leaves(record, type_map, *identity)
-        salts = ref.salt_set_from_document(salt_doc, form_ordered)
-        root, _leaves, _s, _h = ref.build_tree("SHA-256", record, type_map, salts, *identity)
-        roots.append(root.hex())
+        roots = []
+        for fixture in (nfd_fixture, nfc_fixture):
+            record = json_literal.loads(RECORD_FIXTURES[fixture])
+            form_ordered = ref.ordered_leaves(record, type_map, *identity)
+            salts = ref.salt_set_from_document(salt_doc, form_ordered)
+            root, _leaves, _s, _h = ref.build_tree("SHA-256", record, type_map, salts, *identity)
+            roots.append(root.hex())
 
-    if roots[0] != roots[1]:
+        if roots[0] != roots[1]:
+            raise SystemExit(
+                f"corpus defect: the NFD and NFC forms of the class-19 {site} record produced "
+                f"different roots ({roots[0]} vs {roots[1]}); section 6.1 requires one"
+            )
+
+        out.append({
+            "name": name,
+            "class": 19,
+            "site": site,
+            "recordFileNFD": "corpus/fixtures/records/" + nfd_fixture,
+            "recordFileNFC": "corpus/fixtures/records/" + nfc_fixture,
+            "saltsFile": salt_sets.reference_for(salt_name),
+            "recordType": SYNTHETIC_RECORD_TYPE,
+            "schemaVersion": SYNTHETIC_SCHEMA_VERSION,
+            "recordId": RECORD_ID_A,
+            "issuerId": ISSUER_ID,
+            "expectSameRoot": True,
+            "root": roots[0],
+        })
+
+    # The class is not complete until both sites are present, and that requirement is on the SET
+    # rather than on any one vector, so it is checked here rather than in the corpus schema.
+    sites = {vector["site"] for vector in out}
+    if sites != {"value", "key"}:
         raise SystemExit(
-            "corpus defect: the NFD and NFC forms of the class-19 record produced different "
-            f"roots ({roots[0]} vs {roots[1]}); section 6.1 requires one"
+            f"corpus defect: class 19 must carry both the value and the key site, found {sites}"
         )
-
-    return [{
-        "name": "normalization-nfc-value-end-to-end",
-        "class": 19,
-        "site": "value",
-        "recordFileNFD": "corpus/fixtures/records/nfc-value-nfd.json",
-        "recordFileNFC": "corpus/fixtures/records/nfc-value-nfc.json",
-        "saltsFile": salt_sets.reference_for("normalization-nfc-value"),
-        "recordType": SYNTHETIC_RECORD_TYPE,
-        "schemaVersion": SYNTHETIC_SCHEMA_VERSION,
-        "recordId": RECORD_ID_A,
-        "issuerId": ISSUER_ID,
-        "expectSameRoot": True,
-        "root": roots[0],
-    }]
+    # The two sites MUST NOT share a root, or one salt set has been reused across them and the
+    # key vector would be asserting the value vector's arithmetic.
+    if len({vector["root"] for vector in out}) != len(out):
+        raise SystemExit("corpus defect: two class-19 sites produced the same root")
+    return out
 
 
 def build_type_map_vectors():
