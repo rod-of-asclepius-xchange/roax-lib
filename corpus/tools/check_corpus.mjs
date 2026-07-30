@@ -555,8 +555,10 @@ for (const v of V.unlinkability ?? []) {
 }
 
 // Class 19. The two forms share ONE salt set, so any root difference is normalization and
-// nothing else. Only the value case exists: whether the TYPE-MAP LOOKUP matches over normalized
-// keys is an open question (docs/decisions.md), and a key-case vector would settle it.
+// nothing else. Both sites exist, and the key site additionally resolves its differing key
+// through the type map, which is what makes it the vector that pins ruled decision D14a: the
+// synthetic map declares the composed spelling alone, so a matcher comparing raw fails closed on
+// the decomposed twin instead of producing the one root asserted here.
 for (const v of V.normalization ?? []) {
   const map = typeMaps[v.recordType];
   if (map === undefined) {
