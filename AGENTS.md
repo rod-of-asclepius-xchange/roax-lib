@@ -322,7 +322,8 @@ Things to know:
   Use a plain hyphen.
 - In long Markdown, put each full sentence on its own line.
   It keeps diffs readable when a single sentence changes.
-  **Every Markdown file in the tree now holds to this**, measured at zero prose lines carrying more than one sentence, against 932 before the tree was reflowed; code blocks, tables and headings are excluded from that measure because a line of code and a table row are not sentences.
+  **Every Markdown file in the tree now holds to this**, measured at zero prose lines carrying more than one sentence, against 934 before the tree was reflowed; code blocks, tables and headings are excluded from that measure because a line of code and a table row are not sentences.
+  The zero was re-measured by a scan written independently of the tool's own sentence splitter, since a count produced by the splitter that made the split proves only internal consistency.
   An earlier version of this section described the convention as a target that the repository did not yet meet, and it was true when written.
   `tools/reflow-markdown.mjs` is the executable form of the rule rather than a description of it, so what gets applied is readable rather than reconstructed from a diff.
   Run `node tools/reflow-markdown.mjs` to check and `--write` to apply, `--self-test` for the sentence-splitter cases, and `--verify-render` to additionally compare rendered HTML before and after.

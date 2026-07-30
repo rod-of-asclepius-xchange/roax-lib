@@ -19,9 +19,10 @@
 //
 // THE TOOL FAILS CLOSED. Any Markdown construct it does not model - a tilde fence, an indented code
 // block, a lazy continuation, a setext heading, a hard line break in prose, an HTML block, a link
-// reference definition, a GFM table written without leading pipes - refuses the file and exits
-// non-zero rather than guessing at it. That is the same posture decision D7 takes for an unbound
-// type-map path, and it is what makes the tool safe to point at a document nobody has read.
+// reference definition, a GFM table written without leading pipes, a GFM table whose header line is
+// the last line of a paragraph - refuses the file and exits non-zero rather than guessing at it. An
+// unrecognised flag is rejected the same way. That is the same posture decision D7 takes for an
+// unbound type-map path, and it is what makes the tool safe to point at a document nobody has read.
 
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
@@ -185,9 +186,15 @@ function sentenceCuts(text) {
     while (start > 0 && !/\s/.test(text[start - 1])) start -= 1;
     const word = text.slice(start, end + 1);
     if (ABBREVIATIONS.has(word.toLowerCase())) continue;
-    // A lone capital before the period is an initial, not a sentence end.
-    if (/^[A-Za-z]\.$/.test(word)) continue;
 
+    // There is deliberately NO rule here treating a lone letter before the period as a personal
+    // initial. A single capital letter is this repository's own naming for a decision and for a
+    // reference implementation, so `ported from A.` and `open under B.` are genuine sentence ends.
+    // Measured over every tracked Markdown file with inline code and fenced blocks masked: two
+    // single-capital-plus-period sites, both of them sentence ends, and zero personal initials. The
+    // rule had no true positive here and two false negatives, and its only support was a synthetic
+    // self-test. Bring a real `J. Smith.` site before reinstating it, and note that the two real
+    // sites are pinned in SELF_TESTS so a reinstatement fails there.
     cuts.push(after);
   }
   return cuts;
@@ -247,6 +254,18 @@ const SETEXT = /^ {0,3}(=+|-+)[ \t]*$/;
 // the fail-closed posture refuses it. A thematic break carries no pipe and cannot match; a
 // pipe-leading row is caught by TABLE_ROW first and cannot match either.
 const PIPELESS_DELIMITER = /^ {0,3}:?-+:?( *\| *:?-+:?)+ *$/;
+
+// The mirror of that case: a delimiter row that DOES lead with a pipe, sitting directly under a
+// paragraph line. TABLE_ROW matches it, so it interrupts the paragraph and the table branch carries
+// it through verbatim - but GFM reads the paragraph's LAST line as the table header, so that line
+// goes through the sentence splitter and any cut inside it changes the header's cell count. The
+// table then silently becomes a paragraph, and none of the three invariants can see it: the content
+// digest ignores whitespace, the verbatim set holds the delimiter row itself unchanged, and the
+// block signature calls the line before it prose either way. So it is refused too. Measured on the
+// pre-reflow tree, none of the 513 table rows sits under a non-blank non-table line, so this cannot
+// fire on anything committed here; it is a latent gap that the fail-closed posture has to cover for
+// a document nobody has read yet.
+const PIPED_DELIMITER = /^ {0,3}\| *:?-+:? *(\| *:?-+:? *)*\|? *$/;
 
 // A metadata field line: a bold label whose colon sits immediately inside the closing delimiter,
 // such as `**Status:**` or `**`recordType`:**`. These carry one field each, are authored one per
@@ -429,6 +448,9 @@ function reflowLines(lines, numbers, file) {
       // A setext underline is tested first: after a paragraph line, `---` is an H2 rather than the
       // thematic break the same characters mean anywhere else.
       if (paragraph.length > 0 && SETEXT.test(next)) refuse(i, 'setext heading underline is not modelled');
+      if (paragraph.length > 0 && PIPED_DELIMITER.test(next)) {
+        refuse(i, 'GFM table header taken from a paragraph line is not modelled');
+      }
       if (paragraph.length > 0 && interruptsParagraph(next)) break;
       // A pipe-less delimiter row does not interrupt a paragraph, so it would be swallowed here.
       // It is refused rather than made to interrupt: interrupting would restructure the document
@@ -683,6 +705,14 @@ function normalizeHtml(html) {
     .trim();
 }
 
+const KNOWN_FLAGS = new Set([
+  '--self-test',
+  '--write',
+  '--verify-render',
+  '--line-map',
+  '--no-exclusions',
+]);
+
 function percentile(sorted, fraction) {
   if (sorted.length === 0) return 0;
   return sorted[Math.min(sorted.length - 1, Math.floor(fraction * sorted.length))];
@@ -717,7 +747,13 @@ const SELF_TESTS = [
     ['It failed. - a bullet must not open a line either.']],
   ['Is it settled? No, it is open. It stays open.',
     ['Is it settled?', 'No, it is open.', 'It stays open.']],
-  ['Written by J. Smith. The next one follows.', ['Written by J. Smith.', 'The next one follows.']],
+  // The two real single-capital-letter sites in this tree, both sentence ends: a reference
+  // implementation and a decision, not a personal initial. See the note in sentenceCuts.
+  ['B was written from the specification text rather than ported from A. They share no code, and they differ where it counts:',
+    ['B was written from the specification text rather than ported from A.',
+      'They share no code, and they differ where it counts:']],
+  ['**What remains open under B.** Two things, and they are narrower than the original question:',
+    ['**What remains open under B.**', 'Two things, and they are narrower than the original question:']],
   ['The count is 34 states (see section 1.5). That is a lower bound.',
     ['The count is 34 states (see section 1.5).', 'That is a lower bound.']],
   ['Trailing zeros matter: 0.010 is not 0.01. FHIR R4 says SHALL.',
@@ -818,6 +854,8 @@ function runSelfTest() {
     ['```\nunterminated\n', 'unterminated fence'],
     ['a | b\n--- | ---\n1 | 2\n', 'GFM table without leading pipes'],
     [':--- | ---:\n', 'GFM delimiter row without leading pipes, alone'],
+    ['Text with a | pipe in it. And more text.\n| --- | --- |\n| a | b |\n',
+      'GFM table header taken from a paragraph line'],
   ];
   for (const [input, label] of refusals) {
     let refused = false;
@@ -842,6 +880,23 @@ function main(argv) {
   const mapIndex = argv.indexOf('--line-map');
   const mapPath = mapIndex >= 0 ? argv[mapIndex + 1] : null;
   const explicit = positional.filter((arg) => arg !== mapPath);
+
+  // An unrecognised flag is rejected rather than dropped. A silently ignored `--verify-rendor` runs
+  // the plain reflow check and returns the ordinary 0 or 1, which reads as render-verified when no
+  // renderer was ever loaded; the only signal would be an absent suffix in the per-file lines. Same
+  // posture as every refusal above.
+  const unknown = [...flags].filter((flag) => !KNOWN_FLAGS.has(flag));
+  if (unknown.length > 0) {
+    for (const flag of unknown) console.log(`REJECTED unknown flag ${flag}`);
+    console.log(`         known flags: ${[...KNOWN_FLAGS].join(' ')}`);
+    return 2;
+  }
+  // `--line-map` takes its path as the next argument, so a missing or flag-shaped one would leave
+  // the map unwritten just as quietly.
+  if (mapIndex >= 0 && (mapPath === undefined || mapPath.startsWith('--'))) {
+    console.log('REJECTED --line-map needs a path argument');
+    return 2;
+  }
 
   if (flags.has('--self-test')) return runSelfTest();
 

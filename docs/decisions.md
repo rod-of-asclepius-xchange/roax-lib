@@ -147,7 +147,8 @@ Three mechanisms replace it (specification section 7.4), and they are recorded w
 Before the ruling the envelope schema **claimed** a binding the specification defined nowhere, which is the defect this records the fix for.
 The general shape is worth keeping in mind for any future self-describing field: **a document cannot authenticate its own description**, so the description has to come from outside.
 
-**What remains open under B.** Two things, and they are narrower than the original question:
+**What remains open under B.**
+Two things, and they are narrower than the original question:
 
 - **The `Poseidon-BN254` parameterization is not pinned**, and no parameterization is invented here.
   The field, the rate and capacity, the round constants, and the encoding from a length-prefixed byte string to field elements all have to be pinned before any Poseidon record is issued.

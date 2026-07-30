@@ -257,7 +257,8 @@ The row stays in the class table in `docs/conformance-corpus.md` so that a passi
 
 **The corpus was generated twice, in two languages, and the outputs are byte-identical.**
 Implementation A is [`tools/roax_ref.py`](tools/roax_ref.py) (Python 3.13), implementation B is [`tools/roax_ref.mjs`](tools/roax_ref.mjs) (Node 22).
-B was written from the specification text rather than ported from A. They share no code, and they differ where it counts:
+B was written from the specification text rather than ported from A.
+They share no code, and they differ where it counts:
 
 | | implementation A | implementation B |
 |---|---|---|
