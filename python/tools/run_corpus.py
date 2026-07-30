@@ -58,7 +58,7 @@ from roax_canon import (  # noqa: E402
     verify_inclusion,
 )
 from roax_canon.errors import ErrorCode  # noqa: E402
-from roax_canon.flatten import check_reserved_namespace  # noqa: E402
+from roax_canon.flatten import check_reserved_namespace, flatten  # noqa: E402
 from roax_canon.jsonio import as_int, is_json_string  # noqa: E402
 from roax_canon.path import segments_from_json  # noqa: E402
 from roax_canon.profiles import CORPUS_SYNTHETIC_PROFILE  # noqa: E402
@@ -124,6 +124,25 @@ def unescape(node: Any) -> Any:
     if isinstance(node, list):
         return [unescape(v) for v in node]
     return node
+
+
+def carrier(tag: Any, raw: Any) -> Any:
+    """Turn a corpus value carrier into what this package's ``encode_value`` accepts.
+
+    One tag needs it. A corpus tag-5 BYTES value travels as LOWERCASE HEX, which is also the
+    disclosed-envelope carrier (`schemas/envelope-1.0.json`), while this package's
+    :func:`roax_canon.encode_value` takes the octets themselves and rejects anything else. That
+    strictness is correct for a library boundary and the decode belongs here, in the runner that
+    owns the carrier format, rather than being relaxed into the library.
+
+    The corpus had no tag-5 vector until FHIR `base64Binary` was ruled BYTES on 2026-07-30, so
+    this boundary was simply unexercised rather than known-good.
+    """
+    if tag == 5:
+        if not is_json_string(raw):
+            raise ValueError(f"a BYTES carrier must be a hex string, got {raw!r}")
+        return bytes.fromhex(raw)
+    return unescape(raw)
 
 
 def _salt_entries(path: str, expected_pairing: str) -> list[Any]:
@@ -205,20 +224,47 @@ def run_encode_path(vectors, r: Results) -> None:
 def run_encode_value(vectors, r: Results) -> None:
     for x in vectors:
         try:
-            got = encode_value(x["tag"], unescape(x.get("input"))).hex()
+            got = encode_value(x["tag"], carrier(x["tag"], x.get("input"))).hex()
         except RoaxError as exc:
             r.bad(x["class"], x["name"], f"rejected with {exc.code}")
             continue
         r.check(x["class"], x["name"], got, x["encodedHex"])
 
 
-def run_reject(vectors, r: Results) -> None:
-    """Every one of these MUST error, with the reference reason code."""
+# Reference reason codes this implementation spells differently, with the measurement.
+#
+# A corpus `reason` is the REFERENCE implementations' spelling and not a normative code. Every
+# reject vector agreed with this implementation's spelling until the record-shaped reject vectors
+# of the 2026-07-30 type rulings arrived; those are the first whose reason is a FAIL-CLOSED, and
+# the four implementations name that one condition four ways. `corpus/tools/roax_ref.py` and
+# `roax_ref.mjs` say `type-map-uncovered-path`, this package says `type-unresolved`, and the
+# TypeScript and Rust libraries say `type-map-fail-closed` (`corpus/README.md`).
+#
+# A DECLARED equivalence rather than a way to pass: it maps one reference code to the one local
+# code naming the same condition, so a rejection for a DIFFERENT reason still fails.
+REFERENCE_REASON_ALIASES = {
+    "type-map-uncovered-path": ErrorCode.TYPE_UNRESOLVED,
+}
+
+
+def run_reject(vectors, maps, r: Results) -> None:
+    """Every one of these MUST error, with the reference reason code or its declared alias."""
     for x in vectors:
         cls, name = x["class"], x["name"]
         raw = x.get("input")
+        expected = REFERENCE_REASON_ALIASES.get(x["reason"], x["reason"])
         try:
-            if isinstance(raw, dict) and set(raw) == {"$jsonText"}:
+            if "recordType" in x:
+                # A whole-record rejection, flattened through that profile's COMMITTED map. The
+                # map has to be the committed one rather than a permissive stand-in, because
+                # several of these vectors assert that a path has NO binding for an observed
+                # kind, which a resolve-everything map would make unfalsifiable.
+                flatten(
+                    loads(raw["$jsonText"]),
+                    maps(x["recordType"]),
+                    authorize_empty_containers=True,
+                )
+            elif isinstance(raw, dict) and set(raw) == {"$jsonText"}:
                 loads(raw["$jsonText"])
             elif isinstance(raw, dict) and set(raw) == {"$segments"}:
                 segs = segments_from_json(unescape(raw["$segments"]))
@@ -232,20 +278,22 @@ def run_reject(vectors, r: Results) -> None:
                 check_reserved_namespace(segs)
                 encode_path(segs)
             elif x.get("tag") is not None:
-                encode_value(x["tag"], unescape(raw))
+                encode_value(x["tag"], carrier(x["tag"], raw))
             else:
                 r.bad(cls, name, "unsupported reject-vector input shape")
                 continue
         except RoaxError as exc:
-            r.check(cls, name, exc.code, x["reason"], "reason: ")
+            r.check(cls, name, exc.code, expected, "reason: ")
             continue
-        r.bad(cls, name, f"accepted; expected rejection {x['reason']!r}")
+        r.bad(cls, name, f"accepted; expected rejection {expected!r}")
 
 
 def run_leaf(vectors, r: Results) -> None:
     for x in vectors:
         segs = segments_from_json(x["segments"])
-        got = leaf_hash(segs, x["tag"], unescape(x.get("value")), bytes.fromhex(x["saltHex"])).hex()
+        got = leaf_hash(
+            segs, x["tag"], carrier(x["tag"], x.get("value")), bytes.fromhex(x["saltHex"])
+        ).hex()
         r.check(x["class"], x["name"], got, x["leafHash"])
 
 
@@ -680,7 +728,7 @@ def main() -> int:
     r = Results()
     run_encode_path(vectors.get("encodePath", []), r)
     run_encode_value(vectors.get("encodeValue", []), r)
-    run_reject(vectors.get("reject", []), r)
+    run_reject(vectors.get("reject", []), maps, r)
     run_leaf(vectors.get("leaf", []), r)
     run_tree(vectors.get("tree", []), r)
     trees = {

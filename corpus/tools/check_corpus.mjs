@@ -310,6 +310,18 @@ for (const v of V.reject ?? []) {
 function runReject(v) {
   const raw = v.input;
   const resolved = resolveInput(raw);
+  // A `recordType` makes this a WHOLE-RECORD rejection: flatten through that profile's COMMITTED
+  // map, never `structuralOnlyTypeMap`. Several of these vectors assert that a path has no
+  // binding for an observed kind - the ruled FHIR primitive-array null placeholder is one - and a
+  // resolve-everything map makes exactly those unfalsifiable.
+  if (v.recordType !== undefined) {
+    const map = typeMaps[v.recordType];
+    if (map === undefined) {
+      throw new Error(`corpus defect: reject ${v.name} names missing type map ${v.recordType}`);
+    }
+    ref.flatten(parseRecord(resolved), map);
+    return;
+  }
   if (raw !== null && typeof raw === "object" && "$segments" in raw) {
     ref.checkReservedNamespace(resolved);
     ref.encodePath(resolved);

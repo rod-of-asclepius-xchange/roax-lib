@@ -113,6 +113,16 @@ def build_encode_value():
             entry["input"] = value
         entry["encodedHex"] = ref.encode_value(tag, value).hex()
         out.append(entry)
+
+    encoded = {entry["name"]: entry["encodedHex"] for entry in out}
+    # The RULED `base64Binary` -> BYTES semantics. These two rows carry the same logical content
+    # under the two readings the ruling chose between, so if they encode alike then BYTES is
+    # committing the base64 TEXT rather than the decoded octets and the ruling is not implemented.
+    if encoded["bytes-decoded-octets"] == encoded["string-base64-text"]:
+        raise SystemExit(
+            "corpus defect: the BYTES and STRING readings of the same base64 content encode "
+            "identically, so nothing separates committing the octets from committing the text"
+        )
     return out
 
 
@@ -136,7 +146,37 @@ def build_reject():
         else:
             raise SystemExit(f"corpus defect: reject vector {name!r} did not error")
         out.append(entry)
+
+    # The record-shaped rejections. Carried in the same array because they are the same kind of
+    # assertion - this input MUST error with this code - and separated in the plan because they
+    # are driven through a real type map rather than through the value encoder.
+    for name, cls, record_type, raw in plan.REJECT_RECORD:
+        type_map = _reject_type_map(record_type)
+        entry = {"name": name, "class": cls, "recordType": record_type, "input": raw}
+        try:
+            import json_literal
+            ref.flatten(json_literal.loads(resolve_input(raw)), type_map)
+        except RoaxError as exc:
+            entry["reason"] = exc.code
+        else:
+            raise SystemExit(f"corpus defect: reject vector {name!r} did not error")
+        out.append(entry)
     return out
+
+
+def _reject_type_map(record_type):
+    """The committed map a record-shaped reject vector is flattened through.
+
+    A REAL map, never `_AllStringsTypeMap`: several of these vectors assert that a path has NO
+    binding for an observed kind, and a map that resolved everything would make exactly those
+    unfalsifiable.
+    """
+    if record_type == plan.SYNTHETIC_RECORD_TYPE:
+        return synthetic_records.synthetic_type_map()
+    type_map = moh_records.load_type_map(record_type)
+    if type_map is None:
+        raise SystemExit(f"corpus defect: no committed type map for {record_type}")
+    return type_map
 
 
 def run_reject(tag, raw):

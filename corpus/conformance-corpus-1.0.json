@@ -718,6 +718,27 @@
         "encodedHex": "313030"
       },
       {
+        "name": "bytes-decoded-octets",
+        "class": 7,
+        "tag": 5,
+        "input": "48656c6c6f2c20524f415821",
+        "encodedHex": "48656c6c6f2c20524f415821"
+      },
+      {
+        "name": "string-base64-text",
+        "class": 7,
+        "tag": 2,
+        "input": "SGVsbG8sIFJPQVgh",
+        "encodedHex": "534756736247387349464a5051566768"
+      },
+      {
+        "name": "bytes-empty",
+        "class": 7,
+        "tag": 5,
+        "input": "",
+        "encodedHex": ""
+      },
+      {
         "name": "null-value",
         "class": 5,
         "tag": 0,
@@ -995,6 +1016,60 @@
           ]
         },
         "reason": "reserved-namespace"
+      },
+      {
+        "name": "reject-bytes-base64-unpadded",
+        "class": 3,
+        "recordType": "org.roax.corpus.synthetic",
+        "input": {
+          "$jsonText": "{\"blob\": {\"bytes\": \"SGVsbG8sIFJPQVg\", \"text\": \"x\"}, \"marker\": \"m\"}"
+        },
+        "reason": "base64-not-canonical"
+      },
+      {
+        "name": "reject-bytes-base64-url-safe-alphabet",
+        "class": 3,
+        "recordType": "org.roax.corpus.synthetic",
+        "input": {
+          "$jsonText": "{\"blob\": {\"bytes\": \"-_8=\", \"text\": \"x\"}, \"marker\": \"m\"}"
+        },
+        "reason": "base64-not-canonical"
+      },
+      {
+        "name": "reject-bytes-base64-nonzero-pad-bits",
+        "class": 3,
+        "recordType": "org.roax.corpus.synthetic",
+        "input": {
+          "$jsonText": "{\"blob\": {\"bytes\": \"aGl=\", \"text\": \"x\"}, \"marker\": \"m\"}"
+        },
+        "reason": "base64-not-canonical"
+      },
+      {
+        "name": "reject-bytes-base64-line-wrapped",
+        "class": 3,
+        "recordType": "org.roax.corpus.synthetic",
+        "input": {
+          "$jsonText": "{\"blob\": {\"bytes\": \"SGVs\\nbG8=\", \"text\": \"x\"}, \"marker\": \"m\"}"
+        },
+        "reason": "base64-not-canonical"
+      },
+      {
+        "name": "reject-bytes-observed-kind-not-string",
+        "class": 3,
+        "recordType": "org.roax.corpus.synthetic",
+        "input": {
+          "$jsonText": "{\"blob\": {\"bytes\": 5, \"text\": \"x\"}, \"marker\": \"m\"}"
+        },
+        "reason": "type-map-uncovered-path"
+      },
+      {
+        "name": "reject-fhir-primitive-array-null-placeholder",
+        "class": 5,
+        "recordType": "org.roax.corpus.synthetic",
+        "input": {
+          "$jsonText": "{\"name\": [{\"given\": [\"Ada\", null]}], \"marker\": \"m\"}"
+        },
+        "reason": "type-map-uncovered-path"
       }
     ],
     "leaf": [
@@ -1673,6 +1748,45 @@
         "value": "100",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
         "leafHash": "6dcd3433668f8d2b3f0fa76ebe79fb108724f20352176aaf458116ebf2ec2f2b"
+      },
+      {
+        "name": "leaf-bytes-decoded-octets",
+        "class": 7,
+        "segments": [
+          {
+            "key": "value"
+          }
+        ],
+        "tag": 5,
+        "value": "48656c6c6f2c20524f415821",
+        "saltHex": "000102030405060708090a0b0c0d0e0f",
+        "leafHash": "3b9b457b26684b1c626afc9d8acd64b86d1b782ba6a822850616ce58105bd547"
+      },
+      {
+        "name": "leaf-string-base64-text",
+        "class": 7,
+        "segments": [
+          {
+            "key": "value"
+          }
+        ],
+        "tag": 2,
+        "value": "SGVsbG8sIFJPQVgh",
+        "saltHex": "000102030405060708090a0b0c0d0e0f",
+        "leafHash": "f93975fa8179c9a6784a31e677cb0d2327cad3b3c6959179eb32f1a0349bf674"
+      },
+      {
+        "name": "leaf-bytes-empty",
+        "class": 7,
+        "segments": [
+          {
+            "key": "value"
+          }
+        ],
+        "tag": 5,
+        "value": "",
+        "saltHex": "000102030405060708090a0b0c0d0e0f",
+        "leafHash": "3aac49d92c6323e33eddc5f2e78eaa9e338503f69dcb770ce3e1f8dfee4b3319"
       },
       {
         "name": "leaf-null-value",
@@ -5884,6 +5998,19 @@
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
         "root": "d913e52ad4c918f87466d9fbd40070119379f8d293ab85ce1a7ad50f79313107"
+      },
+      {
+        "name": "record-fhir-ruled-bindings",
+        "class": 7,
+        "recordType": "org.roax.corpus.synthetic",
+        "schemaVersion": "1.0",
+        "issuerId": "did:web:corpus.roax.invalid",
+        "recordFile": "corpus/fixtures/records/fhir-ruled-bindings.json",
+        "saltsFile": "corpus/fixtures/salts/record-fhir-ruled-bindings.json",
+        "saltPairing": "path",
+        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
+        "leafCount": 8,
+        "root": "36025461595b5ed9d9d01576fa2f7350fcc3cbe9e4495baa8a3e9d421ae96178"
       },
       {
         "name": "record-typed-scalars",
