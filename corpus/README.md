@@ -50,17 +50,23 @@ On the committed tree, the fully configured command above measures 471 vectors, 
 In particular, each exits 2 when the committed external record vectors were not checked.
 Run `corpus/tools/test_gate_status.sh` for the dependency-matrix and direct-tool regression checks; it uses scratch files only and never rewrites the corpus or its fixtures.
 
-`run.sh` does four things.
+`run.sh` does five things.
 The third is the cross-implementation comparison:
 
 1. implementation A rebuilds the corpus, the generator-owned record and envelope fixtures, and the synthetic type map, then compares those outputs with the committed files, writing nothing;
 2. implementation B shape-validates every committed salt-set input and recomputes the derived fields of every runnable committed vector, while a `NOT RUN` vector is copied through and excluded from the cross-implementation claim;
 3. the emitted file is compared byte for byte with the committed corpus, with copied-through `NOT RUN` vectors identified as unchecked;
-4. Ajv validates the corpus file and every committed type map, checks each envelope fixture against its expected schema verdict, and probes both directions of the schemas' conditionals with synthesized whole-corpus documents, because a conditional that never fires compiles perfectly and asserts nothing.
+4. Ajv validates the corpus file and every committed type map, checks each envelope fixture against its expected schema verdict, and probes both directions of the schemas' conditionals with synthesized whole-corpus documents, because a conditional that never fires compiles perfectly and asserts nothing;
+5. both implementations self-test their declared profile value rules.
 
 Step 1 alone would only prove that one program is self-consistent.
 Step 3 covers only rows generated into the committed corpus.
 It does not claim that profiles or rows absent from that corpus were cross-checked.
+
+**Step 5 is outside the corpus on purpose, and it is the only step that is.**
+Ruled decision D13a keeps value-domain validation in a separate, independently versioned layer rather than in the canonicalization layer, so a corpus vector for a rule like the vaccination `dose` positive-integer narrowing would demand it from five implementations that by that ruling do not carry it.
+The corpus pins the accept case through class 10, where the shipped sample's `dose` values are 1 and 2, and step 5 pins the refusals in the layer that owns them.
+The discriminating values are `0` and the negatives, because a fractional value is already refused one layer down by the specification section 6.2 INTEGER grammar.
 
 Step 1 covers the generator-owned fixtures because the corpus vectors reference them by path, and a corpus that round-trips over a hand-edited fixture is not a pass.
 The generator builds each fixture's bytes, runs the verifier on **those bytes** rather than on the file, and then compares.
@@ -121,7 +127,35 @@ Everything else is literal.
 |---|---|
 | `{"$utf16": ["0041", "d800"]}` | A string built from those UTF-16 code units. This is how an unpaired surrogate is carried: a conforming JSON writer cannot emit one as well-formed UTF-8. |
 | `{"$segments": [ ... ]}` | A path. Used where the corpus schema's own `segments` definition cannot express the vector - see "Known corpus schema limits". A segment's `key` may itself be a `$utf16` object. |
-| `{"$jsonText": "..."}` | Record text to be handed to the implementation's JSON reader, for rejections that happen at the parser boundary rather than at a tag. |
+| `{"$jsonText": "..."}` | Record text to be handed to the implementation's JSON reader, for rejections that happen at the parser boundary rather than at a tag. A reject vector that ALSO carries a `recordType` means something more - see below. |
+
+### A reject vector with a `recordType` is a whole-record rejection
+
+`rejectVector.recordType` is optional, and its presence changes how a runner must consume the vector.
+Absent, the vector goes to the value encoder or the path encoder in the carrier form its `tag` or `segments` names.
+Present, the `input` is a whole record as `{"$jsonText": ...}` and the runner MUST flatten it through the **committed** type map for that `recordType`.
+
+**The shape exists because three of the five type bindings ruled on 2026-07-30 are stated as rejections rather than as tags**, and a tag-bearing reject vector cannot reach any of them: it arrives at the value encoder already in the CARRIER form, so it can never exercise a rejection that happens where a RECORD value is converted into that carrier.
+That is where the ruled `base64Binary` input-admissibility rejections live, and where the ruled FHIR primitive-array null-placeholder rejection lives.
+
+**The map must be the committed one and never a resolve-everything stand-in.**
+Several of these vectors assert that a path has NO binding for an observed kind, and a permissive map makes exactly those unfalsifiable.
+No record identity is carried, because flattening needs none: the assertion is a rejection at the record boundary and not a tree.
+
+### The reason-code divergence these vectors found
+
+**Four implementations name the fail-closed condition four different ways, and non-canonical base64 two ways.**
+The record-shaped reject vectors above are the first vectors whose `reason` is either condition, so the corpus had never been able to see this.
+
+| Condition | `roax_ref.py`, `roax_ref.mjs` | TypeScript library | Python library | Rust library |
+|---|---|---|---|---|
+| No binding for the observed kind | `type-map-uncovered-path` | `type-map-fail-closed` | `type-unresolved` | `type-map-fail-closed` |
+| base64 outside the pinned form | `base64-not-canonical` | `base64-not-canonical` | `base64-not-canonical` | `invalid-base64` |
+
+A corpus `reason` is the reference implementations' spelling and is not a normative code, so each library's runner carries a **declared** equivalence table beside this measurement rather than a loosened comparison: it maps one reference code to the one local code naming the same condition, and a rejection for a different reason still fails.
+Rust's went into the `canonical_rejection_reason` mapper that already existed for exactly this.
+
+Harmonizing the codes themselves is a library API change in three packages and was not made here.
 
 ### How the tree class generates its leaves
 
@@ -144,7 +178,7 @@ Counts are vectors in the file, measured by `build_corpus.py --report`.
 | 7 type tags | 14 | complete |
 | 8 tree shape | 173 | complete |
 | 9 negative proof vectors | 11 | **stale - the forged-size, full-disclosure row is absent** |
-| 10 the three real MOH records | 2 | **partial - 1 of 3 records** |
+| 10 the three real MOH records | 4 | **partial - 2 of 3 records.** The vaccination sample commits since its two bindings were ruled; PDT stays uncommittable - see below |
 | 11 the schema binding | 23 | complete. Includes the three unknown-algorithm and unknown-profile fail-closed vectors: specification section 12.2 calls that "the same rule section 4.2 applies to an unknown path, applied one level up", and section 4.2 is what this class tests. |
 | 12 cross-record unlinkability | 3 | complete. Behavioural rather than pinned: the runner draws and asserts. Detects a deterministic or reused salt; it CANNOT detect a weak CSPRNG, and no fixed vector file can. |
 | 13 reference-schema hazards | 2 | **partial - the `$id` half is inexpressible** |
@@ -153,24 +187,26 @@ Counts are vectors in the file, measured by `build_corpus.py --report`.
 | 16 Unicode version sensitivity | 20 | complete, at the strength class 16 itself states |
 | 17 withheld-leaf salt | 8 | complete |
 | 18 outside-the-root authority | 4 | **partial - the identity rows only; the registry rows are a named gap** |
-| 19 NFC end to end, with a root | 1 | **partial - the value site only; the key site is gated on decision D14** |
+| 19 NFC end to end, with a root | 2 | complete - both the value site and the key site, the latter buildable since decision D14 was ruled D14a |
 
 ### Class 10 is partial, and the reason is a finding rather than an omission
 
-Only the recovery healthcert has a vector.
-The vaccination and PDT samples **cannot be committed at all** under the fail-closed rule of specification section 4.2, because their reference schemas do not determine a ROAX type tag for every scalar those samples contain:
+The recovery and vaccination healthcerts have vectors.
+The PDT sample **cannot be committed at all** under the fail-closed rule of specification section 4.2, because its reference schema does not determine a ROAX type tag for every scalar the sample contains: its root object declares seven members and does not close itself, so `$template`, `attachments`, `issuers` and `notarisationMetadata` - all four present in its own shipped sample - are permitted and undeclared.
+That is twenty unbound `(pattern, jsonKind)` pairs.
 
-- **vaccination:** `notarisationMetadata.signedEuHealthCerts[*].dose` is declared `"type": "number"` with no pattern.
-  ROAX has two numeric tags and JSON Schema's `number` chooses neither.
-  FHIR's own lite schema distinguishes `integer` from `decimal` by **pattern**, both being `"type": "number"`, and the notarise schema carries no such pattern.
-  `expiryDateTime` in the same object is declared with a `format` and `examples` and **no `type` at all**.
-- **PDT:** its root object declares seven members and does not close itself, so `$template`, `attachments`, `issuers` and `notarisationMetadata` - all four present in its own shipped sample - are permitted and undeclared.
-  That is twenty unbound `(pattern, jsonKind)` pairs.
-
-Binding either would be an authored ruling, and an authored ruling inside the corpus is the exact defect `docs/conformance-corpus.md` section 1.2 forbids: every implementation built against the corpus would inherit it as though it were settled.
+Binding them here would be an authored ruling, and an authored ruling inside the corpus is the exact defect `docs/conformance-corpus.md` section 1.2 forbids: every implementation built against the corpus would inherit it as though it were settled.
 So those paths appear as class 11 **fail-closed** vectors, which is a real assertion on real paths, and the roots wait for a ruling.
+The ruling those 20 pairs need is a versioned PDT composition profile rather than 20 authored bindings, because the endorsed sample does not define the composition's full path language (`docs/type-maps.md` section 1.2).
+Nobody has ruled one.
 
-`tools/build_type_maps.py` produces the vectors the moment the bindings exist.
+**The vaccination row was in the same state until 2026-07-30 and is not any more.**
+Its two blocking paths were ruled - `notarisationMetadata.signedEuHealthCerts[*].dose` INTEGER at evidence grade Strong and `expiryDateTime` STRING at grade Moderate - so the sample now commits at 91 leaves without an issuer key identifier and 92 with one (`docs/type-maps.md` section 1.1).
+That is a ruling arriving from a document and reaching the corpus, which is the order section 1.2 requires; it is not the corpus deciding anything.
+The `dose` ruling also carries a positive-integer profile narrowing, which is **not** in the canonicalization layer under ruled decision D13a and is therefore not a corpus vector: it is declared by `docs/profiles/vaccination-healthcert.md` section 6, executable in `tools/profile_rules.py` and `profile_rules.mjs`, and self-tested by `run.sh` step 5.
+What the corpus pins is the accept case, since the sample's `dose` values are 1 and 2.
+
+`tools/build_type_maps.py` produces the vectors the moment the remaining bindings exist.
 Nothing else is blocking.
 
 ### The floor is over segments, and the outer identity does not select it alone
@@ -245,13 +281,27 @@ Building them here would make the corpus invent that interface, which section 1.
 That is why `schemas/conformance-corpus-1.0.json` PERMITS `envelopeVector.verifierConfig` at class 18 rather than requiring it: an earlier revision required it, and the four built vectors carry none because the envelope alone determines them, so the requirement rejected the committed corpus.
 The completeness rule the block exists for - a vector whose outcome turns on the verifier's configuration must state that configuration - is stated in the schema and is **not mechanically enforced today**, because the vectors that would need the check are exactly the ones that cannot be built yet.
 
-### Class 19 carries the value site only, and decision D14 is why
+### Class 19 now carries both sites, and decision D14a is why the key site is buildable
 
 The class defines two sites, a value and an object key, because an implementation can normalize one and not the other.
-Only the value site is built.
-A key-site vector has to resolve its key through the type map, and whether type-map matching normalizes the key it matches on is an open question - ambiguity 4 below, recorded as decision D14 in `docs/decisions.md` Part 2a.
-Both reference implementations match raw, so a built key-site vector would pass under one reading of that question and fail under the other, which settles it from inside a data file.
-The row stays in the class table in `docs/conformance-corpus.md` so that a passing class 19 does not read as coverage it does not have.
+Both are built.
+
+**The key site was deliberately unbuilt until 2026-07-30**, because a key-site vector has to resolve its key through the type map, and whether that lookup normalized was an open question - ambiguity 4 below.
+Both reference implementations matched raw, so a built vector would have passed under one reading and failed under the other, which settles a decision from inside a data file rather than testing a settled one.
+Decision D14 is ruled D14a, normalize, so the vector now tests a decided question and `build_corpus` fails the build if either site is missing.
+
+**Two committed vectors discriminate the two readings, and both fail closed under raw matching.**
+
+| Vector | Under D14a, ruled | Under raw matching |
+|---|---|---|
+| `normalization-nfc-key-end-to-end`, the NFD half | resolves, and gives the same root as its composed twin | `type-map-uncovered-path` at `é`, so the vector's `expectSameRoot` is unreachable |
+| `record-guard-kelvin-key` | resolves, reaching the ASCII `Kelvin` pattern through NFC | `type-map-uncovered-path` at `Kelvin` |
+
+The second exists because the synthetic map used to declare the Kelvin key under **both** spellings, which was a workaround standing in for the decision.
+Removing the U+212A duplicate turned an existing vector into a discriminator at no cost, and keeping it would have left that vector passing under either reading, which is exactly why it proved nothing before.
+
+**Rebuilding the corpus under D14a changed zero existing vectors and added one.**
+Encoded paths already normalized every KEY segment, so the leaf bytes were always NFC and the ruling moves no root.
 
 ## What was actually measured, and what was not
 
@@ -331,9 +381,11 @@ Every one of them is unobservable across the shipped vectors, which is deliberat
    This list previously recorded that section 7 wrote `RID = utf8(recordId)` rather than `utf8(NFC(recordId))`, while the reserved leaf `roax.recordId` is a STRING and therefore *is* normalized.
    Decision D4 was ruled D4b and section 7 has no preimage at all, so the ambiguity is gone rather than resolved.
    The reserved leaf is unaffected and still normalizes.
-4. **Type-map matching is not stated to be over normalized keys.**
-   Section 11.2's general rule - "check the bytes you commit, not the bytes you received" - suggests it should be, but the specification does not say so, and both implementations compare a pattern token against a segment key **raw**, with no `nfc()` on either side (`_match_from`, `roax_ref.py:776`; `matchPattern`, `roax_ref.mjs:619`).
-   The synthetic type map therefore carries the Kelvin key under **both** spellings, so that `record-guard-kelvin-key` resolves identically under either reading and no vector settles the question.
+4. **Resolved: type-map matching is now stated to be over NFC-normalized keys.**
+   This ambiguity was that section 11.2's general rule - "check the bytes you commit, not the bytes you received" - suggested normalizing while the specification said nothing, and both implementations compared a pattern token against a segment key **raw**, with no `nfc()` on either side.
+   It was raised to decision D14 and ruled **D14a on 2026-07-30**: specification section 4.2 now requires the lookup to compare the normalized key, and both implementations normalize the pattern token at parse time and the segment key at match time.
+   The Kelvin workaround that stood in for the decision is removed and the class-19 key site is built, so two vectors now discriminate the readings where none did.
+   See the class 19 section above.
 5. **The type-map `pattern` field is display notation**, so it cannot address a key containing `.`, `[` or `]` - keys section 5 deliberately admits with no rejection rule.
    `a.**` reaches such a key without the pattern language growing an escape, and both implementations reject an ambiguous pattern rather than mis-parse it.
 6. **NFC-colliding sibling keys with disjoint descendants are not ruled.**

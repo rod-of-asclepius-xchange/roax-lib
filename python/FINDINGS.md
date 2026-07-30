@@ -136,16 +136,17 @@ No committed vector carries such a record.
 
 ---
 
-## 7. CONFIRMATION: the corpus is genuinely neutral about decision D14, measured from a third matcher
+## 7. SUPERSEDED BY THE RULING, and the measurement is why it reads that way: the corpus was neutral about decision D14, and is not any more
 
-`docs/decisions.md` part 2a leaves open whether the type-map lookup matches over an NFC-normalized key or over the bytes as received, and `corpus/README.md` ambiguity 4 records that both reference implementations compare raw.
+**As measured during this build**, this implementation's matcher compared raw and passed all 738 assertions, and patching an NFC normalization onto both sides of the comparison gave **the same 738 passes**.
+So no committed vector depended on the answer, which is what the synthetic map's two `Kelvin` spellings - U+212A and ASCII `K`, confirmed by reading the file's code points - were put there to guarantee.
 
-Measured here rather than assumed.
-This implementation's matcher compares raw and passes all 738 assertions.
-Patching an NFC normalization onto both sides of the comparison and re-running gives **the same 738 passes**.
-So no committed vector depends on the answer, which is what the synthetic map's two `Kelvin` spellings - U+212A and ASCII `K`, confirmed by reading the file's code points - were put there to guarantee.
+**That neutrality was a workaround standing in for a decision, and decision D14 was ruled D14a on 2026-07-30: the lookup matches over the NFC-normalized key** (specification section 4.2, `docs/type-maps.md` section 3.1).
+`roax_canon.typemap` normalizes now, on both sides: `parse_pattern` normalizes each pattern token and `resolve` normalizes each KEY segment once per call rather than once per candidate entry, so the unpaired-surrogate rejection has a single site.
 
-`roax_canon.typemap` compares raw and says in its module docstring that adding an `nfc()` there would rule D14 silently.
+**The measurement above is what makes this finding worth keeping rather than deleting.**
+It records that the corpus could not have caught a matcher on the wrong side of the question, which is exactly the gap the ruling closed: the U+212A duplicate is removed and the class-19 key site is built, so two committed vectors now fail closed under raw matching where none did.
+A third matcher agreeing under both readings is evidence of a corpus gap, not of a harmless choice.
 
 ---
 
@@ -214,7 +215,8 @@ Each was reached independently here and resolved the same way, which is corrobor
    Read as the padded form *before* the output-grammar normalization, which is the literal reading and the memory-safe one.
    Under it `0e99999` is rejected; under the other it canonicalizes to `0`.
    No vector carries `0e99999`.
-3. **Decision D14, the lookup's normalization.**
+3. **Resolved: decision D14, the lookup's normalization.**
+   Ruled D14a, normalize, on 2026-07-30.
    See item 7.
 4. **The pattern field is display notation** and cannot address a key containing `.`, `[` or `]`.
    `a.**` reaches such a key; an ambiguous pattern is rejected rather than mis-parsed.
@@ -289,8 +291,10 @@ Unlike the Node reference implementation, which runs Unicode 16.0 tables against
   The registry-dependent half of conformance class 18 is unbuilt in the corpus for the same reason and cannot be run.
 - **`Poseidon-BN254` is registered and unusable**, and `BLOB_REF` is defined and rejected in issuance and in an envelope, per specification sections 7.4 and 6.5.
   Neither is exercised beyond the corpus's fail-closed vectors.
-- **Tag 5 `BYTES` is implemented on both sides and is reached by no corpus vector.**
-  No version-1 profile binds it: the healthcert blob fields bind STRING and FHIR `base64Binary` is unresolved (specification section 6.3), so every corpus leaf and envelope fixture is tag 0 to 4, 6 or 7.
+- **Tag 5 `BYTES` is implemented on both sides, and it is reached by corpus vectors now.**
+  It was reached by none when this was written, because the healthcert blob fields bind STRING and FHIR `base64Binary` was unresolved.
+  **`base64Binary` was ruled BYTES over the decoded octets on 2026-07-30** (`docs/type-maps.md` section 1.3, grade Strong), and the corpus gained class-7 and class-3 rows for the semantics and the input-admissibility rejections, so the paragraph below is now a description of what those vectors exercise rather than of an unexercised surface.
+  It also found one real gap while they were added: a corpus tag-5 value travels as lowercase hex while this package's `encode_value` takes the octets, so `python/tools/run_corpus.py` decodes the carrier rather than the library relaxing its boundary.
   Both carriers are implemented anyway, and they are different carriers: a *record* carries base64 in the pinned RFC 4648 section 4 form, and an *envelope* carries lowercase hex, which is what `schemas/envelope-1.0.json` pins.
   An encoder without a decoder is a round trip that does not close, and the corpus cannot see it, so `python/tests/test_pipeline.py::test_bytes_leaf_round_trips_through_both_envelope_shapes` pins it instead.
 - **Class 12 cannot detect a weak CSPRNG** and neither can this runner.

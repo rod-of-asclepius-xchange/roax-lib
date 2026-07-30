@@ -96,10 +96,12 @@ Turning a record into a root; disclosing individual leaves against that root; an
   A further smart-contract round is expected, so no contract set is treated as permanent by this document.
   **This document does place one requirement on that design, and hands it forward rather than pretending it is closed here: the registry MUST record the pair `(root, hashAlg)`, and a verifier MUST take `hashAlg` from the registry rather than from the envelope.**
   Section 7.4 shows why that is the only one of the three algorithm bindings that actually works.
-- **Some reference-schema type gaps remain unresolved.**
+- **One reference-schema type gap remains unresolved.**
   Four base type-map artifacts are published in `type-maps/`, and their exact coverage is reported in `docs/type-maps.md` section 2.
-  The vaccination sample's `dose` and `expiryDateTime`, PDT's 20 endorsed-sample path-kind pairs, FHIR XHTML, FHIR `base64Binary` and null placeholders remain unbound for the reasons documented in `docs/type-maps.md` section 1.
-  Decision D7 requires each of those paths to fail closed rather than receive a syntactic guess, so the affected records remain uncommittable until profile governance or an issuer-scoped extension supplies determining evidence under section 4.2.
+  Five undetermined bindings were ruled on 2026-07-30 with their evidence grades recorded in `docs/type-maps.md` section 1: the vaccination sample's `dose` and `expiryDateTime`, FHIR `base64Binary`, FHIR `Narrative.div`, and FHIR primitive-array null placeholders.
+  PDT's 20 endorsed-sample path-kind pairs remain unbound, because they are outside the selected base schema rather than ambiguous within it and the clean answer is a versioned composition profile that nobody has ruled.
+  Decision D7 requires that path to fail closed rather than receive a syntactic guess, so the PDT endorsed sample remains uncommittable until profile governance or an issuer-scoped extension supplies determining evidence under section 4.2.
+  Two of the five rulings are operative in the corpus maps today and the three FHIR rulings are not yet in the published artifacts, which `docs/type-maps.md` section 1.6 states along with what the next change must do.
 - **No absence proofs, and the capability is deliberately preserved.**
   Proving "this record asserts no allergy" is possible under the leaf ordering chosen in section 9: sorting by encoded path makes the tree shape a function of the path set alone, so showing the two adjacent leaves in canonical order proves no leaf exists between them (section 9.3).
 
@@ -286,8 +288,14 @@ Under syntactic inference that is INTEGER; an issuer who later writes `1.0` sile
   The first two values MUST equal the artifact fields exactly, and the fetched artifact bytes MUST reproduce `typeMap.id` under the content-ID construction in `docs/type-maps.md` section 2.1.
   The identified bytes MUST decode as strict UTF-8 and MUST contain neither duplicate JSON object member names nor unpaired surrogate escapes after escape decoding, under section 3.2 and `docs/type-maps.md` section 2.1.
   `typeMap.version` MUST equal the artifact's `typeMapVersion`, but semver is metadata and MUST NOT be used to choose a latest or compatible artifact, as specified in `docs/type-maps.md` sections 4 and 5.2.
+- **The lookup MUST compare the NFC-normalized key**, under ruled decision D14a and `docs/type-maps.md` section 3.1.
+  A resolver MUST normalize a KEY segment under the section 6.1 Unicode pin before taking its transition, and MUST NOT compare the bytes as received.
+  This follows section 11.2's rule, "check the bytes you commit, not the bytes you received": a STRING leaf commits `utf8(NFC(s))` under section 6.1 and an encoded KEY segment commits `NFC(key)` under section 5.1, so a raw comparison would decide admissibility on a spelling no root records.
+  It also removes an invisible divergence, since under a raw comparison a decomposed key is refused by the fail-closed rule below while its composed twin commits, and the two render identically.
+  A conforming artifact's transition keys are already NFC, so both sides of the comparison are normalized.
 - **Unknown transitions and missing observed-kind outputs MUST fail closed.**
   A resolver MUST NOT search another installed map, infer from JSON syntax or apply a fallback tag, under ruled decision D7 and `docs/type-maps.md` section 3.
+  Normalizing the lookup key does not widen the map: a key whose NFC form is not a declared transition still fails closed.
 - Complete profile-schema validation MUST precede map resolution.
   The DFA authorizes paths and supplies tags, but it does not replace sibling constraints or resource discriminators in the applicable profile schema, as stated in `docs/type-maps.md` section 3.
 
@@ -318,8 +326,8 @@ That is the moment refusing it is hardest, which is why the refusal is normative
 They contain 3,440 executable DFA states and 3,398 resolved path-kind outputs in total, with per-profile counts, source-audit counts and exact content IDs in `docs/type-maps.md` section 2.
 
 The gap list remains part of the deliverable rather than a reason to guess.
-The vaccination sample cannot be issued because two paths are unresolved, and the PDT endorsed sample cannot be issued against the base map because 20 path-kind pairs are outside the base schema.
-FHIR XHTML, `base64Binary` and null-placeholder semantics also remain unbound as documented in `docs/type-maps.md` section 1.
+The vaccination sample now issues, because its two unresolved paths were ruled on 2026-07-30, and FHIR `Narrative.div`, `base64Binary` and null-placeholder semantics were ruled in the same change with their evidence grades recorded in `docs/type-maps.md` section 1.
+The PDT endorsed sample still cannot be issued against the base map, because 20 path-kind pairs are outside the base schema rather than ambiguous within it and no composition profile has been ruled.
 
 ---
 
@@ -519,8 +527,11 @@ Section 13.1 shows what a rule that strips trailing zeros does to this requireme
 `BYTES` carries the bytes themselves.
 Where a record embeds base64 (`logo`, `attachments[].data`), the profile document states whether the field is bound as `STRING` over the base64 text or as `BYTES` over the decoded content.
 The explicitly typed healthcert blob fields bind as `STRING`, so their base64 text is normalized to NFC and hashed like any other string and no base64 rule enters their digest.
-FHIR `base64Binary` is the version-1 exception: its six full-FHIR and four lite-FHIR source slots remain unresolved between STRING over the text and BYTES over the decoded bytes, so no current map binds those slots (`docs/type-maps.md` sections 1.3 and 2.2).
-That unresolved choice and the healthcert STRING bindings are unchanged by the D9 ruling, which adds BLOB_REF as a carrier selected by no version-1 profile (section 6.5).
+**FHIR `base64Binary` is ruled `BYTES` over the decoded octets**, at its six full-FHIR and four lite-FHIR source slots, because FHIR R4 defines the datatype as a stream of bytes while identifying its JSON form as a string containing base64 text, and `BYTES` commits the value rather than the transport spelling (`docs/type-maps.md` section 1.3, evidence grade Strong).
+The canonical base64 form below is an **input-admissibility condition** under that ruling and never the committed value: the octets are what is hashed, and a spelling outside the pinned form is rejected before it is decoded.
+The healthcert STRING bindings are unchanged, and so is the general rule above that a profile may bind base64 as `STRING` when preserving that exact spelling is the intended semantics.
+The published artifacts do not yet carry the ruled `base64Binary` binding, for the regeneration reason `docs/type-maps.md` section 1.6 states.
+None of this is changed by the D9 ruling, which adds BLOB_REF as a carrier selected by no version-1 profile (section 6.5).
 
 `BYTES` and `BLOB_REF` (section 6.5) both have to decode that text, so one base64 form is pinned now rather than left to be discovered later.
 
@@ -1530,7 +1541,7 @@ This specification takes no position on any of them and defines nothing that dep
 - **C** - what happens to the Singapore healthcerts already issued under OpenAttestation.
 
 **D was ruled on 2026-07-29:** five independent, corpus-enforced libraries rather than a shared core over a binding layer.
-A further open question, D14, was identified after the engineering rulings below and is stated at the end of this section.
+A further question, D14, was identified after the engineering rulings below and was ruled on 2026-07-30; it is stated at the end of this section.
 
 **B is ruled and is no longer open in the "which one" sense.**
 ZK-friendly and non-ZK hashes are both first-class and selectable per record, permanently, via `hashAlg`.
@@ -1552,11 +1563,15 @@ Eight confirmed what it already said; two changed it.
 | **D11** detached signature | None in v1, with the constraints on any future one stated normatively now | 2.2 |
 | **D12** normalization | D12a, NFC pinned at Unicode 15.1, with an end-to-end corpus vector | 6.1 |
 | **D13** clinical validation | D13a at the protocol layer, plus a normative prohibition on claiming clinical facts from root validity | 2.3 |
+| **D14** type-map lookup key | **D14a**, the lookup compares the NFC-normalized key. **Added to this document**: section 4.2 previously said nothing about the form the lookup compares | 4.2 |
 
-**One further question is open and was identified after these rulings, while building the vector D12 required: whether the type-map lookup matches over an NFC-normalized key or over the bytes as received.**
-Section 6.1 pins NFC for hashing and section 4.2 requires an uncovered path to fail closed; neither says which form the lookup that precedes hashing compares.
-Both reference implementations currently match raw, so a decomposed key is refused by the fail-closed rule while its composed twin commits, and the two render identically.
-That is decision D14 in `docs/decisions.md` and this document does not settle it.
+**One further question was identified after these rulings, while building the vector D12 required, and was ruled on 2026-07-30: the type-map lookup matches over the NFC-normalized key.**
+Section 6.1 pins NFC for hashing and section 4.2 requires an uncovered path to fail closed; neither said which form the lookup that precedes hashing compares, and section 4.2 now does.
+
+The ruling follows from the two rules this document already states.
+Section 11.2's rule is "check the bytes you commit, not the bytes you received", and a STRING leaf commits `utf8(NFC(s))` under section 6.1 while an encoded KEY segment commits `NFC(key)` under section 5.1, so a raw comparison would have been the one step deciding admissibility on a spelling no root records.
+And under a raw comparison a decomposed key is refused by the fail-closed rule while its composed twin commits, with the two rendering identically - which is the invisible divergence D12 was ruled to prevent, arriving one layer up.
+That is decision D14a in `docs/decisions.md`, where the alternative and its consequences are recorded.
 
 **All of them, with their alternatives, their reasoning and the constraints they were ruled under, are in [`docs/decisions.md`](../decisions.md).**
 A decision that looks settled here and still reads as open there is a defect in this documentation set, not a nuance; the two files move together.

@@ -70,7 +70,8 @@ Twice in the same design is a pattern, which is why the rule is written down rat
 
 **Decision D4 has since been ruled D4b**, so `masterSalt` no longer exists anywhere in the design and neither foreclosure is reachable today.
 That does not retire the rule.
-It retires this example, which is kept because it is the clearest one available and because the rule still binds on decisions A, C and D14, all of which remain open (`docs/decisions.md` Parts 1 and 2a).
+It retires this example, which is kept because it is the clearest one available and because the rule still binds on decisions A and C, which remain open (`docs/decisions.md` Part 1).
+D14 was the third case the rule held open, and it shows the rule working end to end: the class-19 key vector was withheld while D14 was open and was built under the ruling on 2026-07-30, so no implementation ever inherited an unruled answer from a data file.
 
 **This is a future-proofing constraint, not a tidiness one**, and it connects directly to specification section 12.2.
 A corpus that hard-codes one side of an open question is not upgradeable.
@@ -520,12 +521,14 @@ These four carried class 14 until the D8 ruling created this class; they were al
 
 Use a string whose NFC form is stable across recent Unicode versions, so that this class tests normalization rather than the version pin; class 16 owns the version question and is honest about what it can and cannot demonstrate.
 
-**The key-site row is defined here and deliberately NOT built, and decision D14 is the reason.**
-The corpus carries the value site alone, which is one vector rather than the table's two.
-The specification pins NFC for hashing and says nothing about whether type-map matching normalizes the key it matches on, so both reference implementations compare a pattern token against a segment key raw (`corpus/README.md`, ambiguity 4).
-A built key-site vector has to resolve its key through the type map, so it would pass under one reading and fail under the other, which settles D14 from inside a data file rather than testing it.
-Section 1.2 forbids exactly that, and `docs/decisions.md` Part 2a records D14 as open.
-The row stays in this table because the class is not complete until D14 is ruled and the vector is built under the ruling, and stating the gap here is what keeps a passing class 19 from reading as coverage it does not have.
+**The key-site row was deliberately NOT built until decision D14 was ruled, and it is built now.**
+A key-site vector has to resolve its key through the type map, and whether that lookup normalized was an open question: the specification pinned NFC for hashing and said nothing about the lookup, so both reference implementations compared a pattern token against a segment key raw (`corpus/README.md`, ambiguity 4).
+A vector built then would have passed under one reading and failed under the other, which settles a decision from inside a data file rather than testing a settled one, and section 1.2 forbids exactly that.
+**D14 was ruled D14a on 2026-07-30**, normalize, so the vector now tests a decided question.
+
+The corpus carries both sites, and `corpus/tools/build_corpus.py` fails the build if either is missing, which is the check this table's requirement could not have before.
+The key vector's map declares the composed spelling alone, so it discriminates: under raw matching the decomposed half fails closed with `type-map-uncovered-path` and the equality assertion is unreachable.
+`corpus/README.md` records that measurement and the second discriminator the ruling produced.
 
 **Both forms MUST be computed under one shared salt set, and the vector MUST name the file carrying it.**
 Under decision D4b every salt is an independent random draw (specification section 7), so two issuances of the two forms produce different roots for a reason that has nothing to do with normalization, and the equality assertion would then hold nothing.
