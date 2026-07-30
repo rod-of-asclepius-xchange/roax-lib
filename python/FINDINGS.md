@@ -29,10 +29,8 @@ Specification section 3.3 says, of the flattener's empty-container outputs:
 So under the section 3.3 rule those two records have no type tag at `a.b` and MUST fail closed, which means they have no root at all - and the class-5 vectors `record-structure-empty-array` and `record-structure-empty-object` assert one for each.
 
 **Measured, from this implementation.**
-These are the two reference-available rows of [`README.md`](README.md)'s table, which owns those
-figures; both moved when the corpus grew on 2026-07-30 and the delta between them did not.
-Both need the third-party checkout `.gitignore` excludes, and that table's two reference-unavailable
-rows show the same delta of 4 without it, so the divergence below is reproducible from a bare clone.
+These are the two reference-available rows of [`README.md`](README.md)'s table, which owns those figures; both moved when the corpus grew on 2026-07-30 and the delta between them did not.
+Both need the third-party checkout `.gitignore` excludes, and that table's two reference-unavailable rows show the same delta of 4 without it, so the divergence below is reproducible from a bare clone.
 
 | Empty-container rule | Corpus result |
 |---|---|

@@ -109,11 +109,15 @@ Every occurrence of `additionalProperties` in the lite schema is `false` - 66 of
 That makes unknown KEY paths genuine errors rather than ordinary additional properties.
 It did not settle the six `base64Binary` slots, the untyped `Narrative.div`, or the FHIR null-placeholder conflict, and nothing in a schema could have: each needed a ruling, and all three were ruled on 2026-07-30 under [`docs/type-maps.md`](../type-maps.md) section 1.3.
 
-- **`base64Binary` is BYTES over the decoded octets**, grade Strong, because FHIR R4 defines the datatype as a stream of bytes while identifying its JSON form as base64 text, so BYTES commits the value rather than the transport spelling. The canonical RFC 4648 section 4 form specification section 6.3 pins is an input-admissibility condition and never the committed value.
-- **`Narrative.div` is STRING over the escaped XHTML text**, grade Decisive, because FHIR R4's normative JSON representation states it is one escaped XHTML string. An implementation MUST NOT parse, normalize as markup, or reserialize the XHTML for commitment: STRING selects `utf8(NFC(s))` and nothing more, and a separate FHIR validator still owns the XHTML content rules.
-- **Primitive-array null placeholders get NO NULL binding and the record is REJECTED**, grade Decisive, until a versioned schema and type-map revision admits the FHIR representation. Specification section 4.2 runs complete profile validation before map resolution, so the pinned schema wins and the map may not widen a record its own schema refuses; adding NULL to the map alone would contradict the schema rather than resolve it.
+- **`base64Binary` is BYTES over the decoded octets**, grade Strong, because FHIR R4 defines the datatype as a stream of bytes while identifying its JSON form as base64 text, so BYTES commits the value rather than the transport spelling.
+  The canonical RFC 4648 section 4 form specification section 6.3 pins is an input-admissibility condition and never the committed value.
+- **`Narrative.div` is STRING over the escaped XHTML text**, grade Decisive, because FHIR R4's normative JSON representation states it is one escaped XHTML string.
+  An implementation MUST NOT parse, normalize as markup, or reserialize the XHTML for commitment: STRING selects `utf8(NFC(s))` and nothing more, and a separate FHIR validator still owns the XHTML content rules.
+- **Primitive-array null placeholders get NO NULL binding and the record is REJECTED**, grade Decisive, until a versioned schema and type-map revision admits the FHIR representation.
+  Specification section 4.2 runs complete profile validation before map resolution, so the pinned schema wins and the map may not widen a record its own schema refuses; adding NULL to the map alone would contradict the schema rather than resolve it.
 
-The third ruling is operative today, because it is expressed as an absence and the artifacts already carry no NULL output. The first two are not yet in the artifact, for the reason section 1.6 gives.
+The third ruling is operative today, because it is expressed as an absence and the artifacts already carry no NULL output.
+The first two are not yet in the artifact, for the reason section 1.6 gives.
 
 ### 4.4 Polymorphic fields are real and already present
 

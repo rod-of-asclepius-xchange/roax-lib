@@ -157,40 +157,25 @@ That makes the reserved floor more load-bearing here than elsewhere.
 
 ## 6. Profile value rules, version 1.1
 
-**A binding says what tag a value carries; a value rule says which values the profile admits at all,
-and the two are different layers.**
-Specification section 4.2 requires complete profile-schema validation BEFORE map resolution, and
-ruled decision D13a keeps value-domain validation in "a separate, independently versioned conformance
-layer" rather than in the canonicalization layer (`docs/decisions.md`, D13).
-So the rule below is enforced by the profile validator and NOT by any of the five canonicalization
-implementations, and the version on this section is what a deployment cites.
+**A binding says what tag a value carries; a value rule says which values the profile admits at all, and the two are different layers.**
+Specification section 4.2 requires complete profile-schema validation BEFORE map resolution, and ruled decision D13a keeps value-domain validation in "a separate, independently versioned conformance layer" rather than in the canonicalization layer (`docs/decisions.md`, D13).
+So the rule below is enforced by the profile validator and NOT by any of the five canonicalization implementations, and the version on this section is what a deployment cites.
 
 | Path (segments) | Rule | Ruled |
 |---|---|---|
 | `KEY("notarisationMetadata")`, `KEY("signedEuHealthCerts")`, `anyIndex`, `KEY("dose")` | The canonical INTEGER value MUST match `[1-9][0-9]*`: a positive integer, so `0` and every negative value are refused | 2026-07-30, with the INTEGER binding of section 3.1 |
 
-**The path is carried as SEGMENTS and never as display notation**, for the same reason section 4's
-floor table states: `notarisationMetadata.reference` reads as one token and is two segments, and a
-rule holding a dotted string as a single KEY asks for a leaf no record has, so it matches nothing and
-is silently unenforced while every fixture built the same way agrees with it.
+**The path is carried as SEGMENTS and never as display notation**, for the same reason section 4's floor table states: `notarisationMetadata.reference` reads as one token and is two segments, and a rule holding a dotted string as a single KEY asks for a leaf no record has, so it matches nothing and is silently unenforced while every fixture built the same way agrees with it.
 
 **Why the narrowing is part of the ruling rather than an extra.**
-The type-map binding alone leaves `0` and every negative value formally valid under this profile,
-because both are grammar-valid ROAX INTEGERs, and the EU DCC field this mirrors has minimum 1.
-A fractional value is already refused one layer down by the specification section 6.2 INTEGER grammar,
-so this rule is about `0` and the negatives and about nothing else.
+The type-map binding alone leaves `0` and every negative value formally valid under this profile, because both are grammar-valid ROAX INTEGERs, and the EU DCC field this mirrors has minimum 1.
+A fractional value is already refused one layer down by the specification section 6.2 INTEGER grammar, so this rule is about `0` and the negatives and about nothing else.
 
 **Where it is executable.**
-`corpus/tools/profile_rules.py` and `corpus/tools/profile_rules.mjs` implement this table and run as
-the issuer's half of section 4.2 step 1, before any leaf is built, so a violating record is refused
-rather than committed.
+`corpus/tools/profile_rules.py` and `corpus/tools/profile_rules.mjs` implement this table and run as the issuer's half of section 4.2 step 1, before any leaf is built, so a violating record is refused rather than committed.
 `corpus/tools/run.sh` step 5 self-tests both.
-`rust/tests/dfa_profile_protocol.rs` pins the layering through the `SchemaValidator` seam by showing
-the ruled profile refuse `0` while the bare canonicalization layer accepts it, which is what the
-layer split looks like from the library side.
-The conformance corpus pins the ACCEPT case through class 10, since the shipped sample's `dose` values
-are 1 and 2; the refusals are pinned in the profile layer that owns them rather than demanded from
-implementations that by ruled D13a do not carry them.
+`rust/tests/dfa_profile_protocol.rs` pins the layering through the `SchemaValidator` seam by showing the ruled profile refuse `0` while the bare canonicalization layer accepts it, which is what the layer split looks like from the library side.
+The conformance corpus pins the ACCEPT case through class 10, since the shipped sample's `dose` values are 1 and 2; the refusals are pinned in the profile layer that owns them rather than demanded from implementations that by ruled D13a do not carry them.
 
 ## 7. What the schema does NOT enforce
 
