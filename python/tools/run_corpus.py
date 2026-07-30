@@ -1,0 +1,762 @@
+#!/usr/bin/env python3
+"""Run the ROAX conformance corpus against this Python implementation.
+
+    python3 python/tools/run_corpus.py [--references PATH] [--empty-containers MODE]
+
+This is a **third** runner, deliberately standalone.
+It does not extend `corpus/tools/run.sh`, which is the existing two-implementation gate
+and whose steps 1 through 3 are about those two agreeing with each other and with the
+committed bytes.
+Nothing under `corpus/` is read as source: this runner consumes the vector file, the
+fixtures and the corpus-side type maps, which is exactly what
+`corpus/README.md` documents as the interface for "an implementation that is not one of
+these two".
+
+Exit status is 0 only when all 19 classes pass with no unavailable vectors.
+An assertion failure exits 1.
+A vector or class that cannot run says NOT RUN with the reason and exits 2; it never
+reports green unrun.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from collections import defaultdict
+from typing import Any
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(os.path.dirname(_HERE), "src"))
+sys.path.insert(0, _HERE)
+
+from roax_canon import (  # noqa: E402
+    DEFAULT_PROFILES,
+    DisplayPatternTypeMap,
+    MappingSalts,
+    PINNED_UNICODE_VERSION,
+    PositionalSalts,
+    RecordIdentity,
+    RESERVED_V1,
+    RESERVED_V2,
+    RoaxError,
+    VerifierConfig,
+    audit_path,
+    build_tree,
+    display_path,
+    draw_salt,
+    encode_path,
+    encode_value,
+    leaf_hash,
+    load_file,
+    loads,
+    merkle_tree_head,
+    runtime_unicode_version,
+    unicode_tables_match_pin,
+    verify_envelope,
+    verify_inclusion,
+)
+from roax_canon.errors import ErrorCode  # noqa: E402
+from roax_canon.flatten import check_reserved_namespace  # noqa: E402
+from roax_canon.jsonio import as_int, is_json_string  # noqa: E402
+from roax_canon.path import segments_from_json  # noqa: E402
+from roax_canon.profiles import CORPUS_SYNTHETIC_PROFILE  # noqa: E402
+from ts_sample import load_export  # noqa: E402
+
+REPO = os.path.dirname(os.path.dirname(_HERE))
+CORPUS = os.path.join(REPO, "corpus", "conformance-corpus-1.0.json")
+TYPE_MAP_DIR = os.path.join(REPO, "corpus", "type-maps")
+EXPECTED_CLASSES = tuple(range(1, 20))
+REFERENCES_INSTRUCTION = "rerun with --references /path/to/schemata"
+
+
+# ---------------------------------------------------------------------------------
+# Result accounting
+# ---------------------------------------------------------------------------------
+
+
+class Results:
+    def __init__(self) -> None:
+        self.passed: dict[int, int] = defaultdict(int)
+        self.failed: dict[int, list[str]] = defaultdict(list)
+        self.not_run: dict[int, list[str]] = defaultdict(list)
+
+    def ok(self, cls: int) -> None:
+        self.passed[cls] += 1
+
+    def bad(self, cls: int, name: str, detail: str) -> None:
+        self.failed[cls].append(f"{name}: {detail}")
+
+    def unavailable(self, cls: int, name: str, why: str) -> None:
+        self.not_run[cls].append(f"{name}: {why}")
+
+    def check(self, cls: int, name: str, got: Any, want: Any, what: str = "") -> None:
+        if got == want:
+            self.ok(cls)
+        else:
+            self.bad(cls, name, f"{what}got {got!r}, want {want!r}")
+
+
+# ---------------------------------------------------------------------------------
+# Corpus input escape forms (`corpus/README.md`, "Input escape forms")
+# ---------------------------------------------------------------------------------
+
+
+def from_utf16(units: list[str]) -> str:
+    """Build a string from UTF-16 code units, unpaired surrogates included.
+
+    ``surrogatepass`` is required: plain ``utf-16-be`` raises on a lone ``d800``, which
+    would make the unpaired-surrogate vectors untestable rather than testable.
+    A conforming JSON writer cannot emit one as well-formed UTF-8, which is why the corpus
+    carries them this way at all.
+    """
+    raw = bytes.fromhex("".join(units))
+    return raw.decode("utf-16-be", errors="surrogatepass")
+
+
+def unescape(node: Any) -> Any:
+    """Resolve ``$utf16`` anywhere inside a vector input."""
+    if isinstance(node, dict):
+        if set(node) == {"$utf16"}:
+            return from_utf16([str(u) for u in node["$utf16"]])
+        return {k: unescape(v) for k, v in node.items()}
+    if isinstance(node, list):
+        return [unescape(v) for v in node]
+    return node
+
+
+def _salt_entries(path: str, expected_pairing: str) -> list[Any]:
+    doc = load_file(path)
+    if not isinstance(doc, dict):
+        raise ValueError(f"{path}: salt document must be an object")
+    allowed = (
+        frozenset({"pairing", "leafCount", "salts"})
+        if expected_pairing == "positional"
+        else frozenset({"pairing", "salts"})
+    )
+    unknown = sorted(set(doc) - allowed)
+    if unknown:
+        raise ValueError(f"{path}: unknown salt document members {unknown}")
+    actual_pairing = doc.get("pairing")
+    if actual_pairing != expected_pairing:
+        raise ValueError(
+            f"{path}: salt document declares pairing {actual_pairing!r}, "
+            f"vector requires {expected_pairing!r}"
+        )
+    entries = doc.get("salts")
+    if not isinstance(entries, list):
+        raise ValueError(f"{path}: salt document must carry a `salts` array")
+    if expected_pairing == "positional":
+        if "leafCount" not in doc:
+            raise ValueError(f"{path}: positional salt document must carry `leafCount`")
+        count = as_int(doc["leafCount"], field="leafCount")
+        if count != len(entries):
+            raise ValueError(
+                f"{path}: positional salt document declares {count} leaves "
+                f"but carries {len(entries)} salts"
+            )
+    return entries
+
+
+def _salt_bytes(value: Any, *, path: str) -> bytes:
+    if (
+        not is_json_string(value)
+        or len(value) != 32
+        or any(ch not in "0123456789abcdef" for ch in value)
+    ):
+        raise ValueError(f"{path}: salt must be exactly 32 lowercase hex characters")
+    return bytes.fromhex(value)
+
+
+def salts_by_path(path: str) -> dict[bytes, bytes]:
+    entries = _salt_entries(path, "path")
+    by_path: dict[bytes, bytes] = {}
+    for entry in entries:
+        if not isinstance(entry, dict) or set(entry) != {"segments", "salt"}:
+            raise ValueError(f"{path}: each path-paired salt needs only `segments` and `salt`")
+        encoded = encode_path(segments_from_json(entry["segments"]))
+        if encoded in by_path:
+            raise ValueError(
+                f"{path}: duplicate salt path {display_path(segments_from_json(entry['segments']))!r}"
+            )
+        by_path[encoded] = _salt_bytes(entry["salt"], path=path)
+    return by_path
+
+
+def positional_salts(path: str) -> list[bytes]:
+    entries = _salt_entries(path, "positional")
+    return [_salt_bytes(salt, path=path) for salt in entries]
+
+
+# ---------------------------------------------------------------------------------
+# Per-class runners
+# ---------------------------------------------------------------------------------
+
+
+def run_encode_path(vectors, r: Results) -> None:
+    for x in vectors:
+        segs = segments_from_json(x["segments"])
+        r.check(x["class"], x["name"], encode_path(segs).hex(), x["encodedHex"], "encodedHex: ")
+        if "displayPath" in x:
+            r.check(x["class"], x["name"], display_path(segs), x["displayPath"], "displayPath: ")
+
+
+def run_encode_value(vectors, r: Results) -> None:
+    for x in vectors:
+        try:
+            got = encode_value(x["tag"], unescape(x.get("input"))).hex()
+        except RoaxError as exc:
+            r.bad(x["class"], x["name"], f"rejected with {exc.code}")
+            continue
+        r.check(x["class"], x["name"], got, x["encodedHex"])
+
+
+def run_reject(vectors, r: Results) -> None:
+    """Every one of these MUST error, with the reference reason code."""
+    for x in vectors:
+        cls, name = x["class"], x["name"]
+        raw = x.get("input")
+        try:
+            if isinstance(raw, dict) and set(raw) == {"$jsonText"}:
+                loads(raw["$jsonText"])
+            elif isinstance(raw, dict) and set(raw) == {"$segments"}:
+                segs = segments_from_json(unescape(raw["$segments"]))
+                # Both checks, in the order a flattener applies them: the reserved
+                # namespace guard is on the record's first segment and runs at the input
+                # boundary, and encoding is what rejects an index out of 32-bit range.
+                check_reserved_namespace(segs)
+                encode_path(segs)
+            elif "segments" in x:
+                segs = segments_from_json(x["segments"])
+                check_reserved_namespace(segs)
+                encode_path(segs)
+            elif x.get("tag") is not None:
+                encode_value(x["tag"], unescape(raw))
+            else:
+                r.bad(cls, name, "unsupported reject-vector input shape")
+                continue
+        except RoaxError as exc:
+            r.check(cls, name, exc.code, x["reason"], "reason: ")
+            continue
+        r.bad(cls, name, f"accepted; expected rejection {x['reason']!r}")
+
+
+def run_leaf(vectors, r: Results) -> None:
+    for x in vectors:
+        segs = segments_from_json(x["segments"])
+        got = leaf_hash(segs, x["tag"], unescape(x.get("value")), bytes.fromhex(x["saltHex"])).hex()
+        r.check(x["class"], x["name"], got, x["leafHash"])
+
+
+def run_tree(vectors, r: Results) -> None:
+    for x in vectors:
+        leaves = [bytes.fromhex(h) for h in x["leafHashes"]]
+        r.check(x["class"], x["name"], merkle_tree_head(leaves).hex(), x["root"])
+
+
+def run_inclusion(vectors, trees, r: Results) -> None:
+    for x in vectors:
+        got = verify_inclusion(
+            bytes.fromhex(x["leafHash"]),
+            x["index"],
+            x["treeSize"],
+            [bytes.fromhex(h) for h in x["auditPath"]],
+            bytes.fromhex(x["root"]),
+        )
+        r.check(x["class"], x["name"], got, x["expect"], "verify: ")
+        # Generating the audit path for that index must reproduce the one carried, which
+        # is the half a verify-only runner would miss.
+        source = trees.get(f"tree-n{x['treeSize']}")
+        if source is not None and x["expect"]:
+            regenerated = [h.hex() for h in audit_path(x["index"], source)]
+            r.check(x["class"], x["name"], regenerated, x["auditPath"], "generated auditPath: ")
+
+
+def run_negative_proof(vectors, r: Results) -> None:
+    """These MUST NOT verify.
+
+    STATED LIMIT, because `corpus/README.md` is explicit that a runner handing a leaf hash
+    straight to a fold primitive is testing the primitive rather than the defence.
+    These vectors carry a leaf hash and no ``(path, tag, value, salt)``, so the full
+    disclosed-copy path cannot be driven from them: there is nothing to recompute a leaf
+    hash from. What this asserts is the RFC 9162 half.
+    The defence specification section 10 step 2 actually requires - never accepting a
+    caller-supplied leaf hash - is structural in this implementation, because
+    :func:`roax_canon.verify.verify_envelope` has no parameter that takes one.
+    This runner invokes that full-verifier entry point for 54 envelope vectors: 3 in
+    class 11, 34 in class 14, 5 in class 15, 8 in class 17 and 4 in class 18.
+    That is an entry-point count, not a claim that all 54 reach leaf recomputation.
+    """
+    for x in vectors:
+        got = verify_inclusion(
+            bytes.fromhex(x["leafHash"]),
+            x["index"],
+            x["treeSize"],
+            [bytes.fromhex(h) for h in x["auditPath"]],
+            bytes.fromhex(x["root"]),
+        )
+        r.check(x["class"], x["name"], got, False, f"attack {x['attack']}: ")
+
+
+def run_type_map(vectors, maps, r: Results) -> None:
+    for x in vectors:
+        cls, name = x["class"], x["name"]
+        try:
+            resolver = maps(x["recordType"])
+        except RoaxError as exc:
+            if x.get("expectMapRejected"):
+                r.ok(cls)
+            else:
+                r.bad(cls, name, f"map rejected with {exc.code}")
+            continue
+        except FileNotFoundError as exc:
+            path = exc.filename or os.path.join(TYPE_MAP_DIR, f"{x['recordType']}.json")
+            r.bad(cls, name, f"committed corpus type map is missing: {path}")
+            continue
+        if x.get("expectMapRejected"):
+            r.bad(cls, name, "map was accepted; expected rejection")
+            continue
+        segs = segments_from_json(x["segments"])
+        try:
+            tag = resolver.resolve(segs, x["jsonKind"])
+        except RoaxError as exc:
+            if x.get("expectFailClosed"):
+                r.check(cls, name, exc.code, ErrorCode.TYPE_UNRESOLVED, "reason: ")
+            else:
+                r.bad(
+                    cls, name, f"failed closed with {exc.code}; expected tag {x.get('expectTag')}"
+                )
+            continue
+        if x.get("expectFailClosed"):
+            r.bad(cls, name, f"resolved to tag {tag}; expected fail-closed")
+        else:
+            r.check(cls, name, tag, x["expectTag"], "tag: ")
+
+
+def _record_for(vector, references: str | None):
+    """Return ``(record, unavailable_reason, failure_reason)`` for one record vector.
+
+    Exactly one reason is populated when no record can be returned.
+    """
+    ref = vector["recordFile"]
+    if "#" in ref:
+        module, export = ref.split("#", 1)
+        if not references:
+            return (
+                None,
+                f"no reference checkout was configured; {REFERENCES_INSTRUCTION}",
+                None,
+            )
+        references = os.path.abspath(references)
+        if not os.path.isdir(references):
+            return (
+                None,
+                f"reference checkout path is not a directory: {references}; "
+                f"{REFERENCES_INSTRUCTION}",
+                None,
+            )
+        rel = module
+        prefix = "references/"
+        if rel.startswith(prefix):
+            rel = rel[len(prefix) :]
+        candidates = [os.path.join(references, rel)]
+        # Allow --references to point either at the parent of `schemata/` or at the
+        # checkout itself.
+        fallback = os.path.join(references, rel.split("/", 1)[1] if "/" in rel else rel)
+        if fallback not in candidates:
+            candidates.append(fallback)
+        candidate = next((path for path in candidates if os.path.exists(path)), None)
+        if candidate is None:
+            attempted = " and ".join(candidates)
+            return (
+                None,
+                f"reference module was not found; attempted {attempted}; "
+                f"{REFERENCES_INSTRUCTION}",
+                None,
+            )
+        try:
+            return load_export(candidate, export), None, None
+        except Exception as exc:
+            # The extractor is an input boundary. Any ordinary read or parse exception
+            # is reported as a failed attempt rather than escaping without a terminal
+            # corpus result.
+            return (
+                None,
+                None,
+                f"could not extract {export!r} from reference module {candidate}: "
+                f"{type(exc).__name__}: {exc}",
+            )
+    return load_file(os.path.join(REPO, ref)), None, None
+
+
+def run_record(vectors, maps, r: Results, references, authorize_empty) -> None:
+    for x in vectors:
+        cls, name = x["class"], x["name"]
+        if "envelopeFile" in x:
+            r.bad(cls, name, "unsupported record-vector envelope carrier")
+            continue
+        reserved_set = _reserved_set(x)
+        if reserved_set == RESERVED_V2:
+            # NOT RUN rather than FAIL. This package deliberately implements no
+            # published-DFA artifact loader and no content-ID reproduction, so a vector
+            # selecting envelope 2.0 is one this runner CANNOT run, not one it ran and
+            # disagreed with. Reporting it as a failure would collapse the three-way
+            # contract in this module's own docstring, where could-not-check is a third
+            # status that is neither a pass nor a failure (`FINDINGS.md` item 13;
+            # specification section 4.2).
+            r.unavailable(
+                cls,
+                name,
+                "vector selects envelope 2.0 through `typeMapId`, which this package does "
+                "not implement: specification section 4.2 requires selecting the exact "
+                "map by a reproduced content ID from a published DFA artifact",
+            )
+            continue
+        record, why_not_run, failure = _record_for(x, references)
+        if failure is not None:
+            r.bad(cls, name, failure)
+            continue
+        if record is None:
+            r.unavailable(cls, name, why_not_run or "record unavailable")
+            continue
+        identity = RecordIdentity(
+            record_type=x["recordType"],
+            schema_version=x["schemaVersion"],
+            record_id=x["recordId"],
+            issuer_id=x["issuerId"],
+            issuer_key_id=x.get("issuerKeyId"),
+            type_map_id=x.get("typeMapId"),
+        )
+        salts_path = os.path.join(REPO, x["saltsFile"])
+        try:
+            if x["saltPairing"] == "positional":
+                salt_values = positional_salts(salts_path)
+                salts = PositionalSalts(salt_values)
+                salt_count = len(salt_values)
+            elif x["saltPairing"] == "path":
+                by_path = salts_by_path(salts_path)
+                salts = MappingSalts(by_path)
+                salt_count = len(by_path)
+            else:
+                raise ValueError(f"unknown vector saltPairing {x['saltPairing']!r}")
+        except (OSError, KeyError, TypeError, ValueError, RoaxError) as exc:
+            r.bad(cls, name, f"invalid committed salt set: {type(exc).__name__}: {exc}")
+            continue
+        try:
+            built = build_tree(
+                record,
+                identity,
+                maps(x["recordType"]),
+                salts,
+                reserved_set=reserved_set,
+                authorize_empty_containers=authorize_empty,
+            )
+        except FileNotFoundError as exc:
+            path = exc.filename or os.path.join(TYPE_MAP_DIR, f"{x['recordType']}.json")
+            r.bad(cls, name, f"committed corpus type map is missing: {path}")
+            continue
+        except RoaxError as exc:
+            r.bad(cls, name, f"rejected with {exc.code}: {exc.detail}")
+            continue
+        if salt_count != built.leaf_count:
+            r.bad(
+                cls,
+                name,
+                f"committed salt set has {salt_count} entries for {built.leaf_count} leaves",
+            )
+            continue
+        r.check(cls, name, built.leaf_count, x["leafCount"], "leafCount: ")
+        r.check(cls, name, built.root.hex(), x["root"], "root: ")
+
+
+def _reserved_set(vector) -> str:
+    return RESERVED_V2 if vector.get("typeMapId") else RESERVED_V1
+
+
+def run_unlinkability(vectors, r: Results) -> None:
+    """Behavioural: draw with THIS implementation's generator and assert the relations.
+
+    Nothing is compared against a pinned value, because under ruled decision D4b there is
+    none to pin.
+
+    HONEST LIMIT, repeated from `docs/conformance-corpus.md` class 12: this detects a
+    deterministic or reused salt.
+    It cannot detect a weak or predictable CSPRNG, and no fixed vector file can.
+    """
+    for x in vectors:
+        cls, name = x["class"], x["name"]
+        paths = [segments_from_json(p) for p in x["paths"]]
+        encoded = [encode_path(p) for p in paths]
+        if len(set(encoded)) != len(encoded):
+            r.bad(cls, name, "vector names the same encoded path twice; corpus defect")
+            continue
+        value = unescape(x.get("value"))
+        salts_per_trial: list[list[bytes]] = []
+        hashes_per_trial: list[list[bytes]] = []
+        for _ in range(x["trials"]):
+            drawn = [draw_salt() for _ in paths]
+            salts_per_trial.append(drawn)
+            hashes_per_trial.append(
+                [leaf_hash(p, x["tag"], value, s) for p, s in zip(paths, drawn)]
+            )
+
+        within = all(len(set(trial)) == len(trial) for trial in salts_per_trial)
+        r.check(cls, name, within, True, "distinct salts within an issuance: ")
+
+        across_salts = all(
+            len({trial[i] for trial in salts_per_trial}) == len(salts_per_trial)
+            for i in range(len(paths))
+        )
+        r.check(cls, name, across_salts, True, "distinct salts across issuances: ")
+
+        across_hashes = all(
+            len({trial[i] for trial in hashes_per_trial}) == len(hashes_per_trial)
+            for i in range(len(paths))
+        )
+        r.check(cls, name, across_hashes, True, "distinct leaf hashes across issuances: ")
+
+
+def run_normalization(vectors, maps, r: Results, authorize_empty) -> None:
+    for x in vectors:
+        cls, name = x["class"], x["name"]
+        identity = RecordIdentity(
+            record_type=x["recordType"],
+            schema_version=x["schemaVersion"],
+            record_id=x["recordId"],
+            issuer_id=x["issuerId"],
+            issuer_key_id=x.get("issuerKeyId"),
+        )
+        try:
+            by_path = salts_by_path(os.path.join(REPO, x["saltsFile"]))
+        except (OSError, KeyError, TypeError, ValueError, RoaxError) as exc:
+            r.bad(cls, name, f"invalid committed salt set: {type(exc).__name__}: {exc}")
+            continue
+        roots = []
+        for key in ("recordFileNFD", "recordFileNFC"):
+            record = load_file(os.path.join(REPO, x[key]))
+            built = build_tree(
+                record,
+                identity,
+                maps(x["recordType"]),
+                MappingSalts(by_path),
+                authorize_empty_containers=authorize_empty,
+            )
+            if len(by_path) != built.leaf_count:
+                r.bad(
+                    cls,
+                    name,
+                    f"committed salt set has {len(by_path)} entries for "
+                    f"{built.leaf_count} leaves",
+                )
+                roots = []
+                break
+            roots.append(built.root.hex())
+        if not roots:
+            continue
+        r.check(cls, name, roots[0] == roots[1], x["expectSameRoot"], "same root: ")
+        if "root" in x:
+            r.check(cls, name, roots[0], x["root"], "root: ")
+
+
+def run_envelope(vectors, config, r: Results) -> None:
+    for x in vectors:
+        cls, name = x["class"], x["name"]
+        envelope = load_file(os.path.join(REPO, x["envelopeFile"]))
+        cfg = config
+        if "verifierConfig" in x:
+            vc = x["verifierConfig"]
+            cfg = VerifierConfig(
+                profiles=config.profiles,
+                hash_alg_allow_list=tuple(vc["hashAlgAllowList"]),
+                resolvers=config.resolvers,
+                reserved_set=config.reserved_set,
+                anchored_root=bytes.fromhex(vc["anchoredRoot"]),
+                anchored_hash_alg=vc["anchoredHashAlg"],
+                registry_address=vc["registryAddress"],
+                registry_chain_id=vc.get("registryChainId"),
+                authorize_empty_containers=config.authorize_empty_containers,
+            )
+        result = verify_envelope(envelope, cfg)
+        r.check(cls, name, result.accepted, x["expectAccept"], "accept: ")
+        if "reason" in x:
+            r.check(cls, name, result.reason, x["reason"], f"reason ({result.detail[:90]}): ")
+
+
+# ---------------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------------
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--references",
+        default=os.environ.get("ROAX_REFERENCES") or os.path.join(REPO, "references"),
+        help=(
+            "checkout holding the third-party reference schemata; class 10 needs it "
+            "(default: ROAX_REFERENCES, then repository references/)"
+        ),
+    )
+    parser.add_argument(
+        "--empty-containers",
+        choices=("structural", "authorized"),
+        default="structural",
+        help=(
+            "how an empty container is tagged. 'structural' emits EMPTY_ARRAY and "
+            "EMPTY_OBJECT without consulting the type map, which is what the committed "
+            "corpus asserts. 'authorized' applies the rule specification section 3.3 "
+            "states, under which an unauthorized empty container fails closed."
+        ),
+    )
+    parser.add_argument("--verbose", action="store_true", help="list every failure")
+    args = parser.parse_args()
+
+    authorize_empty = args.empty_containers == "authorized"
+    references = args.references
+
+    corpus = json.load(open(CORPUS, encoding="utf-8"))
+    vectors = corpus["vectors"]
+
+    print("ROAX-CANON/1 conformance corpus, Python implementation")
+    print(
+        f"  corpus            {corpus['corpusVersion']}  canon {corpus['canon']}"
+        f"  hashAlg {corpus['hashAlg']}"
+    )
+    print(f"  corpus Unicode    {corpus['unicodeVersion']}   pin {PINNED_UNICODE_VERSION}")
+    print(
+        f"  runtime Unicode   {runtime_unicode_version()}"
+        f"  {'matches the pin' if unicode_tables_match_pin() else 'DOES NOT MATCH THE PIN'}"
+    )
+    print(f"  python            {sys.version.split()[0]}")
+    print(f"  empty containers  {args.empty_containers}")
+    if not authorize_empty:
+        print(
+            "    NOTE: 'structural' is the committed corpus's behaviour and diverges from\n"
+            "    specification section 3.3, which requires the selected map to authorize a\n"
+            "    structured path and observed kind before EMPTY_ARRAY or EMPTY_OBJECT is\n"
+            "    emitted. Run with --empty-containers=authorized to see the difference."
+        )
+    if not references:
+        print(f"  references        NOT RUN - not configured; {REFERENCES_INSTRUCTION}")
+    elif not os.path.isdir(references):
+        print(
+            f"  references        NOT RUN - {os.path.abspath(references)} is not a directory;\n"
+            f"                    {REFERENCES_INSTRUCTION}"
+        )
+    else:
+        print(f"  references        {references}")
+    print()
+
+    cache: dict[str, DisplayPatternTypeMap] = {}
+
+    def maps(record_type: str) -> DisplayPatternTypeMap:
+        if record_type not in cache:
+            cache[record_type] = DisplayPatternTypeMap.from_file(
+                os.path.join(TYPE_MAP_DIR, f"{record_type}.json")
+            )
+        return cache[record_type]
+
+    # The synthetic profile exists only inside this corpus and must never be issued
+    # against, so it is registered here rather than in the library's default registry.
+    registry = DEFAULT_PROFILES.with_profile(CORPUS_SYNTHETIC_PROFILE)
+    resolvers = {}
+    for record_type in registry.record_types():
+        candidate = os.path.join(TYPE_MAP_DIR, f"{record_type}.json")
+        if os.path.exists(candidate):
+            resolvers[record_type] = maps(record_type)
+    config = VerifierConfig(
+        profiles=registry,
+        # Specification section 7.4 defines a construction for SHA-256 alone and leaves
+        # `Poseidon-BN254` registered but unparameterized, so a corpus naming any other
+        # algorithm cannot exist yet and a branch for one would be dead either way. The
+        # allow-list is the verifier's own (section 7.4, H3) rather than the document's,
+        # so sourcing it from `corpus["hashAlg"]` would be the wrong shape regardless.
+        hash_alg_allow_list=("SHA-256",),
+        resolvers=resolvers,
+        authorize_empty_containers=authorize_empty,
+    )
+
+    r = Results()
+    run_encode_path(vectors.get("encodePath", []), r)
+    run_encode_value(vectors.get("encodeValue", []), r)
+    run_reject(vectors.get("reject", []), r)
+    run_leaf(vectors.get("leaf", []), r)
+    run_tree(vectors.get("tree", []), r)
+    trees = {
+        t["name"]: [bytes.fromhex(h) for h in t["leafHashes"]] for t in vectors.get("tree", [])
+    }
+    run_inclusion(vectors.get("inclusion", []), trees, r)
+    run_negative_proof(vectors.get("negativeProof", []), r)
+    run_type_map(vectors.get("typeMap", []), maps, r)
+    run_record(vectors.get("record", []), maps, r, references, authorize_empty)
+    run_unlinkability(vectors.get("unlinkability", []), r)
+    run_normalization(vectors.get("normalization", []), maps, r, authorize_empty)
+    run_envelope(vectors.get("envelope", []), config, r)
+
+    observed_classes = set(r.passed) | set(r.failed) | set(r.not_run)
+    missing_classes = [cls for cls in EXPECTED_CLASSES if cls not in observed_classes]
+    for cls in missing_classes:
+        r.unavailable(
+            cls,
+            "entire class",
+            "no assertion, failure, or unavailable vector was recorded for this class",
+        )
+
+    classes = sorted(set(EXPECTED_CLASSES) | observed_classes)
+    print(f"{'class':>5}  {'pass':>6}  {'fail':>6}  {'not run':>7}  status")
+    total_fail = 0
+    total_not_run = 0
+    classes_passed = 0
+    for cls in classes:
+        passed = r.passed.get(cls, 0)
+        failed = len(r.failed.get(cls, ()))
+        not_run = len(r.not_run.get(cls, ()))
+        total_fail += failed
+        total_not_run += not_run
+        if failed:
+            status = "FAIL"
+        elif not_run:
+            status = "INCOMPLETE - NOT RUN" if passed else "NOT RUN"
+        elif passed:
+            status = "PASS"
+            classes_passed += 1
+        else:
+            status = "NOT RUN"
+        print(f"{cls:>5}  {passed:>6}  {failed:>6}  {not_run:>7}  {status}")
+
+    if total_not_run:
+        print("\nNot run:")
+        for cls in sorted(r.not_run):
+            for line in r.not_run[cls]:
+                print(f"  class {cls}: {line}")
+
+    if total_fail:
+        print(f"\n{total_fail} assertion(s) failed:")
+        for cls in sorted(r.failed):
+            for line in r.failed[cls] if args.verbose else r.failed[cls][:12]:
+                print(f"  class {cls}: {line}")
+            if not args.verbose and len(r.failed[cls]) > 12:
+                print(f"  class {cls}: ... and {len(r.failed[cls]) - 12} more (--verbose)")
+        print(
+            f"\nRESULT: FAIL ({sum(r.passed.values())} passed; {total_fail} failed; "
+            f"{total_not_run} not run; {classes_passed}/19 classes passed)"
+        )
+        return 1
+
+    if total_not_run:
+        print(
+            f"\nRESULT: INCOMPLETE / NOT RUN ({sum(r.passed.values())} assertions passed; "
+            f"{total_not_run} not run; {classes_passed}/19 classes passed)"
+        )
+        return 2
+
+    print(
+        f"\nRESULT: PASS ({sum(r.passed.values())} assertions; "
+        f"{classes_passed}/19 classes passed; 0 not run)"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

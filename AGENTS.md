@@ -5,18 +5,25 @@ release, architecture, and sharp-edge notes that should travel with the code.
 
 ## What this repository is right now
 
-Specification, schemas, the conformance corpus, and two of the five ruled libraries: the independent Rust implementation under `rust/` and the independent TypeScript implementation under `src/`.
+Specification, schemas, the conformance corpus, and three of the five ruled libraries: the independent Rust implementation under `rust/`, the independent TypeScript implementation under `src/`, and the independent Python implementation under `python/`.
 Decision D was ruled to five independent, corpus-enforced libraries on 2026-07-29 (`docs/decisions.md`, decision D).
 The specifications came first so the design could be reviewed before five language implementations existed to be re-litigated, and that ordering held.
 `rust/README.md` owns that crate's protocol boundaries, its build, test and lint commands, and the open-decision behaviour it preserves.
+`python/README.md` owns that package's surface, its standalone corpus runner, its test commands and its per-class figures, and `python/FINDINGS.md` records what that build found.
 
 Do not add the Go, Swift or Kotlin library without an explicit instruction to do so.
 
+**That ruling carries an obligation on HOW each one is written, and it is the reason the option was worth choosing.**
+An implementation is written from `docs/spec/roax-canon-1.md`, and its author does not read another implementation while writing it.
+The two reference implementations under `corpus/tools/` exist precisely because they were written independently of each other, and their agreement is the only evidence the specification says one thing.
+A library produced by reading an existing one passes the corpus while destroying what a pass means.
+Validate against the corpus AFTER writing a thing, never while writing it.
+
 `corpus/tools/` holds two small reference implementations, in Python and in plain `.mjs`. **They are
 corpus tooling and they are not roax-lib.** They exist to generate and check the vectors and they
-are deliberately parser-only, error-code-only and unoptimized. If you need a further implementation
-for cross-checking, add another single-file one; do not promote these, and do not fold them into
-`src/`.
+are deliberately parser-only, error-code-only and unoptimized. Do not promote them into a library,
+do not import them from one, and do not fold them into `src/`. If you need a further implementation
+for cross-checking, add another single-file one.
 
 ### The TypeScript library
 
@@ -26,8 +33,9 @@ for cross-checking, add another single-file one; do not promote these, and do no
 **`package.json` and `tsconfig.json` now exist, and an earlier version of this file gave their
 absence as a rule.** That rule was "a TypeScript package here would read as the beginning of a
 library", and it is superseded because the library is now deliberate rather than accidental. It is
-superseded **only for the two libraries that exist**, Rust and TypeScript: adding a `go.mod`, a
-`Package.swift` or a Gradle build is still the thing not to do without an instruction. The package
+superseded **only for the three libraries that exist**, whose manifests are `rust/Cargo.toml`, the
+root `package.json` and `python/pyproject.toml`: adding a `go.mod`, a `Package.swift` or a Gradle
+build is still the thing not to do without an instruction. The package
 is zero-dependency at
 runtime - `node:crypto` supplies SHA-256 and the CSPRNG - and TypeScript plus `@types/node` are the
 only devDependencies. Ajv is still installed OUTSIDE the tree and named by `ROAX_AJV`, as the
@@ -100,6 +108,10 @@ These are the things a future agent is most likely to get wrong.
   Resolve NFC-normalized KEY and INDEX segments, then select one output by observed JSON kind.
   A missing transition or output fails closed. The map must authorize a path before the flattener
   emits EMPTY_ARRAY or EMPTY_OBJECT, or an unknown empty extension bypasses D7.
+  **The committed corpus does not implement that authorization rule**, so an implementation that
+  follows the specification here fails two class-5 vectors that assert a root the rule refuses.
+  The narrow fix is a corpus edit rather than an implementation default, and it is measured in
+  `python/FINDINGS.md` item 1.
 
 - **The exact effective type map is committed per record.** The envelope's `typeMap.id` selects
   immutable artifact bytes and is itself committed at the single-segment reserved path
@@ -358,7 +370,9 @@ the ambiguities found and what was actually measured. Read it before touching a 
 corpus/tools/run.sh --references /path/to/schemata --modules /path/to/node_modules
 ```
 
-Both flags are optional and their absence is reported, never hidden. Things to know:
+Both flags are optional and their absence is reported, never hidden: a missing dependency leaves the
+affected check NOT RUN and exits **2**, which is neither a pass nor a failure, so a bare run does
+not mean the gate failed. `corpus/README.md` owns that status table. Things to know:
 
 - **A vector is never hand-written.** `corpus/tools/corpus_plan.py` carries INPUTS only; every
   expected hash, root, audit path, resolved tag and accept/reject verdict is computed. A value
@@ -418,9 +432,9 @@ received, and it is open** (`docs/decisions.md` part 2a).
 The specification pins NFC for hashing and is silent on the lookup that precedes it, so a decomposed
 key is refused by the fail-closed rule while its composed twin commits and the two render
 identically.
-The two matchers in this tree already disagree: `docs/type-maps.md` section 3 step 2 requires the
-published DFA to normalize, and the display-pattern matchers of `corpus/tools/roax_ref.py` and
-`corpus/tools/roax_ref.mjs` compare raw.
+The matchers in this tree already disagree: `docs/type-maps.md` section 3 step 2 requires the
+published DFA to normalize, and the display-pattern matchers of `corpus/tools/roax_ref.py`,
+`corpus/tools/roax_ref.mjs`, `src/typemap.ts` and `python/src/roax_canon/typemap.py` compare raw.
 Adding an `nfc()` call to either side, or removing the one in the DFA's stated semantics, rules D14
 silently - so do not, and note that the synthetic map carries the Kelvin key under both spellings
 precisely so no committed vector depends on the answer.

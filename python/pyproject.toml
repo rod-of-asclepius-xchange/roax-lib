@@ -1,0 +1,75 @@
+# Packaging metadata for the Python implementation of ROAX-CANON/1.
+#
+# This manifest is scoped to `python/` deliberately, as `rust/Cargo.toml` is to `rust/`.
+# The root `package.json` is the TypeScript library's own manifest rather than a shared one
+# (`AGENTS.md`, "Validating the schemas"), so no manifest in this repository describes a
+# shared library. The project owner ruled for five independent builds on 2026-07-29
+# (`docs/decisions.md`, decision D), so a per-language manifest is correct; nothing here
+# makes `corpus/tools/` installable, and those two files remain corpus tooling rather than
+# roax-lib.
+#
+# There are NO runtime dependencies and there will not be any. Every hazard this library
+# exists to close is in the standard library's own defaults, so a dependency that wrapped
+# `json` or `unicodedata` would put a second reading of the specification between this
+# code and the bytes it commits.
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "roax-canon"
+version = "0.1.0"
+description = "ROAX-CANON/1: canonicalization, commitment and selective disclosure for health records"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+keywords = ["roax", "canonicalization", "merkle", "selective-disclosure", "fhir"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Healthcare Industry",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security :: Cryptography",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Specification = "https://github.com/rod-of-asclepius-xchange/roax-lib/blob/main/docs/spec/roax-canon-1.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+roax_canon = ["py.typed"]
+
+# Line length matches what the repository's prose is hard-wrapped at, so a doc comment and
+# the code it sits on wrap the same way.
+#
+# The tree is formatted, not merely configured: `black --check python/` passes. It was
+# formatted with 25.1.0 and then re-checked with 22.10.0, and both report clean, so the
+# committed bytes are a fixed point of black's pre-23.x and post-24.x stable styles rather
+# than an artifact of whichever version happened to be installed. Re-measure that pair
+# before assuming a third version agrees; there is no CI here to catch the drift.
+#
+# One consequence is worth naming, because it looks like an oversight and is not: black
+# dedents a docstring's continuation lines to their common prefix, so the run command in
+# `tests/test_pipeline.py` sits at column 0 while the same command in
+# `tests/test_canonicalization.py` and `tools/run_corpus.py` stays indented. Those two have
+# other continuation lines at column 0, which is the whole of the difference. Do not
+# re-indent it: 22.10.0 accepts either form and will report clean, but the normalization
+# arrived in 24.x, so the next run on a current black undoes the edit.
+#
+# No `target-version` is set. Black infers it from the source, and pinning one here would
+# be an unmeasured second lever over the same output.
+[tool.black]
+line-length = 100
+
+# flake8 does not read pyproject.toml on its own, so this block is inert unless the
+# `Flake8-pyproject` plugin is installed; a bare `flake8 python/` otherwise falls back to
+# its 79-column default and reports lines this project accepts. Without that plugin, pass
+# the two settings on the command line instead:
+#   flake8 --max-line-length=110 --extend-ignore=E203 python/
+[tool.flake8]
+max-line-length = 110
+# E203 is where flake8 and black disagree about slice colons; black wins.
+extend-ignore = ["E203"]

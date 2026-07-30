@@ -9,8 +9,8 @@ and vaccination healthcerts - integrating with ROAX.
 Status: **implementation phase.**
 The specifications and schemas were drafted and reviewed before any library existed, deliberately,
 so that the design could be settled before five implementations existed to re-litigate it.
-Two of those five now exist: the independent Rust library under [`rust/`](rust/) and the independent
-TypeScript library under [`src/`](src/).
+Three of those five now exist: the independent Rust library under [`rust/`](rust/), the independent
+TypeScript library under [`src/`](src/) and the independent Python library under [`python/`](python/).
 The Go, Swift and Kotlin libraries have not been added.
 
 ## Start here
@@ -26,6 +26,7 @@ The Go, Swift and Kotlin libraries have not been added.
 | [`docs/conformance-corpus.md`](docs/conformance-corpus.md) | What cross-language agreement has to be proven against, and why that is a release gate rather than decoration. |
 | [`schemas/`](schemas/) | JSON Schemas for the envelope, the type map and the conformance corpus. |
 | [`rust/`](rust/) | The independent Rust implementation, its protocol boundaries and validation commands. |
+| [`python/`](python/) | The independent Python implementation, standard library only. [`python/FINDINGS.md`](python/FINDINGS.md) records what that build found. |
 
 ## Why not OpenAttestation
 
@@ -88,8 +89,10 @@ docs/conformance-corpus.md
 schemas/            JSON Schemas
 type-maps/          immutable generated base maps and their registry
 tools/              type-map reproduction and integrity checks
+corpus/             the conformance corpus, its fixtures and its two reference implementations
 rust/               independent Rust implementation of ROAX-CANON/1
 src/                independent TypeScript implementation of ROAX-CANON/1
+python/             independent Python implementation of ROAX-CANON/1
 ```
 
 Reference material used during design - including third-party schemata - is kept
