@@ -8,7 +8,7 @@ release, architecture, and sharp-edge notes that should travel with the code.
 Specification, schemas, the conformance corpus, the independent Rust implementation under `rust/`, and the independent Python implementation under `python/`.
 Decision D was ruled to five independent, corpus-enforced libraries on 2026-07-29 (`docs/decisions.md`, decision D).
 `rust/README.md` owns that crate's protocol boundaries, its build, test and lint commands, and the open-decision behaviour it preserves.
-`python/README.md` owns that package's surface, its standalone corpus runner, its test commands and its per-class figures, and `python/FINDINGS.md` owns every divergence and ambiguity that build measured.
+`python/README.md` owns that package's surface, its standalone corpus runner, its test commands and its per-class figures, and `python/FINDINGS.md` records the divergences and ambiguities found while building it.
 
 Do not add the TypeScript, Go, Swift or Kotlin library without an explicit instruction to do so.
 

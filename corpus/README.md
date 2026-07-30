@@ -15,8 +15,8 @@ enforcement mechanism for cross-language agreement, not a safety net.
 |---|---|
 | `conformance-corpus-1.0.json` | The vector file. The deliverable. |
 | `type-maps/*.json` | The type maps class 10 and class 11 are asserted against. Three are derived from the reference schemas with a citation on every entry; one is authored for the synthetic fixtures and says so. |
-| `fixtures/records/*.json` | Synthetic records for classes 5, 7, 13 and 15. Authored here; no reference sample is reproduced. |
-| `fixtures/envelopes/*.json` | Envelopes for classes 14, 15 and 17. Generated. |
+| `fixtures/records/*.json` | Synthetic records for classes 5, 7, 13, 15 and 19. Authored here; no reference sample is reproduced. |
+| `fixtures/envelopes/*.json` | Envelopes for classes 11, 14, 15, 17 and 18. Generated. |
 | `fixtures/salts/*.json` | The committed per-leaf salt sets. **Inputs, not generated fixtures**: under decision D4b a salt is an independent CSPRNG draw that nothing can re-derive (specification section 7), so a fresh build cannot recompute one and comparing it against a fresh draw would fail forever. Drawn once by `build_corpus.py --draw-salts` and committed; a build that finds one missing FAILS rather than drawing, because a drawn-on-demand salt would give one machine a root no other machine could reproduce. Class 10's sets pair positionally, everything else by path - `docs/conformance-corpus.md` class 10 says why, and why harmonizing them toward positional envelopes would be the unsafe direction. |
 | `tools/` | Two independent implementations, the generator, the runner and the schema validator. |
 
@@ -31,29 +31,66 @@ needs it.
 corpus/tools/run.sh --references /path/to/schemata --modules /path/to/node_modules
 ```
 
-Both arguments are optional and their absence is reported rather than hidden.
+Both arguments are optional so that the runnable subset remains useful, but an omitted dependency
+makes the gate incomplete rather than successful.
 
-- Without `--references`, class 10 reports `SKIPPED - NOT RUN` and contributes zero assertions. It
-  never reports green unrun.
-- Without `--modules` (holding `ajv@8` and `ajv-formats`), the JSON Schema validation step is
-  skipped and says so. The repository has no npm package manifest, deliberately.
+- Without `--references`, class 10 reports `NOT RUN`, names the exact `--references` flag that
+  enables it, and contributes zero assertions.
+- Without `--modules` (holding `ajv@8` and `ajv-formats`), the JSON Schema validation step reports
+  `NOT RUN` and names the exact `--modules` flag that enables it.
+  The repository has no npm package manifest, deliberately.
 
-`run.sh` does four things, and the third is the one that matters:
+The exit status distinguishes the three gate outcomes:
 
-1. implementation A rebuilds the corpus **and every fixture** and compares them with the committed
-   files, writing nothing;
-2. implementation B recomputes every derived value in the corpus and rewrites it;
-3. the two files are compared byte for byte;
-4. every artifact is validated against the repository's JSON Schemas, and both directions of the
-   schemas' conditionals are probed with synthesized whole-corpus documents, because a conditional
-   that never fires compiles perfectly and asserts nothing.
+| Status | Meaning |
+|---:|---|
+| 0 | Every check and vector ran and passed. |
+| 1 | At least one check ran and failed. |
+| 2 | Nothing failed, but at least one check or vector was `NOT RUN`. |
+
+On the committed tree, the fully configured command above measures 471 vectors, 1,101
+implementation-B assertions, and 70 JSON Schema verdicts.
+
+`build_corpus.py --check` and `check_corpus.mjs` use the same three-way status.
+In particular, each exits 2 when the committed external record vectors were not checked.
+Run `corpus/tools/test_gate_status.sh` for the dependency-matrix and direct-tool regression checks;
+it uses scratch files only and never rewrites the corpus or its fixtures.
+
+`run.sh` does four things.
+The third is the cross-implementation comparison:
+
+1. implementation A rebuilds the corpus, the generator-owned record and envelope fixtures, and the
+   synthetic type map, then compares those outputs with the committed files, writing nothing;
+2. implementation B shape-validates every committed salt-set input and recomputes the derived
+   fields of every runnable committed vector, while a `NOT RUN` vector is copied through and
+   excluded from the cross-implementation claim;
+3. the emitted file is compared byte for byte with the committed corpus, with copied-through
+   `NOT RUN` vectors identified as unchecked;
+4. Ajv validates the corpus file and every committed type map, checks each envelope fixture against
+   its expected schema verdict, and probes both directions of the schemas' conditionals with
+   synthesized whole-corpus documents, because a conditional that never fires compiles perfectly
+   and asserts nothing.
 
 Step 1 alone would only prove that one program is self-consistent.
+Step 3 covers only rows generated into the committed corpus.
+It does not claim that profiles or rows absent from that corpus were cross-checked.
 
-Step 1 covers the fixtures because the corpus vectors reference them by path, and a corpus that
-round-trips over a hand-edited fixture is not a pass. The generator builds each fixture's bytes,
-runs the verifier on **those bytes** rather than on the file, and then compares. It used to write
-first and compare afterwards, which erased the edit it existed to catch.
+Step 1 covers the generator-owned fixtures because the corpus vectors reference them by path, and a
+corpus that round-trips over a hand-edited fixture is not a pass.
+The generator builds each fixture's bytes, runs the verifier on **those bytes** rather than on the
+file, and then compares.
+It used to write first and compare afterwards, which erased the edit it existed to catch.
+
+The salt sets are committed random inputs, not generator-owned fixtures, so no check regenerates
+them.
+Step 2 scans every `.json` file under `fixtures/salts/` and enforces the closed shape for its
+declared pairing, including canonical path segments and indices, unique encoded paths, positional
+`leafCount` cardinality, and lowercase 32-hex salts.
+The path-paired shape follows `schemas/envelope-1.0.json` `$defs.leafSalt`, and the positional shape
+is the corpus-only carrier defined by `docs/conformance-corpus.md` class 10.
+Vector execution then consumes the referenced set and checks the resulting leaf count and root.
+These checks validate the carrier and its use; they neither regenerate a random draw nor measure
+its CSPRNG entropy (specification section 7).
 
 Exactly what step 1 verifies, and nothing more:
 
@@ -90,7 +127,7 @@ means operationally. The procedure per class:
 | `encodeValue` | `encodeValue(tag, input)` equals `encodedHex`. |
 | `reject` | The input MUST error. The `reason` is the reference reason code; an implementation with its own taxonomy should map to it rather than ignore it. |
 | `leaf` | `leafHash(segments, tag, value, saltHex)` equals `leafHash`. The salt is an INPUT: decision D4 is ruled D4b, so nothing derives one (specification section 7). |
-| `record` | Flatten the record, union the reserved leaves, order by encoded path, take each leaf's salt from the set `saltsFile` names in the shape `saltPairing` declares; the leaf count then equals `leafCount` and the root equals `root`. A vector may instead carry the whole thing as one full envelope copy, naming `envelopeFile` and no salt set; `check_corpus.mjs` reports that carrier SKIPPED rather than reading it. |
+| `record` | Flatten the record, union the reserved leaves, order by encoded path, take each leaf's salt from the set `saltsFile` names in the shape `saltPairing` declares; the leaf count then equals `leafCount` and the root equals `root`. A vector may instead carry the whole thing as one full envelope copy, naming `envelopeFile` and no salt set; a runner that does not implement that schema-valid carrier fails with exit 1 rather than reporting it `NOT RUN`. |
 | `unlinkability` | Perform `trials` independent issuances at the paths given, with YOUR OWN generator, and assert the three relations. Nothing is compared against a pinned value, because under D4b there is none to pin. |
 | `tree` | `MTH(leafHashes)` equals `root`. |
 | `inclusion` | Verifying `(leafHash, index, treeSize, auditPath, root)` returns `expect`. Generating the audit path for `index` reproduces `auditPath`. |

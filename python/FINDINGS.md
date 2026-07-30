@@ -66,8 +66,9 @@ Confirmed from the fixtures rather than assumed: `corpus/fixtures/envelopes/guar
 `AGENTS.md` already records this and calls closing it corpus-rebuild work.
 It is repeated here only because it is the single thing that would silently break a reader who implemented section 11.2 as written and then ran the corpus: **every** record and envelope vector fails, on leaf count and on root.
 
-`roax_canon` carries both sets, selected by `reserved_set=RESERVED_V1` or `RESERVED_V2`, and defaults to `RESERVED_V1` because that is the set every committed artifact uses.
-The 2.0 set is implemented and **is not exercised by any committed vector**, so it is stated as untested rather than as verified.
+`roax_canon.reserved_leaves` models both structural sets and defaults to `RESERVED_V1`, because that is the set every committed artifact uses (`python/src/roax_canon/record.py:50-63` and `:89-113`).
+The package cannot issue, emit or verify envelope 2.0 yet: exact structured-path DFA artifact loading and content-ID reproduction are deliberately not implemented, so those operations reject with `type-map-rejected` rather than trusting the display-pattern corpus resolver by `recordType` (`python/src/roax_canon/record.py:242-252`; `python/src/roax_canon/disclose.py:47-56`; `python/src/roax_canon/verify.py:404-410`; specification section 4.2).
+No committed vector exercises the structural 2.0 leaf set.
 
 ---
 
@@ -221,7 +222,7 @@ Each was reached independently here and resolved the same way, which is corrobor
 ## 12. Python-specific hazards, each demonstrated rather than asserted
 
 Not specification findings.
-Recorded because the task named two of them and asked for the rest, and because every one of these is silent.
+Recorded because these Python defaults fail silently and the corpus does not cover all of them.
 
 | Hazard | Default behaviour | Where it is closed |
 |---|---|---|
@@ -231,17 +232,19 @@ Recorded because the task named two of them and asked for the rest, and because 
 | `json.loads` accepts `NaN`, `Infinity`, `-Infinity` | produces floats | `parse_constant` raises `non-finite-number` |
 | a plain `dict` object hook drops duplicate keys | `{"a":1,"a":2}` becomes `{"a":2}` | `object_pairs_hook` raises `duplicate-key` |
 | **`parse_int=str, parse_float=str` collapses `5` and `"5"`** | the type map resolves the wrong tag | `JsonNumber` is a distinct `str` subclass; `json_kind` reads the type |
-| **`JsonNumber` subclasses `str`, so it passes `isinstance(x, str)` at every carrier boundary** | a JSON number reaches a member the envelope schema pins to a string, and the envelope still verifies | `jsonio.is_json_string`, applied at the outer identity members and `typeMap.id` (`verify.py`, `_verify`), at `KEY` path segments (`path.segments_from_json`), at a type-map `pattern` (`typemap.DisplayPatternTypeMap.__init__`), at `disclosure.leaves[].value` for tags 2, 3, 4 and 5 (`verify._decode_carrier`) and at every hex field - `root`, each `salts[].salt`, each disclosed leaf's `salt` and each `auditPath` entry (`verify._hexbytes`) |
-| `$` in a regular expression also matches before a trailing newline | `"1.0\n"` is accepted and canonicalized | every grammar anchored `\A` and `\Z` |
+| **`JsonNumber` subclasses `str`, so it passes `isinstance(x, str)` at an unchecked carrier boundary** | a JSON number reaches a member a schema pins to a string and may be committed or verified under the wrong observed kind | `jsonio.is_json_string`, applied to the outer identity and optional type-map descriptor (`verify._verify`), structured-path keys (`path.segments_from_json`), every string member of the display-pattern map carrier (`typemap.DisplayPatternTypeMap.__init__`), a record-side base64 BYTES value (`flatten._coerce_record_value`), disclosed values at tags 2 through 5 (`verify._decode_carrier`) and every envelope hex field (`verify._hexbytes`) |
+| `$` in a regular expression also matches before a trailing newline | `"1.0\n"` is accepted and canonicalized | every full-string conformance grammar under `python/src/roax_canon` is anchored `\A` and `\Z`; the TypeScript sample reader uses prefix token scanners with explicit boundary checks |
 | `\d` matches non-ASCII decimal digits, and `int("１２")` is 12 | a fullwidth numeral canonicalizes | grammars spell `[0-9]` out; `isdigit`, `isdecimal`, `isnumeric` are never used |
 | `str` holds unpaired surrogates and `unicodedata.normalize` passes them through | fails later at `.encode("utf-8")`, after the guard has run | explicit check before normalization, `unpaired-surrogate` |
 | `bytes.fromhex` accepts uppercase and embedded spaces | `"AB CD"` decodes | envelope hex fields validated lowercase and fixed-length |
-| CPython 3.11+ caps `int()` conversion at 4300 digits | `1e` + 5000 digits raises `ValueError`, not the specification's bound | exponent refused by digit count first, `digit-bound-exceeded` |
+| CPython 3.11+ defaults to a 4300-digit `int()` conversion cap | `1e` + 5000 digits raises `ValueError`, not the specification's bound | exponent refused by digit count first, `digit-bound-exceeded` |
 | `base64.b64decode(validate=True)` accepts non-canonical trailing bits | RFC 4648 section 3.5's non-canonical case passes | explicit final-quantum check |
 
 **The `JsonNumber` row is the residual of closing the row above it, and it is worth spelling out.**
 Both halves of `JsonNumber` are deliberate: subclassing `str` is what keeps the literal verbatim (specification section 6.4), and being a distinct type is what stops the JSON number `5` and the JSON string `"5"` collapsing at the type-map lookup (specification section 4.2).
-The first half is what makes it invisible to an `isinstance(x, str)` test, so every place this package requires a member to BE a string had to be moved onto `is_json_string` rather than left on `isinstance`.
+The first half is what makes it invisible to an `isinstance(x, str)` test, so each
+schema-string boundary named in the table must distinguish a genuine JSON string from
+`JsonNumber` rather than relying on `isinstance`.
 The one that mattered is `disclosure.leaves[].value`, because that carrier feeds the leaf hash directly: measured on CPython 3.13, a disclosed tag-4 leaf carrying `0.010` as a JSON number canonicalized to the same bytes the genuine leaf committed and verified `ok`, while any consumer re-reading the same envelope with a stdlib parser reads `0.01`.
 `schemas/envelope-1.0.json` pins that carrier to `"type": "string"` and says why in its own description, so this is a defect of this implementation rather than a finding against the specification.
 Closing it at the verifier exposed the same hazard on the encoder: `disclosed_copy` was emitting the record's `JsonNumber` straight into that carrier.
@@ -251,7 +254,13 @@ The narrower `str()` conversion alone would have left a second mismatch behind: 
 The verifier is deliberately NOT tightened to match: `canonical_decimal` yields an identical leaf hash from either spelling, so rejecting a non-canonical carrier on input would change accept and reject behaviour for no security gain.
 `canonical_integer`, `canonical_decimal` and `nfc` are reused rather than reimplemented, because a second preimage builder is the drift specification section 8 exists to prevent.
 The full-copy `record` body is deliberately NOT covered by any of this: specification section 7.3 has that body carry record numbers in their original JSON form, and the flattener resolves those through the observed JSON kind.
-No committed vector reaches any of these boundaries, so the unit tests are the only thing holding them.
+No committed vector supplies a hostile JSON number at one of these schema-string
+boundaries.
+Normal disclosed tag-2 values do reach `_decode_carrier` - 317 committed leaf values do
+so - while tags 3, 4 and 5 do not, so focused unit tests hold the hostile forms and the
+unreached tag carriers.
+A separate focused test holds the record-side BYTES boundary, which no version-1 profile
+selects (specification section 6.5).
 
 **One consequence of the same subclassing is left open, and it belongs to a caller rather than to this package.**
 `json.dumps` on a full copy serializes the record body's `JsonNumber` values as JSON **strings**, because `JsonNumber` subclasses `str`, so re-reading that text gives kind `string` where the type map expects kind `number` and the copy fails `type-unresolved`.
@@ -293,4 +302,8 @@ Unlike the Node reference implementation, which runs Unicode 16.0 tables against
   It asserts the three relations against `secrets.token_bytes`.
   The randomness source is an implementation-review obligation, not a testable one.
 - **Class 9's negative proofs are driven through the fold**, not through the full disclosed-copy path, because those vectors carry a leaf hash and no `(path, tag, value, salt)` to recompute one from.
-  What actually closes the attack is that `verify_envelope` has no parameter that accepts a leaf hash, which every class-14 through class-18 vector exercises.
+  What closes the envelope attack is that `verify_envelope` has no parameter that accepts
+  a leaf hash.
+  The corpus has 45 disclosed fixtures across classes 11, 14, 17 and 18, but fixtures
+  rejected by earlier checks do not all reach the proof fold, so focused unit tests pin
+  recomputation rather than crediting every fixture with that coverage.

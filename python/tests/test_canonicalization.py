@@ -76,8 +76,9 @@ class TestDecimal(unittest.TestCase):
         self.assertEqual(ctx.exception.code, ErrorCode.DIGIT_BOUND_EXCEEDED)
 
     def test_absurd_exponent_never_reaches_int(self):
-        # CPython 3.11+ caps int()/str() conversion at 4300 digits, so an unguarded
-        # int(exponent) would raise ValueError rather than this specification's own bound.
+        # CPython 3.11+ ships with a configurable int()/str() conversion limit whose
+        # default is 4300 digits, so an unguarded int(exponent) would raise ValueError
+        # rather than this specification's own bound.
         with self.assertRaises(RoaxError) as ctx:
             canonical_decimal("1e" + "9" * 5000)
         self.assertEqual(ctx.exception.code, ErrorCode.DIGIT_BOUND_EXCEEDED)

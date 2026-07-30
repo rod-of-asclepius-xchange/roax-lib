@@ -53,6 +53,30 @@ __all__ = [
 ]
 
 JSON_KINDS = ("string", "number", "boolean", "null", "object", "array")
+_TOP_LEVEL_FIELDS = frozenset(
+    {"typeMapVersion", "recordType", "schemaVersion", "sourceSchemas", "entries"}
+)
+_REQUIRED_TOP_LEVEL_FIELDS = ("typeMapVersion", "recordType", "schemaVersion", "entries")
+_ENTRY_FIELDS = frozenset({"pattern", "jsonKind", "tag", "source"})
+_SOURCE_SCHEMA_FIELDS = frozenset({"path", "commit", "note"})
+_TYPE_MAP_VERSION = re.compile(r"\A[0-9]+\.[0-9]+\.[0-9]+\Z")
+_SOURCE_COMMIT = re.compile(r"\A[0-9a-f]{7,40}\Z")
+
+
+def _unknown_fields(document: dict[Any, Any], allowed: frozenset[str]) -> list[str]:
+    """Return stable diagnostic spellings without assuming every key is a string."""
+    return sorted((repr(key) for key in document if key not in allowed))
+
+
+def _reject_unknown_fields(
+    document: dict[Any, Any], allowed: frozenset[str], *, source: str, where: str
+) -> None:
+    unknown = _unknown_fields(document, allowed)
+    if unknown:
+        raise RoaxError(
+            ErrorCode.TYPE_MAP_REJECTED,
+            f"{source}: unknown {where} fields {unknown}",
+        )
 
 
 class TypeResolver(Protocol):
@@ -61,6 +85,13 @@ class TypeResolver(Protocol):
     An implementation MUST raise :class:`~roax_canon.errors.TypeResolutionError` with
     :data:`~roax_canon.errors.ErrorCode.TYPE_UNRESOLVED` when it has no output, rather
     than returning a default.
+
+    The protocol carries no artifact metadata.
+    :func:`roax_canon.record.build_tree` binds
+    :class:`DisplayPatternTypeMap`'s declared ``recordType`` and ``schemaVersion``
+    automatically, but a custom resolver is a trusted integration seam whose caller MUST
+    bind its provenance and scope to the supplied identity before construction
+    (specification sections 4.2 and 12.1).
     """
 
     def resolve(self, segments: Sequence[Segment], kind: str) -> int:  # pragma: no cover
@@ -194,17 +225,95 @@ class DisplayPatternTypeMap:
     treating an undeclared binding as an unknown path.
     """
 
-    def __init__(self, document: dict[str, Any], *, source: str = "<memory>") -> None:
-        self.source = source
-        self.record_type = document.get("recordType")
-        self.schema_version = document.get("schemaVersion")
-        self.type_map_version = document.get("typeMapVersion")
+    def __init__(self, document: Any, *, source: str = "<memory>") -> None:
+        from .jsonio import as_int, is_json_string, is_record_type_string
 
-        raw_entries = document.get("entries")
+        # This class consumes the closed carrier pinned by `schemas/type-map-1.0.json`.
+        # Validate that boundary here rather than relying on a caller to have run a JSON
+        # Schema tool: `from_file` is used directly by the standalone corpus runner.
+        if not isinstance(document, dict):
+            raise RoaxError(
+                ErrorCode.TYPE_MAP_REJECTED,
+                f"{source}: type map must be an object",
+            )
+        _reject_unknown_fields(document, _TOP_LEVEL_FIELDS, source=source, where="type-map")
+
+        missing = [field for field in _REQUIRED_TOP_LEVEL_FIELDS if field not in document]
+        if missing:
+            raise RoaxError(
+                ErrorCode.TYPE_MAP_REJECTED,
+                f"{source}: type map is missing required fields {missing}",
+            )
+
+        type_map_version = document["typeMapVersion"]
+        record_type = document["recordType"]
+        schema_version = document["schemaVersion"]
+        if (
+            not is_json_string(type_map_version)
+            or _TYPE_MAP_VERSION.match(type_map_version) is None
+        ):
+            raise RoaxError(
+                ErrorCode.TYPE_MAP_REJECTED,
+                f"{source}: typeMapVersion must be a three-part numeric version string",
+            )
+        if not is_record_type_string(record_type):
+            raise RoaxError(
+                ErrorCode.TYPE_MAP_REJECTED,
+                f"{source}: recordType is not a reverse-DNS profile string",
+            )
+        if not is_json_string(schema_version) or not schema_version:
+            raise RoaxError(
+                ErrorCode.TYPE_MAP_REJECTED,
+                f"{source}: schemaVersion must be a non-empty string",
+            )
+
+        self.source = source
+        self.record_type = record_type
+        self.schema_version = schema_version
+        self.type_map_version = type_map_version
+
+        if "sourceSchemas" in document:
+            raw_sources = document["sourceSchemas"]
+            if not isinstance(raw_sources, list):
+                raise RoaxError(
+                    ErrorCode.TYPE_MAP_REJECTED,
+                    f"{source}: sourceSchemas must be an array",
+                )
+            for raw_source in raw_sources:
+                if not isinstance(raw_source, dict):
+                    raise RoaxError(
+                        ErrorCode.TYPE_MAP_REJECTED,
+                        f"{source}: sourceSchemas entry is not an object: {raw_source!r}",
+                    )
+                _reject_unknown_fields(
+                    raw_source,
+                    _SOURCE_SCHEMA_FIELDS,
+                    source=source,
+                    where="sourceSchemas entry",
+                )
+                path = raw_source.get("path")
+                if not is_json_string(path):
+                    raise RoaxError(
+                        ErrorCode.TYPE_MAP_REJECTED,
+                        f"{source}: sourceSchemas entry carries no `path` string",
+                    )
+                commit = raw_source.get("commit")
+                if "commit" in raw_source and (
+                    not is_json_string(commit) or _SOURCE_COMMIT.match(commit) is None
+                ):
+                    raise RoaxError(
+                        ErrorCode.TYPE_MAP_REJECTED,
+                        f"{source}: sourceSchemas entry carries a malformed `commit`",
+                    )
+                if "note" in raw_source and not is_json_string(raw_source["note"]):
+                    raise RoaxError(
+                        ErrorCode.TYPE_MAP_REJECTED,
+                        f"{source}: sourceSchemas entry carries a non-string `note`",
+                    )
+
+        raw_entries = document["entries"]
         if not isinstance(raw_entries, list) or not raw_entries:
             raise RoaxError(ErrorCode.TYPE_MAP_REJECTED, f"{source}: type map has no entries")
-
-        from .jsonio import as_int, is_json_string
 
         entries: list[_Entry] = []
         for raw in raw_entries:
@@ -217,11 +326,12 @@ class DisplayPatternTypeMap:
                 raise RoaxError(
                     ErrorCode.TYPE_MAP_REJECTED, f"{source}: entry is not an object: {raw!r}"
                 )
+            _reject_unknown_fields(raw, _ENTRY_FIELDS, source=source, where="entry")
             pattern = raw.get("pattern")
-            if not is_json_string(pattern):
+            if not is_json_string(pattern) or not pattern:
                 raise RoaxError(
                     ErrorCode.TYPE_MAP_REJECTED,
-                    f"{source}: entry carries no `pattern` string: {raw!r}",
+                    f"{source}: entry carries no non-empty `pattern` string: {raw!r}",
                 )
             try:
                 # A tag is an artifact field rather than a record value, so converting it
@@ -240,8 +350,13 @@ class DisplayPatternTypeMap:
                     f"version-1 profile declares (specification section 6.5)",
                 )
             kind = raw.get("jsonKind")
-            if kind is not None and kind not in JSON_KINDS:
+            if "jsonKind" in raw and kind not in JSON_KINDS:
                 raise RoaxError(ErrorCode.TYPE_MAP_REJECTED, f"{source}: bad jsonKind {kind!r}")
+            if "source" in raw and not is_json_string(raw["source"]):
+                raise RoaxError(
+                    ErrorCode.TYPE_MAP_REJECTED,
+                    f"{source}: entry carries a non-string `source`",
+                )
             entries.append(_Entry(parse_pattern(pattern), kind, tag, pattern))
         self.entries = tuple(entries)
 

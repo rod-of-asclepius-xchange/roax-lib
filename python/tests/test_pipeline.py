@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import re
 import sys
+import tempfile
 import unicodedata
 import unittest
+from dataclasses import replace
 
 from roax_canon import (
     DEFAULT_PROFILES,
@@ -40,6 +42,7 @@ from roax_canon import (
     VerifierConfig,
 )
 from roax_canon.errors import ErrorCode
+from roax_canon.jsonio import is_uri_string
 from roax_canon.tree import largest_power_of_two_below
 
 SYNTHETIC_MAP = {
@@ -72,6 +75,34 @@ def resolver() -> DisplayPatternTypeMap:
 
 
 class TestJsonReader(unittest.TestCase):
+    def test_uri_carrier_matches_the_schema_components(self):
+        accepted = (
+            "did:web:example.invalid",
+            "urn:uuid:11111111-1111-4111-8111-111111111111",
+            "https://example.invalid",
+            "x://[::1]",
+            "x://",
+            "x:/",
+            "x:y??q",
+            "x:y?q?r",
+        )
+        rejected = (
+            "not a uri",
+            "x:y[",
+            "x:y]",
+            "x:y#z#q",
+            "x:y?q[f]",
+            "x://host/a[b]",
+            "x:#",
+            "x:?",
+        )
+        for value in accepted:
+            with self.subTest(accepted=value):
+                self.assertTrue(is_uri_string(value))
+        for value in rejected:
+            with self.subTest(rejected=value):
+                self.assertFalse(is_uri_string(value))
+
     def test_numeric_literals_are_preserved_verbatim(self):
         parsed = loads('{"a": 0.010, "b": 9223372036854775807, "c": 1e999}')
         self.assertEqual(str(parsed["a"]), "0.010")
@@ -181,6 +212,61 @@ class TestFlatten(unittest.TestCase):
 
 
 class TestReservedLeaves(unittest.TestCase):
+    def test_identity_fields_are_genuine_json_strings(self):
+        required = ("record_type", "schema_version", "record_id", "issuer_id")
+        optional = ("issuer_key_id", "type_map_id")
+        base = {
+            "record_type": IDENTITY.record_type,
+            "schema_version": IDENTITY.schema_version,
+            "record_id": IDENTITY.record_id,
+            "issuer_id": IDENTITY.issuer_id,
+            "issuer_key_id": None,
+            "type_map_id": None,
+        }
+        for field_name in required + optional:
+            with self.subTest(field=field_name):
+                hostile = {**base, field_name: JsonNumber("5")}
+                with self.assertRaises(RoaxError) as ctx:
+                    RecordIdentity(**hostile)
+                self.assertEqual(ctx.exception.code, ErrorCode.ENVELOPE_SHAPE)
+                self.assertIn(field_name, ctx.exception.detail)
+
+    def test_identity_schema_minima_and_uri_are_enforced_at_issuance(self):
+        base = {
+            "record_type": IDENTITY.record_type,
+            "schema_version": IDENTITY.schema_version,
+            "record_id": IDENTITY.record_id,
+            "issuer_id": IDENTITY.issuer_id,
+        }
+        for field_name in ("schema_version", "record_id"):
+            with self.subTest(empty=field_name):
+                with self.assertRaises(RoaxError) as ctx:
+                    RecordIdentity(**{**base, field_name: ""})
+                self.assertEqual(ctx.exception.code, ErrorCode.ENVELOPE_SHAPE)
+
+        for issuer_id in ("", "not a uri", "did:", "1did:value", "https: white space"):
+            with self.subTest(issuer_id=issuer_id):
+                with self.assertRaises(RoaxError) as ctx:
+                    RecordIdentity(**{**base, "issuer_id": issuer_id})
+                self.assertEqual(ctx.exception.code, ErrorCode.ENVELOPE_SHAPE)
+
+        for issuer_id in (
+            "did:web:example.invalid",
+            "urn:uuid:11111111-1111-4111-8111-111111111111",
+            "https://example.invalid/issuer",
+        ):
+            with self.subTest(valid_issuer_id=issuer_id):
+                self.assertEqual(
+                    RecordIdentity(**{**base, "issuer_id": issuer_id}).issuer_id,
+                    issuer_id,
+                )
+
+        for record_type in ("synthetic", "Org.example.record", "org_example.record", "org..record"):
+            with self.subTest(record_type=record_type):
+                with self.assertRaises(RoaxError) as ctx:
+                    RecordIdentity(**{**base, "record_type": record_type})
+                self.assertEqual(ctx.exception.code, ErrorCode.ENVELOPE_SHAPE)
+
     def test_single_dotted_segment(self):
         for leaf in reserved_leaves(IDENTITY):
             self.assertEqual(len(leaf.path), 1)
@@ -307,31 +393,250 @@ class TestRecordAndEnvelope(unittest.TestCase):
         self.assertEqual(self.built.leaf_count, 4 + 4)
 
     def test_full_copy_round_trip(self):
-        envelope = full_copy(self.record, IDENTITY, self.built)
+        envelope = full_copy(self.built)
         result = verify_envelope(envelope, self.config)
         self.assertTrue(result.accepted, result.detail)
 
+    def test_full_copy_record_must_be_a_json_object(self):
+        for record in (loads("[]"), loads('"scalar"'), loads("5"), None):
+            with self.subTest(stage="issue", record=record):
+                with self.assertRaises(RoaxError) as ctx:
+                    issue(record, IDENTITY, resolver())
+                self.assertEqual(ctx.exception.code, ErrorCode.ENVELOPE_SHAPE)
+
+            with self.subTest(stage="verify", record=record):
+                hostile = full_copy(self.built)
+                hostile["record"] = record
+                self.assertEqual(
+                    verify_envelope(hostile, self.config).reason,
+                    ErrorCode.ENVELOPE_SHAPE,
+                )
+
+    def test_envelope_leaf_count_carrier_floors(self):
+        hostile = disclosed_copy(
+            list(self.registry.get(IDENTITY.record_type).floor()),
+            self.built,
+            profile=self.registry.get(IDENTITY.record_type),
+        )
+        hostile["leafCount"] = 4
+        self.assertEqual(
+            verify_envelope(hostile, self.config).reason,
+            ErrorCode.ENVELOPE_SHAPE,
+        )
+
+        hostile = full_copy(self.built)
+        hostile["leafCount"] = 5
+        hostile["issuer"] = {
+            **hostile["issuer"],
+            "keyId": "did:web:example.invalid#key-1",
+        }
+        self.assertEqual(
+            verify_envelope(hostile, self.config).reason,
+            ErrorCode.ENVELOPE_SHAPE,
+        )
+
+        minimal = issue(loads('{"marker": "m"}'), IDENTITY, resolver())
+        self.assertEqual(minimal.leaf_count, 5)
+        self.assertTrue(verify_envelope(full_copy(minimal), self.config).accepted)
+
+        keyed_identity = replace(
+            IDENTITY,
+            issuer_key_id="did:web:example.invalid#key-1",
+        )
+        keyed = issue(loads('{"marker": "m"}'), keyed_identity, resolver())
+        self.assertEqual(keyed.leaf_count, 6)
+        self.assertTrue(verify_envelope(full_copy(keyed), self.config).accepted)
+
+    def test_emitters_accept_no_replacement_issuance_context(self):
+        alternate_identity = RecordIdentity(
+            record_type=IDENTITY.record_type,
+            schema_version="2.0",
+            record_id="urn:uuid:22222222-2222-4222-8222-222222222222",
+            issuer_id="did:web:other.invalid",
+        )
+        profile = self.registry.get(IDENTITY.record_type)
+        reveal = list(profile.floor())
+
+        full_replacements = {
+            "record": {"marker": "replacement"},
+            "identity": alternate_identity,
+            "hash_alg": "Poseidon-BN254",
+            "reserved_set": RESERVED_V2,
+        }
+        for name, replacement in full_replacements.items():
+            with self.subTest(emitter="full", replacement=name):
+                with self.assertRaises(TypeError):
+                    full_copy(self.built, **{name: replacement})
+
+        disclosed_replacements = {
+            "identity": alternate_identity,
+            "hash_alg": "Poseidon-BN254",
+            "reserved_set": RESERVED_V2,
+        }
+        for name, replacement in disclosed_replacements.items():
+            with self.subTest(emitter="disclosed", replacement=name):
+                with self.assertRaises(TypeError):
+                    disclosed_copy(reveal, self.built, **{name: replacement})
+
+        with self.assertRaises(TypeError):
+            full_copy({"marker": "replacement"}, alternate_identity, self.built)
+        with self.assertRaises(TypeError):
+            disclosed_copy(reveal, alternate_identity, self.built)
+
+    def test_commitment_owns_an_isolated_record_snapshot(self):
+        record = loads('{"marker": "before", "count": 5, "list": ["original"]}')
+        built = issue(record, IDENTITY, resolver())
+
+        record["marker"] = "after"
+        record["count"] = JsonNumber("6")
+        record["list"][0] = "after"
+        first = full_copy(built)
+        self.assertEqual(first["record"]["marker"], "before")
+        self.assertEqual(str(first["record"]["count"]), "5")
+        self.assertIsInstance(first["record"]["count"], JsonNumber)
+        self.assertEqual(first["record"]["list"], ["original"])
+        self.assertTrue(verify_envelope(first, self.config).accepted)
+
+        first["record"]["marker"] = "envelope mutation"
+        first["record"]["list"][0] = "envelope mutation"
+        second = full_copy(built)
+        self.assertEqual(second["record"]["marker"], "before")
+        self.assertEqual(second["record"]["list"], ["original"])
+        self.assertTrue(verify_envelope(second, self.config).accepted)
+
+    def test_disclosed_copy_profile_must_match_the_sealed_record_type(self):
+        mismatched = Profile(
+            "sg.gov.moh.pdt-healthcert",
+            ((Key("marker"),),),
+        )
+        reveal = list(self.registry.get(IDENTITY.record_type).floor())
+        with self.assertRaises(RoaxError) as ctx:
+            disclosed_copy(reveal, self.built, profile=mismatched)
+        self.assertEqual(ctx.exception.code, ErrorCode.PROFILE_UNKNOWN)
+        self.assertIn("does not match", ctx.exception.detail)
+
+    def test_builtin_type_map_metadata_is_bound_to_the_record_identity(self):
+        mismatches = {
+            "recordType": {
+                **SYNTHETIC_MAP,
+                "recordType": "org.example.other",
+            },
+            "schemaVersion": {
+                **SYNTHETIC_MAP,
+                "schemaVersion": "2.0",
+            },
+        }
+        for field_name, document in mismatches.items():
+            with self.subTest(stage="issue", field=field_name):
+                mismatched = DisplayPatternTypeMap(document)
+                with self.assertRaises(RoaxError) as ctx:
+                    issue(self.record, IDENTITY, mismatched)
+                self.assertEqual(ctx.exception.code, ErrorCode.TYPE_MAP_REJECTED)
+                self.assertIn(field_name, ctx.exception.detail)
+
+            with self.subTest(stage="verify full copy", field=field_name):
+                config = VerifierConfig(
+                    profiles=self.registry,
+                    resolvers={
+                        IDENTITY.record_type: DisplayPatternTypeMap(document),
+                    },
+                )
+                result = verify_envelope(full_copy(self.built), config)
+                self.assertEqual(result.reason, ErrorCode.TYPE_MAP_REJECTED)
+                self.assertIn(field_name, result.detail)
+
+    def test_custom_resolver_remains_a_trusted_metadata_free_seam(self):
+        delegate = resolver()
+
+        class CustomResolver:
+            def resolve(self, segments, kind):
+                return delegate.resolve(segments, kind)
+
+        custom = CustomResolver()
+        built = issue(self.record, IDENTITY, custom)
+        config = VerifierConfig(
+            profiles=self.registry,
+            resolvers={IDENTITY.record_type: custom},
+        )
+        self.assertTrue(verify_envelope(full_copy(built), config).accepted)
+
+    def test_v2_pipeline_fails_closed_without_an_artifact_aware_resolver(self):
+        # RESERVED_V2 can model the structural reserved leaf, but issuance, emission and
+        # verification need to load the exact published DFA selected by this content ID.
+        # This package deliberately implements neither that loader nor content-ID
+        # reproduction, so a syntactically plausible fake ID must never become authority
+        # merely because the display-pattern corpus resolver can tag this record
+        # (specification section 4.2).
+        identity = RecordIdentity(
+            IDENTITY.record_type,
+            IDENTITY.schema_version,
+            IDENTITY.record_id,
+            IDENTITY.issuer_id,
+            type_map_id="sha256:" + "0" * 64,
+        )
+
+        profile = self.registry.get("org.roax.corpus.synthetic")
+        forged_v2 = replace(
+            self.built,
+            identity=identity,
+            reserved_set=RESERVED_V2,
+        )
+        operations = {
+            "issue": lambda: issue(
+                self.record,
+                identity,
+                resolver(),
+                reserved_set=RESERVED_V2,
+            ),
+            "full copy": lambda: full_copy(forged_v2),
+            "disclosed copy": lambda: disclosed_copy(
+                profile.floor(reserved_set=RESERVED_V2),
+                forged_v2,
+                profile=profile,
+            ),
+        }
+        for name, operation in operations.items():
+            with self.subTest(operation=name):
+                with self.assertRaises(RoaxError) as ctx:
+                    operation()
+                self.assertEqual(ctx.exception.code, ErrorCode.TYPE_MAP_REJECTED)
+                self.assertIn("content-ID reproduction", ctx.exception.detail)
+
+        envelope = full_copy(self.built)
+        envelope["typeMap"] = {
+            "id": identity.type_map_id,
+            "version": SYNTHETIC_MAP["typeMapVersion"],
+        }
+        config = VerifierConfig(
+            profiles=self.registry,
+            resolvers={"org.roax.corpus.synthetic": resolver()},
+            reserved_set=RESERVED_V2,
+        )
+        result = verify_envelope(envelope, config)
+        self.assertEqual(result.reason, ErrorCode.TYPE_MAP_REJECTED)
+        self.assertIn("content-ID reproduction", result.detail)
+
     def test_full_copy_detects_a_tampered_value(self):
-        envelope = full_copy(self.record, IDENTITY, self.built)
+        envelope = full_copy(self.built)
         envelope["record"]["marker"] = "tampered"
         self.assertEqual(verify_envelope(envelope, self.config).reason, ErrorCode.ROOT_MISMATCH)
 
     def test_full_copy_rejects_a_missing_salt(self):
-        envelope = full_copy(self.record, IDENTITY, self.built)
+        envelope = full_copy(self.built)
         envelope["salts"][0]["segments"] = [{"key": "notALeafInThisTree"}]
         self.assertEqual(
             verify_envelope(envelope, self.config).reason, ErrorCode.SALT_MISSING_FOR_LEAF
         )
 
     def test_full_copy_rejects_a_duplicate_salt_path(self):
-        envelope = full_copy(self.record, IDENTITY, self.built)
+        envelope = full_copy(self.built)
         envelope["salts"][1]["segments"] = envelope["salts"][0]["segments"]
         self.assertEqual(
             verify_envelope(envelope, self.config).reason, ErrorCode.SALTS_DUPLICATE_PATH
         )
 
     def test_full_copy_rejects_a_salts_length_disagreement(self):
-        envelope = full_copy(self.record, IDENTITY, self.built)
+        envelope = full_copy(self.built)
         envelope["leafCount"] = envelope["leafCount"] + 1
         self.assertEqual(
             verify_envelope(envelope, self.config).reason, ErrorCode.SALTS_LENGTH_NOT_LEAF_COUNT
@@ -340,14 +645,14 @@ class TestRecordAndEnvelope(unittest.TestCase):
     def test_disclosed_copy_round_trip(self):
         floor = self.registry.get("org.roax.corpus.synthetic")
         reveal = list(floor.floor()) + [(Key("marker"),)]
-        envelope = disclosed_copy(reveal, IDENTITY, self.built, profile=floor)
+        envelope = disclosed_copy(reveal, self.built, profile=floor)
         self.assertNotIn("salts", envelope)
         self.assertTrue(verify_envelope(envelope, self.config).accepted)
 
     def test_disclosed_copy_carries_no_withheld_salt(self):
         floor = self.registry.get("org.roax.corpus.synthetic")
         reveal = list(floor.floor()) + [(Key("marker"),)]
-        envelope = disclosed_copy(reveal, IDENTITY, self.built, profile=floor)
+        envelope = disclosed_copy(reveal, self.built, profile=floor)
         emitted = {entry["salt"] for entry in envelope["disclosure"]["leaves"]}
         revealed = {self.built.salts[self.built.index_of(path)].hex() for path in reveal}
         self.assertEqual(emitted, revealed)
@@ -376,19 +681,34 @@ class TestRecordAndEnvelope(unittest.TestCase):
             profiles=DEFAULT_PROFILES.with_profile(profile),
             resolvers={"org.roax.corpus.synthetic": blob_map},
         )
-        full = full_copy(record, IDENTITY, built)
+        full = full_copy(built)
         self.assertTrue(verify_envelope(full, config).accepted)
 
-        partial = disclosed_copy(list(profile.floor()), IDENTITY, built, profile=profile)
+        partial = disclosed_copy(list(profile.floor()), built, profile=profile)
         blob_entry = next(e for e in partial["disclosure"]["leaves"] if e["displayPath"] == "blob")
         self.assertEqual(blob_entry["value"], b"hello".hex())
         result = verify_envelope(partial, config)
         self.assertTrue(result.accepted, f"{result.reason}: {result.detail}")
 
+    def test_bytes_binding_rejects_a_json_number_record_value(self):
+        # JsonNumber subclasses str, and "1111" is canonical base64. A bare str check
+        # would therefore decode this JSON number and commit it as BYTES even though the
+        # map observed kind is explicitly `number`.
+        numeric_bytes_map = DisplayPatternTypeMap(
+            {
+                **SYNTHETIC_MAP,
+                "entries": SYNTHETIC_MAP["entries"]
+                + [{"pattern": "blob", "jsonKind": "number", "tag": 5}],
+            }
+        )
+        with self.assertRaises(RoaxError) as ctx:
+            flatten(loads('{"marker": "m", "blob": 1111}'), numeric_bytes_map)
+        self.assertEqual(ctx.exception.code, ErrorCode.ENVELOPE_SHAPE)
+
     def test_disclosed_copy_rejects_salts_array(self):
         floor = self.registry.get("org.roax.corpus.synthetic")
         reveal = list(floor.floor()) + [(Key("marker"),)]
-        envelope = disclosed_copy(reveal, IDENTITY, self.built, profile=floor)
+        envelope = disclosed_copy(reveal, self.built, profile=floor)
         envelope["salts"] = []
         self.assertEqual(
             verify_envelope(envelope, self.config).reason, ErrorCode.DISCLOSED_COPY_CARRIES_SALTS
@@ -397,7 +717,7 @@ class TestRecordAndEnvelope(unittest.TestCase):
     def test_disclosed_copy_rejects_a_seed_member(self):
         floor = self.registry.get("org.roax.corpus.synthetic")
         reveal = list(floor.floor()) + [(Key("marker"),)]
-        envelope = disclosed_copy(reveal, IDENTITY, self.built, profile=floor)
+        envelope = disclosed_copy(reveal, self.built, profile=floor)
         envelope["masterSalt"] = "00" * 32
         self.assertEqual(
             verify_envelope(envelope, self.config).reason, ErrorCode.MASTER_SALT_IN_ENVELOPE
@@ -408,7 +728,7 @@ class TestRecordAndEnvelope(unittest.TestCase):
         # Withhold the profile's own non-redactable path, `marker`, keeping every reserved
         # one: the floor fires, because nothing earlier can.
         reserved_only = [p for p in floor.floor() if p[0].value.startswith("roax.")]
-        envelope = disclosed_copy(reserved_only, IDENTITY, self.built, profile=None)
+        envelope = disclosed_copy(reserved_only, self.built, profile=None)
         self.assertEqual(
             verify_envelope(envelope, self.config).reason, ErrorCode.MINIMUM_DISCLOSURE_FLOOR
         )
@@ -416,7 +736,7 @@ class TestRecordAndEnvelope(unittest.TestCase):
         # outer-identity-mismatch rather than minimum-disclosure-floor. That ordering is
         # what 16 of the corpus's 54 envelope vectors pin.
         partial = [p for p in floor.floor() if p[0].value != "roax.recordType"]
-        envelope = disclosed_copy(partial + [(Key("marker"),)], IDENTITY, self.built, profile=None)
+        envelope = disclosed_copy(partial + [(Key("marker"),)], self.built, profile=None)
         self.assertEqual(
             verify_envelope(envelope, self.config).reason, ErrorCode.OUTER_IDENTITY_MISMATCH
         )
@@ -424,24 +744,24 @@ class TestRecordAndEnvelope(unittest.TestCase):
     def test_outer_identity_relabel_is_rejected(self):
         floor = self.registry.get("org.roax.corpus.synthetic")
         reveal = list(floor.floor()) + [(Key("marker"),)]
-        envelope = disclosed_copy(reveal, IDENTITY, self.built, profile=floor)
+        envelope = disclosed_copy(reveal, self.built, profile=floor)
         envelope["recordType"] = "sg.gov.moh.pdt-healthcert"
         self.assertEqual(
             verify_envelope(envelope, self.config).reason, ErrorCode.OUTER_IDENTITY_MISMATCH
         )
 
     def test_unknown_profile_and_algorithm_fail_closed(self):
-        envelope = full_copy(self.record, IDENTITY, self.built)
+        envelope = full_copy(self.built)
         envelope["recordType"] = "com.example.not-a-profile"
         self.assertEqual(verify_envelope(envelope, self.config).reason, ErrorCode.PROFILE_UNKNOWN)
-        envelope = full_copy(self.record, IDENTITY, self.built)
+        envelope = full_copy(self.built)
         envelope["hashAlg"] = "Poseidon-BN254"
         self.assertEqual(
             verify_envelope(envelope, self.config).reason, ErrorCode.HASH_ALG_NOT_ALLOWED
         )
 
     def test_registry_authority_overrides_the_envelope(self):
-        envelope = full_copy(self.record, IDENTITY, self.built)
+        envelope = full_copy(self.built)
         hostile = VerifierConfig(
             profiles=self.registry,
             resolvers={"org.roax.corpus.synthetic": resolver()},
@@ -475,7 +795,7 @@ class TestDisclosedCarrierIsTheCommittedValue(unittest.TestCase):
         record = loads(body)
         built = issue(record, IDENTITY, resolver())
         reveal = list(self.profile.floor()) + [(Key(key),) for key in record]
-        envelope = disclosed_copy(reveal, IDENTITY, built, profile=self.profile)
+        envelope = disclosed_copy(reveal, built, profile=self.profile)
         result = verify_envelope(envelope, self.config)
         self.assertTrue(result.accepted, f"{result.reason}: {result.detail}")
         return next(
@@ -514,15 +834,16 @@ class TestDisclosedCarrierIsTheCommittedValue(unittest.TestCase):
 class TestHostileEnvelopeMembers(unittest.TestCase):
     """Specification section 11.3 makes everything outside the root attacker-controlled.
 
-    Three properties are pinned here and none is reachable from the committed corpus,
-    because all 54 envelope fixtures are schema-valid.
+    Three hostile-input properties are pinned here.
+    The committed fixtures exercise the ordinary paths, while their schema-valid carriers
+    do not take the rejection branches below.
 
     1. A member that is a JSON *number* where the envelope schema requires a JSON string
        is REJECTED rather than committed. `JsonNumber` subclasses `str` so the literal
        survives, so `encode_value(STRING, ...)` would encode the two identically and the
        envelope would verify against a genuine root.
-    2. `verify_envelope` returns a `VerificationResult` for every input. A verifier
-       service handed a hostile envelope must reject it, not crash.
+    2. `verify_envelope` converts the malformed JSON-value shapes enumerated below into a
+       `VerificationResult`. A verifier service handed one must reject it, not crash.
     3. Every object `schemas/envelope-1.0.json` closes is closed here too, at each depth.
        A nested object is read by named key, so an extra member one level down would be
        ignored, and one carrying a withheld leaf's salt would ride inside an envelope that
@@ -540,12 +861,12 @@ class TestHostileEnvelopeMembers(unittest.TestCase):
         )
 
     def full(self):
-        return full_copy(self.record, IDENTITY, self.built)
+        return full_copy(self.built)
 
     def disclosed(self):
         floor = self.registry.get("org.roax.corpus.synthetic")
         reveal = list(floor.floor()) + [(Key("marker"),)]
-        return disclosed_copy(reveal, IDENTITY, self.built, profile=floor)
+        return disclosed_copy(reveal, self.built, profile=floor)
 
     def test_a_json_number_identity_member_is_rejected(self):
         # Without the check this envelope verifies: the reserved `roax.schemaVersion` leaf
@@ -577,9 +898,160 @@ class TestHostileEnvelopeMembers(unittest.TestCase):
         hostile["recordType"] = JsonNumber("5")
         self.assertEqual(verify_envelope(hostile, self.config).reason, ErrorCode.PROFILE_UNKNOWN)
 
+    def test_identity_minima_and_issuer_uri_are_enforced_by_the_verifier(self):
+        cases = {
+            "empty schemaVersion": lambda envelope: envelope.update(schemaVersion=""),
+            "empty recordId": lambda envelope: envelope.update(recordId=""),
+            "empty issuer.id": lambda envelope: envelope.update(
+                issuer={**envelope["issuer"], "id": ""}
+            ),
+            "relative issuer.id": lambda envelope: envelope.update(
+                issuer={**envelope["issuer"], "id": "not a uri"}
+            ),
+        }
+        for shape in (self.full, self.disclosed):
+            for name, mutate in cases.items():
+                with self.subTest(shape=shape.__name__, case=name):
+                    hostile = shape()
+                    mutate(hostile)
+                    self.assertEqual(
+                        verify_envelope(hostile, self.config).reason,
+                        ErrorCode.ENVELOPE_SHAPE,
+                    )
+
+    def test_record_type_form_is_checked_independently_of_the_profile_registry(self):
+        invalid_type = "invalid"
+        hostile = self.full()
+        hostile["recordType"] = invalid_type
+        config = VerifierConfig(
+            profiles=self.registry.with_profile(Profile(invalid_type)),
+            resolvers={invalid_type: resolver()},
+        )
+        self.assertEqual(
+            verify_envelope(hostile, config).reason,
+            ErrorCode.ENVELOPE_SHAPE,
+        )
+
+    def test_optional_type_map_hint_has_the_envelope_1_carrier_shape(self):
+        # Envelope 1 leaves this descriptor unauthenticated and optional, but when present
+        # its carrier is still closed and fully shaped by schemas/envelope-1.0.json.
+        # A syntactically valid value unrelated to this root remains accepted, proving the
+        # hint did not start selecting a map as a side effect of validating its shape.
+        valid = {
+            "id": "sha256:" + "0" * 64,
+            "version": "9.9.9",
+        }
+        envelope = self.full()
+        envelope["typeMap"] = valid
+        self.assertTrue(verify_envelope(envelope, self.config).accepted)
+
+        cases = {
+            "not an object": None,
+            "missing id": {"version": "1.0.0"},
+            "missing version": {"id": "sha256:" + "0" * 64},
+            "numeric id": {"id": JsonNumber("5"), "version": "1.0.0"},
+            "numeric version": {
+                "id": "sha256:" + "0" * 64,
+                "version": JsonNumber("1.0"),
+            },
+            "malformed id": {"id": "x", "version": "1.0.0"},
+            "malformed version": {
+                "id": "sha256:" + "0" * 64,
+                "version": "1.0",
+            },
+            "unknown member": {**valid, "latest": True},
+        }
+        for name, descriptor in cases.items():
+            with self.subTest(case=name):
+                hostile = self.full()
+                hostile["typeMap"] = descriptor
+                self.assertEqual(
+                    verify_envelope(hostile, self.config).reason,
+                    ErrorCode.ENVELOPE_SHAPE,
+                )
+
+    def test_display_path_is_a_string_hint_and_is_never_reconstructed(self):
+        # The structured segments remain authoritative. A wrong but genuine display
+        # string is accepted, while a JsonNumber or nested carrier is schema-invalid.
+        envelope = self.disclosed()
+        envelope["disclosure"]["leaves"][0]["displayPath"] = "deliberately.not.the.path"
+        self.assertTrue(verify_envelope(envelope, self.config).accepted)
+
+        for hostile_value in (JsonNumber("5"), {}, []):
+            with self.subTest(value=hostile_value):
+                hostile = self.disclosed()
+                hostile["disclosure"]["leaves"][0]["displayPath"] = hostile_value
+                self.assertEqual(
+                    verify_envelope(hostile, self.config).reason,
+                    ErrorCode.ENVELOPE_SHAPE,
+                )
+
+    def test_anchor_has_the_exact_closed_schema_carrier(self):
+        registry = "0x" + "aB" * 20
+        tx_hash = "0x" + "Cd" * 32
+        for chain_id in (JsonNumber("1.0"), JsonNumber("1e0")):
+            with self.subTest(valid_chain_id=chain_id):
+                envelope = self.full()
+                envelope["anchor"] = {
+                    "chainId": chain_id,
+                    "registry": registry,
+                    "txHash": tx_hash,
+                    "anchoredAt": "2026-07-28T23:59:60Z",
+                }
+                self.assertTrue(verify_envelope(envelope, self.config).accepted)
+
+        cases = {
+            "null anchor": None,
+            "missing chainId": {"registry": registry},
+            "missing registry": {"chainId": JsonNumber("1")},
+            "boolean chainId": {"chainId": True, "registry": registry},
+            "fractional chainId": {"chainId": JsonNumber("1.1"), "registry": registry},
+            "negative chainId": {"chainId": JsonNumber("-1"), "registry": registry},
+            "numeric registry": {
+                "chainId": JsonNumber("1"),
+                "registry": JsonNumber("1" * 40),
+            },
+            "nested registry": {"chainId": JsonNumber("1"), "registry": {}},
+            "short registry": {"chainId": JsonNumber("1"), "registry": "0x0"},
+            "numeric txHash": {
+                "chainId": JsonNumber("1"),
+                "registry": registry,
+                "txHash": JsonNumber("1" * 64),
+            },
+            "nested txHash": {
+                "chainId": JsonNumber("1"),
+                "registry": registry,
+                "txHash": [],
+            },
+            "bad anchoredAt": {
+                "chainId": JsonNumber("1"),
+                "registry": registry,
+                "anchoredAt": "2026-02-29T00:00:00Z",
+            },
+            "numeric anchoredAt": {
+                "chainId": JsonNumber("1"),
+                "registry": registry,
+                "anchoredAt": JsonNumber("2026"),
+            },
+            "nested anchoredAt": {
+                "chainId": JsonNumber("1"),
+                "registry": registry,
+                "anchoredAt": {},
+            },
+        }
+        for name, anchor in cases.items():
+            with self.subTest(case=name):
+                hostile = self.full()
+                hostile["anchor"] = anchor
+                self.assertEqual(
+                    verify_envelope(hostile, self.config).reason,
+                    ErrorCode.ENVELOPE_SHAPE,
+                )
+
     def test_a_json_number_disclosed_leaf_value_is_rejected(self):
-        # No corpus vector reaches this at any tag, so this test is the only thing holding
-        # it: no envelope fixture carries a non-string `value` at tag 2, 3 or 4.
+        # The 54 committed envelope fixtures contain 317 ordinary tag-2 string values.
+        # None exercises the hostile-number branch, or a disclosed value at tag 3, 4 or 5,
+        # so these four direct cases hold the discriminator at each string carrier.
         #
         # DECIMAL is the case that shows the harm. `JsonNumber` subclasses `str`, so a
         # carrier of 0.010 canonicalizes to the same "0.010" the genuine leaf committed
@@ -587,20 +1059,31 @@ class TestHostileEnvelopeMembers(unittest.TestCase):
         # stdlib parser gets 0.01 - the trailing-zero destruction specification section
         # 6.4 and `docs/decisions.md` part 0 exist to prevent, and which
         # `schemas/envelope-1.0.json` forbids by pinning the carrier to "type": "string".
-        record = loads('{"marker": "m", "amount": 0.010}')
-        built = issue(record, IDENTITY, resolver())
+        carrier_map = DisplayPatternTypeMap(
+            {
+                **SYNTHETIC_MAP,
+                "entries": SYNTHETIC_MAP["entries"]
+                + [{"pattern": "blob", "jsonKind": "string", "tag": 5}],
+            }
+        )
+        record = loads('{"marker": "5", "count": 5, "amount": 0.010, "blob": "EQ=="}')
+        built = issue(record, IDENTITY, carrier_map)
         profile = Profile("org.roax.corpus.synthetic", ((Key("marker"),),))
         config = VerifierConfig(
             profiles=DEFAULT_PROFILES.with_profile(profile),
-            resolvers={"org.roax.corpus.synthetic": resolver()},
+            resolvers={"org.roax.corpus.synthetic": carrier_map},
         )
-        reveal = list(profile.floor()) + [(Key("marker"),), (Key("amount"),)]
-        envelope = disclosed_copy(reveal, IDENTITY, built, profile=profile)
+        reveal = list(profile.floor()) + [
+            (Key("count"),),
+            (Key("amount"),),
+            (Key("blob"),),
+        ]
+        envelope = disclosed_copy(reveal, built, profile=profile)
 
-        def with_amount(carrier):
+        def with_carrier(path, carrier):
             copied = {**envelope, "disclosure": {**envelope["disclosure"]}}
             copied["disclosure"]["leaves"] = [
-                {**leaf, "value": carrier} if leaf["displayPath"] == "amount" else leaf
+                {**leaf, "value": carrier} if leaf["displayPath"] == path else leaf
                 for leaf in envelope["disclosure"]["leaves"]
             ]
             return copied
@@ -615,24 +1098,32 @@ class TestHostileEnvelopeMembers(unittest.TestCase):
         self.assertNotIsInstance(emitted, JsonNumber)
         self.assertTrue(verify_envelope(envelope, config).accepted)
 
-        self.assertTrue(verify_envelope(with_amount("0.010"), config).accepted)
-        self.assertEqual(
-            verify_envelope(with_amount(JsonNumber("0.010")), config).reason,
-            ErrorCode.ENVELOPE_SHAPE,
-        )
-        # The same collapse at the other two string carriers, and the tags that are
-        # deliberately NOT string carriers must keep working.
-        self.assertEqual(
-            verify_envelope(with_amount(JsonNumber("5")), config).reason,
-            ErrorCode.ENVELOPE_SHAPE,
-        )
+        cases = {
+            "marker": (2, JsonNumber("5")),
+            "count": (3, JsonNumber("5")),
+            "amount": (4, JsonNumber("0.010")),
+            "blob": (5, JsonNumber("11")),
+        }
+        for path, (tag, hostile_value) in cases.items():
+            with self.subTest(path=path, tag=tag):
+                honest = next(
+                    leaf for leaf in envelope["disclosure"]["leaves"] if leaf["displayPath"] == path
+                )
+                self.assertEqual(honest["tag"], tag)
+                self.assertIsInstance(honest["value"], str)
+                self.assertNotIsInstance(honest["value"], JsonNumber)
+                self.assertEqual(
+                    verify_envelope(with_carrier(path, hostile_value), config).reason,
+                    ErrorCode.ENVELOPE_SHAPE,
+                )
+
+        # Tags that deliberately do not use a string carrier must keep working.
         boolean = loads('{"marker": "m", "flag": true}')
         boolean_built = issue(boolean, IDENTITY, resolver())
         self.assertTrue(
             verify_envelope(
                 disclosed_copy(
                     list(profile.floor()) + [(Key("marker"),), (Key("flag"),)],
-                    IDENTITY,
                     boolean_built,
                     profile=profile,
                 ),
@@ -738,33 +1229,34 @@ class TestHostileEnvelopeMembers(unittest.TestCase):
         base = (
             '{"canon":"ROAX-CANON/1","hashAlg":"SHA-256","recordType":"hl7.fhir.bundle",'
             '"schemaVersion":"1.0","recordId":"r","root":"' + "00" * 32 + '",'
-            '"leafCount":%s,"issuer":{"id":"i"},%s}'
+            '"leafCount":%s,"issuer":{"id":"did:example:issuer"},%s}'
         )
         cases = {
             "segments is null": base
-            % (1, '"record":{},"salts":[{"segments":null,"salt":"' + salt + '"}]'),
+            % (5, '"record":{},"salts":[{"segments":null,"salt":"' + salt + '"}]'),
             "segments carries an object key": base
-            % (1, '"record":{},"salts":[{"segments":[{"key":{}}],"salt":"' + salt + '"}]'),
+            % (5, '"record":{},"salts":[{"segments":[{"key":{}}],"salt":"' + salt + '"}]'),
             "auditPath is null": base
             % (
-                1,
+                5,
                 '"disclosure":{"mode":"selective","leaves":[{"segments":[{"key":"a"}],'
                 '"index":0,"tag":2,"value":"x","salt":"' + salt + '","auditPath":null}]}',
             ),
             "typeMap is a string": base
             % (
-                1,
+                5,
                 '"typeMap":"oops","record":{},"salts":[{"segments":[{"key":"a"}],"salt":"'
                 + salt
                 + '"}]',
             ),
-            # CPython 3.11+ caps int(str) at 4300 digits, so an unbounded count raises
-            # ValueError before any rule of this specification applies. Same interpreter
-            # hazard `roax_canon.numbers` already refuses for a decimal exponent.
+            # CPython 3.11+ ships with a configurable int(str) conversion limit whose
+            # default is 4300 digits, so an unbounded count raises ValueError before any
+            # rule of this specification applies. Same interpreter hazard
+            # `roax_canon.numbers` already refuses for a decimal exponent.
             "leafCount has 5000 digits": base % ("9" * 5000, '"record":{},"salts":[]'),
             "index has 5000 digits": base
             % (
-                1,
+                5,
                 '"disclosure":{"mode":"selective","leaves":[{"segments":[{"key":"a"}],'
                 '"index":'
                 + "9" * 5000
@@ -804,6 +1296,30 @@ class TestSalts(unittest.TestCase):
 
 
 class TestTypeMapMatcher(unittest.TestCase):
+    def test_tag_uses_json_schema_integer_semantics(self):
+        def load_tag(literal):
+            document = (
+                '{"typeMapVersion":"1.0.0",'
+                '"recordType":"org.roax.corpus.synthetic",'
+                '"schemaVersion":"1.0",'
+                '"entries":[{"pattern":"marker","jsonKind":"string","tag":' + literal + "}]}"
+            )
+            with tempfile.NamedTemporaryFile("w+", suffix=".json") as handle:
+                handle.write(document)
+                handle.flush()
+                return DisplayPatternTypeMap.from_file(handle.name)
+
+        # JSON Schema's integer type is mathematical, not lexical.
+        for literal in ("1.0", "1e0"):
+            with self.subTest(valid=literal):
+                self.assertEqual(load_tag(literal).resolve((Key("marker"),), "string"), 1)
+
+        for literal in ("1.1", "true", '"1"', "-1", "9", "null", "{}"):
+            with self.subTest(invalid=literal):
+                with self.assertRaises(RoaxError) as ctx:
+                    load_tag(literal)
+                self.assertEqual(ctx.exception.code, ErrorCode.TYPE_MAP_REJECTED)
+
     def test_index_wildcard(self):
         self.assertEqual(resolver().resolve((Key("list"), Index(7)), "string"), 2)
 
@@ -835,6 +1351,40 @@ class TestTypeMapMatcher(unittest.TestCase):
                 with self.assertRaises(RoaxError) as ctx:
                     DisplayPatternTypeMap({**SYNTHETIC_MAP, "entries": entries})
                 self.assertEqual(ctx.exception.code, ErrorCode.TYPE_MAP_REJECTED)
+
+    def test_top_level_carrier_rejects_with_the_stable_code(self):
+        cases = [
+            [],
+            {key: value for key, value in SYNTHETIC_MAP.items() if key != "typeMapVersion"},
+            {key: value for key, value in SYNTHETIC_MAP.items() if key != "recordType"},
+            {key: value for key, value in SYNTHETIC_MAP.items() if key != "schemaVersion"},
+            {**SYNTHETIC_MAP, "unexpected": True},
+            {
+                **SYNTHETIC_MAP,
+                "entries": [
+                    {
+                        "pattern": "marker",
+                        "jsonKind": "string",
+                        "tag": 2,
+                        "unexpected": True,
+                    }
+                ],
+            },
+        ]
+        for document in cases:
+            with self.subTest(document=document):
+                with self.assertRaises(RoaxError) as ctx:
+                    DisplayPatternTypeMap(document)
+                self.assertEqual(ctx.exception.code, ErrorCode.TYPE_MAP_REJECTED)
+
+        # Exercise the actual file-loading boundary too: an array used to escape as an
+        # AttributeError when the constructor called `.get`.
+        with tempfile.NamedTemporaryFile("w+", suffix=".json") as handle:
+            handle.write("[]")
+            handle.flush()
+            with self.assertRaises(RoaxError) as ctx:
+                DisplayPatternTypeMap.from_file(handle.name)
+        self.assertEqual(ctx.exception.code, ErrorCode.TYPE_MAP_REJECTED)
 
     def test_ambiguous_patterns_are_rejected_rather_than_mis_parsed(self):
         for pattern in ("a[b]", "a[", "]a", "", "a.*"):

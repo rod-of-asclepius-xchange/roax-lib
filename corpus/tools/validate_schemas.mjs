@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Validate every artifact this corpus ships against the repository's JSON Schemas.
+// Validate the corpus file, type maps, and envelope fixtures against the repository's JSON
+// Schemas.
 //
 // The repository has no CI and no package manifest, and `AGENTS.md` records that the three
 // schemas were checked with Ajv 8 in STRICT mode plus ajv-formats. This does the same for the
@@ -213,5 +214,7 @@ probe("corpus carrying the deleted salt vector group", false,
 probe("encodeValue vector carrying a bare JSON number", false,
   (doc) => { doc.vectors.encodeValue[0].input = 1.5; });
 
-console.log(failures ? `FAILED: ${failures}` : "OK: every artifact validates as expected");
+console.log(failures
+  ? `FAILED: ${failures}`
+  : "OK: corpus, type maps, envelope fixtures, and conditional probes validated as expected");
 process.exit(failures ? 1 : 0);

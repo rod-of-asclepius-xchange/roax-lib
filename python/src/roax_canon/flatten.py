@@ -17,8 +17,9 @@ key enumeration.
 
 An empty container is a leaf so that removing it changes the root.
 Empty array, empty object and explicit null are **three distinct leaves**, which is a
-departure from dogtag, where `crates/dogtag-standard-rs/src/flatten.rs:96-115` collapses
-all three to ``TypedScalar::Null``.
+departure from dogtag, where
+`dogtag-mono-repo/crates/dogtag-standard-rs/src/flatten.rs:96-115` collapses all three to
+``TypedScalar::Null``.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from __future__ import annotations
 from typing import Any, Sequence
 
 from .errors import ErrorCode, InputError, RoaxError
-from .jsonio import json_kind
+from .jsonio import is_json_string, json_kind
 from .leaf import Leaf
 from .path import Index, Key, Segment, display_path
 from .text import nfc
@@ -92,13 +93,11 @@ def _coerce_record_value(tag: int, node: Any, segments: Sequence[Segment]) -> An
     enters its digest.
     """
     if tag == BYTES:
-        if isinstance(node, (bytes, bytearray)):
-            return bytes(node)
-        if isinstance(node, str):
+        if is_json_string(node):
             return decode_base64_canonical(node)
         raise RoaxError(
             ErrorCode.ENVELOPE_SHAPE,
-            f"{display_path(segments)}: BYTES binding needs base64 text or bytes",
+            f"{display_path(segments)}: BYTES binding needs a base64 JSON string",
         )
     if tag == BLOB_REF:
         raise RoaxError(
@@ -135,12 +134,12 @@ def flatten(
     array.json` and `structure-empty-object.json` carry ``a.b`` as ``[]`` and ``{}`` and
     the class-5 vectors assert a root for each.
     Under the section 3.3 rule those two records fail closed and have no root at all.
-    The corpus predates the type-map artifact work that added that sentence, so the
-    divergence is one of vintage rather than of reading, and specification section 1.1
-    makes the specification govern.
-    `python/tools/run_corpus.py` is the one caller that passes ``False``, with that
-    citation attached and a printed notice; every other caller gets the specification's
-    rule.
+    The sentence is present from commit ``f77386f`` and the corpus artifacts were rebuilt
+    later at ``d778726``, so this is not a stale-vintage difference; `python/FINDINGS.md`
+    item 1 records the measurement.
+    Specification section 1.1 makes the specification govern.
+    The standalone `python/tools/run_corpus.py` runner passes ``False``, with that citation
+    attached and a printed notice; the library default remains the specification's rule.
     """
     leaves: list[Leaf] = []
 

@@ -8,9 +8,11 @@ document, and each of the three is compared here.
 The registry it names is carried for a caller and is compared against nothing, because
 this package reads no chain; see :class:`VerifierConfig`.
 
-Attacker control is also why :func:`verify_envelope` returns a result for every input.
-Each member shape it depends on is checked explicitly, and the broad ``except`` there is a
-backstop for a shape nobody anticipated rather than the mechanism.
+Attacker control is also why :func:`verify_envelope` converts every protocol rejection
+and the explicitly enumerated malformed-member exceptions into a result.
+The schema-member shapes handled below have explicit checks, and that ``except`` list is
+a backstop for the named Python failure classes rather than a claim of totality over every
+possible caller object.
 
 The order of the disclosed-copy checks is derived rather than chosen, and
 `corpus/README.md` measures both halves of it:
@@ -39,6 +41,11 @@ rebuilds, and on an 8-leaf tree an internal node presented as a leaf with a forg
 2 verifies against the genuine root.
 ``leafCount`` is therefore **not** authenticated in a disclosed copy and is used for
 nothing here beyond being the tree size RFC 9162 requires as an input.
+
+Envelope 2.0 verification is deliberately fail-closed in this package.
+That version requires exact structured-path DFA selection by the content ID committed at
+``roax.typeMap.id`` under specification section 4.2, while this package implements
+neither published-artifact loading nor content-ID reproduction.
 """
 
 from __future__ import annotations
@@ -49,7 +56,13 @@ from typing import Any, Mapping
 
 from .errors import ErrorCode, RoaxError
 from .hashes import DEFAULT_HASH_ALG, get_hash
-from .jsonio import as_int, is_json_string
+from .jsonio import (
+    as_int,
+    is_json_string,
+    is_nonnegative_schema_integer,
+    is_record_type_string,
+    is_uri_string,
+)
 from .flatten import RESERVED_KEY_PREFIX
 from .leaf import CANON, SALT_BYTES, leaf_hash
 from .path import Key, Segment, display_path, encode_path, segments_from_json
@@ -106,6 +119,15 @@ _DISCLOSED_LEAF_MEMBERS = frozenset(
 # `schemas/envelope-1.0.json` pins a BYTES leaf value to this form. Anchored \A and \Z
 # rather than ^ and $, because Python's $ also matches before a trailing newline.
 _HEX_CARRIER = re.compile(r"\A([0-9a-f]{2})*\Z")
+_TYPE_MAP_ID = re.compile(r"\Asha256:[0-9a-f]{64}\Z")
+_TYPE_MAP_VERSION = re.compile(r"\A[0-9]+\.[0-9]+\.[0-9]+\Z")
+_ANCHOR_REGISTRY = re.compile(r"\A0x[0-9a-fA-F]{40}\Z")
+_ANCHOR_TX_HASH = re.compile(r"\A0x[0-9a-fA-F]{64}\Z")
+_ANCHOR_DATE_TIME = re.compile(
+    r"\A([0-9]{4})-([0-9]{2})-([0-9]{2})[Tt ]"
+    r"([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.[0-9]+)?"
+    r"(?:[Zz]|([+-])([0-9]{2})(?::?([0-9]{2}))?)\Z"
+)
 
 _REQUIRED_MEMBERS = (
     "canon",
@@ -163,9 +185,11 @@ class VerifierConfig:
     ``roax.typeMap.id`` is not one of that version's committed reserved leaves, so its
     value is outside the root and is a hint rather than authority (specification section
     11.3, and that member's own description in the schema).
-    The section 4.2 binding that makes it selectable arrived with
-    `schemas/envelope-2.0.json`, which requires the member and commits the leaf; see
-    :func:`verify_envelope`.
+    The section 4.2 binding arrived with `schemas/envelope-2.0.json`, which requires the
+    member and commits the leaf.
+    This package cannot verify that version yet: it deliberately has no published-DFA
+    artifact loader or content-ID reproduction, so selecting :data:`RESERVED_V2` fails
+    closed rather than trusting a display-pattern resolver by record type.
     """
 
     profiles: ProfileRegistry = DEFAULT_PROFILES
@@ -238,6 +262,78 @@ def _hexbytes(text: Any, *, field_name: str, size: int) -> bytes:
     return bytes.fromhex(text)
 
 
+def _is_anchor_date_time(value: str) -> bool:
+    """Match the schema's RFC 3339 date-time format, including leap seconds."""
+    match = _ANCHOR_DATE_TIME.match(value)
+    if match is None:
+        return False
+    year, month, day, hour, minute, second = (int(group) for group in match.groups()[:6])
+    days = (0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+    leap_year = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+    if not 1 <= month <= 12:
+        return False
+    month_days = 29 if month == 2 and leap_year else days[month]
+    if not 1 <= day <= month_days:
+        return False
+
+    sign, zone_hour_text, zone_minute_text = match.groups()[6:]
+    zone_hour = int(zone_hour_text or "0")
+    zone_minute = int(zone_minute_text or "0")
+    if zone_hour > 23 or zone_minute > 59:
+        return False
+    if hour <= 23 and minute <= 59 and second < 60:
+        return True
+    # RFC 3339 admits 23:59:60 at a leap second. Translate a numeric offset back
+    # to UTC using the same boundary calculation the schema validator applies.
+    zone_sign = -1 if sign == "-" else 1
+    utc_minute = minute - zone_minute * zone_sign
+    utc_hour = hour - zone_hour * zone_sign - (1 if utc_minute < 0 else 0)
+    return (
+        (utc_hour == 23 or utc_hour == -1)
+        and (utc_minute == 59 or utc_minute == -1)
+        and second == 60
+    )
+
+
+def _validate_anchor(anchor: Any) -> None:
+    """Validate the exact closed routing-hint carrier in envelope schema 1.0."""
+    if not isinstance(anchor, Mapping):
+        raise RoaxError(ErrorCode.ENVELOPE_SHAPE, "`anchor` must be an object")
+    _check_members(anchor, _ANCHOR_MEMBERS, "anchor")
+    for required in ("chainId", "registry"):
+        if required not in anchor:
+            raise RoaxError(
+                ErrorCode.ENVELOPE_SHAPE,
+                f"anchor.{required} is required when `anchor` is present",
+            )
+
+    if not is_nonnegative_schema_integer(anchor["chainId"]):
+        raise RoaxError(
+            ErrorCode.ENVELOPE_SHAPE,
+            "anchor.chainId must be a non-negative integer",
+        )
+    registry = anchor["registry"]
+    if not is_json_string(registry) or _ANCHOR_REGISTRY.match(registry) is None:
+        raise RoaxError(
+            ErrorCode.ENVELOPE_SHAPE,
+            "anchor.registry must be a 20-byte 0x-prefixed hex JSON string",
+        )
+    if "txHash" in anchor:
+        tx_hash = anchor["txHash"]
+        if not is_json_string(tx_hash) or _ANCHOR_TX_HASH.match(tx_hash) is None:
+            raise RoaxError(
+                ErrorCode.ENVELOPE_SHAPE,
+                "anchor.txHash must be a 32-byte 0x-prefixed hex JSON string",
+            )
+    if "anchoredAt" in anchor:
+        anchored_at = anchor["anchoredAt"]
+        if not is_json_string(anchored_at) or not _is_anchor_date_time(anchored_at):
+            raise RoaxError(
+                ErrorCode.ENVELOPE_SHAPE,
+                "anchor.anchoredAt must be an RFC 3339 date-time JSON string",
+            )
+
+
 def verify_envelope(
     envelope: Mapping[str, Any], config: VerifierConfig | None = None
 ) -> VerificationResult:
@@ -255,13 +351,12 @@ def verify_envelope(
     except RoaxError as exc:
         return _reject(exc.code, exc.detail)
     except (TypeError, ValueError, AttributeError, KeyError, IndexError, RecursionError) as exc:
-        # A backstop, and deliberately not the mechanism: every member shape this module
-        # depends on is checked explicitly above, and each of those checks carries the
-        # reason code the case is about. This clause exists because specification section
-        # 11.3 makes everything outside the root attacker-controlled, so a shape nobody
-        # anticipated MUST still leave this function returning a result rather than
-        # raising into a verifier service. It is placed after the `RoaxError` clause so a
-        # real rejection keeps its own code.
+        # A backstop, and deliberately not the primary mechanism: the schema-member shapes
+        # this module reads have explicit checks above, and those checks carry the reason
+        # code their cases are about. This clause converts the named Python failure classes
+        # from another malformed shape into a rejection instead of letting them escape into
+        # a verifier service. It is placed after the `RoaxError` clause so a real rejection
+        # keeps its own code.
         #
         # `RecursionError` is named explicitly because it is a `RuntimeError` and so is
         # caught by none of the others: `flatten.walk` and `jsonio._check_surrogates` both
@@ -305,6 +400,11 @@ def _verify(env: Mapping[str, Any], cfg: VerifierConfig) -> VerificationResult:
         return _reject(
             ErrorCode.ENVELOPE_SHAPE,
             "a full copy MUST carry the salt of every leaf (specification section 7.3)",
+        )
+    if has_record and not isinstance(env["record"], dict):
+        return _reject(
+            ErrorCode.ENVELOPE_SHAPE,
+            "`record` must be a JSON object in a full copy " "(schemas/envelope-1.0.json:118-120)",
         )
 
     # --- Authority the verifier holds, before anything the document says. --------
@@ -361,27 +461,69 @@ def _verify(env: Mapping[str, Any], cfg: VerifierConfig) -> VerificationResult:
     for member in ("recordType", "schemaVersion", "recordId"):
         if not is_json_string(env[member]):
             return _reject(ErrorCode.ENVELOPE_SHAPE, f"{member} must be a JSON string")
+    if not is_record_type_string(env["recordType"]):
+        return _reject(
+            ErrorCode.ENVELOPE_SHAPE,
+            "recordType must be a lowercase reverse-DNS profile name",
+        )
+    for member in ("schemaVersion", "recordId"):
+        if not env[member]:
+            return _reject(ErrorCode.ENVELOPE_SHAPE, f"{member} must not be empty")
     if not is_json_string(issuer["id"]):
         return _reject(ErrorCode.ENVELOPE_SHAPE, "issuer.id must be a JSON string")
+    if not is_uri_string(issuer["id"]):
+        return _reject(ErrorCode.ENVELOPE_SHAPE, "issuer.id must be an absolute URI")
     if "keyId" in issuer and not is_json_string(issuer["keyId"]):
         return _reject(ErrorCode.ENVELOPE_SHAPE, "issuer.keyId must be a JSON string")
-    type_map = env.get("typeMap")
-    if type_map is not None:
+    carrier_floor = 6 if "keyId" in issuer or cfg.reserved_set == RESERVED_V2 else 5
+    if leaf_count < carrier_floor:
+        return _reject(
+            ErrorCode.ENVELOPE_SHAPE,
+            f"leafCount must be at least {carrier_floor} for this envelope shape",
+        )
+    # This is only the JSON carrier floor. It does not make an outer leafCount or keyId
+    # authoritative; full copies still derive the count, and disclosed copies still
+    # recompute every revealed leaf before using the count as RFC 9162's tree-size input
+    # (specification sections 10, 11.1 and 11.3).
+    if cfg.reserved_set == RESERVED_V2 and "typeMap" not in env:
+        return _reject(ErrorCode.ENVELOPE_SHAPE, "`typeMap` is required under envelope 2.0")
+    if "typeMap" in env:
+        type_map = env["typeMap"]
         if not isinstance(type_map, Mapping):
             return _reject(ErrorCode.ENVELOPE_SHAPE, "`typeMap` must be an object")
         _check_members(type_map, _TYPE_MAP_MEMBERS, "typeMap")
-        if "id" in type_map and not is_json_string(type_map["id"]):
-            return _reject(ErrorCode.ENVELOPE_SHAPE, "typeMap.id must be a JSON string")
+        for required in ("id", "version"):
+            if required not in type_map:
+                return _reject(
+                    ErrorCode.ENVELOPE_SHAPE,
+                    f"typeMap.{required} is required when `typeMap` is present",
+                )
+        if not is_json_string(type_map["id"]) or _TYPE_MAP_ID.match(type_map["id"]) is None:
+            return _reject(
+                ErrorCode.ENVELOPE_SHAPE,
+                "typeMap.id must be a sha256 content-ID JSON string",
+            )
+        if (
+            not is_json_string(type_map["version"])
+            or _TYPE_MAP_VERSION.match(type_map["version"]) is None
+        ):
+            return _reject(
+                ErrorCode.ENVELOPE_SHAPE,
+                "typeMap.version must be a three-part numeric version JSON string",
+            )
+    if cfg.reserved_set == RESERVED_V2:
+        return _reject(
+            ErrorCode.TYPE_MAP_REJECTED,
+            "envelope 2.0 verification requires exact structured-path DFA artifact loading "
+            "and content-ID reproduction, which this package does not implement "
+            "(specification section 4.2)",
+        )
 
-    # `anchor` is closed although no check in this module dereferences it. Being unread is
-    # what makes it a carrier: an unclosed routing hint is somewhere a producer can park a
-    # withheld leaf's salt with nothing ever looking at it (specification sections 7.3 and
-    # 11.3).
-    anchor = env.get("anchor")
-    if anchor is not None:
-        if not isinstance(anchor, Mapping):
-            return _reject(ErrorCode.ENVELOPE_SHAPE, "`anchor` must be an object")
-        _check_members(anchor, _ANCHOR_MEMBERS, "anchor")
+    # `anchor` remains routing only, but a routing hint is still a schema carrier.
+    # Validate its closed shape without ever treating one of its values as authority
+    # (schemas/envelope-1.0.json:90-100; specification section 11.3).
+    if "anchor" in env:
+        _validate_anchor(env["anchor"])
 
     if has_record:
         return _verify_full_copy(env, cfg, hasher, root, leaf_count, record_type)
@@ -501,9 +643,8 @@ def _decode_carrier(tag: int, value: Any) -> Any:
     map binds kind ``number`` to tag 2, 3 or 4.
 
     :func:`~roax_canon.jsonio.is_json_string` and not ``isinstance(value, str)``, because
-    `JsonNumber` subclasses :class:`str` so the literal survives, and that same
-    subclassing is what carries a JSON number through every carrier boundary in this
-    package undetected.
+    `JsonNumber` subclasses :class:`str` so the literal survives and would pass a bare
+    string check at this carrier boundary.
 
     `BYTES` is carried as lowercase hex, which is what `schemas/envelope-1.0.json` pins
     and is a different carrier from the RFC 4648 base64 the *record* uses for the same
@@ -511,10 +652,12 @@ def _decode_carrier(tag: int, value: Any) -> Any:
     The hex test alone does not subsume the string test: an all-digit JSON number literal
     of even length matches `_HEX_CARRIER`.
 
-    **No committed corpus vector reaches any of this.**
-    No envelope fixture carries a non-string ``value`` at tags 2, 3 or 4, and no version-1
-    profile binds `BYTES`, because the healthcert blob fields bind STRING and FHIR
-    ``base64Binary`` is unresolved (specification section 6.3).
+    The 54 committed envelope fixtures contain 317 ordinary JSON-string ``value``
+    carriers at tag 2, so the successful STRING path is corpus-exercised.
+    None replaces one of those strings with a hostile JSON number, and none carries a
+    disclosed value at tag 3, 4 or 5.
+    No version-1 profile binds `BYTES`, because the healthcert blob fields bind STRING and
+    FHIR ``base64Binary`` is unresolved (specification section 6.3).
     The `BYTES` decoder exists because :func:`roax_canon.disclose.disclosed_copy` emits
     that carrier, and an encoder without a decoder is a round trip that does not close.
     """
@@ -562,6 +705,11 @@ def _verify_disclosed_copy(env, cfg, hasher, root, leaf_count) -> VerificationRe
             if required not in raw:
                 return _reject(ErrorCode.ENVELOPE_SHAPE, f"disclosed leaf missing {required!r}")
         _check_members(raw, _DISCLOSED_LEAF_MEMBERS, "disclosed leaf")
+        if "displayPath" in raw and not is_json_string(raw["displayPath"]):
+            return _reject(
+                ErrorCode.ENVELOPE_SHAPE,
+                "displayPath must be a JSON string when present",
+            )
 
         segments = segments_from_json(raw["segments"])
         tag = as_int(raw["tag"], field="tag")
