@@ -5,8 +5,8 @@
 **Status:** published as [`type-maps/sg.gov.moh.recovery-healthcert-2.0.json`](../../type-maps/sg.gov.moh.recovery-healthcert-2.0.json) at exact artifact ID `sha256:db935b67a3a82754921267e3af237b606f7489b46e05aa892d175b8d87504177`.
 The lite-FHIR `Narrative.div` and four `base64Binary` slots remain unresolved, null placeholders admitted by FHIR but rejected by the pinned schema fail closed, 65 Bundle-reachable lite-FHIR object nodes omit an object type, and the recovery root remains an issuer extension point, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.3, 1.5, 2 and 5.
 
-Recovery is the closest sibling of PDT and shares most of its shape. This document states what
-differs, and does not restate what is identical.
+Recovery is the closest sibling of PDT and shares most of its shape.
+This document states what differs, and does not restate what is identical.
 
 ---
 
@@ -31,26 +31,21 @@ Differences from PDT:
 The PDT type map must handle a polymorphic `type`; the recovery one must not accept an array there.
 A type map shared between the two families would be wrong for one of them.
 
-`fhirBundle` again references the lite FHIR 4.0.1 `Bundle`, so entries carry a nested `.resource` -
-the genuine FHIR layout, same as PDT and unlike vaccination.
+`fhirBundle` again references the lite FHIR 4.0.1 `Bundle`, so entries carry a nested `.resource` - the genuine FHIR layout, same as PDT and unlike vaccination.
 
 ## 2. The `$id` collision - a real defect
 
-**The recovery schema's `$id` is copied from PDT and points at
-`.../pdt-healthcert/2.0/schema.json`, despite the file being the recovery schema.**
+**The recovery schema's `$id` is copied from PDT and points at `.../pdt-healthcert/2.0/schema.json`, despite the file being the recovery schema.**
 
-This collides with PDT's schema identity in any validator that registers both by `$id`. Depending on
-registration order, one schema silently shadows the other, and a recovery record can end up
-validated against the PDT rules - which would accept an array-valued `type` and would not require
-`validUntil`.
+This collides with PDT's schema identity in any validator that registers both by `$id`.
+Depending on registration order, one schema silently shadows the other, and a recovery record can end up validated against the PDT rules - which would accept an array-valued `type` and would not require `validUntil`.
 
 **Requirement for ROAX:** an implementation MUST NOT resolve these reference schemas by `$id`.
-Load them by path, or rewrite the `$id` at load time and record that it did so. A test that
-registers both and asserts the recovery rules still apply belongs in the conformance corpus
-(`docs/conformance-corpus.md`, class 13).
+Load them by path, or rewrite the `$id` at load time and record that it did so.
+A test that registers both and asserts the recovery rules still apply belongs in the conformance corpus (`docs/conformance-corpus.md`, class 13).
 
-This defect is in the reference schemata, not in ROAX, and ROAX cannot fix it upstream. It can only
-refuse to be caught by it.
+This defect is in the reference schemata, not in ROAX, and ROAX cannot fix it upstream.
+It can only refuse to be caught by it.
 
 ## 3. Type-map scope
 
@@ -64,8 +59,8 @@ Separately, 65 reached lite-FHIR object-applicator source nodes collapse to 63 m
 Its exact artifact ID, `recordType` and `schemaVersion` are checked together when selecting this map, under [`docs/type-maps.md`](../type-maps.md) section 4 and specification section 4.2.
 The open recovery root permits issuer properties but supplies no semantic type for an unknown path, so issuers add such paths only through immutable scoped child artifacts under [`docs/type-maps.md`](../type-maps.md) section 5.
 
-`logo` is present here too and is a base64 blob. In the recovery sample it is 2,618 bytes, much
-smaller than the PDT and vaccination blobs but still the largest single value in that record.
+`logo` is present here too and is a base64 blob.
+In the recovery sample it is 2,618 bytes, much smaller than the PDT and vaccination blobs but still the largest single value in that record.
 The published map binds it as STRING over its base64 text because the recovery schema declares a string, under specification sections 4.2 and 6.3.
 
 ## 4. Non-redactable paths
@@ -83,15 +78,16 @@ Without it the holder chooses whether the verifier learns the certificate has ex
 
 ## 5. Known defects and cautions
 
-- **The `$id` collision** - section 2. The most consequential of the three.
+- **The `$id` collision** - section 2.
+  The most consequential of the three.
 - **`fhirVersion` is unvalidated** - see [`fhir.md`](fhir.md) section 6.
-- **A minimal Bundle validates.** `{"resourceType":"Bundle"}` satisfies `fhirBundle`. Confirmed by
-  reproduction.
+- **A minimal Bundle validates.**
+  `{"resourceType":"Bundle"}` satisfies `fhirBundle`.
+  Confirmed by reproduction.
 
 ## 6. What the schema and tests do NOT enforce
 
-Tests accept the three scalar types and reject a missing, unknown or array-valued `type`; they
-reject a missing `id` or `version`, missing or invalid validity dates, and missing FHIR fields.
+Tests accept the three scalar types and reject a missing, unknown or array-valued `type`; they reject a missing `id` or `version`, missing or invalid validity dates, and missing FHIR fields.
 
 Neither the schema nor the tests require that:
 
@@ -102,17 +98,16 @@ Neither the schema nor the tests require that:
 - references resolve;
 - any clinical resource is present at all.
 
-**The first of these deserves emphasis.** A recovery certificate asserts recovery, which implies a
-prior positive result. The schema does not check the result is positive. A record carrying a
-negative observation validates identically.
+**The first of these deserves emphasis.**
+A recovery certificate asserts recovery, which implies a prior positive result.
+The schema does not check the result is positive.
+A record carrying a negative observation validates identically.
 
-**Consequence for ROAX:** the same caution as PDT, sharpened. A valid
-`sg.gov.moh.recovery-healthcert` root proves a typed payload was committed by an issuer. It does not
-prove recovery, does not prove a positive result, and does not prove the validity interval is
-coherent. If ROAX intends to claim recovery semantics, those rules have to be added by this profile
-and enforced above the protocol layer.
+**Consequence for ROAX:** the same caution as PDT, sharpened.
+A valid `sg.gov.moh.recovery-healthcert` root proves a typed payload was committed by an issuer.
+It does not prove recovery, does not prove a positive result, and does not prove the validity interval is coherent.
+If ROAX intends to claim recovery semantics, those rules have to be added by this profile and enforced above the protocol layer.
 
-**Decision D13 is ruled and that makes this normative.** Specification section 2.3 states that no
-surface derived from this protocol may assert a clinical fact from root validity alone, and puts
-clinical validation in a separate, independently versioned layer. "Proof of recovery" on a screen,
-derived from a root that verified, is exactly the claim that section forbids.
+**Decision D13 is ruled and that makes this normative.**
+Specification section 2.3 states that no surface derived from this protocol may assert a clinical fact from root validity alone, and puts clinical validation in a separate, independently versioned layer.
+"Proof of recovery" on a screen, derived from a root that verified, is exactly the claim that section forbids.

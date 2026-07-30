@@ -214,7 +214,8 @@ Each was reached independently here and resolved the same way, which is corrobor
    Read as the padded form *before* the output-grammar normalization, which is the literal reading and the memory-safe one.
    Under it `0e99999` is rejected; under the other it canonicalizes to `0`.
    No vector carries `0e99999`.
-3. **Decision D14, the lookup's normalization.** See item 7.
+3. **Decision D14, the lookup's normalization.**
+   See item 7.
 4. **The pattern field is display notation** and cannot address a key containing `.`, `[` or `]`.
    `a.**` reaches such a key; an ambiguous pattern is rejected rather than mis-parsed.
 
@@ -248,9 +249,7 @@ The code is left alone because the corpus asserts error codes and both reference
 
 **The `JsonNumber` row is the residual of closing the row above it, and it is worth spelling out.**
 Both halves of `JsonNumber` are deliberate: subclassing `str` is what keeps the literal verbatim (specification section 6.4), and being a distinct type is what stops the JSON number `5` and the JSON string `"5"` collapsing at the type-map lookup (specification section 4.2).
-The first half is what makes it invisible to an `isinstance(x, str)` test, so each
-schema-string boundary named in the table must distinguish a genuine JSON string from
-`JsonNumber` rather than relying on `isinstance`.
+The first half is what makes it invisible to an `isinstance(x, str)` test, so each schema-string boundary named in the table must distinguish a genuine JSON string from `JsonNumber` rather than relying on `isinstance`.
 The one that mattered is `disclosure.leaves[].value`, because that carrier feeds the leaf hash directly: measured on CPython 3.13, a disclosed tag-4 leaf carrying `0.010` as a JSON number canonicalized to the same bytes the genuine leaf committed and verified `ok`, while any consumer re-reading the same envelope with a stdlib parser reads `0.01`.
 `schemas/envelope-1.0.json` pins that carrier to `"type": "string"` and says why in its own description, so this is a defect of this implementation rather than a finding against the specification.
 Closing it at the verifier exposed the same hazard on the encoder: `disclosed_copy` was emitting the record's `JsonNumber` straight into that carrier.
@@ -260,13 +259,9 @@ The narrower `str()` conversion alone would have left a second mismatch behind: 
 The verifier is deliberately NOT tightened to match: `canonical_decimal` yields an identical leaf hash from either spelling, so rejecting a non-canonical carrier on input would change accept and reject behaviour for no security gain.
 `canonical_integer`, `canonical_decimal` and `nfc` are reused rather than reimplemented, because a second preimage builder is the drift specification section 8 exists to prevent.
 The full-copy `record` body is deliberately NOT covered by any of this: specification section 7.3 has that body carry record numbers in their original JSON form, and the flattener resolves those through the observed JSON kind.
-No committed vector supplies a hostile JSON number at one of these schema-string
-boundaries.
-Normal disclosed tag-2 values do reach `_decode_carrier` - 317 committed leaf values do
-so - while tags 3, 4 and 5 do not, so focused unit tests hold the hostile forms and the
-unreached tag carriers.
-A separate focused test holds the record-side BYTES boundary, which no version-1 profile
-selects (specification section 6.5).
+No committed vector supplies a hostile JSON number at one of these schema-string boundaries.
+Normal disclosed tag-2 values do reach `_decode_carrier` - 317 committed leaf values do so - while tags 3, 4 and 5 do not, so focused unit tests hold the hostile forms and the unreached tag carriers.
+A separate focused test holds the record-side BYTES boundary, which no version-1 profile selects (specification section 6.5).
 
 **One consequence of the same subclassing is left open, and it belongs to a caller rather than to this package.**
 `json.dumps` on a full copy serializes the record body's `JsonNumber` values as JSON **strings**, because `JsonNumber` subclasses `str`, so re-reading that text gives kind `string` where the type map expects kind `number` and the copy fails `type-unresolved`.
@@ -295,24 +290,15 @@ Unlike the Node reference implementation, which runs Unicode 16.0 tables against
 - **`Poseidon-BN254` is registered and unusable**, and `BLOB_REF` is defined and rejected in issuance and in an envelope, per specification sections 7.4 and 6.5.
   Neither is exercised beyond the corpus's fail-closed vectors.
 - **Tag 5 `BYTES` is implemented on both sides and is reached by no corpus vector.**
-  No version-1 profile binds it: the healthcert blob fields bind STRING and FHIR
-  `base64Binary` is unresolved (specification section 6.3), so every corpus leaf and envelope fixture
-  is tag 0 to 4, 6 or 7.
-  Both carriers are implemented anyway, and they are different carriers: a *record* carries base64 in
-  the pinned RFC 4648 section 4 form, and an *envelope* carries lowercase hex, which is what
-  `schemas/envelope-1.0.json` pins.
-  An encoder without a decoder is a round trip that does not close, and the corpus cannot see it, so
-  `python/tests/test_pipeline.py::test_bytes_leaf_round_trips_through_both_envelope_shapes` pins it
-  instead.
+  No version-1 profile binds it: the healthcert blob fields bind STRING and FHIR `base64Binary` is unresolved (specification section 6.3), so every corpus leaf and envelope fixture is tag 0 to 4, 6 or 7.
+  Both carriers are implemented anyway, and they are different carriers: a *record* carries base64 in the pinned RFC 4648 section 4 form, and an *envelope* carries lowercase hex, which is what `schemas/envelope-1.0.json` pins.
+  An encoder without a decoder is a round trip that does not close, and the corpus cannot see it, so `python/tests/test_pipeline.py::test_bytes_leaf_round_trips_through_both_envelope_shapes` pins it instead.
 - **Class 12 cannot detect a weak CSPRNG** and neither can this runner.
   It asserts the three relations against `secrets.token_bytes`.
   The randomness source is an implementation-review obligation, not a testable one.
 - **Class 9's negative proofs are driven through the fold**, not through the full disclosed-copy path, because those vectors carry a leaf hash and no `(path, tag, value, salt)` to recompute one from.
-  What closes the envelope attack is that `verify_envelope` has no parameter that accepts
-  a leaf hash.
-  The corpus has 45 disclosed fixtures across classes 11, 14, 17 and 18, but fixtures
-  rejected by earlier checks do not all reach the proof fold, so focused unit tests pin
-  recomputation rather than crediting every fixture with that coverage.
+  What closes the envelope attack is that `verify_envelope` has no parameter that accepts a leaf hash.
+  The corpus has 45 disclosed fixtures across classes 11, 14, 17 and 18, but fixtures rejected by earlier checks do not all reach the proof fold, so focused unit tests pin recomputation rather than crediting every fixture with that coverage.
 
 ---
 
@@ -346,7 +332,7 @@ The tree floor of 6 that the same paragraph derives is consequently reached by e
 One leaf, not zero, which is the whole of the defect: the guarded state does not exist.
 
 **Two conditions on that reproduction, both measured rather than assumed, because an unconditioned version of this claim would be wrong.**
-The `[]` row is a `flatten` result and not an issuable record: specification section 11.1 shapes `record` as an object present in a full copy only (`docs/spec/roax-canon-1.md:1330-1331`) and requires exactly one of `record` and `disclosure` (`docs/spec/roax-canon-1.md:1402`), and `schemas/envelope-1.0.json:118-120` types it `"object"`, so `[]` as a whole record is refused at issuance with `envelope-shape` before the leaf count is ever consulted.
+The `[]` row is a `flatten` result and not an issuable record: specification section 11.1 shapes `record` as an object present in a full copy only (`docs/spec/roax-canon-1.md:1039-1040`) and requires exactly one of `record` and `disclosure` (`docs/spec/roax-canon-1.md:1092`), and `schemas/envelope-1.0.json:118-120` types it `"object"`, so `[]` as a whole record is refused at issuance with `envelope-shape` before the leaf count is ever consulted.
 And `{}` commits but does not verify unconditionally.
 `build_tree(loads("{}"), ..., authorize_empty_containers=False)` yields a 5-leaf tree with a root, so the record is anchored rather than rejected, which is what section 3.3 forbids.
 `verify_envelope(full_copy(built))` then returns accepted with reason `ok` **only when the verifier carries the same structural setting**, `VerifierConfig(authorize_empty_containers=False)`.
@@ -357,9 +343,7 @@ Either way the `empty-record` branch never runs: under the structural reading no
 **The edit available to the specification author, which is the point of reporting it.**
 Section 9.1 keeps `MTH([])` for exactly this reason - so the function is total - and it says outright that the case is unreachable.
 Section 3.3 does not, so a reader looks for the reachable state its MUST guards and finds none.
-Two different repairs are available and they are not equivalent:
-say so in section 3.3 the way section 9.1 already does, which keeps the algorithm as written;
-or move the requirement onto the record body, where `{}` is an object with zero keys and the check would have something to test, which changes what is admissible at issuance.
+Two different repairs are available and they are not equivalent: say so in section 3.3 the way section 9.1 already does, which keeps the algorithm as written; or move the requirement onto the record body, where `{}` is an object with zero keys and the check would have something to test, which changes what is admissible at issuance.
 Choosing between them is a specification decision, so this build does neither.
 
 **What this build does, and why that is not a reading of the defect.**
