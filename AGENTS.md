@@ -345,7 +345,7 @@ every place the build disagreed with the corpus or found the specification ambig
 library only, CPython 3.10 or later, no runtime dependencies and there will not be any.
 
 ```sh
-python3 python/tools/run_corpus.py                       # 19/19 classes, 738 assertions, no skips
+python3 python/tools/run_corpus.py                       # per-class figures: python/README.md
 PYTHONPATH=python/src python3 -m unittest discover -s python/tests -t python
 ```
 
