@@ -194,13 +194,9 @@ def is_json_string(value: Any) -> bool:
 
 
 _URI_SCHEME = re.compile(r"\A[A-Za-z][A-Za-z0-9+.-]*\Z")
-_RECORD_TYPE = re.compile(
-    r"\A[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)+\Z"
-)
+_RECORD_TYPE = re.compile(r"\A[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)+\Z")
 _IPV_FUTURE = re.compile(r"\A[vV][0-9A-Fa-f]+\.[A-Za-z0-9._~!$&'()*+,;=:-]+\Z")
-_URI_UNRESERVED = frozenset(
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
-)
+_URI_UNRESERVED = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
 _URI_SUB_DELIMITERS = frozenset("!$&'()*+,;=")
 _URI_PCHAR = _URI_UNRESERVED | _URI_SUB_DELIMITERS | frozenset(":@")
 _URI_QUERY_OR_FRAGMENT = _URI_PCHAR | frozenset("/?")
@@ -253,8 +249,7 @@ def _uri_authority_is_valid(authority: str) -> bool:
     literal = host_and_port[1:closing]
     suffix = host_and_port[closing + 1 :]
     if suffix and (
-        not suffix.startswith(":")
-        or any(digit not in "0123456789" for digit in suffix[1:])
+        not suffix.startswith(":") or any(digit not in "0123456789" for digit in suffix[1:])
     ):
         return False
     if _IPV_FUTURE.match(literal) is not None:

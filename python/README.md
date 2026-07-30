@@ -6,7 +6,8 @@ No network, no chain reads, no key management.
 
 **Standard library only.**
 `hashlib`, `unicodedata`, `secrets`, `json` and `re`.
-Nothing here needs installing to run, which matters in a repository that deliberately has no package manifest for its corpus tooling.
+Nothing here needs installing to run.
+`pyproject.toml` declares no runtime dependencies and the tests add none, so a bare CPython checkout runs both the unit suite and the corpus runner.
 
 Requires CPython 3.10 or later for the `X | Y` type syntax; developed and measured on 3.13.5.
 

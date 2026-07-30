@@ -175,7 +175,9 @@ def salts_by_path(path: str) -> dict[bytes, bytes]:
             raise ValueError(f"{path}: each path-paired salt needs only `segments` and `salt`")
         encoded = encode_path(segments_from_json(entry["segments"]))
         if encoded in by_path:
-            raise ValueError(f"{path}: duplicate salt path {display_path(segments_from_json(entry['segments']))!r}")
+            raise ValueError(
+                f"{path}: duplicate salt path {display_path(segments_from_json(entry['segments']))!r}"
+            )
         by_path[encoded] = _salt_bytes(entry["salt"], path=path)
     return by_path
 

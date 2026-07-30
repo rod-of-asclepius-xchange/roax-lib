@@ -34,9 +34,7 @@ __all__ = ["load_export", "parse_object_literal"]
 
 _WS = re.compile(r"(?:\s+|//[^\n]*|/\*.*?\*/)*", re.DOTALL)
 _IDENT = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*")
-_IDENT_CONTINUATION = frozenset(
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_$"
-)
+_IDENT_CONTINUATION = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_$")
 _NUMBER = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?")
 _ESCAPES = {
     '"': '"',

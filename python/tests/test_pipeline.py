@@ -1,6 +1,6 @@
 """Reader, flattener, tree, record and envelope tests.
 
-python3 -m unittest discover -s python/tests -t python
+PYTHONPATH=python/src python3 -m unittest discover -s python/tests -t python
 """
 
 from __future__ import annotations

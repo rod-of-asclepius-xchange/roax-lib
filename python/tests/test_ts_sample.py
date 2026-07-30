@@ -170,8 +170,7 @@ class LoadExport(unittest.TestCase):
 
     def test_an_export_spelling_in_a_line_comment_is_not_live(self):
         path = self._module(
-            "// export const sampleDocument = {from: 'comment'};\n"
-            "export const other = {a: 1};\n"
+            "// export const sampleDocument = {from: 'comment'};\n" "export const other = {a: 1};\n"
         )
         with self.assertRaises(ValueError):
             load_export(path, "sampleDocument")
@@ -206,9 +205,7 @@ class LoadExport(unittest.TestCase):
 
     def test_a_nested_namespace_export_is_not_a_module_export(self):
         path = self._module(
-            "namespace Nested {\n"
-            "  export const sampleDocument = {from: 'namespace'};\n"
-            "}\n"
+            "namespace Nested {\n" "  export const sampleDocument = {from: 'namespace'};\n" "}\n"
         )
         with self.assertRaises(ValueError):
             load_export(path, "sampleDocument")

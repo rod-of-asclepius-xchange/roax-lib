@@ -2,10 +2,11 @@
 
 These cover what the conformance corpus reaches plus the Python-specific traps it cannot
 see, because a trap that is closed by accident reopens on the next edit.
-Standard library only: there is no package manifest in this repository by design, so a
-test that needed `pytest` could not be run by anyone who just cloned it.
+Standard library only: `python/pyproject.toml` declares no runtime dependencies and these
+tests add none, so the suite runs on a bare CPython checkout with nothing installed, which
+a test that needed `pytest` would not.
 
-    python3 -m unittest discover -s python/tests -t python
+    PYTHONPATH=python/src python3 -m unittest discover -s python/tests -t python
 """
 
 from __future__ import annotations

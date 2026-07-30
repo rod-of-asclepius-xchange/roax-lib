@@ -240,6 +240,11 @@ Recorded because these Python defaults fail silently and the corpus does not cov
 | CPython 3.11+ defaults to a 4300-digit `int()` conversion cap | `1e` + 5000 digits raises `ValueError`, not the specification's bound | exponent refused by digit count first, `digit-bound-exceeded` |
 | `base64.b64decode(validate=True)` accepts non-canonical trailing bits | RFC 4648 section 3.5's non-canonical case passes | explicit final-quantum check |
 
+**One error code in that table is reused past its name, and it is recorded rather than changed.**
+A Python-native `int` or `float` handed directly to `json_kind` is rejected under `non-finite-number`, which is accurate for the `NaN` and `Infinity` row above it and inaccurate for a finite `0.01` (`python/src/roax_canon/jsonio.py:170-179`).
+The rejection itself is the load-bearing half: a float has already lost the literal, so coercing it would defeat specification section 6.4, and both spellings reach the same guard.
+The code is left alone because the corpus asserts error codes and both reference implementations are error-code-only, so renaming one to describe a boundary no vector reaches would change a cross-checked surface to improve prose.
+
 **The `JsonNumber` row is the residual of closing the row above it, and it is worth spelling out.**
 Both halves of `JsonNumber` are deliberate: subclassing `str` is what keeps the literal verbatim (specification section 6.4), and being a distinct type is what stops the JSON number `5` and the JSON string `"5"` collapsing at the type-map lookup (specification section 4.2).
 The first half is what makes it invisible to an `isinstance(x, str)` test, so each
