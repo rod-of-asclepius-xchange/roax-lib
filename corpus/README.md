@@ -1,6 +1,6 @@
 # The ROAX conformance corpus
 
-**Status:** first cut. 471 vectors, all 19 classes reachable, 14 complete, 4 partial and 1 stale.
+**Status:** first cut. 488 vectors, all 19 classes reachable, 14 complete, 4 partial and 1 stale.
 **Normative definition:** [`docs/conformance-corpus.md`](../docs/conformance-corpus.md).
 **Schema:** [`schemas/conformance-corpus-1.0.json`](../schemas/conformance-corpus-1.0.json).
 **Specification:** [`docs/spec/roax-canon-1.md`](../docs/spec/roax-canon-1.md), which governs where the
@@ -49,8 +49,15 @@ The exit status distinguishes the three gate outcomes:
 | 1 | At least one check ran and failed. |
 | 2 | Nothing failed, but at least one check or vector was `NOT RUN`. |
 
-On the committed tree, the fully configured command above measures 471 vectors, 1,101
-implementation-B assertions, and 70 JSON Schema verdicts.
+On the committed tree, the fully configured command above measures 488 vectors, 1,122
+implementation-B assertions, and 76 JSON Schema verdicts.
+The provenance of the last two differs, and the difference is stated rather than smoothed over.
+1,122 is `check_corpus.mjs` run here without the reference checkout, which passes 1,114 assertions
+and reports class 10 NOT RUN, plus the 8 assertions those four vectors carry once the checkout is
+supplied.
+76 is counted from `validate_schemas.mjs`'s structure - the corpus file, the four corpus type maps,
+the 54 envelope fixtures and its 17 conditional probes - rather than read off a run, because that
+tool needs an Ajv installed outside this tree.
 
 `build_corpus.py --check` and `check_corpus.mjs` use the same three-way status.
 In particular, each exits 2 when the committed external record vectors were not checked.
@@ -224,7 +231,7 @@ Counts are vectors in the file, measured by `build_corpus.py --report`.
 | 8 tree shape | 173 | complete |
 | 9 negative proof vectors | 11 | **stale - the forged-size, full-disclosure row is absent** |
 | 10 the three real MOH records | 4 | **partial - 2 of 3 records.** The vaccination sample commits since its two bindings were ruled; PDT stays uncommittable - see below |
-| 11 the schema binding | 24 | complete. Includes the three unknown-algorithm and unknown-profile fail-closed vectors: specification section 12.2 calls that "the same rule section 4.2 applies to an unknown path, applied one level up", and section 4.2 is what this class tests. |
+| 11 the schema binding | 24 | **partial - the two FHIR fail-closed rows are inexpressible.** Includes the three unknown-algorithm and unknown-profile fail-closed vectors: specification section 12.2 calls that "the same rule section 4.2 applies to an unknown path, applied one level up", and section 4.2 is what this class tests - see below |
 | 12 cross-record unlinkability | 3 | complete. Behavioural rather than pinned: the runner draws and asserts. Detects a deterministic or reused salt; it CANNOT detect a weak CSPRNG, and no fixed vector file can. |
 | 13 reference-schema hazards | 2 | **partial - the `$id` half is inexpressible** |
 | 14 minimum-disclosure floor | 34 | complete. The four outer-identity vectors this row used to count are class 18 now - see below. |
@@ -265,6 +272,21 @@ corpus pins is the accept case, since the sample's `dose` values are 1 and 2.
 
 `tools/build_type_maps.py` produces the vectors the moment the remaining bindings exist. Nothing
 else is blocking.
+
+### Class 11 is partial, and the two missing rows are inexpressible rather than merely absent
+
+`docs/conformance-corpus.md` class 11 requires the fail-closed rows to cover FHIR `Narrative.div` and FHIR `base64Binary`, and none of the 21 committed `typeMap` vectors does.
+That gap predates the 2026-07-30 rulings and is not closable here: `corpus/type-maps/` carries no map for `hl7.fhir.bundle` at all, and a fail-closed vector has to name an exact map to fail closed against.
+It is the same corpus defect that leaves specification section 10 step 1 undischargeable for that `recordType`, recorded in `docs/typescript-implementation-findings.md`.
+So the row is the sibling of class 13's `$id` half below: the assertion is real and the carrier for it does not exist.
+
+Two wrong ways to close it, both of which `docs/conformance-corpus.md` section 1.2 forbids.
+Authoring FHIR class-11 vectors would need a corpus-side FHIR map, and writing one invents bindings for paths the rulings deliberately left out of the operative artifacts (`docs/type-maps.md` section 1.6).
+Trimming the requirement to match the vectors settles the same question from the other side.
+The requirement therefore stands and this row stays partial until a corpus-side map for `hl7.fhir.bundle` exists.
+
+**The unknown empty array and empty object that requirement also names are absent for a different reason**, which is the release-blocking section 3.3 divergence recorded in `docs/typescript-implementation-findings.md` and `python/FINDINGS.md` item 1, not a missing map.
+Both halves have to close before this class is complete.
 
 ### The floor is over segments, and the outer identity does not select it alone
 

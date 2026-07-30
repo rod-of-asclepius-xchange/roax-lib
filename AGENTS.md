@@ -425,13 +425,17 @@ not mean the gate failed. `corpus/README.md` owns that status table. Things to k
 - **Python's `$` also matches before a trailing newline; JavaScript's does not.** Anchor every
   grammar in section 6.2 with `\A`/`\Z`. The first draft of implementation A accepted `"1.0\n"` and
   canonicalized it. `reject-decimal-trailing-newline` pins it.
-- **Three classes are deliberately short, and each is short for a reason recorded in
-  `corpus/README.md`: 10, 13 and 18.** Class 10 is 2 of 3 records - PDT stays uncommittable on its
-  20 endorsed-sample pairs, which need a versioned composition profile nobody has ruled - and class
-  13 is half. Class 18 carries the four identity rows and not the registry rows, which need an
-  anchoring registry that specification section 2.2 leaves undesigned. Do not fill either in without
-  reading why it is short - building the unbuilt half of 18 decides an open question from inside a
-  data file, which `docs/conformance-corpus.md` section 1.2 forbids.
+- **Four classes are deliberately short, and each is short for a reason recorded in
+  `corpus/README.md`: 10, 11, 13 and 18.** Class 10 is 2 of 3 records - PDT stays uncommittable on
+  its 20 endorsed-sample pairs, which need a versioned composition profile nobody has ruled - and
+  class 13 is half. Class 11 lacks the two FHIR fail-closed rows its stated minimum names, and they
+  are inexpressible for the same reason section 10 step 1 is undischargeable above: `corpus/type-maps/`
+  carries no `hl7.fhir.bundle` map for such a vector to fail closed against. Class 18 carries the
+  four identity rows and not the registry rows, which need an anchoring registry that specification
+  section 2.2 leaves undesigned. Do not fill any of them in without reading why it is short -
+  building the unbuilt half of 18 decides an open question from inside a data file, which
+  `docs/conformance-corpus.md` section 1.2 forbids, and authoring the class-11 rows would need an
+  invented FHIR map that does the same thing.
   **Class 19 is complete now.** It carried the value site alone while D14 was open, and its key site
   was built under ruled D14a on 2026-07-30; `build_corpus.py` fails if either site is missing.
 - **Class 9 is stale against its corrected requirement.**
