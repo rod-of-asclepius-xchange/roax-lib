@@ -51,13 +51,16 @@ The exit status distinguishes the three gate outcomes:
 
 On the committed tree, the fully configured command above measures 488 vectors, 1,122
 implementation-B assertions, and 76 JSON Schema verdicts.
-The provenance of the last two differs, and the difference is stated rather than smoothed over.
-1,122 is `check_corpus.mjs` run here without the reference checkout, which passes 1,114 assertions
-and reports class 10 NOT RUN, plus the 8 assertions those four vectors carry once the checkout is
-supplied.
-76 is counted from `validate_schemas.mjs`'s structure - the corpus file, the four corpus type maps,
-the 54 envelope fixtures and its 17 conditional probes - rather than read off a run, because that
-tool needs an Ajv installed outside this tree.
+**Each of the last two needs an input that lives outside this tree, and the two are missing in
+different ways**, neither of which is drift.
+Without the pinned third-party reference checkout, `check_corpus.mjs` still runs and passes 1,114
+assertions while reporting class 10's four vectors NOT RUN; supplying the checkout adds the 8
+assertions those vectors carry.
+Without an Ajv 8 and `ajv-formats` installed outside this tree and named by `--modules` or
+`ROAX_NODE_MODULES`, `validate_schemas.mjs` emits no verdict at all and exits 2, which `run.sh`
+reports as step 4 NOT RUN rather than as a lower count; with one it emits 76 verdict lines - the
+corpus file, the four corpus type maps, the 54 envelope fixtures and its 17 conditional probes -
+and exits 0.
 
 `build_corpus.py --check` and `check_corpus.mjs` use the same three-way status.
 In particular, each exits 2 when the committed external record vectors were not checked.
