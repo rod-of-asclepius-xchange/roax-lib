@@ -143,7 +143,7 @@ This subsection owns that status; other documents point here rather than restati
 The ROAX libraries written so far were each produced by a different team from the one that built the corpus.
 Each was explicitly instructed not to read [`corpus/tools/roax_ref.py`](../corpus/tools/roax_ref.py) or [`corpus/tools/roax_ref.mjs`](../corpus/tools/roax_ref.mjs) while implementing, and each was validated against the corpus only after it had been written.
 That is genuine independence from the corpus tooling, and independence from the corpus tooling is what gate 3 chiefly protects.
-Two of them live in this repository: the Rust library under [`rust/`](../rust) and the TypeScript library under [`src/`](../src), whose disagreements with this corpus are recorded in [`docs/typescript-implementation-findings.md`](typescript-implementation-findings.md).
+Three of them live in this repository: the Rust library under [`rust/`](../rust), the TypeScript library under [`src/`](../src), whose disagreements with this corpus are recorded in [`docs/typescript-implementation-findings.md`](typescript-implementation-findings.md), and the Python library under [`python/`](../python), whose disagreements are recorded in [`python/FINDINGS.md`](../python/FINDINGS.md).
 
 **What the ruling withholds.**
 A single briefing author wrote every implementation brief, and those briefs carried specific warnings: trailing zeros in a decimal are significant, the display path is never hashed, and an unbound path fails closed.
