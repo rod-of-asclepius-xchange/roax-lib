@@ -4,13 +4,19 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 
 ## What this repository is right now
 
-Specification, schemas, the conformance corpus, and three of the five ruled libraries: the independent Rust implementation under `rust/`, the independent TypeScript implementation under `src/`, and the independent Python implementation under `python/`.
+Specification, schemas, the conformance corpus, and four independent libraries: Rust under `rust/`, TypeScript under `src/`, Python under `python/` and Swift under `swift/`.
 Decision D was ruled to five independent, corpus-enforced libraries on 2026-07-29 (`docs/decisions.md`, decision D).
-The specifications came first so the design could be reviewed before five language implementations existed to be re-litigated, and that ordering held.
+The specifications came first so the design could be reviewed before the language implementations existed to be re-litigated, and that ordering held.
 `rust/README.md` owns that crate's protocol boundaries, its build, test and lint commands, and what ruled decisions D13a and D14a mean for its surface.
 `python/README.md` owns that package's surface, its standalone corpus runner, its test commands and its per-class figures, and `python/FINDINGS.md` records what that build found.
+`swift/README.md` owns that package's targets, its corpus runner and its reference-record naming contract, and `swift/FINDINGS.md` records what that build found.
 
-Do not add the Go, Swift or Kotlin library without an explicit instruction to do so.
+Do not add the Go or Kotlin library without an explicit instruction to do so.
+
+**"Four exist and two are outstanding" does not add up to Da's five, and that is a real open question rather than a counting slip in this file.**
+The five the specification names are the five rows of its section 6.4 parser table - Rust, Go, TypeScript, Swift and Kotlin - and Python is a fully independent, corpus-passing library that is not one of them, so the tree holds six target languages.
+An earlier version of this file and of `README.md` each papered over the same mismatch a different way.
+It belongs to the project owner alongside decisions A and C; do not resolve it in prose, and note that no library's status depends on the answer.
 
 **That ruling carries an obligation on HOW each one is written, and it is the reason the option was worth choosing.**
 An implementation is written from `docs/spec/roax-canon-1.md`, and its author does not read another implementation while writing it.
@@ -31,7 +37,7 @@ See [`src/README.md`](src/README.md).
 
 **`package.json` and `tsconfig.json` now exist, and an earlier version of this file gave their absence as a rule.**
 That rule was "a TypeScript package here would read as the beginning of a library", and it is superseded because the library is now deliberate rather than accidental.
-It is superseded **only for the three libraries that exist**, whose manifests are `rust/Cargo.toml`, the root `package.json` and `python/pyproject.toml`: adding a `go.mod`, a `Package.swift` or a Gradle build is still the thing not to do without an instruction.
+It is superseded **only for the four libraries that exist**, whose manifests are `rust/Cargo.toml`, the root `package.json`, `python/pyproject.toml` and `swift/Package.swift`: adding a `go.mod` or a Gradle build is still the thing not to do without an instruction.
 The package is zero-dependency at runtime - `node:crypto` supplies SHA-256 and the CSPRNG - and TypeScript plus `@types/node` are the only devDependencies.
 Ajv is still installed OUTSIDE the tree and named by `ROAX_AJV`, as the schema-validation section below describes; do not add it here.
 
@@ -60,6 +66,23 @@ Without it every class-10 assertion reports NOT RUN with its reason, and is neve
 **The filename inside that directory must be `<authority>.<profile>.json`**, for example `sg.gov.moh.recovery-healthcert.json`: the vector names only the path inside the reference checkout and the extraction utility writes wherever `--out` says, so the name is the runner's contract and a mismatch is reported as NOT RUN naming the exact path probed.
 **Class 10 now needs TWO records**, recovery and `sg.gov.moh.vaccination-healthcert.json`, since the vaccination bindings were ruled.
 Rust's corpus test reads the same directory but names each file by its EXPORT instead - `sampleDocument.json` and `sampleVaccineHealthCert.json` - through `ROAX_EXTRACTED_RECORDS`; the two conventions are separate and a directory can satisfy both.
+Swift follows the `<recordType>.json` convention, through `ROAX_REFERENCE_RECORDS` for `swift test` and `--references` for `swift run roax-conformance`, so one directory now satisfies three runners.
+
+### The Swift library
+
+`swift/` is a SwiftPM package: `Sources/ROAXCanon` is the library, `Sources/ROAXCanonCorpus` is the corpus runner, `Sources/roax-conformance` is its command-line front end and `Tests/ROAXCanonTests` is the suite.
+See [`swift/README.md`](swift/README.md) and [`swift/FINDINGS.md`](swift/FINDINGS.md).
+Build and gate it with `swift build --package-path swift`, `swift test --package-path swift` and `swift run --package-path swift roax-conformance`.
+It passes 488 of 488 vectors with a reference checkout and reports exactly the four class-10 vectors NOT RUN without one, exiting 2 rather than 0 so a bare run does not read as a pass.
+
+**The runner is a LIBRARY target rather than only an executable, and that is deliberate**: it makes `swift test` a real gate over the committed corpus instead of a second suite that could pass while the corpus failed.
+
+**`EmptyContainerPolicy` defaults to the SPECIFICATION reading and the runner opts out of it explicitly.**
+Specification section 3.3 requires the map to authorize EMPTY_ARRAY and EMPTY_OBJECT; the committed corpus does not implement that, so the runner selects `.assignedWithoutMapAuthorization`, prints which reading it used, and a test pins the cost at exactly the 2 class-5 vectors `python/FINDINGS.md` item 1 already measured.
+Do not flip the default to make something green.
+
+**SHA-256 has two implementations in that package on purpose**: CryptoKit where it exists, and `ReferenceSHA256` otherwise, with a test asserting they agree across every block boundary.
+That pair is an asset rather than drift only because the test exists, so do not delete it when touching either.
 
 ## This repository is PUBLIC
 
@@ -297,6 +320,25 @@ These are the things a future agent is most likely to get wrong.
   Those 16 are four reserved paths across four profiles because the committed corpus predates `roax.typeMap.id`, while class 14 now defines five reserved paths; closing that difference is corpus-rebuild work and not a reason to trim the table.
   `profile-unknown` stays ahead of both: it is the verifier's own allow-list, not a policy choice.
   See `corpus/README.md`.
+
+- **Swift's `String` comparison is CANONICAL EQUIVALENCE, so the idiomatic duplicate-key check silently rules an open ambiguity.**
+  `"é" == "e\u{0301}"` is `true` in Swift and `Hashable` agrees, so a `Set<String>` implementing specification section 3.2's duplicate-key rejection refuses a record whose two member names are distinct raw keys agreeing only under NFC.
+  That is `corpus/README.md` ambiguity 6, which is unruled and which the Rust implementation ACCEPTS, so the language feature decides it in the opposite direction with nothing in the diff to review.
+  `swift/Sources/ROAXCanon/JSONValue.swift` therefore keys its duplicate set on `Array(key.utf8)`, and the same feature is deliberately kept for `PathSegment`, where canonical equivalence coincides exactly with encoded-path equality because `encodePath` commits `NFC(key)`.
+  Both readings are pinned by tests; an edit that harmonizes them breaks one.
+  Swift appears to be the only named target language that sets this trap - Rust and Go compare bytes, JavaScript and Kotlin/JVM UTF-16 code units, Python code points - which is why three libraries preceded it without finding it.
+  Full measurement in `swift/FINDINGS.md` finding 7.
+
+- **No Apple API reports the Unicode version behind `precomposedStringWithCanonicalMapping`, so the section 6.1 pin is a declaration there.**
+  `dlsym` for `u_getUnicodeVersion_<major>` across ICU 55 to 90 in `libicucore.dylib` finds nothing, and the Swift standard library's own tables answer for characters assigned in Unicode 16.0, so they are demonstrably not the pinned 15.1.
+  This is the same position `corpus/README.md` records for reference implementation B under Node's 16.0 tables and the limit class 16 states about itself; it is not a new risk, and the Swift library agrees on all 27 class-4, 20 class-16 and both class-19 vectors anyway.
+  Do not add a "check the Unicode version" call on Apple platforms - there is nothing to call.
+
+- **Three Foundation APIs are forbidden inside the Swift library and appear only in tests that assert what they do wrong.**
+  `JSONSerialization` mangles `0.010` to `0.01` and `2.0` to `2` while PRESERVING `1234567890123456789.1`, which is the inconsistency specification section 6.4 warns about, and it also cannot raise `duplicate-key` at all.
+  `Decimal` carries 38 significant digits, so class 1's 40-digit-by-40-digit vector is unrepresentable and a 50-digit integer is silently corrupted rather than rejected.
+  `Data(base64Encoded:)` rejects the unpadded, URL-safe and line-wrapped spellings but ACCEPTS `aGl=`, whose final quantum carries non-zero unused bits, which specification section 6.3 requires rejecting by name and which the corpus carries as one vector.
+  Getting three of four right is what makes the fourth easy to miss.
 
 ## The conformance corpus
 

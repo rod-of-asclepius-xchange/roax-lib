@@ -5,9 +5,16 @@ Open protocol standards and multi-language libraries for **human healthcare reco
 The goal is a language-neutral way to canonically serialize, merklize, anchor and selectively disclose real health records - FHIR, and Singapore MOH's PDT, recovery and vaccination healthcerts - integrating with ROAX.
 
 Status: **implementation phase.**
-The specifications and schemas were drafted and reviewed before any library existed, deliberately, so that the design could be settled before five implementations existed to re-litigate it.
-Three of those five now exist: the independent Rust library under [`rust/`](rust/), the independent TypeScript library under [`src/`](src/) and the independent Python library under [`python/`](python/).
-The Go, Swift and Kotlin libraries have not been added.
+The specifications and schemas were drafted and reviewed before any library existed, deliberately, so that the design could be settled before the implementations existed to re-litigate it.
+
+**Four independent libraries exist today**: Rust under [`rust/`](rust/), TypeScript under [`src/`](src/), Python under [`python/`](python/) and Swift under [`swift/`](swift/).
+**Two named target languages have not been added**, Go and Kotlin, and neither should be without an explicit instruction.
+
+**The arithmetic in that pair of sentences does not reach the ruled number, and saying so is the accurate statement rather than a rounding of it.**
+Decision D was ruled Da on 2026-07-29 to *five* independent, corpus-enforced libraries, and the five the specification names are the five rows of its section 6.4 parser table: Rust, Go, TypeScript, Swift and Kotlin.
+Python is a fully independent, corpus-passing library that is not one of those five, so four exist and two are outstanding, which totals six languages rather than five.
+An earlier version of this section resolved the same mismatch by writing "three of those five" beside a list of three missing libraries, which added to six a different way.
+Whether Da's "five" is a count or that exact list belongs to the project owner alongside decisions A and C; nothing in this repository decides it, and no library's status depends on the answer.
 
 ## Start here
 
@@ -23,6 +30,7 @@ The Go, Swift and Kotlin libraries have not been added.
 | [`schemas/`](schemas/) | JSON Schemas for the envelope, the type map and the conformance corpus. |
 | [`rust/`](rust/) | The independent Rust implementation, its protocol boundaries and validation commands. |
 | [`python/`](python/) | The independent Python implementation, standard library only. [`python/FINDINGS.md`](python/FINDINGS.md) records what that build found. |
+| [`swift/`](swift/) | The independent Swift implementation, a SwiftPM package for macOS and iOS. [`swift/FINDINGS.md`](swift/FINDINGS.md) records what that build found, including a `String` comparison rule that silently answers an open specification ambiguity. |
 
 ## Why not OpenAttestation
 
@@ -80,6 +88,7 @@ corpus/             the conformance corpus, its fixtures and its two reference i
 rust/               independent Rust implementation of ROAX-CANON/1
 src/                independent TypeScript implementation of ROAX-CANON/1
 python/             independent Python implementation of ROAX-CANON/1
+swift/              independent Swift implementation of ROAX-CANON/1
 ```
 
 Reference material used during design - including third-party schemata - is kept **outside** this repository by design and is never committed here.
