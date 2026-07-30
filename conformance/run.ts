@@ -28,7 +28,7 @@ import { merkleTreeHead, inclusionProof, verifyInclusion } from '../src/tree.js'
 import { readJson, type JsonKind } from '../src/json.js';
 import { assertRecordPathAllowed, type RecordIdentity } from '../src/reserved.js';
 import { LegacyPatternTypeMap } from '../src/typemap.js';
-import type { EmptyContainerPolicy } from '../src/flatten.js';
+import { flattenRecord, type EmptyContainerPolicy } from '../src/flatten.js';
 import {
   commitRecord,
   drawSalt,
@@ -166,12 +166,30 @@ function runReject(corpus: Corpus, report: Report): void {
     const v = raw as {
       name: string;
       class: number;
+      recordType?: string;
       tag?: number;
       input?: unknown;
       segments?: unknown;
       reason: string;
     };
     expectReject(report, v.class, v.name, v.reason, () => {
+      // A `recordType` makes this a WHOLE-RECORD rejection: read the record and flatten it
+      // through that profile's COMMITTED map. The map has to be the committed one rather than a
+      // permissive stand-in, because several of these vectors assert that a path has NO binding
+      // for an observed kind, which a resolve-everything map makes unfalsifiable.
+      //
+      // `map-authorized` is forced here rather than taking the run's policy. Every one of these
+      // vectors asserts a rejection at a SCALAR or a base64 carrier, so the empty-container
+      // reading cannot change any of their outcomes, and pinning it keeps a policy sweep from
+      // silently turning a rejection into a pass.
+      if (v.recordType !== undefined) {
+        const record = readJson((v.input as { $jsonText: string }).$jsonText);
+        assertRecordPathAllowed([]);
+        return flattenRecord(record, {
+          resolver: resolverFor(v.recordType),
+          emptyContainerPolicy: 'map-authorized',
+        });
+      }
       // `$jsonText` goes to the JSON reader, which is where a parser-boundary rejection lives.
       if (isEscapeObject(v.input, '$jsonText')) {
         return readJson((v.input as { $jsonText: string }).$jsonText);

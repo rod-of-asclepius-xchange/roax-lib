@@ -106,11 +106,39 @@
       "properties": {
         "name": { "$ref": "#/$defs/name" },
         "class": { "$ref": "#/$defs/classRef" },
+        "recordType": {
+          "description": "OPTIONAL, and its presence changes how a runner must consume the vector. When it is absent the vector is fed to the value encoder or the path encoder, in the carrier form its `tag` or `segments` names. When it is PRESENT the `input` is a WHOLE RECORD carried as {\"$jsonText\": ...}, and the runner MUST flatten it through the committed type map for this `recordType` and expect `reason`. That second shape exists because a tag-bearing reject vector reaches the value encoder already in the CARRIER form, so it can never exercise a rejection that happens where a RECORD value is converted INTO that carrier - and that is exactly where the ruled BYTES input-admissibility rejections and the ruled FHIR primitive-array null-placeholder rejection live (docs/type-maps.md section 1.3). The map MUST be the committed one and never a resolve-everything stand-in: several of these vectors assert that a path has NO binding for an observed kind, and a permissive map makes exactly those unfalsifiable. No record identity is carried, because flattening needs none: what such a vector asserts is a rejection at the record boundary and not a tree.",
+          "type": "string",
+          "minLength": 1
+        },
         "tag": { "$ref": "#/$defs/tagRef" },
         "input": {},
         "segments": { "$ref": "#/$defs/segments" },
         "reason": { "type": "string", "minLength": 1 }
-      }
+      },
+      "allOf": [
+        {
+          "description": "A recordType binds the input shape. Stated structurally rather than in prose, because a runner dispatches on it: the record travels as $jsonText, and neither `tag` nor `segments` may appear, since neither the value encoder nor the path encoder is what consumes the vector.",
+          "if": {
+            "type": "object",
+            "required": ["recordType"],
+            "properties": { "recordType": true }
+          },
+          "then": {
+            "type": "object",
+            "required": ["input"],
+            "properties": {
+              "input": {
+                "type": "object",
+                "required": ["$jsonText"],
+                "properties": { "$jsonText": true }
+              },
+              "tag": false,
+              "segments": false
+            }
+          }
+        }
+      ]
     },
 
     "leafVector": {

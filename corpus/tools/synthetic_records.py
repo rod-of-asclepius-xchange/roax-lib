@@ -110,6 +110,37 @@ SYNTHETIC_TYPE_MAP = {
         # nothing before.
         {"pattern": "Kelvin", "jsonKind": "string", "tag": ref.TAG_STRING, "source": AUTHORED},
 
+        # The three RULED FHIR bindings of `docs/type-maps.md` section 1.3, exercised here on the
+        # SYNTHETIC profile. These rows assert the ruled TAG SEMANTICS and they are NOT the FHIR
+        # profile binding: the published FHIR artifacts still carry their pre-ruling `unresolved`
+        # rows, because regeneration is blocked on the 34 merged object states of
+        # `docs/type-maps.md` section 6 and hand-editing a generated artifact would replace a
+        # blocked regeneration with an unreproducible one. corpus/README.md says the same.
+        #
+        # base64Binary -> BYTES, over the DECODED OCTETS. The canonical RFC 4648 section 4
+        # spelling is an input-admissibility condition rather than the committed value, so a
+        # non-canonical spelling of the same bytes is refused before it can be committed
+        # (specification section 6.3).
+        {"pattern": "blob.bytes", "jsonKind": "string", "tag": ref.TAG_BYTES, "source": AUTHORED},
+        # And the same base64 TEXT at a STRING-bound path, which is the OTHER half of the ruling:
+        # a profile that means the transport spelling gets the spelling, so the two paths carry
+        # identical record text and commit different bytes. Without this pair, "BYTES commits the
+        # decoded octets" is a claim no vector separates from "BYTES commits the text".
+        {"pattern": "blob.text", "jsonKind": "string", "tag": ref.TAG_STRING, "source": AUTHORED},
+        # Narrative.div -> STRING over the ESCAPED XHTML TEXT, with no parsing and no
+        # reserialization. STRING selects `utf8(NFC(s))` and nothing else, so the markup travels
+        # as characters (specification section 6.1).
+        {"pattern": "narrative.div", "jsonKind": "string", "tag": ref.TAG_STRING,
+         "source": AUTHORED},
+        # FHIR primitive-array null placeholders -> RULED: publish NO NULL binding, and REJECT a
+        # record carrying one until a versioned schema and type-map revision admits the FHIR
+        # representation. The ruling is expressed by an ABSENCE, so the entry below binds `string`
+        # and deliberately declares nothing for `null`, and the reject vector over this path is
+        # what makes that absence checkable. Adding a `null` row here would rule the question the
+        # other way from inside a data file.
+        {"pattern": "name[*].given[*]", "jsonKind": "string", "tag": ref.TAG_STRING,
+         "source": AUTHORED},
+
         # Scalars for the type-tag and numeric classes inside a whole record.
         {"pattern": "counts.integer", "jsonKind": "number", "tag": ref.TAG_INTEGER,
          "source": AUTHORED},
@@ -188,6 +219,26 @@ RECORD_FIXTURES = {
     "guard-nested-roax-dotted.json": '{\n  "a": { "roax.foo": "ordinary" },\n  "marker": "guard"\n}\n',
     "guard-kelvin-key.json": '{\n  "\\u212Aelvin": "ordinary",\n  "marker": "guard"\n}\n',
 
+    # The three RULED FHIR bindings of `docs/type-maps.md` section 1.3, over the synthetic
+    # profile. `bytes` and `text` carry the SAME base64 characters at differently bound paths, so
+    # the pair separates "BYTES commits the decoded octets" from "BYTES commits the text": a
+    # runner that hashed the base64 characters at the BYTES path would give the two leaves equal
+    # value bytes. `div` carries escaped XHTML, which STRING commits as characters with no
+    # parsing and no reserialization.
+    "fhir-ruled-bindings.json": (
+        '{\n'
+        '  "blob": {\n'
+        '    "bytes": "SGVsbG8sIFJPQVgh",\n'
+        '    "text": "SGVsbG8sIFJPQVgh"\n'
+        '  },\n'
+        '  "narrative": {\n'
+        '    "div": '
+        '"<div xmlns=\\"http://www.w3.org/1999/xhtml\\">a &amp; b &lt;ok&gt;</div>"\n'
+        '  },\n'
+        '  "marker": "typed"\n'
+        '}\n'
+    ),
+
     # Class 15 reject row: a record key that IS a reserved path.
     "guard-reserved-collision.json": '{\n  "roax.recordId": "squatted",\n  "marker": "guard"\n}\n',
 
@@ -213,6 +264,7 @@ RECORD_VECTOR_PLAN = [
     ("record-guard-roax-x", 15, "guard-roax-x.json", None),
     ("record-guard-nested-roax-dotted", 15, "guard-nested-roax-dotted.json", None),
     ("record-guard-kelvin-key", 15, "guard-kelvin-key.json", None),
+    ("record-fhir-ruled-bindings", 7, "fhir-ruled-bindings.json", None),
     ("record-typed-scalars", 7, "typed-scalars.json", None),
     ("record-typed-scalars-with-key-id", 7, "typed-scalars.json",
      "did:web:corpus.roax.invalid#key-1"),

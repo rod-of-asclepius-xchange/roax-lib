@@ -828,6 +828,20 @@ fn canonical_rejection_reason(error: &Error, raw_json: Option<&str>) -> &'static
         Error::DuplicateKey { .. } => "duplicate-key",
         Error::UnpairedSurrogate => "unpaired-surrogate",
         Error::ReservedNamespaceCollision => "reserved-namespace",
+        // Two conditions this crate spells differently from the reference implementations, both
+        // surfaced by the record-shaped reject vectors of the 2026-07-30 type rulings, which are
+        // the first vectors to reach either one. `corpus/README.md` records all the spellings.
+        //
+        // The mappings are DECLARED here rather than absorbed into the comparison, so a
+        // rejection for a DIFFERENT reason still fails. This function already exists to
+        // reconcile this crate's names with the corpus's reference spellings.
+        //
+        // Fail-closed: this crate and the TypeScript library say "type-map-fail-closed", the
+        // references say "type-map-uncovered-path", the Python library says "type-unresolved".
+        Error::UnknownTypeBinding { .. } => "type-map-uncovered-path",
+        // Non-canonical base64: this crate says "invalid-base64" while the references, the
+        // TypeScript library and the Python library all say "base64-not-canonical".
+        Error::InvalidBase64 => "base64-not-canonical",
         _ => error.code(),
     }
 }
@@ -886,8 +900,39 @@ fn reject_path_input(value: &Value) -> Result<(), String> {
         .map_err(|error| canonical_rejection_reason(&error, None).to_owned())
 }
 
-fn run_reject_vector(vector: &Value) -> Result<(), String> {
+fn run_reject_vector(vector: &Value, maps: &HashMap<String, LegacyTypeMap>) -> Result<(), String> {
     let input = field(vector, "input");
+    // A `recordType` makes this a WHOLE-RECORD rejection: read the record and commit it through
+    // that profile's COMMITTED map. The map must be the committed one rather than a permissive
+    // stand-in, because several of these vectors assert that a path has NO binding for an
+    // observed kind, which a resolve-everything map makes unfalsifiable.
+    if let Some(record_type) = vector.get("recordType").and_then(Value::as_str) {
+        let raw = input
+            .get("$jsonText")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "a record-shaped reject vector carries $jsonText".to_owned())?;
+        let map = maps
+            .get(record_type)
+            .ok_or_else(|| format!("no committed type map for {record_type}"))?;
+        let record = JsonValue::from_str(raw)
+            .map_err(|error| canonical_rejection_reason(&error, Some(raw)).to_owned())?;
+        // The identity below is arbitrary and the vector carries none, because every one of
+        // these rejections happens at a RECORD leaf: no reserved leaf is involved, and the
+        // rejection is reached before a tree exists.
+        let context = v1_context(
+            record_type,
+            &map.schema_version,
+            "urn:uuid:00000000-0000-4000-8000-000000000000",
+            "did:web:corpus.roax.invalid",
+            None,
+        );
+        let ordered = ordered_v1_paths(&record, &context)
+            .map_err(|_| "type-map-uncovered-path".to_owned())?;
+        let salts = generate_salts(&ordered).map_err(|error| error.to_string())?;
+        return commit_full_copy_with_salts(&record, &context, &LegacyProfile::new(map), &salts)
+            .map(|_| ())
+            .map_err(|error| canonical_rejection_reason(&error, None).to_owned());
+    }
     if input.get("$segments").is_some() {
         return reject_path_input(input);
     }
@@ -1052,7 +1097,7 @@ fn committed_conformance_corpus() {
     assert_eq!(corpus.hash_alg, HashAlgorithm::Sha256.name());
     assert_eq!(
         vector_count(&corpus.vectors),
-        475,
+        488,
         "every committed vector array must be consumed"
     );
 
@@ -1106,7 +1151,7 @@ fn committed_conformance_corpus() {
 
     for vector in &corpus.vectors.reject {
         let (class, name) = vector_identity(vector);
-        let got = match run_reject_vector(vector) {
+        let got = match run_reject_vector(vector, &maps) {
             Ok(()) => "<accepted>".to_owned(),
             Err(reason) => reason,
         };

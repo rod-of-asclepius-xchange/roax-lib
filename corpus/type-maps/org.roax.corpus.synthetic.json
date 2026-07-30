@@ -94,6 +94,30 @@
       "source": "corpus fixture: authored declaration, not derived from any reference schema"
     },
     {
+      "pattern": "blob.bytes",
+      "jsonKind": "string",
+      "tag": 5,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "blob.text",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "narrative.div",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
+      "pattern": "name[*].given[*]",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "corpus fixture: authored declaration, not derived from any reference schema"
+    },
+    {
       "pattern": "counts.integer",
       "jsonKind": "number",
       "tag": 3,

@@ -14,6 +14,7 @@ Section references below are to `docs/spec/roax-canon-1.md`.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import re
 import unicodedata
@@ -74,6 +75,13 @@ DECIMAL_INPUT_GRAMMAR = re.compile(
 )
 DECIMAL_OUTPUT_GRAMMAR = re.compile(r"\A-?(0|[1-9][0-9]*)(\.[0-9]+)?\Z")
 HEX_BYTES = re.compile(r"\A([0-9a-f]{2})*\Z")
+# Section 6.3: RFC 4648 section 4, standard alphabet, required padding, no line wrapping. The
+# grammar admits at most one padded final quantum and nothing outside the alphabet, so the
+# URL-safe alphabet of RFC 4648 section 5, any line break and absent or excess padding are all
+# refused by the pattern alone. Non-zero unused pad bits are a separate check below, because no
+# regular expression can express them.
+BASE64_CANONICAL = re.compile(r"\A(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?\Z")
+BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
 
 class RoaxError(Exception):
@@ -139,6 +147,36 @@ def nfc(s: str) -> str:
     """Section 6.1. Rejection of unpaired surrogates happens BEFORE normalization."""
     reject_unpaired_surrogates(s)
     return unicodedata.normalize("NFC", s)
+
+
+def decode_canonical_base64(text: str) -> bytes:
+    """Section 6.3. Decode base64 in the ONE form `ROAX-CANON/1` pins, or reject.
+
+    RFC 4648 section 4: the standard alphabet, with padding, and no line wrapping. Four things
+    are refused, and the fourth is the one an implementation reaches for a library for and gets
+    wrong: the URL-safe alphabet of RFC 4648 section 5, absent or excess padding, any character
+    outside the alphabet including a line break, and a final quantum whose UNUSED BITS ARE
+    NON-ZERO. RFC 4648 section 3.5 names that last case, and it matters because two different
+    strings otherwise decode to the same bytes, so two implementations can disagree about
+    whether the record is admissible at all.
+
+    Python's `base64.b64decode(validate=True)` closes the alphabet and the padding length but
+    does NOT check the pad bits, so the check below is explicit rather than delegated.
+    """
+    if not isinstance(text, str):
+        raise RoaxError("base64-not-canonical", repr(text))
+    if BASE64_CANONICAL.match(text) is None:
+        raise RoaxError("base64-not-canonical", text)
+    padding = len(text) - len(text.rstrip("="))
+    if padding:
+        # Each character carries 6 bits. With one `=` the final quantum keeps 16 of its 18 bits,
+        # so the last alphabet character's low 2 bits are unused; with two `=` it keeps 8 of 12
+        # and the low 4 are unused. Every unused bit MUST be zero.
+        unused_bits = 2 if padding == 1 else 4
+        last = BASE64_ALPHABET.index(text[-padding - 1])
+        if last & ((1 << unused_bits) - 1):
+            raise RoaxError("base64-not-canonical", text)
+    return base64.b64decode(text, validate=True)
 
 
 # --------------------------------------------------------------------------------------------
@@ -613,7 +651,19 @@ def carrier(tag: int, node):
             raise RoaxError("tag-value-mismatch", f"{TAG_NAMES[tag]} at a JSON string")
         raise RoaxError("tag-value-mismatch", TAG_NAMES[tag])
     if tag == TAG_BYTES:
-        raise RoaxError("bytes-binding-unsupported", "v1 binds base64 fields as STRING")
+        # Section 6.3, and ruled 2026-07-30 for FHIR `base64Binary`: BYTES commits the DECODED
+        # OCTETS, and the canonical RFC 4648 section 4 spelling is an INPUT-ADMISSIBILITY
+        # condition rather than the committed value. So the decode happens here, once, at the
+        # record boundary, and the carrier `encode_value` receives is already the octets in hex.
+        #
+        # A record embedding base64 that a profile binds STRING is a different thing and is
+        # unchanged: that field commits its base64 TEXT under NFC and no base64 rule enters its
+        # digest.
+        if isinstance(node, NumberLiteral):
+            raise RoaxError("tag-value-mismatch", "BYTES at a JSON number")
+        if not isinstance(node, str):
+            raise RoaxError("tag-value-mismatch", "BYTES")
+        return decode_canonical_base64(node).hex()
     raise RoaxError("tag-unknown", repr(tag))
 
 
