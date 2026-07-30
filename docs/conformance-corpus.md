@@ -364,11 +364,20 @@ Each vector MUST name the exact content ID, semver, `recordType`, opaque `schema
 This is the highest-risk surface in the design (specification section 4) and also the easiest to
 diff, which is the one piece of good news about it.
 
-At minimum the fail-closed rows MUST cover vaccination `dose` and `expiryDateTime`, PDT
-`$template.name`, FHIR `Narrative.div`, FHIR `base64Binary`, and an unknown empty array and empty
-object, because `docs/type-maps.md` sections 1 and 3 record those as the reachable places where a
-proposal or mechanically known empty-container tag could otherwise be mistaken for an operative
-binding.
+At minimum the fail-closed rows MUST cover PDT `$template.name`, FHIR `Narrative.div`, FHIR
+`base64Binary`, and an unknown empty array and empty object, because `docs/type-maps.md` sections 1
+and 3 record those as the reachable places where a proposal or mechanically known empty-container tag
+could otherwise be mistaken for an operative binding.
+The two FHIR entries stay on that list after being ruled on 2026-07-30, because neither the published
+artifacts nor the corpus-side profile maps carry those bindings; their tag semantics are pinned over
+the synthetic profile instead (`docs/type-maps.md` section 1.6).
+
+**Vaccination `dose` and `expiryDateTime` were on that list until the same date, and the ruling
+inverted the requirement for them.**
+The rows now assert the ruled tags, INTEGER and STRING, because the corpus-side vaccination map binds
+both (`docs/type-maps.md` section 1.1).
+What stays fail-closed there is `dose` at a kind the ruling does not bind, which is what keeps one
+ruled `(pattern, kind)` binding from reading as permission for every kind.
 
 **One row was added when decision D9 was ruled:** a type map binding any path to **tag 8 `BLOB_REF`**
 MUST be **rejected**, because the content-addressed binding is defined and selected by no version-1

@@ -28,12 +28,14 @@ Specification section 3.3 says, of the flattener's empty-container outputs:
 `corpus/fixtures/records/structure-empty-array.json` and `structure-empty-object.json` carry `a.b` as `[]` and `{}`.
 So under the section 3.3 rule those two records have no type tag at `a.b` and MUST fail closed, which means they have no root at all - and the class-5 vectors `record-structure-empty-array` and `record-structure-empty-object` assert one for each.
 
-**Measured, from this implementation:**
+**Measured, from this implementation.**
+These are the two reference-available rows of [`README.md`](README.md)'s table, which owns those
+figures; both moved when the corpus grew on 2026-07-30 and the delta between them did not.
 
 | Empty-container rule | Corpus result |
 |---|---|
-| structural: tag 6 or 7 assigned without a map lookup | 738 passing assertions, 0 failures |
-| section 3.3: the map must authorize the path and kind | 734 passing assertions, **2 failures**, both class 5 |
+| structural: tag 6 or 7 assigned without a map lookup | 759 passing assertions, 0 failures |
+| section 3.3: the map must authorize the path and kind | 755 passing assertions, **2 failures**, both class 5 |
 
 The two failures are exactly `record-structure-empty-array` and `record-structure-empty-object`, each rejected with `type-unresolved`.
 Nothing else moves.

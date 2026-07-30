@@ -70,14 +70,14 @@ So under the specification's rule both records **fail closed and have no root at
 `record-structure-empty-array` and `record-structure-empty-object` assert one.
 
 **Measured, by running this implementation both ways on a bare checkout**, where class 10 reports
-2 skipped because its records live outside this repository.
+4 skipped because its records live outside this repository.
 The `mechanical` row is the `npm test` default that section 10 below reports; neither row was run
 against a reference checkout, so no `map-authorized` count with those records is claimed here.
 
 | Empty-container policy | Corpus result |
 |---|---|
-| `mechanical` - tag 6 or 7 from the observed kind, without consulting the map | 680 pass, 0 fail, 2 skipped |
-| `map-authorized` - specification section 3.3 | 676 pass, **2 fail**, both class 5, 2 skipped |
+| `mechanical` - tag 6 or 7 from the observed kind, without consulting the map | 697 pass, 0 fail, 4 skipped |
+| `map-authorized` - specification section 3.3 | 693 pass, **2 fail**, both class 5, 4 skipped |
 
 The two rows differ by four assertions where only two vectors flip, which is not a third failure
 hiding somewhere: a record vector asserts `leafCount` and `root` separately, and a throw out of
@@ -210,7 +210,8 @@ currently observe.
 **This implementation declares the mismatch rather than claiming the pin.**
 `describeUnicodeEnvironment` in `src/bytes.ts` reports the pinned version and the runtime's, and
 the conformance runner prints the declaration on every run.
-All 20 class-16 vectors and both class-19 assertions pass under 16.0 tables, which agrees with
+All 20 class-16 vectors and all four class-19 assertions, the value site and the key site built under
+ruled D14a, pass under 16.0 tables, which agrees with
 `corpus/README.md`'s measurement that its Node implementation also agreed on every vector while
 running 16.0.
 Class 16 is explicit that it detects a version mismatch by declaration rather than by
@@ -443,12 +444,12 @@ Nothing here is carried forward from an earlier run.
 
 | Run | Result |
 |---|---|
-| `npm test`, the default | **680 assertions, 0 failures, 2 NOT RUN** - class 10, whose records live outside this repository |
-| `ROAX_EMPTY_CONTAINERS=map-authorized`, the section 3.3 reading | **676 passed, 2 failed, 2 NOT RUN**, exit 1 |
+| `npm test`, the default | **697 assertions, 0 failures, 4 NOT RUN** - class 10, whose records live outside this repository |
+| `ROAX_EMPTY_CONTAINERS=map-authorized`, the section 3.3 reading | **693 passed, 2 failed, 4 NOT RUN**, exit 1 |
 | `test/unit.ts` | **36 tests, 0 failures** |
 
 The runner's total line spells the third column `skipped` while the per-vector note for each of
-those 2 assertions reads `NOT RUN` and names its reason; they are the same 2 assertions, and
+those 4 entries reads `NOT RUN` and names its reason; they are the same 4 class-10 vectors, and
 neither spelling adds them to the passed count.
 
 **The corpus runs were made under `emptyContainerPolicy: 'mechanical'`, which is the corpus's rule
@@ -461,33 +462,42 @@ own, evidence of conformance to section 3.3 - the two are mutually exclusive as 
 The runner DECLARES the active policy on every run, beside the Unicode declaration and for the same
 reason: a total line read on its own must not stand for a conformance claim the run did not make.
 
-### Class 10 is NOT RUN here, and 684/0/0 is not claimed
+### Class 10 is NOT RUN here, and no complete 19-class total is claimed
 
-**Class 10 did not execute in any run recorded above, and its 2 assertions are counted as NOT RUN
-rather than as passed.**
+**Class 10 did not execute in any run recorded above, and its 8 assertions, across four vectors, are
+counted as NOT RUN rather than as passed.**
 An earlier revision of this section carried a second corpus row - `ROAX_REFERENCE_RECORDS=<dir> npm
-run conformance` giving 684 assertions, 0 failures, 0 skipped across all 19 classes - and that row
-has been removed rather than restated, because it was not reproducible on this machine and a
-measurement that cannot be reproduced must not sit in a table of measurements as though it were
-current.
+run conformance` giving 684 assertions, 0 failures, 0 skipped across all 19 classes, measured when
+the class carried two vectors - and that row has been removed rather than restated, because it was
+not reproducible on this machine and a measurement that cannot be reproduced must not sit in a table
+of measurements as though it were current.
+That is why no with-records total is restated for the four vectors either.
 
-The class needs a record this repository deliberately does not vendor.
-Its two vectors, the real Singapore MOH recovery-healthcert records at 69 and 70 leaves, resolve
-against `references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/sample-data.ts#sampleDocument`,
-which lives in a third-party checkout that `.gitignore` excludes and that no part of this
-repository may copy in.
+The class needs records this repository deliberately does not vendor.
+Its four vectors are two real Singapore MOH samples with and without an issuer key identifier: the
+recovery-healthcert records at 69 and 70 leaves, resolving against
+`references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/sample-data.ts#sampleDocument`, and the
+vaccination-healthcert records at 91 and 92 leaves, resolving against
+`references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/sample-data.ts#sampleVaccineHealthCert`,
+which the 2026-07-30 `dose` and `expiryDateTime` rulings made committable.
+Both live in a third-party checkout that `.gitignore` excludes and that no part of this repository
+may copy in.
 To run it:
 
-1. Extract the record with `corpus/tools/extract_reference_record.py --out
-   <dir>/sg.gov.moh.recovery-healthcert.json`, pointed at a reference checkout.
+1. Extract BOTH records with `corpus/tools/extract_reference_record.py --out
+   <dir>/sg.gov.moh.recovery-healthcert.json` and `--out
+   <dir>/sg.gov.moh.vaccination-healthcert.json`, pointed at a reference checkout.
    That utility is a data-extraction tool and NOT one of the two reference implementations, so
    reading it while writing a library does not compromise the independence rule.
+   Extracting one leaves the other profile's two vectors NOT RUN, because the name is derived per
+   vector.
 2. Set **`ROAX_REFERENCE_RECORDS=<dir>`**, which is the one flag that enables the class.
 
 **The filename inside that directory is `<authority>.<profile>.json` and is this runner's contract
 rather than the corpus's**, since `recordVector` names only the path inside the reference checkout
 and the extraction utility writes wherever `--out` says.
-A file under any other name leaves the class NOT RUN.
+A file under any other name leaves that profile's two vectors NOT RUN, and the derived name is
+per-vector, so one missing file does not hide the other profile's pair.
 
 What IS verified here is the gate rather than the class.
 The two ways it cannot run are reported apart, because they have different remedies: the variable
@@ -501,4 +511,4 @@ the corpus and the `0.010` unit test failing first.
 
 The roots this implementation produces are byte-identical to the committed ones on every vector
 that carries a root **and that ran**.
-That excludes the two class-10 MOH vectors, whose roots were not compared in any run recorded here.
+That excludes the four class-10 MOH vectors, whose roots were not compared in any run recorded here.
