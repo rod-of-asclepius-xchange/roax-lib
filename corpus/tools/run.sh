@@ -16,7 +16,8 @@
 # --references  a read-only checkout of the Open-Attestation schemata package. Without it,
 #               class 10 reports SKIPPED. It never reports green unrun.
 # --modules     a node_modules holding ajv@8 and ajv-formats. Without it, step 4 is skipped and
-#               says so. The repository has no package manifest by design.
+#               says so. Ajv lives outside this tree by design: the root package.json is the
+#               TypeScript library's, not a place for schema tooling.
 
 set -u
 

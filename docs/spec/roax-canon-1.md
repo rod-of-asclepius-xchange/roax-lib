@@ -2,7 +2,8 @@
 
 **Status:** draft for review.
 Not frozen.
-The independent Rust implementation exists under `rust/`; the other four ruled independent libraries have not been added.
+Two ruled independent implementations exist, in Rust under `rust/` and in TypeScript under `src/`; the other three have not been added.
+The TypeScript implementation was written from this document alone, and its disagreements with the conformance corpus are recorded in `docs/typescript-implementation-findings.md`.
 **Version string:** `ROAX-CANON/1`
 **Date:** 2026-07-28
 

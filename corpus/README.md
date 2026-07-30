@@ -36,7 +36,8 @@ Both arguments are optional and their absence is reported rather than hidden.
 - Without `--references`, class 10 reports `SKIPPED - NOT RUN` and contributes zero assertions. It
   never reports green unrun.
 - Without `--modules` (holding `ajv@8` and `ajv-formats`), the JSON Schema validation step is
-  skipped and says so. The repository has no npm package manifest, deliberately.
+  skipped and says so. Ajv is installed outside this tree deliberately: the root `package.json` is
+  the TypeScript library's and is not a place for schema tooling, as `AGENTS.md` records.
 
 `run.sh` does four things, and the third is the one that matters:
 

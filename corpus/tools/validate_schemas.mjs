@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Validate every artifact this corpus ships against the repository's JSON Schemas.
 //
-// The repository has no CI and no package manifest, and `AGENTS.md` records that the three
-// schemas were checked with Ajv 8 in STRICT mode plus ajv-formats. This does the same for the
-// artifacts, so "it conforms to the schema" is a measurement rather than an intention.
+// The repository has no CI, and its `package.json` is the TypeScript library's rather than a place
+// for schema tooling, so Ajv stays outside the tree. `AGENTS.md` records that the seven schemas
+// were checked with Ajv 8 in STRICT mode plus ajv-formats. This does the same for the artifacts,
+// so "it conforms to the schema" is a measurement rather than an intention.
 //
 //   npm install ajv@8 ajv-formats      # anywhere; pass its node_modules with --modules
 //   node validate_schemas.mjs [--modules DIR]
