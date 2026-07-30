@@ -370,7 +370,9 @@ the ambiguities found and what was actually measured. Read it before touching a 
 corpus/tools/run.sh --references /path/to/schemata --modules /path/to/node_modules
 ```
 
-Both flags are optional and their absence is reported, never hidden. Things to know:
+Both flags are optional and their absence is reported, never hidden: a missing dependency leaves the
+affected check NOT RUN and exits **2**, which is neither a pass nor a failure, so a bare run does
+not mean the gate failed. `corpus/README.md` owns that status table. Things to know:
 
 - **A vector is never hand-written.** `corpus/tools/corpus_plan.py` carries INPUTS only; every
   expected hash, root, audit path, resolved tag and accept/reject verdict is computed. A value
@@ -432,7 +434,7 @@ key is refused by the fail-closed rule while its composed twin commits and the t
 identically.
 The matchers in this tree already disagree: `docs/type-maps.md` section 3 step 2 requires the
 published DFA to normalize, and the display-pattern matchers of `corpus/tools/roax_ref.py`,
-`corpus/tools/roax_ref.mjs` and `python/src/roax_canon/typemap.py` compare raw.
+`corpus/tools/roax_ref.mjs`, `src/typemap.ts` and `python/src/roax_canon/typemap.py` compare raw.
 Adding an `nfc()` call to either side, or removing the one in the DFA's stated semantics, rules D14
 silently - so do not, and note that the synthetic map carries the Kelvin key under both spellings
 precisely so no committed vector depends on the answer.

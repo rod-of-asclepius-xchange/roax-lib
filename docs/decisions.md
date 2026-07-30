@@ -677,6 +677,8 @@ It is recorded here rather than settled in passing, because settling it changes 
 reference implementations and in the type-map tooling at once.
 It also reaches the Rust library, which takes neither side: `LookupKeyMode` has no default, and the construction and verification paths reject a key whose binding differs between the two readings rather than choosing one (`rust/README.md`).
 So a ruling retires that guard as well as changing the matchers.
+It reaches the TypeScript and Python libraries too, and each of those compares a display pattern against a segment key raw today, with no `nfc()` on either side and a note at the site saying that adding one would rule D14 silently (`src/typemap.ts:182-191`; `python/src/roax_canon/typemap.py:25-33` and `:195`).
+That is a statement of what those two do while the decision is open rather than a reading of it, and neither exposes a switch, so a ruling lands in both of them: as an edit under D14a and as specified behaviour under D14b.
 
 **Written into the spec:** nothing. Specification section 6.1 pins NFC for **hashing**, and section
 4.2 requires an uncovered path to fail closed. Neither says whether the type-map **lookup** that
@@ -699,7 +701,7 @@ invisible to whoever typed the value.
 in for a decision, and it is why no existing vector settles the question.
 `corpus/README.md` records the same gap in its specification-reading notes.
 
-**The two matchers in this repository already answer it differently, and that is the substance of the question rather than a detail of it.**
+**The matchers in this repository already answer it differently, and that is the substance of the question rather than a detail of it.**
 `docs/type-maps.md` section 3 step 2 requires a conforming resolver of the published DFA artifacts to NFC-normalize a KEY segment before taking its transition, so those artifacts are already described as reading D14a.
 The corpus reference implementations are display-pattern matchers over `corpus/type-maps/` rather than the DFA, and they compare raw, as above.
 Neither document is wrong about the thing it owns, and neither is the specification, which says nothing.

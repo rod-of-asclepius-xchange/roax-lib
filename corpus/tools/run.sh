@@ -82,7 +82,7 @@ echo
 echo "=== 2. implementation B (Node) recomputes every runnable vector"
 # This wrapper owns the extraction path. Clear a direct-runner environment override so a stale
 # directory cannot make class 10 run after this invocation reported missing --references.
-ROAX_EXTRACTED_RECORDS= node "$HERE/check_corpus.mjs" \
+ROAX_EXTRACTED_RECORDS='' node "$HERE/check_corpus.mjs" \
   ${record_args[@]+"${record_args[@]}"} --emit "$WORK/corpus-b.json"
 step2_status=$?
 record_status "$step2_status"
