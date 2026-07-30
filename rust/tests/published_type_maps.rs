@@ -708,7 +708,13 @@ fn the_lookup_matches_a_key_under_nfc_on_both_sides() {
     let id = content_id(&bytes);
     let composed = structured_path(&[K("\u{e9}")]);
     let decomposed = structured_path(&[K("e\u{301}")]);
-    assert_ne!(composed.encode(), decomposed.encode().map(|_| Vec::new()));
+    // The crux of the ruling, asserted rather than described: the two paths ENCODE
+    // IDENTICALLY, because `Path::encode` normalizes every KEY segment under
+    // ROAX-CANON/1 section 5.1. So the composed and decomposed records commit the same
+    // bytes, and a raw lookup would have decided admissibility on a spelling neither
+    // root records.
+    assert_eq!(composed.encode(), decomposed.encode());
+    assert_ne!(composed, decomposed);
 
     let map = DfaTypeMap::from_exact_bytes(&bytes, &id).expect("valid synthetic type map");
     assert_eq!(

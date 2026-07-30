@@ -216,15 +216,15 @@ Counts are vectors in the file, measured by `build_corpus.py --report`.
 |---:|---:|---|
 | 1 FHIR decimals | 44 | complete |
 | 2 integers beyond 2^53 | 12 | complete |
-| 3 rejection vectors | 24 | complete |
+| 3 rejection vectors | 29 | complete. Includes the five record-shaped rows the ruled FHIR `base64Binary` BYTES binding needs: four non-canonical base64 spellings and a JSON number at the BYTES-bound path - see below.
 | 4 Unicode | 27 | complete |
-| 5 structure | 9 | complete |
+| 5 structure | 10 | complete. The tenth is `reject-fhir-primitive-array-null-placeholder`, which makes the ruled ABSENCE of a NULL binding checkable - see below.
 | 6 path | 40 | complete |
-| 7 type tags | 14 | complete |
+| 7 type tags | 21 | complete. Grew with the ruled `base64Binary` BYTES semantics: a record committing a BYTES leaf and a STRING leaf from the same base64 characters, plus the isolated encoding pair that separates the two readings - see below.
 | 8 tree shape | 173 | complete |
 | 9 negative proof vectors | 11 | **stale - the forged-size, full-disclosure row is absent** |
 | 10 the three real MOH records | 4 | **partial - 2 of 3 records.** The vaccination sample commits since its two bindings were ruled; PDT stays uncommittable - see below |
-| 11 the schema binding | 23 | complete. Includes the three unknown-algorithm and unknown-profile fail-closed vectors: specification section 12.2 calls that "the same rule section 4.2 applies to an unknown path, applied one level up", and section 4.2 is what this class tests. |
+| 11 the schema binding | 24 | complete. Includes the three unknown-algorithm and unknown-profile fail-closed vectors: specification section 12.2 calls that "the same rule section 4.2 applies to an unknown path, applied one level up", and section 4.2 is what this class tests. |
 | 12 cross-record unlinkability | 3 | complete. Behavioural rather than pinned: the runner draws and asserts. Detects a deterministic or reused salt; it CANNOT detect a weak CSPRNG, and no fixed vector file can. |
 | 13 reference-schema hazards | 2 | **partial - the `$id` half is inexpressible** |
 | 14 minimum-disclosure floor | 34 | complete. The four outer-identity vectors this row used to count are class 18 now - see below. |

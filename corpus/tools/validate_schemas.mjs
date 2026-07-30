@@ -210,6 +210,34 @@ probe("corpus carrying the deleted salt vector group", false,
     }];
   });
 
+// rejectVector's recordType conditional, added with the 2026-07-30 type rulings. A `recordType`
+// makes the vector a WHOLE-RECORD rejection flattened through that profile's committed map, so the
+// conditional binds the input shape: the record travels as `$jsonText`, and neither `tag` nor
+// `segments` may appear, because neither the value encoder nor the path encoder consumes it.
+//
+// Both directions, because the else side is the half a compile check cannot see: without it a
+// reader cannot tell this conditional from one that forbids `tag` on every reject vector.
+const recordReject = (doc) =>
+  findVector(doc, "reject", (v) => v.recordType !== undefined);
+const bareReject = (doc) =>
+  findVector(doc, "reject", (v) => v.recordType === undefined && v.tag !== undefined);
+
+probe("record-shaped reject vector as committed", true, () => {});
+probe("record-shaped reject vector whose input is not $jsonText", false,
+  (doc) => { recordReject(doc).input = "not-a-record"; });
+probe("record-shaped reject vector also carrying a tag", false,
+  (doc) => { recordReject(doc).tag = 2; });
+probe("record-shaped reject vector also carrying segments", false,
+  (doc) => { recordReject(doc).segments = [{ key: "a" }]; });
+probe("reject vector with NO recordType keeping its tag", true,
+  (doc) => { bareReject(doc); });
+probe("reject vector with NO recordType keeping segments", true,
+  (doc) => {
+    const v = bareReject(doc);
+    delete v.tag;
+    v.segments = [{ key: "a" }];
+  });
+
 // Every value carrier makes a JSON number unrepresentable at any depth, because a JSON number in
 // a vector file would be destroyed by the very parser under test (spec section 6.4).
 probe("encodeValue vector carrying a bare JSON number", false,
