@@ -214,6 +214,4 @@ def downgrade(full: Mapping[str, Any], reveal: Sequence[Sequence[Segment]]) -> N
     Rebuild with :func:`disclosed_copy` from the :class:`~roax_canon.record.BuiltRecord`
     instead, which cannot emit a withheld salt because it never sees a request for one.
     """
-    raise NotImplementedError(
-        "rebuild with disclosed_copy() rather than stripping a full copy"
-    )
+    raise NotImplementedError("rebuild with disclosed_copy() rather than stripping a full copy")

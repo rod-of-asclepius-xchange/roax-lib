@@ -124,8 +124,7 @@ def salts_by_path(path: str) -> dict[bytes, bytes]:
     doc = load_file(path)
     entries = doc["salts"] if isinstance(doc, dict) else doc
     return {
-        encode_path(segments_from_json(e["segments"])): bytes.fromhex(e["salt"])
-        for e in entries
+        encode_path(segments_from_json(e["segments"])): bytes.fromhex(e["salt"]) for e in entries
     }
 
 
@@ -267,7 +266,9 @@ def run_type_map(vectors, maps, r: Results) -> None:
             if x.get("expectFailClosed"):
                 r.check(cls, name, exc.code, ErrorCode.TYPE_UNRESOLVED, "reason: ")
             else:
-                r.bad(cls, name, f"failed closed with {exc.code}; expected tag {x.get('expectTag')}")
+                r.bad(
+                    cls, name, f"failed closed with {exc.code}; expected tag {x.get('expectTag')}"
+                )
             continue
         if x.get("expectFailClosed"):
             r.bad(cls, name, f"resolved to tag {tag}; expected fail-closed")

@@ -1,6 +1,6 @@
 """Reader, flattener, tree, record and envelope tests.
 
-    python3 -m unittest discover -s python/tests -t python
+python3 -m unittest discover -s python/tests -t python
 """
 
 from __future__ import annotations
@@ -232,8 +232,13 @@ class TestReservedLeaves(unittest.TestCase):
         # names and the SAME path once NFC is applied (specification section 6.1), so the
         # sort in section 9 would have a tie it has no rule for. Rejected instead.
         accents = DisplayPatternTypeMap(
-            {**SYNTHETIC_MAP, "entries": [{"pattern": "\u00e9", "jsonKind": "string", "tag": 2},
-                                          {"pattern": "e\u0301", "jsonKind": "string", "tag": 2}]}
+            {
+                **SYNTHETIC_MAP,
+                "entries": [
+                    {"pattern": "\u00e9", "jsonKind": "string", "tag": 2},
+                    {"pattern": "e\u0301", "jsonKind": "string", "tag": 2},
+                ],
+            }
         )
         record = loads('{"\\u00e9": "a", "e\\u0301": "b"}')
         self.assertEqual(len(record), 2, "the two keys are distinct JSON member names")
@@ -244,7 +249,9 @@ class TestReservedLeaves(unittest.TestCase):
 
 class TestTree(unittest.TestCase):
     def test_split_rule(self):
-        self.assertEqual([largest_power_of_two_below(n) for n in range(2, 10)], [1, 2, 2, 4, 4, 4, 4, 8])
+        self.assertEqual(
+            [largest_power_of_two_below(n) for n in range(2, 10)], [1, 2, 2, 4, 4, 4, 4, 8]
+        )
 
     def test_single_leaf_is_not_rehashed(self):
         leaf = bytes(range(32))
@@ -342,9 +349,7 @@ class TestRecordAndEnvelope(unittest.TestCase):
         reveal = list(floor.floor()) + [(Key("marker"),)]
         envelope = disclosed_copy(reveal, IDENTITY, self.built, profile=floor)
         emitted = {entry["salt"] for entry in envelope["disclosure"]["leaves"]}
-        revealed = {
-            self.built.salts[self.built.index_of(path)].hex() for path in reveal
-        }
+        revealed = {self.built.salts[self.built.index_of(path)].hex() for path in reveal}
         self.assertEqual(emitted, revealed)
         withheld = set(s.hex() for s in self.built.salts) - revealed
         self.assertTrue(withheld)
@@ -356,8 +361,11 @@ class TestRecordAndEnvelope(unittest.TestCase):
         # (specification section 6.3). So the encoder-without-a-decoder asymmetry this
         # closes is invisible to the corpus and is pinned here instead.
         blob_map = DisplayPatternTypeMap(
-            {**SYNTHETIC_MAP, "entries": SYNTHETIC_MAP["entries"]
-             + [{"pattern": "blob", "jsonKind": "string", "tag": 5}]}
+            {
+                **SYNTHETIC_MAP,
+                "entries": SYNTHETIC_MAP["entries"]
+                + [{"pattern": "blob", "jsonKind": "string", "tag": 5}],
+            }
         )
         record = loads('{"marker": "m", "blob": "aGVsbG8="}')
         built = issue(record, IDENTITY, blob_map)
@@ -372,9 +380,7 @@ class TestRecordAndEnvelope(unittest.TestCase):
         self.assertTrue(verify_envelope(full, config).accepted)
 
         partial = disclosed_copy(list(profile.floor()), IDENTITY, built, profile=profile)
-        blob_entry = next(
-            e for e in partial["disclosure"]["leaves"] if e["displayPath"] == "blob"
-        )
+        blob_entry = next(e for e in partial["disclosure"]["leaves"] if e["displayPath"] == "blob")
         self.assertEqual(blob_entry["value"], b"hello".hex())
         result = verify_envelope(partial, config)
         self.assertTrue(result.accepted, f"{result.reason}: {result.detail}")
@@ -548,17 +554,13 @@ class TestHostileEnvelopeMembers(unittest.TestCase):
         for envelope in (self.full(), self.disclosed()):
             hostile = dict(envelope)
             hostile["schemaVersion"] = JsonNumber("1.0")
-            self.assertEqual(
-                verify_envelope(hostile, self.config).reason, ErrorCode.ENVELOPE_SHAPE
-            )
+            self.assertEqual(verify_envelope(hostile, self.config).reason, ErrorCode.ENVELOPE_SHAPE)
 
     def test_every_identity_member_is_checked(self):
         cases = {
             "recordId": lambda e: e.update(recordId=JsonNumber("5")),
             "issuer.id": lambda e: e.update(issuer={**e["issuer"], "id": JsonNumber("5")}),
-            "issuer.keyId": lambda e: e.update(
-                issuer={**e["issuer"], "keyId": JsonNumber("5")}
-            ),
+            "issuer.keyId": lambda e: e.update(issuer={**e["issuer"], "keyId": JsonNumber("5")}),
             "typeMap.id": lambda e: e.update(typeMap={"id": JsonNumber("5")}),
         }
         for name, mutate in cases.items():
@@ -739,29 +741,35 @@ class TestHostileEnvelopeMembers(unittest.TestCase):
             '"leafCount":%s,"issuer":{"id":"i"},%s}'
         )
         cases = {
-            "segments is null": base % (1, '"record":{},"salts":[{"segments":null,"salt":"'
-                                        + salt + '"}]'),
-            "segments carries an object key": base % (
-                1, '"record":{},"salts":[{"segments":[{"key":{}}],"salt":"' + salt + '"}]'
-            ),
-            "auditPath is null": base % (
+            "segments is null": base
+            % (1, '"record":{},"salts":[{"segments":null,"salt":"' + salt + '"}]'),
+            "segments carries an object key": base
+            % (1, '"record":{},"salts":[{"segments":[{"key":{}}],"salt":"' + salt + '"}]'),
+            "auditPath is null": base
+            % (
                 1,
                 '"disclosure":{"mode":"selective","leaves":[{"segments":[{"key":"a"}],'
                 '"index":0,"tag":2,"value":"x","salt":"' + salt + '","auditPath":null}]}',
             ),
-            "typeMap is a string": base % (
+            "typeMap is a string": base
+            % (
                 1,
                 '"typeMap":"oops","record":{},"salts":[{"segments":[{"key":"a"}],"salt":"'
-                + salt + '"}]',
+                + salt
+                + '"}]',
             ),
             # CPython 3.11+ caps int(str) at 4300 digits, so an unbounded count raises
             # ValueError before any rule of this specification applies. Same interpreter
             # hazard `roax_canon.numbers` already refuses for a decimal exponent.
             "leafCount has 5000 digits": base % ("9" * 5000, '"record":{},"salts":[]'),
-            "index has 5000 digits": base % (
+            "index has 5000 digits": base
+            % (
                 1,
                 '"disclosure":{"mode":"selective","leaves":[{"segments":[{"key":"a"}],'
-                '"index":' + "9" * 5000 + ',"tag":2,"value":"x","salt":"' + salt
+                '"index":'
+                + "9" * 5000
+                + ',"tag":2,"value":"x","salt":"'
+                + salt
                 + '","auditPath":[]}]}',
             ),
         }
@@ -785,7 +793,9 @@ class TestSalts(unittest.TestCase):
         a = issue(record, IDENTITY, resolver())
         b = issue(record, IDENTITY, resolver())
         self.assertNotEqual(a.root, b.root)
-        self.assertEqual(a.encoded_paths, b.encoded_paths, "tree shape is a function of paths alone")
+        self.assertEqual(
+            a.encoded_paths, b.encoded_paths, "tree shape is a function of paths alone"
+        )
 
     def test_short_salt_rejected(self):
         with self.assertRaises(RoaxError) as ctx:
@@ -851,8 +861,13 @@ class TestTypeMapMatcher(unittest.TestCase):
         # And the corpus is deliberately neutral about which reading is right: its
         # synthetic map carries the key under BOTH spellings.
         both = DisplayPatternTypeMap(
-            {**SYNTHETIC_MAP, "entries": [{"pattern": "\u212aelvin", "jsonKind": "string", "tag": 2},
-                                          {"pattern": "Kelvin", "jsonKind": "string", "tag": 2}]}
+            {
+                **SYNTHETIC_MAP,
+                "entries": [
+                    {"pattern": "\u212aelvin", "jsonKind": "string", "tag": 2},
+                    {"pattern": "Kelvin", "jsonKind": "string", "tag": 2},
+                ],
+            }
         )
         self.assertEqual(both.resolve((Key("\u212aelvin"),), "string"), 2)
         self.assertEqual(both.resolve((Key("Kelvin"),), "string"), 2)

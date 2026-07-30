@@ -104,9 +104,7 @@ class LoadExport(unittest.TestCase):
     """Reading one named export out of a module on disk."""
 
     def _module(self, body: str) -> str:
-        handle = tempfile.NamedTemporaryFile(
-            "w", suffix=".ts", encoding="utf-8", delete=False
-        )
+        handle = tempfile.NamedTemporaryFile("w", suffix=".ts", encoding="utf-8", delete=False)
         handle.write(body)
         handle.close()
         self.addCleanup(os.unlink, handle.name)

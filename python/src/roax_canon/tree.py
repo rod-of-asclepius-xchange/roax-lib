@@ -82,9 +82,7 @@ def audit_path(
     if n == 0:
         raise TreeError(ErrorCode.TREE_EMPTY, "no leaves")
     if index < 0 or index >= n:
-        raise TreeError(
-            ErrorCode.INCLUSION_PROOF_FAILED, f"leaf index {index} outside [0, {n})"
-        )
+        raise TreeError(ErrorCode.INCLUSION_PROOF_FAILED, f"leaf index {index} outside [0, {n})")
 
     path: list[bytes] = []
     m = index

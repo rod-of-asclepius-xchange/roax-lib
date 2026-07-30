@@ -597,9 +597,11 @@ def _verify_disclosed_copy(env, cfg, hasher, root, leaf_count) -> VerificationRe
         # root and this version commits no such leaf, so selecting on it would be trusting
         # an unauthenticated hint; a verifier that instead picked a map by `recordType`
         # alone would be resolving against an artifact the envelope never identified.
-        if len(segments) == 1 and isinstance(segments[0], Key) and nfc(
-            segments[0].value, where="disclosed leaf key"
-        ).startswith(RESERVED_KEY_PREFIX):
+        if (
+            len(segments) == 1
+            and isinstance(segments[0], Key)
+            and nfc(segments[0].value, where="disclosed leaf key").startswith(RESERVED_KEY_PREFIX)
+        ):
             if tag != _RESERVED_TAG:
                 return _reject(
                     ErrorCode.OUTER_IDENTITY_MISMATCH,

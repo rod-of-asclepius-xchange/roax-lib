@@ -128,9 +128,7 @@ def canonical_integer(text: str) -> str:
             f"INTEGER value must be carried as a string, got {type(text).__name__}",
         )
     if INTEGER_GRAMMAR.match(text) is None:
-        raise GrammarError(
-            ErrorCode.INTEGER_GRAMMAR, f"not a canonical integer literal: {text!r}"
-        )
+        raise GrammarError(ErrorCode.INTEGER_GRAMMAR, f"not a canonical integer literal: {text!r}")
     digits = text[1:] if text.startswith("-") else text
     if len(digits) > DIGIT_BOUND:
         raise GrammarError(
@@ -162,9 +160,7 @@ def canonical_decimal(text: str) -> str:
         )
     m = DECIMAL_INPUT_GRAMMAR.match(text)
     if m is None:
-        raise GrammarError(
-            ErrorCode.DECIMAL_GRAMMAR, f"not a canonical decimal literal: {text!r}"
-        )
+        raise GrammarError(ErrorCode.DECIMAL_GRAMMAR, f"not a canonical decimal literal: {text!r}")
 
     sign = m.group("sign")
     int_digits = m.group("int")

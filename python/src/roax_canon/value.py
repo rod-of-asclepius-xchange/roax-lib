@@ -61,7 +61,9 @@ VALUELESS_TAGS = frozenset({NULL, EMPTY_ARRAY, EMPTY_OBJECT})
 # RFC 4648 section 4: the standard alphabet, with padding and no line wrapping.
 # Anchored \A and \Z rather than ^ and $, because Python's $ also matches before a
 # trailing newline and a wrapped line is exactly what this pin forbids.
-_BASE64_CANONICAL = re.compile(r"\A(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}=={1}|[A-Za-z0-9+/]{3}={1})?\Z")
+_BASE64_CANONICAL = re.compile(
+    r"\A(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}=={1}|[A-Za-z0-9+/]{3}={1})?\Z"
+)
 _BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
 
@@ -197,10 +199,6 @@ def encode_value(tag: int, value: Any = None) -> bytes:
     if tag == BLOB_REF:
         if not isinstance(value, BlobRef):
             raise GrammarError(ErrorCode.ENVELOPE_SHAPE, "BLOB_REF value must be a BlobRef")
-        return (
-            _u64be(value.blob_byte_length)
-            + _u32be(len(value.blob_digest))
-            + value.blob_digest
-        )
+        return _u64be(value.blob_byte_length) + _u32be(len(value.blob_digest)) + value.blob_digest
 
     raise InputError(ErrorCode.ENVELOPE_SHAPE, f"unknown type tag {tag!r}")

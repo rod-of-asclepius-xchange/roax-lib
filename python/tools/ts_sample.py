@@ -32,7 +32,17 @@ __all__ = ["load_export", "parse_object_literal"]
 _WS = re.compile(r"(?:\s+|//[^\n]*|/\*.*?\*/)*", re.DOTALL)
 _IDENT = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*")
 _NUMBER = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?")
-_ESCAPES = {'"': '"', "'": "'", "\\": "\\", "/": "/", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t"}
+_ESCAPES = {
+    '"': '"',
+    "'": "'",
+    "\\": "\\",
+    "/": "/",
+    "b": "\b",
+    "f": "\f",
+    "n": "\n",
+    "r": "\r",
+    "t": "\t",
+}
 
 
 class _Reader:
@@ -74,7 +84,9 @@ class _Reader:
         if m is not None:
             self.pos = m.end()
             return JsonNumber(m.group(0))
-        raise ValueError(f"unsupported literal at offset {self.pos}: {self.text[self.pos:self.pos + 30]!r}")
+        raise ValueError(
+            f"unsupported literal at offset {self.pos}: {self.text[self.pos:self.pos + 30]!r}"
+        )
 
     def string(self) -> str:
         quote = self.text[self.pos]
