@@ -17,7 +17,16 @@ tool="$(basename "$0")"
 
 case "$tool" in
   python3)
-    exit "${ROAX_GATE_STUB_BUILD_STATUS:-0}"
+    # run.sh calls python3 twice: build_corpus.py at step 1 and profile_rules.py at step 5.
+    # They have independent exit statuses, so the stub selects on which one it was handed.
+    case "${1:-}" in
+      *profile_rules.py)
+        exit "${ROAX_GATE_STUB_PROFILE_RULE_STATUS:-0}"
+        ;;
+      *)
+        exit "${ROAX_GATE_STUB_BUILD_STATUS:-0}"
+        ;;
+    esac
     ;;
   node)
     case "${1:-}" in
@@ -40,6 +49,9 @@ case "$tool" in
         ;;
       *validate_schemas.mjs)
         exit "${ROAX_GATE_STUB_SCHEMA_STATUS:-0}"
+        ;;
+      *profile_rules.mjs)
+        exit "${ROAX_GATE_STUB_PROFILE_RULE_STATUS:-0}"
         ;;
       *)
         echo "test stub: unexpected node command ${1:-<none>}" >&2
