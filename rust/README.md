@@ -44,8 +44,10 @@ ROAX_EXTRACTED_RECORDS="$(pwd -P)/schemata/extracted" \
   cargo clippy --manifest-path rust/Cargo.toml --all-targets -- -D warnings
 ```
 
-Class 10 needs the recovery sample extracted from the gitignored Open-Attestation schemata checkout at commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`, as cited by `corpus/conformance-corpus-1.0.json`.
-The integration test fails visibly instead of reporting a complete pass when that sample is absent.
+Class 10 needs two samples extracted from the gitignored Open-Attestation schemata checkout at commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`, as cited by `corpus/conformance-corpus-1.0.json`: the recovery healthcert, and the vaccination healthcert its two 2026-07-30 bindings made committable.
+Inside `ROAX_EXTRACTED_RECORDS` this test names each file by the vector's EXPORT rather than by its profile, so they are `sampleDocument.json` and `sampleVaccineHealthCert.json` (`tests/conformance_corpus.rs:1030-1031`); the TypeScript runner's `<authority>.<profile>.json` convention is a separate contract and one directory can satisfy both.
+With neither sample supplied the integration test fails visibly instead of reporting a complete pass.
+With one of the two, class 10 reports `PASS WITH SKIPS` and names each vector it could not run, which is a partial run rather than a failure (`tests/conformance_corpus.rs:99-120`).
 
 The committed class-9 rows all match, but the corpus currently lacks the forged-size, full-disclosure row required by `docs/conformance-corpus.md` class 9.
 `tests/security_boundaries.rs` pins the Rust defence locally, while `corpus/README.md` records why that does not complete the cross-language release gate.
