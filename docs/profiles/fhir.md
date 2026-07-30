@@ -1,6 +1,8 @@
 # Profile: HL7 FHIR 4.0.1
 
-**`recordType`:** `hl7.fhir.bundle` **`schemaVersion`:** `4.0.1` (see the caution in section 6 about what this string means) **Status:** published as [`type-maps/hl7.fhir.bundle-4.0.1.json`](../../type-maps/hl7.fhir.bundle-4.0.1.json) at exact artifact ID `sha256:0e9e642bc89c081e2e6faf651acdc25c46fac83201248ef53a7c812181279807`.
+**`recordType`:** `hl7.fhir.bundle`
+**`schemaVersion`:** `4.0.1` (see the caution in section 6 about what this string means)
+**Status:** published as [`type-maps/hl7.fhir.bundle-4.0.1.json`](../../type-maps/hl7.fhir.bundle-4.0.1.json) at exact artifact ID `sha256:0e9e642bc89c081e2e6faf651acdc25c46fac83201248ef53a7c812181279807`.
 Six schema-local `base64Binary` slots and `Narrative.div` remain unresolved, null placeholders admitted by FHIR but rejected by the pinned schema fail closed, and 659 object-applicator source nodes omit an object type, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.3, 1.5 and 2.
 
 ---

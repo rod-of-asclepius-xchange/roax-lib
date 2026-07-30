@@ -19,13 +19,13 @@
 //
 // THE TOOL FAILS CLOSED. Any Markdown construct it does not model - a tilde fence, an indented code
 // block, a lazy continuation, a setext heading, a hard line break in prose, an HTML block, a link
-// reference definition - refuses the file and exits non-zero rather than guessing at it. That is
-// the same posture decision D7 takes for an unbound type-map path, and it is what makes the tool
-// safe to point at a document nobody has read.
+// reference definition, a GFM table written without leading pipes - refuses the file and exits
+// non-zero rather than guessing at it. That is the same posture decision D7 takes for an unbound
+// type-map path, and it is what makes the tool safe to point at a document nobody has read.
 
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {lstatSync, readFileSync, writeFileSync} from 'node:fs';
+import {lstatSync, readFileSync, realpathSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -238,6 +238,25 @@ const QUOTE = /^( {0,3})>( ?)(.*)$/;
 const LINK_DEF = /^ {0,3}\[[^\]]+\]:\s/;
 const SETEXT = /^ {0,3}(=+|-+)[ \t]*$/;
 
+// A GFM delimiter row written without a leading pipe, which is the shape of a table whose rows
+// carry no outer pipes. GFM admits that table and TABLE_ROW deliberately does not match it: the
+// `^ {0,3}\|` anchor is what keeps a mid-paragraph `|` out of the table branch. So such a table
+// reaches the paragraph branch, where nothing downstream would notice it - the delimiter row is
+// not a thematic break, not a setext underline and not a list item, so it joins the paragraph and
+// the whole table collapses into one line of prose. That is a rendering change, not a reflow, and
+// the fail-closed posture refuses it. A thematic break carries no pipe and cannot match; a
+// pipe-leading row is caught by TABLE_ROW first and cannot match either.
+const PIPELESS_DELIMITER = /^ {0,3}:?-+:?( *\| *:?-+:?)+ *$/;
+
+// A metadata field line: a bold label whose colon sits immediately inside the closing delimiter,
+// such as `**Status:**` or `**`recordType`:**`. These carry one field each, are authored one per
+// line, and end in no sentence punctuation, so sentence splitting alone merges a whole field list
+// into a single 300-character line - which defeats the readable-diff purpose the convention exists
+// for. A field line therefore always starts its own output line and is never joined onto the line
+// before it. Requiring the colon before the closing `**` is what keeps the `**A bold thesis
+// sentence.** Then the rest` paragraph opening these documents use 257 times out of the rule.
+const METADATA_FIELD = /^(\*\*|__)(?![*_])[^\n]{1,80}?:\1(\s|$)/;
+
 // CommonMark lets only some blocks interrupt a paragraph, and the list rule is the one that
 // matters here: a bullet may interrupt, but an ordered item may only if its number is 1 and its
 // content is non-empty. docs/spec/roax-canon-1.md wraps "while building class 9. It is recorded
@@ -332,6 +351,7 @@ function reflowLines(lines, numbers, file) {
     }
 
     if (LINK_DEF.test(line)) refuse(i, 'link reference definition is not modelled');
+    if (PIPELESS_DELIMITER.test(line)) refuse(i, 'GFM table without leading pipes is not modelled');
     if (/^ {0,3}<[A-Za-z!/?]/.test(line)) refuse(i, 'HTML block is not modelled');
     if (/\[\^/.test(line)) refuse(i, 'footnote syntax is not modelled');
     if (line.includes('\t')) refuse(i, 'tab in Markdown is not modelled');
@@ -410,6 +430,10 @@ function reflowLines(lines, numbers, file) {
       // thematic break the same characters mean anywhere else.
       if (paragraph.length > 0 && SETEXT.test(next)) refuse(i, 'setext heading underline is not modelled');
       if (paragraph.length > 0 && interruptsParagraph(next)) break;
+      // A pipe-less delimiter row does not interrupt a paragraph, so it would be swallowed here.
+      // It is refused rather than made to interrupt: interrupting would restructure the document
+      // silently, which is the opposite of failing closed.
+      if (PIPELESS_DELIMITER.test(next)) refuse(i, 'GFM table without leading pipes is not modelled');
       if (/[ \t]+$/.test(next) || /\\$/.test(next)) {
         refuse(i, 'hard line break inside prose is not modelled');
       }
@@ -420,22 +444,37 @@ function reflowLines(lines, numbers, file) {
     const leading = /^ */.exec(paragraph[0])[0];
     if (leading.length > 3) refuse(start, 'paragraph indented four or more spaces is not modelled');
 
-    // Join into one logical string, remembering which original line each character came from, so
-    // a sentence that spans a wrap can report both.
-    let joined = '';
-    const spans = [];
+    // Metadata field lines partition the paragraph before anything is joined: each one opens a
+    // group, so it keeps the line the author gave it. Everything else in a group is joined and cut
+    // on sentence boundaries exactly as before, which is why a field line that wrapped still
+    // absorbs its continuation.
+    const groups = [[]];
     for (let k = 0; k < paragraph.length; k += 1) {
-      const text = paragraph[k].trim();
-      if (k > 0) joined += ' ';
-      spans.push([joined.length, joined.length + text.length, paragraphNumbers[k]]);
-      joined += text;
+      if (k > 0 && METADATA_FIELD.test(paragraph[k].trim())) groups.push([]);
+      groups[groups.length - 1].push(k);
     }
 
-    for (const [from, to] of splitSentences(joined)) {
-      const contributors = spans
-        .filter((span) => span[0] < to && span[1] > from)
-        .map((span) => span[2]);
-      emit(leading + joined.slice(from, to), contributors.length > 0 ? contributors : [paragraphNumbers[0]]);
+    for (const group of groups) {
+      // Join into one logical string, remembering which original line each character came from, so
+      // a sentence that spans a wrap can report both.
+      let joined = '';
+      const spans = [];
+      for (const k of group) {
+        const text = paragraph[k].trim();
+        if (joined !== '') joined += ' ';
+        spans.push([joined.length, joined.length + text.length, paragraphNumbers[k]]);
+        joined += text;
+      }
+
+      for (const [from, to] of splitSentences(joined)) {
+        const contributors = spans
+          .filter((span) => span[0] < to && span[1] > from)
+          .map((span) => span[2]);
+        emit(
+          leading + joined.slice(from, to),
+          contributors.length > 0 ? contributors : [paragraphNumbers[group[0]]],
+        );
+      }
     }
   }
 
@@ -662,8 +701,8 @@ const SELF_TESTS = [
   ['It says "MUST cover ... an unknown empty array", and the corpus agrees.',
     ['It says "MUST cover ... an unknown empty array", and the corpus agrees.']],
   ['Node v22.21.0 was used. It worked.', ['Node v22.21.0 was used.', 'It worked.']],
-  ['See `docs/spec/roax-canon-1.md:911-912`. The rule holds.',
-    ['See `docs/spec/roax-canon-1.md:911-912`.', 'The rule holds.']],
+  ['See `docs/spec/roax-canon-1.md:912-913`. The rule holds.',
+    ['See `docs/spec/roax-canon-1.md:912-913`.', 'The rule holds.']],
   ['A period inside `a.b[0].c` is display only. Never hash it.',
     ['A period inside `a.b[0].c` is display only.', 'Never hash it.']],
   ['Read <https://hl7.org/fhir/R4/datatypes.html> for the rule. Then apply it.',
@@ -716,6 +755,21 @@ const DOCUMENT_SELF_TESTS = [
   // An inline code span that was split across a wrap rejoins with a single space.
   ['Run `tool --out\nfile.json`, then stop. Done.\n',
     'Run `tool --out file.json`, then stop.\nDone.\n'],
+  // A block of metadata field lines keeps one field per line. None of these ends in sentence
+  // punctuation, so without the rule the whole block would merge into a single line.
+  ['**Status:** draft for review.\n**Version string:** `ROAX-CANON/1`\n**Date:** 2026-07-28\n',
+    '**Status:** draft for review.\n**Version string:** `ROAX-CANON/1`\n**Date:** 2026-07-28\n'],
+  ['**`recordType`:** `hl7.fhir.bundle`\n__Date:__ 2026-07-28\n',
+    '**`recordType`:** `hl7.fhir.bundle`\n__Date:__ 2026-07-28\n'],
+  // A field line that wrapped still absorbs its continuation; the next field line still splits.
+  ['**Label:** a value that\nwrapped across lines\n**Other:** second value\n',
+    '**Label:** a value that wrapped across lines\n**Other:** second value\n'],
+  // Ordinary wrapped prose still joins: a bold thesis sentence carries no colon inside the closing
+  // delimiter, so it is not a field line and the rule leaves the 257 sites like it alone.
+  ['**A bold thesis sentence.** Then the\nrest of the paragraph continues.\n',
+    '**A bold thesis sentence.**\nThen the rest of the paragraph continues.\n'],
+  ['A sentence about `**Label:**` that\nwrapped, and a second one follows here.\n',
+    'A sentence about `**Label:**` that wrapped, and a second one follows here.\n'],
 ];
 
 function runSelfTest() {
@@ -762,6 +816,8 @@ function runSelfTest() {
     ['A heading\n=========\n', 'setext heading'],
     ['    indented code\n', 'indented code'],
     ['```\nunterminated\n', 'unterminated fence'],
+    ['a | b\n--- | ---\n1 | 2\n', 'GFM table without leading pipes'],
+    [':--- | ---:\n', 'GFM delimiter row without leading pipes, alone'],
   ];
   for (const [input, label] of refusals) {
     let refused = false;
@@ -893,6 +949,22 @@ function main(argv) {
   return 0;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Compare resolved paths rather than strings. `import.meta.url` is percent-encoded and already
+// realpathed by the loader, while `process.argv[1]` is neither, so the string form goes false for a
+// checkout under a path containing a space or a non-ASCII character and for any invocation through a
+// symlink. That failure is silent - main() never runs, nothing is printed and the exit status is 0,
+// which reads as "every file conforms" - and a fail-open entry point is the one thing this tool must
+// not have. Same idiom as tools/check-type-map-extension.mjs:1769-1779.
+function isDirectInvocation() {
+  if (process.argv[1] === undefined) return false;
+  const modulePath = fileURLToPath(import.meta.url);
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(modulePath);
+  } catch {
+    return path.resolve(process.argv[1]) === modulePath;
+  }
+}
+
+if (isDirectInvocation()) {
   process.exit(main(process.argv.slice(2)));
 }

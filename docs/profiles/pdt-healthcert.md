@@ -1,6 +1,8 @@
 # Profile: Singapore MOH PDT HealthCert 2.0
 
-**`recordType`:** `sg.gov.moh.pdt-healthcert` **`schemaVersion`:** `2.0` **Status:** the base profile map is published as [`type-maps/sg.gov.moh.pdt-healthcert-2.0.json`](../../type-maps/sg.gov.moh.pdt-healthcert-2.0.json) at exact artifact ID `sha256:4f8cecc59c85101b8b567658c90651bcbf8f9d4dc279571aa40a03cf04f434ff`.
+**`recordType`:** `sg.gov.moh.pdt-healthcert`
+**`schemaVersion`:** `2.0`
+**Status:** the base profile map is published as [`type-maps/sg.gov.moh.pdt-healthcert-2.0.json`](../../type-maps/sg.gov.moh.pdt-healthcert-2.0.json) at exact artifact ID `sha256:4f8cecc59c85101b8b567658c90651bcbf8f9d4dc279571aa40a03cf04f434ff`.
 The published base artifact intentionally excludes 20 path/kind pairs present in the endorsed sample because no clinic or endorsed composition artifact has been selected, the lite-FHIR `Narrative.div` and four `base64Binary` slots remain unresolved, and 65 Bundle-reachable lite-FHIR object nodes omit an object type, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.2, 1.3, 1.5 and 2.
 
 PDT is the pre-departure test certificate.

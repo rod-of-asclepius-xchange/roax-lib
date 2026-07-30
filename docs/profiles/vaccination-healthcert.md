@@ -1,6 +1,8 @@
 # Profile: Singapore MOH Vaccination HealthCert 1.0
 
-**`recordType`:** `sg.gov.moh.vaccination-healthcert` **`schemaVersion`:** `1.0` **Status:** the fail-closed map is published as [`type-maps/sg.gov.moh.vaccination-healthcert-1.0.json`](../../type-maps/sg.gov.moh.vaccination-healthcert-1.0.json) at exact artifact ID `sha256:de7bb92226af5fa5dc5064d9cb203329abc69160f4280fdf739e66e5e0151e93`.
+**`recordType`:** `sg.gov.moh.vaccination-healthcert`
+**`schemaVersion`:** `1.0`
+**Status:** the fail-closed map is published as [`type-maps/sg.gov.moh.vaccination-healthcert-1.0.json`](../../type-maps/sg.gov.moh.vaccination-healthcert-1.0.json) at exact artifact ID `sha256:de7bb92226af5fa5dc5064d9cb203329abc69160f4280fdf739e66e5e0151e93`.
 `notarisationMetadata.signedEuHealthCerts[*].dose` and `notarisationMetadata.signedEuHealthCerts[*].expiryDateTime` remain unbound, so the shipped sample is uncommittable under fail-closed, and 26 object-intended schema paths leave their non-object alternatives unbound, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.1, 1.4 and 2.
 
 **This is the structurally different one.**

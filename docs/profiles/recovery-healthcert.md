@@ -1,6 +1,8 @@
 # Profile: Singapore MOH Recovery HealthCert 2.0
 
-**`recordType`:** `sg.gov.moh.recovery-healthcert` **`schemaVersion`:** `2.0` **Status:** published as [`type-maps/sg.gov.moh.recovery-healthcert-2.0.json`](../../type-maps/sg.gov.moh.recovery-healthcert-2.0.json) at exact artifact ID `sha256:db935b67a3a82754921267e3af237b606f7489b46e05aa892d175b8d87504177`.
+**`recordType`:** `sg.gov.moh.recovery-healthcert`
+**`schemaVersion`:** `2.0`
+**Status:** published as [`type-maps/sg.gov.moh.recovery-healthcert-2.0.json`](../../type-maps/sg.gov.moh.recovery-healthcert-2.0.json) at exact artifact ID `sha256:db935b67a3a82754921267e3af237b606f7489b46e05aa892d175b8d87504177`.
 The lite-FHIR `Narrative.div` and four `base64Binary` slots remain unresolved, null placeholders admitted by FHIR but rejected by the pinned schema fail closed, 65 Bundle-reachable lite-FHIR object nodes omit an object type, and the recovery root remains an issuer extension point, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.3, 1.5, 2 and 5.
 
 Recovery is the closest sibling of PDT and shares most of its shape.

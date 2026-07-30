@@ -4,7 +4,8 @@
 Not frozen.
 Three ruled independent implementations exist, in Rust under `rust/`, in TypeScript under `src/` and in Python under `python/`; the other two have not been added.
 The TypeScript implementation was written from this document alone, and its disagreements with the conformance corpus are recorded in `docs/typescript-implementation-findings.md`.
-**Version string:** `ROAX-CANON/1` **Date:** 2026-07-28
+**Version string:** `ROAX-CANON/1`
+**Date:** 2026-07-28
 
 This document specifies how a health record is turned into a set of typed, salted leaves, how those leaves are hashed and merklized into a single 32-byte root, and how individual leaves are later disclosed and verified against that root.
 

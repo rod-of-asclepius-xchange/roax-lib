@@ -105,7 +105,7 @@ These are the things a future agent is most likely to get wrong.
   The Rust artifact loader follows the executable checker for that demonstrated edge (`rust/src/type_map.rs:1200-1202`; `rust/tests/published_type_maps.rs:518-532`).
 
 - **Issuer-scope membership does not state a Unicode comparison rule.**
-  The specification requires the disclosed issuer identity to be a member of `scope.issuerIds`, while the executable extension checker compares inherited scope strings byte-for-byte and neither source says whether to NFC-normalize the membership check (`docs/spec/roax-canon-1.md:911-912`; `tools/check-type-map-extension.mjs:890-900`).
+  The specification requires the disclosed issuer identity to be a member of `scope.issuerIds`, while the executable extension checker compares inherited scope strings byte-for-byte and neither source says whether to NFC-normalize the membership check (`docs/spec/roax-canon-1.md:912-913`; `tools/check-type-map-extension.mjs:890-900`).
   The Rust loader rejects every issuer child artifact until it has exact parent/additivity inputs, so this ambiguity cannot silently select an issuer in the current API.
 
 - **An extension point does not open the whole subtree beneath it.**
@@ -329,6 +329,9 @@ Things to know:
   It is zero-dependency except for `--verify-render`, which takes markdown-it 14 from `ROAX_MARKDOWN_IT` outside the tree exactly as the schema tooling takes Ajv 8 from `ROAX_AJV`, and reports NOT RUN with exit 2 when it is absent.
   The reflow was verified against markdown-it 14.3.0, so name the major version when you re-run it: a later one could move the comparison baseline without saying so.
   It fails closed on any construct it does not model rather than guessing at one, and a second run is a no-op, so it does not churn future diffs.
+  **One line is exempt from the join half of the rule: a metadata field, whose content opens with a bold label ending in a colon, as `**Status:**` does.**
+  A field carries no sentence punctuation, so sentence splitting alone merges a whole field list into one 300-character line, which defeats the readable-diff purpose the convention exists for; the document headers of `docs/spec/roax-canon-1.md` and the four `docs/profiles/` profiles are the sites this governs.
+  The colon has to sit immediately inside the closing delimiter, which is what keeps the `**A bold thesis sentence.** Then the rest` paragraph opening these documents use 257 times out of the exemption.
   `docs/type-maps.md` is the single exclusion and is a named constant in the tool: separate in-flight work owns that file and reflows its own prose to this same convention, so remove the entry once that lands.
   Hold new and substantially rewritten prose to the convention, and reach for the tool rather than rewrapping by hand.
   Do not reflow a file wholesale as a side effect of an unrelated change, because the cosmetic diff buries the real one.
