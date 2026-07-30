@@ -34,6 +34,38 @@ public struct Envelope {
     public let salts: [SaltEntry]?
     public let disclosedLeaves: [DisclosedLeaf]?
 
+    public init(
+        canon: String = ROAXCanon.version,
+        hashAlg: String = SHA256Hash.identifier,
+        recordType: String,
+        schemaVersion: String,
+        recordId: String,
+        issuerId: String,
+        issuerKeyId: String? = nil,
+        typeMapId: String? = nil,
+        typeMapVersion: String? = nil,
+        root: [UInt8],
+        leafCount: Int,
+        record: JSONValue? = nil,
+        salts: [SaltEntry]? = nil,
+        disclosedLeaves: [DisclosedLeaf]? = nil
+    ) {
+        self.canon = canon
+        self.hashAlg = hashAlg
+        self.recordType = recordType
+        self.schemaVersion = schemaVersion
+        self.recordId = recordId
+        self.issuerId = issuerId
+        self.issuerKeyId = issuerKeyId
+        self.typeMapId = typeMapId
+        self.typeMapVersion = typeMapVersion
+        self.root = root
+        self.leafCount = leafCount
+        self.record = record
+        self.salts = salts
+        self.disclosedLeaves = disclosedLeaves
+    }
+
     public var identity: RecordIdentity {
         RecordIdentity(
             recordType: recordType,
@@ -451,11 +483,12 @@ public extension Commitment {
                 segments: leaf.segments,
                 index: index,
                 tag: leaf.tag,
-                // The carrier form is the caller's to fill in from the record;
-                // this builder deals in leaves, and the salt is the load-bearing
-                // part: a disclosed copy carries the salt of every leaf it
-                // reveals and the salt of no other leaf.
-                value: nil,
+                // The carrier form its tag pins, so this disclosure verifies
+                // through `EnvelopeVerifier` rather than being rejected for
+                // `disclosed-leaf-named-without-value`. The salt is the
+                // load-bearing part: a disclosed copy carries the salt of every
+                // leaf it reveals and the salt of no other leaf.
+                value: leaf.carrierValue,
                 salt: leaf.salt,
                 auditPath: try MerkleTree.inclusionProof(leaves: hashes, index: index, hash: H.self)
             )

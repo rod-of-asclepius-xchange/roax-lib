@@ -15,13 +15,13 @@ A library produced by reading an existing one passes the corpus while destroying
 | Measure | Result |
 |---|---|
 | Corpus vectors | 488 pass, 0 fail, 0 NOT RUN with a reference checkout |
-| Unit and gap tests | 32 pass |
+| Unit and gap tests | 33 pass |
 | Vaccination sample | commits at 91 leaves without an issuer key identifier, 92 with one |
 | Recovery sample | commits at 69 leaves without an issuer key identifier, 70 with one |
 | Runtime dependencies | none; CryptoKit where it exists, and an in-tree SHA-256 otherwise |
 
 What that pass does and does not mean is in [`FINDINGS.md`](FINDINGS.md), which is worth more than the code.
-Two findings are new with this build: a corpus gap around the forged-tree-size attack, and a Swift `String` comparison rule that silently answers an open specification ambiguity in the opposite direction from the rest of the family.
+Three findings are new with this build: a Swift `String` comparison rule that silently answers an open specification ambiguity in the opposite direction from the rest of the family, and two corpus gaps - the forged-tree-size attack, and the fact that no vector covers the ENVELOPE-PRODUCING side, which hid a real bug in this library that all 488 vectors missed.
 
 ## Running it
 
@@ -82,7 +82,7 @@ Inside `ROAXCanon`, the pieces that carry a protocol boundary:
 | `Envelope.swift` | Both copy kinds, the outer-identity binding and the minimum-disclosure floor, in the order section 11.3 derives. |
 | `MerkleTree.swift` | RFC 9162 with the section 9.1 adaptation, over already-hashed leaves. |
 
-## Four things a reader should know before changing anything here
+## Five things a reader should know before changing anything here
 
 ### The type-map resolver is an interface because the corpus forces it to be
 
@@ -106,6 +106,12 @@ That decides `corpus/README.md` ambiguity 6 in the opposite direction from the R
 The same language feature is *correct* for `PathSegment`, where canonical equivalence coincides exactly with encoded-path equality, and both readings are pinned by tests so an edit that harmonizes them breaks one.
 See [`FINDINGS.md`](FINDINGS.md) finding 7.
 
+### A disclosure this library produces must verify through this library's verifier
+
+No corpus vector checks that: every committed envelope fixture was built by something else, so the corpus only ever runs the verifier against a third party's bytes.
+`Commitment.disclose` therefore fills in each leaf's carrier through `Leaf.carrierValue`, and the carriers are per tag rather than the record's spellings - BYTES is lowercase hex here even though the record spelled it base64.
+See [`FINDINGS.md`](FINDINGS.md) finding 10, which records the bug this gap hid.
+
 ### There is one leaf-preimage builder and nothing else assembles those bytes
 
 `LeafConstruction.preimage` is it.
@@ -114,7 +120,16 @@ Nothing else in this package concatenates a domain string, a path and a tag.
 
 ## Platform support
 
-`Package.swift` declares macOS 13 and iOS 16.
+`Package.swift` declares macOS 13 and iOS 16, and **the iOS half is verified rather than declared**:
+
+```sh
+xcodebuild -scheme ROAXCanon -destination 'generic/platform=iOS' build
+```
+
+builds `ROAXCanon` against `iPhoneOS26.2.sdk` for `arm64-apple-ios16.0` and succeeds, with CryptoKit resolving there.
+That check is worth running rather than assuming, because `swift build` alone uses the macOS sysroot even when handed an iOS target triple, and reports success while warning `using sysroot for 'MacOSX' but targeting 'iPhone'`.
+A package that only ever saw `swift build` could fail on the platform it was written for.
+
 Nothing in the library needs Darwin: SHA-256 comes from CryptoKit through `#if canImport(CryptoKit)` and from `ReferenceSHA256` otherwise, and a test asserts the two agree across every block boundary.
 That pair is a cross-check rather than a divergence risk precisely because the test exists.
 

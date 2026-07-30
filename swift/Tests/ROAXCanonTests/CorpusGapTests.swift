@@ -302,6 +302,102 @@ final class CorpusGapTests: XCTestCase {
         XCTAssertFalse(disclosed.map { $0.salt.roaxHex }.contains(withheld.salt.roaxHex))
     }
 
+    /// **A disclosure this library produces must verify through this library's
+    /// own verifier**, and nothing in the corpus can check that.
+    ///
+    /// Every committed envelope fixture was built by something else, so the
+    /// corpus only ever exercises the verifier against a third party's bytes.
+    /// The producing side is therefore completely uncovered: an implementation
+    /// whose `disclose` emitted a leaf without its carrier value, or with the
+    /// wrong carrier for its tag, would pass all 488 vectors and be unable to
+    /// verify a single envelope it had itself issued.
+    ///
+    /// This test drives the real `EnvelopeVerifier`, including the outer-identity
+    /// binding and the minimum-disclosure floor, over an envelope assembled from
+    /// `Commitment.disclose`.
+    func testADisclosureThisLibraryProducesVerifiesThroughItsOwnVerifier() throws {
+        let committer = try syntheticCommitter()
+        // One leaf per carrier form the envelope pins, so a wrong carrier for
+        // any tag fails here rather than only for STRING.
+        let record = try JSONScanner.parse("""
+        {"marker":"m","flag":true,
+         "counts":{"integer":5,"decimal":0.010,"text":"5"},
+         "blob":{"bytes":"SGVsbG8sIFJPQVgh","text":"t"}}
+        """)
+        let commitment = try committer.commit(
+            record: record, context: CommitmentContext(identity: syntheticIdentity)
+        )
+
+        let paths: [Path] = [
+            [.key("roax.recordType")], [.key("roax.schemaVersion")],
+            [.key("roax.recordId")], [.key("roax.issuer.id")],
+            [.key("marker")], [.key("flag")],
+            [.key("counts"), .key("integer")], [.key("counts"), .key("decimal")],
+            [.key("blob"), .key("bytes")],
+        ]
+        let disclosed = try commitment.disclose(paths: paths, hash: SHA256Hash.self)
+
+        // Every carrier is populated; a nil value on a tag that requires one is
+        // precisely the bug this test exists for.
+        for leaf in disclosed where ![.null, .emptyArray, .emptyObject].contains(leaf.tag) {
+            XCTAssertNotNil(leaf.value, "leaf \(PathEncoding.display(leaf.segments)) carries no value")
+        }
+        // And the carriers are the tag's, not the record's: BYTES is hex here
+        // even though the record spelled it base64.
+        let bytesLeaf = disclosed.first { $0.tag == .bytes }!
+        XCTAssertEqual(bytesLeaf.value, .string("48656c6c6f2c20524f415821"))
+        // DECIMAL keeps its trailing zero through the round trip.
+        let decimalLeaf = disclosed.first { $0.tag == .decimal }!
+        XCTAssertEqual(decimalLeaf.value, .string("0.010"))
+
+        let envelope = Envelope(
+            recordType: syntheticIdentity.recordType,
+            schemaVersion: syntheticIdentity.schemaVersion,
+            recordId: syntheticIdentity.recordId,
+            issuerId: syntheticIdentity.issuerId,
+            root: commitment.root,
+            leafCount: commitment.leafCount,
+            disclosedLeaves: disclosed
+        )
+        let verifier = EnvelopeVerifier<SHA256Hash>()
+        XCTAssertNoThrow(try verifier.verify(envelope),
+                         "this library cannot verify an envelope it issued itself")
+
+        // And the verifier is not simply accepting everything: dropping a
+        // floor path is refused, and so is a tampered value.
+        let short = Envelope(
+            recordType: syntheticIdentity.recordType,
+            schemaVersion: syntheticIdentity.schemaVersion,
+            recordId: syntheticIdentity.recordId,
+            issuerId: syntheticIdentity.issuerId,
+            root: commitment.root, leafCount: commitment.leafCount,
+            disclosedLeaves: disclosed.filter {
+                $0.segments != [.key("roax.recordId")]
+            }
+        )
+        XCTAssertThrowsError(try verifier.verify(short)) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "outer-identity-mismatch")
+        }
+
+        let tampered = disclosed.map { leaf -> DisclosedLeaf in
+            guard leaf.segments == [.key("marker")] else { return leaf }
+            return DisclosedLeaf(
+                segments: leaf.segments, index: leaf.index, tag: leaf.tag,
+                value: .string("tampered"), salt: leaf.salt, auditPath: leaf.auditPath
+            )
+        }
+        XCTAssertThrowsError(try verifier.verify(Envelope(
+            recordType: syntheticIdentity.recordType,
+            schemaVersion: syntheticIdentity.schemaVersion,
+            recordId: syntheticIdentity.recordId,
+            issuerId: syntheticIdentity.issuerId,
+            root: commitment.root, leafCount: commitment.leafCount,
+            disclosedLeaves: tampered
+        ))) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "inclusion-proof-failed")
+        }
+    }
+
     /// A record contributing zero leaves of its own is rejected at issuance
     /// rather than anchored (specification sections 3.3 and 9.1).
     ///

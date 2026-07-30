@@ -21,10 +21,11 @@ Everything below was measured on Apple Swift 6.2.4 (swiftlang-6.2.4.1.4), macOS 
 | 7 | **Swift `String` equality is canonical equivalence, so the obvious duplicate-key check silently answers `corpus/README.md` ambiguity 6** | language **and** specification | **No, in either direction** |
 | 8 | Specification section 3.3's empty-container rule is unsatisfiable against the committed corpus | specification vs corpus | Inverted: the corpus fails an implementation that follows the specification |
 | 9 | Section 3.3's zero-leaf MUST can never fire from a JSON record | specification | No, and it cannot |
+| 10 | The corpus covers the verifying side of an envelope and not the producing side | corpus | **No - it caught a real bug in this library that all 488 vectors missed** |
 
 Findings 8 and 9 were reported by the TypeScript and Python builds before this one and are restated here only because a fourth independent implementation reaching the same place is the evidence those reports were about.
 Findings 1 to 5 are Swift-specific.
-Findings 6 and 7 are new here.
+Findings 6, 7 and 10 are new here.
 
 ## 1. `JSONSerialization` destroys numeric literals, and the failure is inconsistent
 
@@ -246,6 +247,29 @@ There is no JSON record that contributes zero leaves, so the MUST is unreachable
 
 The check is implemented anyway, on the same reasoning specification section 9.1 gives for keeping `MTH([])`: a total function is easier to port than one with an undefined case, and a caller that reaches it has a defect worth failing loudly on rather than an input worth hashing.
 
+## 10. The corpus covers the verifying side of an envelope and not the producing side
+
+**Kind: corpus.
+This one is stated because it caught a real bug in this library that all 488 vectors did not.**
+
+Every committed envelope fixture was built by the corpus generator, so class 14, 15, 17 and 18 vectors all run this library's **verifier** against a third party's bytes.
+Nothing in the corpus runs this library's verifier against this library's own **issuance** output, because no vector asks an implementation to produce an envelope.
+
+The bug that gap hid: `Commitment.disclose` emitted each revealed leaf with `value: nil`, leaving the carrier for the caller to fill in.
+`EnvelopeVerifier` rejects exactly that shape, for `disclosed-leaf-named-without-value`, which is itself a committed corpus vector.
+So this library could issue a disclosure that its own verifier refused, while passing all 488 vectors including the one naming that very condition.
+An earlier round-trip test in this suite missed it too, because it checked inclusion proofs directly rather than driving `EnvelopeVerifier`.
+
+**The carriers are per tag and are not the record's spellings**, which is what makes the producing side worth covering rather than obvious: tags 0, 6 and 7 carry no value, BOOL carries a JSON boolean, INTEGER and DECIMAL carry strings already in canonical output form, and BYTES carries lowercase **hex** where the record spelled it base64.
+Four ways to get one wrong, none of them reachable from a vector.
+
+`Leaf.carrierValue` now produces them and `CorpusGapTests.testADisclosureThisLibraryProducesVerifiesThroughItsOwnVerifier` drives the real verifier over an envelope built from `Commitment.disclose`, with one leaf per carrier form.
+Reverting the fix fails that test on five leaves, which is how the coverage was confirmed rather than assumed.
+
+**The general shape is worth a corpus vector rather than four library-local tests.**
+A class asking an implementation to *produce* a disclosed copy from a record, a salt set and a path list, and to verify the result, would catch this in every language at once.
+It is a genuine gap in what `docs/conformance-corpus.md` defines rather than a gap in what the corpus happens to contain, so closing it is a corpus change and is not made here.
+
 ## What this build did not find
 
 Stated because a findings document that lists only hits is not checkable.
@@ -258,6 +282,8 @@ Stated because a findings document that lists only hits is not checkable.
 - **No ambiguity found in specification sections 5, 8 or 9.**
   Path encoding, the leaf preimage and the tree function were implemented from the text without a judgement call, and they were right first time against class 8's 173 vectors - 8 tree roots and 165 inclusion proofs - plus 86 leaf vectors and 28 path vectors.
   That is worth recording as evidence that those three sections are as implementable as section 1 claims.
+- **The package builds for its actual destination**, verified rather than declared: `xcodebuild -scheme ROAXCanon -destination 'generic/platform=iOS'` succeeds against `iPhoneOS26.2.sdk` at `arm64-apple-ios16.0`, with CryptoKit resolving there.
+  `swift build` alone would not have told anyone: handed an iOS target triple it still uses the macOS sysroot, warns `using sysroot for 'MacOSX' but targeting 'iPhone'`, and reports success.
 - **The reason-code divergence `corpus/README.md` measured is real and this library adds to it.**
   This implementation names the fail-closed condition `type-map-fail-closed`, agreeing with the TypeScript and Rust libraries and differing from the reference implementations' `type-map-uncovered-path` and from Python's `type-unresolved`.
   A declared equivalence table in the runner maps one reference code to the one local code naming the same condition, so a rejection for a different reason still fails.

@@ -11,6 +11,41 @@ public struct Leaf: Equatable {
     public let hash: [UInt8]
 
     public var displayPath: String { PathEncoding.display(segments) }
+
+    /// This leaf's value in the envelope carrier form its tag pins.
+    ///
+    /// `schemas/envelope-1.0.json` fixes one carrier per tag, and they are not
+    /// the record's spellings: tags 0, 6 and 7 carry no value at all, BOOL
+    /// carries a JSON boolean, INTEGER and DECIMAL carry **strings** already in
+    /// canonical output form, and BYTES carries lowercase **hex** rather than
+    /// the base64 the record used.
+    ///
+    /// This exists so that a disclosure built by this library verifies through
+    /// this library. Emitting a leaf without its carrier produces an envelope
+    /// whose own verifier rejects it for `disclosed-leaf-named-without-value`,
+    /// and no corpus vector can catch that, because every committed envelope
+    /// fixture was built by something else.
+    ///
+    /// The round trip is exact rather than approximate. A STRING leaf's encoded
+    /// bytes are `utf8(NFC(s))`, and re-encoding that text yields `NFC(NFC(s))`,
+    /// which NFC idempotence makes the same bytes; the numeric tags round-trip
+    /// because their encoded form already satisfies the output grammar their
+    /// canonicalizer produces.
+    public var carrierValue: JSONValue? {
+        switch tag {
+        case .null, .emptyArray, .emptyObject:
+            return nil
+        case .bool:
+            return .bool(encodedValue.first == 0x01)
+        case .string, .integer, .decimal:
+            return .string(String(decoding: encodedValue, as: UTF8.self))
+        case .bytes:
+            return .string(encodedValue.roaxHex)
+        case .blobRef:
+            // Selected by no version-1 profile, so a leaf can never carry it.
+            return nil
+        }
+    }
 }
 
 public enum LeafConstruction {
