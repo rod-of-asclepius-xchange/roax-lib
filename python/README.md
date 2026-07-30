@@ -15,8 +15,7 @@ Importing the package on an older interpreter raises a `RuntimeError` naming tha
 ## Read this first
 
 [`FINDINGS.md`](FINDINGS.md) is the more valuable half of this deliverable.
-It records the specification defects, divergences, ambiguities, confirmations and
-Python-specific hazards documented during this build, with the measurement behind each.
+It records the specification defects, divergences, ambiguities, confirmations and Python-specific hazards documented during this build, with the measurement behind each.
 
 ## Why it is written from the specification
 
@@ -40,11 +39,9 @@ python3 python/tools/run_corpus.py --references /path/to/schemata \
 
 This is a third runner and it is standalone.
 It does not extend `corpus/tools/run.sh`, which is the existing two-implementation gate; it consumes the vector file, the fixtures and the corpus-side type maps, which is the interface `corpus/README.md` documents for an implementation that is not one of those two.
-The runner does not deliberately write files or modify `corpus/`; the interpreter's normal
-`__pycache__` writes may still occur.
+The runner does not deliberately write files or modify `corpus/`; the interpreter's normal `__pycache__` writes may still occur.
 
-Measured on CPython 3.13.5:
-Pass and fail are assertion counts; not-run entries are vectors or required classes.
+Measured on CPython 3.13.5: Pass and fail are assertion counts; not-run entries are vectors or required classes.
 
 | Mode | Pass | Fail | Not run | Classes passed | Result | Exit |
 |---|---:|---:|---:|---:|---|---:|
@@ -53,32 +50,19 @@ Pass and fail are assertion counts; not-run entries are vectors or required clas
 | authorized, references available | 734 | 2 | 0 | 18/19 | `FAIL` | 1 |
 
 The first row is the only conforming PASS.
-Class 10 reproduces both roots of the MOH recovery sample at
-`references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/sample-data.ts`, upstream commit
-`09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`, at 69 and 70 leaves.
+Class 10 reproduces both roots of the MOH recovery sample at `references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/sample-data.ts`, upstream commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`, at 69 and 70 leaves.
 
 `--references` defaults first to `ROAX_REFERENCES`, then to `references/` at the repository root.
 The checkout is third-party, `.gitignore` excludes it, and it is never committed.
-Without it, class 10 reports its two vectors as NOT RUN with the attempted path and
-`--references /path/to/schemata` remedy, the terminal result is `INCOMPLETE / NOT RUN`, and
-the process exits 2.
+Without it, class 10 reports its two vectors as NOT RUN with the attempted path and `--references /path/to/schemata` remedy, the terminal result is `INCOMPLETE / NOT RUN`, and the process exits 2.
 It never reports PASS for those 734 assertions.
 The whole difference is class 10's two vectors and the 4 assertions they carry, whose records resolve out of that checkout through the `recordFile` strings committed at `corpus/conformance-corpus-1.0.json:5900` and `:5914`.
-The authorized-mode 734 is a different measurement: the checkout is present, the two
-class-5 empty-container records fail closed, and the process exits 1
-([`FINDINGS.md`](FINDINGS.md), item 1).
-An unsupported reject-vector shape, an unsupported record-vector envelope carrier, a missing
-committed type map, or a present reference module that cannot be extracted is a failure and
-also exits 1.
+The authorized-mode 734 is a different measurement: the checkout is present, the two class-5 empty-container records fail closed, and the process exits 1 ([`FINDINGS.md`](FINDINGS.md), item 1).
+An unsupported reject-vector shape, an unsupported record-vector envelope carrier, a missing committed type map, or a present reference module that cannot be extracted is a failure and also exits 1.
 
-A record vector carrying `typeMapId` is the other NOT RUN case, and it is deliberately not a
-failure.
-That field selects envelope 2.0, which this package does not implement, so such a vector is one
-the runner cannot run rather than one it ran and disagreed with; it reports NOT RUN with the
-reason and contributes to exit 2.
-No committed corpus 1.0 record vector carries the field, so nothing reaches this path today and
-none of the figures above move; it becomes reachable on the corpus rebuild
-[`AGENTS.md`](../AGENTS.md) records as pending.
+A record vector carrying `typeMapId` is the other NOT RUN case, and it is deliberately not a failure.
+That field selects envelope 2.0, which this package does not implement, so such a vector is one the runner cannot run rather than one it ran and disagreed with; it reports NOT RUN with the reason and contributes to exit 2.
+No committed corpus 1.0 record vector carries the field, so nothing reaches this path today and none of the figures above move; it becomes reachable on the corpus rebuild [`AGENTS.md`](../AGENTS.md) records as pending.
 
 ## Running the unit tests
 
@@ -114,17 +98,12 @@ Runnable as written, from the repository root, with `PYTHONPATH=python/src`.
 ### Full-copy serialization warning
 
 Plain `json.dumps(full_copy(...))` is not a supported wire serializer.
-`JsonNumber` subclasses `str`, so `json.dumps` quotes record numbers and changes their observed
-JSON kind from `number` to `string` when the envelope is read again.
-Specification section 7.3 requires a full copy's record body to preserve the original JSON
-number form.
-This package ships no serializer, so callers writing a full copy to the wire must emit those
-original numeric tokens unquoted ([`FINDINGS.md`](FINDINGS.md), item 12).
+`JsonNumber` subclasses `str`, so `json.dumps` quotes record numbers and changes their observed JSON kind from `number` to `string` when the envelope is read again.
+Specification section 7.3 requires a full copy's record body to preserve the original JSON number form.
+This package ships no serializer, so callers writing a full copy to the wire must emit those original numeric tokens unquoted ([`FINDINGS.md`](FINDINGS.md), item 12).
 
-The example below uses `org.roax.corpus.synthetic` only because its authored type map covers
-the example record.
-That profile is corpus-only and must never be issued against
-([`corpus/README.md`](../corpus/README.md), "The synthetic profile").
+The example below uses `org.roax.corpus.synthetic` only because its authored type map covers the example record.
+That profile is corpus-only and must never be issued against ([`corpus/README.md`](../corpus/README.md), "The synthetic profile").
 
 ```python
 import roax_canon as roax

@@ -1,12 +1,10 @@
 # Profile: Singapore MOH PDT HealthCert 2.0
 
-**`recordType`:** `sg.gov.moh.pdt-healthcert`
-**`schemaVersion`:** `2.0`
-**Status:** the base profile map is published as [`type-maps/sg.gov.moh.pdt-healthcert-2.0.json`](../../type-maps/sg.gov.moh.pdt-healthcert-2.0.json) at exact artifact ID `sha256:4f8cecc59c85101b8b567658c90651bcbf8f9d4dc279571aa40a03cf04f434ff`.
+**`recordType`:** `sg.gov.moh.pdt-healthcert` **`schemaVersion`:** `2.0` **Status:** the base profile map is published as [`type-maps/sg.gov.moh.pdt-healthcert-2.0.json`](../../type-maps/sg.gov.moh.pdt-healthcert-2.0.json) at exact artifact ID `sha256:4f8cecc59c85101b8b567658c90651bcbf8f9d4dc279571aa40a03cf04f434ff`.
 The published base artifact intentionally excludes 20 path/kind pairs present in the endorsed sample because no clinic or endorsed composition artifact has been selected, the lite-FHIR `Narrative.div` and four `base64Binary` slots remain unresolved, and 65 Bundle-reachable lite-FHIR object nodes omit an object type, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.2, 1.3, 1.5 and 2.
 
-PDT is the pre-departure test certificate. It is the most structurally complex of the three
-healthcert families, because it is not one schema but three compositional views of a workflow.
+PDT is the pre-departure test certificate.
+It is the most structurally complex of the three healthcert families, because it is not one schema but three compositional views of a workflow.
 
 ---
 
@@ -19,16 +17,15 @@ id, version, type, validFrom, fhirVersion, fhirBundle
 ```
 
 - `version` is fixed to `pdt-healthcert-v2.0`.
-- `type` is either one of `PCR`, `ART`, `SER`, `LAMP`, **or** a non-empty array of those values with
-  unique items. Both forms are legal, which matters for the type map: the same path is sometimes a
-  string and sometimes an array.
+- `type` is either one of `PCR`, `ART`, `SER`, `LAMP`, **or** a non-empty array of those values with unique items.
+  Both forms are legal, which matters for the type map: the same path is sometimes a string and sometimes an array.
 - `validFrom` is a date-time.
-- `fhirBundle` references the **lite** FHIR 4.0.1 `Bundle` definition, so its entries carry a nested
-  `.resource`. This is the genuine FHIR Bundle layout, unlike the vaccination profile.
-- The optional `logo` is described only as base64. There is no encoding pattern.
-- **The top object does not set `additionalProperties: false`,** so extensions are allowed. That is
-  the opposite of the vaccination profile and it directly affects how the fail-closed rule behaves
-  here - see section 5.
+- `fhirBundle` references the **lite** FHIR 4.0.1 `Bundle` definition, so its entries carry a nested `.resource`.
+  This is the genuine FHIR Bundle layout, unlike the vaccination profile.
+- The optional `logo` is described only as base64.
+  There is no encoding pattern.
+- **The top object does not set `additionalProperties: false`,** so extensions are allowed.
+  That is the opposite of the vaccination profile and it directly affects how the fail-closed rule behaves here - see section 5.
 
 ## 2. Three schemas, one workflow
 
@@ -54,19 +51,14 @@ government-endorsed OA record
   + the original clinic OA document as a base64 attachment
 ```
 
-**This is confirmed, not inferred, for the attachment step.** The `text/open-attestation`
-attachment in the endorsed sample was decoded and found to be an OA v2 wrapped clinic document: its
-unsalted payload matches the clinic sample, and its `signature.targetHash` and `merkleRoot` are the
-same single-document digest, recomputed independently from 119 flattened field leaves with zero
-obfuscated leaves.
+**This is confirmed, not inferred, for the attachment step.**
+The `text/open-attestation` attachment in the endorsed sample was decoded and found to be an OA v2 wrapped clinic document: its unsalted payload matches the clinic sample, and its `signature.targetHash` and `merkleRoot` are the same single-document digest, recomputed independently from 119 flattened field leaves with zero obfuscated leaves.
 
-**But the workflow is not schema-enforced.** The endorsed schema does not require an attachment, a
-masked national identifier, a new `id`, a distinct endorser, or any cryptographic or content
-relationship between the visible endorsed payload and the attachment. The clinic and endorsed test
-suites contain one happy-path assertion each.
+**But the workflow is not schema-enforced.**
+The endorsed schema does not require an attachment, a masked national identifier, a new `id`, a distinct endorser, or any cryptographic or content relationship between the visible endorsed payload and the attachment.
+The clinic and endorsed test suites contain one happy-path assertion each.
 
-So the sequence above is strong fixture evidence about intent, and a weak guarantee about any
-particular document.
+So the sequence above is strong fixture evidence about intent, and a weak guarantee about any particular document.
 
 ## 3. Type-map scope
 
@@ -100,13 +92,12 @@ Two specific hazards:
 | `type` | The test kind. A PDT certificate that does not say whether it was PCR or ART is not a test certificate. |
 | `validFrom` | A validity claim with no start is not checkable. |
 
-`validUntil` is deliberately absent from this list because the PDT base schema does not have one;
-that is the recovery profile.
+`validUntil` is deliberately absent from this list because the PDT base schema does not have one; that is the recovery profile.
 
 ## 5. Interaction with the fail-closed rule - read this
 
-The PDT base object **allows additional properties.** So a real PDT record may legitimately carry
-fields the type map has never seen.
+The PDT base object **allows additional properties.**
+So a real PDT record may legitimately carry fields the type map has never seen.
 
 **Decision D7 is ruled D7a - fail closed, permanently** (2026-07-28, `docs/decisions.md`).
 Such a record is rejected at issuance rather than being given a guessed type tag, under specification section 4.2.
@@ -122,15 +113,10 @@ The 20 endorsed-sample pairs are proposals rather than bindings.
 Nineteen have explicit string evidence in the composed OpenAttestation or Notarise schema, while `notarisationMetadata.signedEuHealthCerts[*].expiryDateTime` has only a date-time annotation and string examples with no declared type, as documented in [`docs/type-maps.md`](../type-maps.md) section 1.2.
 The base map never chooses STRING for any of those pairs on the strength of their sample syntax.
 
-**Why this matters more here than anywhere else.** PDT already has the most real-world traffic of the
-three healthcert families, and its open-world base object means an unknown path is a routine event
-rather than an anomaly - the opposite of the vaccination profile, whose top-level object closes with
-`additionalProperties: false` (see [`vaccination-healthcert.md`](vaccination-healthcert.md) section
-1). If extending the map is slow or unclear, fail-closed becomes an adoption blocker exactly where it
-can least afford to be, and the pressure to "just default it to STRING for now" will arrive from a
-real issuer with a real record. That is the moment refusing is hardest, which is why the refusal is
-normative in the specification rather than advisory, and why the extension path being fast is a
-deliverable rather than an aspiration.
+**Why this matters more here than anywhere else.**
+PDT already has the most real-world traffic of the three healthcert families, and its open-world base object means an unknown path is a routine event rather than an anomaly - the opposite of the vaccination profile, whose top-level object closes with `additionalProperties: false` (see [`vaccination-healthcert.md`](vaccination-healthcert.md) section 1).
+If extending the map is slow or unclear, fail-closed becomes an adoption blocker exactly where it can least afford to be, and the pressure to "just default it to STRING for now" will arrive from a real issuer with a real record.
+That is the moment refusing is hardest, which is why the refusal is normative in the specification rather than advisory, and why the extension path being fast is a deliverable rather than an aspiration.
 
 ### 5.1 Blob binding
 
@@ -139,30 +125,25 @@ deliverable rather than an aspiration.
 
 Two things that ruling did change, and neither alters a byte of an existing PDT record:
 
-- **One canonical base64 form is now pinned** - RFC 4648 section 4, standard alphabet, with padding,
-  no line wrapping (specification section 6.3). This governs a `BYTES` binding rather than a `STRING`
-  one, so it does not change the operative `logo` STRING binding. It matters here because the PDT schema
-  describes `logo` only as base64 with no encoding pattern (section 6 below), so nothing upstream
-  constrains what an issuer sends.
-- **A content-addressed binding, type tag 8 `BLOB_REF`, is defined and selected by nothing**
-  (specification section 6.5). **This profile does not select it**, and an implementation MUST reject
-  a record that binds any PDT path to tag 8. It exists so that a future record family issuing under
-  Poseidon - where a 14 KB blob costs about 14 ms rather than about 41 microseconds - does not need a
-  second leaf-binding form retrofitted after five implementations already exist.
+- **One canonical base64 form is now pinned** - RFC 4648 section 4, standard alphabet, with padding, no line wrapping (specification section 6.3).
+  This governs a `BYTES` binding rather than a `STRING` one, so it does not change the operative `logo` STRING binding.
+  It matters here because the PDT schema describes `logo` only as base64 with no encoding pattern (section 6 below), so nothing upstream constrains what an issuer sends.
+- **A content-addressed binding, type tag 8 `BLOB_REF`, is defined and selected by nothing** (specification section 6.5).
+  **This profile does not select it**, and an implementation MUST reject a record that binds any PDT path to tag 8.
+  It exists so that a future record family issuing under Poseidon - where a 14 KB blob costs about 14 ms rather than about 41 microseconds - does not need a second leaf-binding form retrofitted after five implementations already exist.
 
 ## 6. Known defects and cautions
 
-- **`fhirVersion` is unvalidated** - example `4.0.1`, not `const` or `enum`. See
-  [`fhir.md`](fhir.md) section 6.
+- **`fhirVersion` is unvalidated** - example `4.0.1`, not `const` or `enum`.
+  See [`fhir.md`](fhir.md) section 6.
 - **`logo` has no base64 pattern**, so it is not validated as base64 at all.
-- **A minimal Bundle validates.** `{"resourceType":"Bundle"}` satisfies `fhirBundle`. Confirmed by
-  reproduction against the audited schema.
+- **A minimal Bundle validates.**
+  `{"resourceType":"Bundle"}` satisfies `fhirBundle`.
+  Confirmed by reproduction against the audited schema.
 
 ## 7. What the schema and tests do NOT enforce
 
-The tests validate the sample, all four scalar `type` values and a multi-type certificate; they
-reject a missing `id`, `version` or `type`, unknown or duplicate types, a missing or malformed
-`validFrom`, and a missing FHIR version or bundle.
+The tests validate the sample, all four scalar `type` values and a multi-type certificate; they reject a missing `id`, `version` or `type`, unknown or duplicate types, a missing or malformed `validFrom`, and a missing FHIR version or bundle.
 
 They do **not** test, and the schema does not require, that:
 
@@ -175,18 +156,13 @@ They do **not** test, and the schema does not require, that:
 - identifiers are UUIDs;
 - the `logo` is valid base64.
 
-These omissions agree with the schema. They are not missing test coverage over a stricter rule; the
-rule is genuinely absent.
+These omissions agree with the schema.
+They are not missing test coverage over a stricter rule; the rule is genuinely absent.
 
-**Consequence for ROAX:** a valid `sg.gov.moh.pdt-healthcert` root proves that a particular typed
-payload was committed by a particular issuer. It does not prove that the payload describes a test,
-still less a negative one. Any product surface that says "negative PDT result" is making a claim the
-protocol layer does not support, and must derive it from the payload itself after disclosure and
-attribute it to the payload.
+**Consequence for ROAX:** a valid `sg.gov.moh.pdt-healthcert` root proves that a particular typed payload was committed by a particular issuer.
+It does not prove that the payload describes a test, still less a negative one.
+Any product surface that says "negative PDT result" is making a claim the protocol layer does not support, and must derive it from the payload itself after disclosure and attribute it to the payload.
 
-**That is now normative rather than advisory.** Decision D13 is ruled, and specification section 2.3
-states that no surface derived from this protocol may assert a clinical fact on the strength of root
-validity alone. Enforcing the rules this section lists as absent - that the Bundle contains an
-Observation, that `type` agrees with the method, that the result is negative - belongs to the
-separate, independently versioned clinical-validation layer that ruling puts outside
-`ROAX-CANON/1`.
+**That is now normative rather than advisory.**
+Decision D13 is ruled, and specification section 2.3 states that no surface derived from this protocol may assert a clinical fact on the strength of root validity alone.
+Enforcing the rules this section lists as absent - that the Bundle contains an Observation, that `type` agrees with the method, that the result is negative - belongs to the separate, independently versioned clinical-validation layer that ruling puts outside `ROAX-CANON/1`.

@@ -1,13 +1,10 @@
 # Profile: Singapore MOH Vaccination HealthCert 1.0
 
-**`recordType`:** `sg.gov.moh.vaccination-healthcert`
-**`schemaVersion`:** `1.0`
-**Status:** the fail-closed map is published as [`type-maps/sg.gov.moh.vaccination-healthcert-1.0.json`](../../type-maps/sg.gov.moh.vaccination-healthcert-1.0.json) at exact artifact ID `sha256:de7bb92226af5fa5dc5064d9cb203329abc69160f4280fdf739e66e5e0151e93`.
+**`recordType`:** `sg.gov.moh.vaccination-healthcert` **`schemaVersion`:** `1.0` **Status:** the fail-closed map is published as [`type-maps/sg.gov.moh.vaccination-healthcert-1.0.json`](../../type-maps/sg.gov.moh.vaccination-healthcert-1.0.json) at exact artifact ID `sha256:de7bb92226af5fa5dc5064d9cb203329abc69160f4280fdf739e66e5e0151e93`.
 `notarisationMetadata.signedEuHealthCerts[*].dose` and `notarisationMetadata.signedEuHealthCerts[*].expiryDateTime` remain unbound, so the shipped sample is uncommittable under fail-closed, and 26 object-intended schema paths leave their non-object alternatives unbound, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.1, 1.4 and 2.
 
-**This is the structurally different one.** Read section 2 before anything else; it is the reason
-this family cannot share a `fhirBundle` handler with PDT and recovery, and it is the place where a
-well-intentioned normalization would break every commitment already made.
+**This is the structurally different one.**
+Read section 2 before anything else; it is the reason this family cannot share a `fhirBundle` handler with PDT and recovery, and it is the place where a well-intentioned normalization would break every commitment already made.
 
 ---
 
@@ -24,19 +21,16 @@ Unlike PDT and recovery, the top-level object **closes** with `additionalPropert
 That makes an unknown top-level path genuinely anomalous under the fail-closed rule in specification section 4.2.
 It does not make the current map complete because two Notarise scalar paths lack decisive type evidence and 26 nested schemas omit an object type, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.1 and 1.4.
 
-Note also what is *not* required: there is no `version` field pinning a healthcert version string,
-unlike `pdt-healthcert-v2.0` and `rec-healthcert-v2.0`. The record's own identification of its
-family rests on `$id`, which is itself defective - see section 5.
+Note also what is *not* required: there is no `version` field pinning a healthcert version string, unlike `pdt-healthcert-v2.0` and `rec-healthcert-v2.0`.
+The record's own identification of its family rests on `$id`, which is itself defective - see section 5.
 
 ## 2. The `fhirBundle` layout is NOT the FHIR Bundle layout
 
 This is the critical finding for this profile.
 
-In PDT and recovery, `fhirBundle` references the lite FHIR `Bundle`, whose entries are wrappers:
-the resource sits at `entry[i].resource`.
+In PDT and recovery, `fhirBundle` references the lite FHIR `Bundle`, whose entries are wrappers: the resource sits at `entry[i].resource`.
 
-In vaccination 1.0, `fhirBundle.entry[]` items **directly** match a `Patient`, `Specimen`,
-`Observation`, `Organization`, `Immunization`, `ImmunizationRecommendation` or `Location`.
+In vaccination 1.0, `fhirBundle.entry[]` items **directly** match a `Patient`, `Specimen`, `Observation`, `Organization`, `Immunization`, `ImmunizationRecommendation` or `Location`.
 The sample correspondingly places `fullUrl` and `resourceType` directly on each entry.
 
 ```
@@ -52,43 +46,40 @@ PDT / recovery (genuine FHIR Bundle):     vaccination 1.0 (flattened pseudo-FHIR
 ### 2.1 Why this must not be silently normalized
 
 Under `ROAX-CANON/1` the path is inside every leaf preimage (specification section 8).
-`fhirBundle.entry[0].birthDate` and `fhirBundle.entry[0].resource.birthDate` are different paths,
-so they are different leaves, so they produce a different root.
+`fhirBundle.entry[0].birthDate` and `fhirBundle.entry[0].resource.birthDate` are different paths, so they are different leaves, so they produce a different root.
 
 > **Normative for this profile:** an implementation MUST commit the flattened layout as it stands.
 > It MUST NOT normalize entries into the genuine FHIR wrapper shape before hashing.
 
-Silent normalization would make every existing commitment unverifiable, and would do so quietly -
-the record would still look like valid FHIR, and would simply fail to match its anchored root.
+Silent normalization would make every existing commitment unverifiable, and would do so quietly - the record would still look like valid FHIR, and would simply fail to match its anchored root.
 
 Two legitimate options exist and the choice is a product decision, not an implementation detail:
 
-- **Preserve as a distinct payload profile.** Exact compatibility, no semantic rewrite. Consumers
-  must handle both the genuine and the flattened Bundle forms. This is what this document specifies.
-- **Normalize through a declared, versioned adapter.** Downstream code gets genuine FHIR, but the
-  adapter version and both the pre- and post-normalization identities must be explicit, and any
-  existing proof remains a proof of the legacy bytes, not of the rewritten record.
+- **Preserve as a distinct payload profile.**
+  Exact compatibility, no semantic rewrite.
+  Consumers must handle both the genuine and the flattened Bundle forms.
+  This is what this document specifies.
+- **Normalize through a declared, versioned adapter.**
+  Downstream code gets genuine FHIR, but the adapter version and both the pre- and post-normalization identities must be explicit, and any existing proof remains a proof of the legacy bytes, not of the rewritten record.
 
-This is folded into decision C in `docs/decisions.md`, since it bears directly on what happens to
-already-issued Singapore healthcerts.
+This is folded into decision C in `docs/decisions.md`, since it bears directly on what happens to already-issued Singapore healthcerts.
 
 ## 3. Type-map scope
 
-The vaccination healthcert **references neither the full nor the lite FHIR schema.** It defines its
-`fhirBundle` inline against its own seven definitions:
+The vaccination healthcert **references neither the full nor the lite FHIR schema.**
+It defines its `fhirBundle` inline against its own seven definitions:
 
 ```
 Patient, Specimen, Observation, Organization,
 Immunization, ImmunizationRecommendation, Location
 ```
 
-Compare with lite's seven: `Bundle, Device, Observation, Organization, Patient, Practitioner,
-Specimen`. They are **not the same seven.** Lite has `Bundle`, `Device` and `Practitioner`;
-vaccination has `Immunization`, `ImmunizationRecommendation` and `Location`.
+Compare with lite's seven: `Bundle, Device, Observation, Organization, Patient, Practitioner, Specimen`.
+They are **not the same seven.**
+Lite has `Bundle`, `Device` and `Practitioner`; vaccination has `Immunization`, `ImmunizationRecommendation` and `Location`.
 
-**Lite omits `Immunization` and `ImmunizationRecommendation` entirely.** A type map built from the
-lite schema alone therefore fails closed on the central clinical content of every vaccination
-record.
+**Lite omits `Immunization` and `ImmunizationRecommendation` entirely.**
+A type map built from the lite schema alone therefore fails closed on the central clinical content of every vaccination record.
 This is why the vaccination definitions are materialized in their own exact artifact rather than being looked up in either healthcert lite-FHIR map, as documented in [`fhir.md`](fhir.md) section 4 and [`docs/type-maps.md`](../type-maps.md) section 2.
 
 Additional scope for this profile:
@@ -130,9 +121,8 @@ An implementation MUST report the unresolved binding and stop rather than choose
 
 ### 3.3 Blobs
 
-`logo` is 14,314 bytes in the vaccination sample - a single embedded PNG. Together with the PDT
-attachment it is why blobs are 60-70% of all hashed bytes across the reference records
-(decision D9).
+`logo` is 14,314 bytes in the vaccination sample - a single embedded PNG.
+Together with the PDT attachment it is why blobs are 60-70% of all hashed bytes across the reference records (decision D9).
 The published map binds `logo` and declared attachment data as STRING over the base64 text because the source schemas declare strings, under specification sections 4.2 and 6.3.
 
 ## 4. Non-redactable paths
@@ -149,24 +139,21 @@ That makes the reserved floor more load-bearing here than elsewhere.
 
 ## 5. Known defects and cautions
 
-- **The `$id` is wrong.** It points at a PDT interim-healthcert path despite the title saying
-  vaccination. This is the second `$id` copy error across the reference schemata - the recovery
-  schema has the other one. Same requirement as in
-  [`recovery-healthcert.md`](recovery-healthcert.md) section 2: do not resolve these schemas by
-  `$id`.
-- **Several nested resource definitions omit an explicit `type: "object"`,** which weakens
-  validation under JSON Schema's keyword-applicability rules. Keywords like `properties` and
-  `required` simply do not apply to a non-object instance, so those definitions accept values they
-  appear to constrain.
+- **The `$id` is wrong.**
+  It points at a PDT interim-healthcert path despite the title saying vaccination.
+  This is the second `$id` copy error across the reference schemata - the recovery schema has the other one.
+  Same requirement as in [`recovery-healthcert.md`](recovery-healthcert.md) section 2: do not resolve these schemas by `$id`.
+- **Several nested resource definitions omit an explicit `type: "object"`,** which weakens validation under JSON Schema's keyword-applicability rules.
+  Keywords like `properties` and `required` simply do not apply to a non-object instance, so those definitions accept values they appear to constrain.
   The map follows declared object children but leaves every non-object alternative unbound at all 26 affected path patterns, as listed in [`docs/type-maps.md`](../type-maps.md) section 1.4.
-- **`fhirBundle.entry` has no `minItems`.** An empty entry array is valid. The `anyOf` restricts an
-  item only when an item is present, so the schema does not require a Patient, an Immunization or a
-  Recommendation - it does not require any entry at all.
+- **`fhirBundle.entry` has no `minItems`.**
+  An empty entry array is valid.
+  The `anyOf` restricts an item only when an item is present, so the schema does not require a Patient, an Immunization or a Recommendation - it does not require any entry at all.
 
 ## 6. What the schema does NOT enforce
 
-The local test suite has **exactly one assertion**: that the full sample is valid. There are no
-negative tests.
+The local test suite has **exactly one assertion**: that the full sample is valid.
+There are no negative tests.
 
 The sample demonstrates five relationships that the schema does not assert:
 
@@ -176,22 +163,15 @@ The sample demonstrates five relationships that the schema does not assert:
 - patient and location references resolve to entry `fullUrl` values;
 - the two Immunizations align with the two EU DCC dose records.
 
-Within a resource, the schema is stricter than its siblings: `Patient` requires `resourceType`, a
-nationality extension, at least one identifier, at least one name and a birth date, and
-`Immunization` requires a resource type, vaccine code, occurrence date and lot number.
+Within a resource, the schema is stricter than its siblings: `Patient` requires `resourceType`, a nationality extension, at least one identifier, at least one name and a birth date, and `Immunization` requires a resource type, vaccine code, occurrence date and lot number.
 
-**But "required within a resource" is not "the bundle must contain that resource."** Since `entry`
-has no `minItems` and the `anyOf` only constrains items that exist, a vaccination healthcert with
-an empty bundle validates.
+**But "required within a resource" is not "the bundle must contain that resource."**
+Since `entry` has no `minItems` and the `anyOf` only constrains items that exist, a vaccination healthcert with an empty bundle validates.
 
-**Consequence for ROAX:** a valid `sg.gov.moh.vaccination-healthcert` root proves a typed payload
-was committed by an issuer. It does not prove the record contains a patient, contains any
-vaccination, or that its cross-field relationships hold. Those five sample relationships are
-plausible product invariants and every one of them would have to be added by this profile to be
-relied upon.
+**Consequence for ROAX:** a valid `sg.gov.moh.vaccination-healthcert` root proves a typed payload was committed by an issuer.
+It does not prove the record contains a patient, contains any vaccination, or that its cross-field relationships hold.
+Those five sample relationships are plausible product invariants and every one of them would have to be added by this profile to be relied upon.
 
-**Decision D13 is ruled and that makes this normative.** Specification section 2.3 states that no
-surface derived from this protocol may assert a clinical fact from root validity alone, and puts
-clinical validation in a separate, independently versioned layer. This profile is the sharpest case
-for it: `fhirBundle.entry` has no `minItems`, so a vaccination healthcert with an empty bundle
-validates, commits, anchors and verifies while asserting no vaccination at all.
+**Decision D13 is ruled and that makes this normative.**
+Specification section 2.3 states that no surface derived from this protocol may assert a clinical fact from root validity alone, and puts clinical validation in a separate, independently versioned layer.
+This profile is the sharpest case for it: `fhirBundle.entry` has no `minItems`, so a vaccination healthcert with an empty bundle validates, commits, anchors and verifies while asserting no vaccination at all.
