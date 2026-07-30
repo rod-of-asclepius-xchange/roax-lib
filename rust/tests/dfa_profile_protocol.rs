@@ -273,3 +273,167 @@ fn both_high_level_call_sites_resolve_a_decomposed_key_like_its_composed_twin() 
     verify_text(&rewritten, &profile, policy)
         .expect("a decomposed disclosed key must verify under D14a");
 }
+
+/// A type map that binds one INTEGER leaf, for the profile-rule layering test below.
+fn integer_artifact() -> Vec<u8> {
+    let artifact = json!({
+        "format": "ROAX-TYPE-MAP/1",
+        "typeMapVersion": "1.0.0",
+        "recordType": "org.roax.test.protocol",
+        "schemaVersion": "1",
+        "scope": { "kind": "profile" },
+        "sourceSchemas": [{
+            "sourceId": "test-source",
+            "kind": "content",
+            "uri": "https://example.invalid/schema.json",
+            "digest": format!("sha256:{}", "0".repeat(64))
+        }],
+        "extensionPoints": [],
+        "addedSelectors": [],
+        "coverage": {
+            "concretePathCardinality": "infinite",
+            "states": 2,
+            "keyTransitions": 1,
+            "indexTransitions": 0,
+            "resolvedOutputs": 1,
+            "unresolvedOutputStates": 0,
+            "structurallyUntypedObjectSourceNodes": 0,
+            "structurallyUntypedObjectStates": 0,
+            "byTag": { "3": 1 },
+            "byBasis": { "schema-type": 1 },
+            "notes": []
+        },
+        "automaton": {
+            "representation": "structured-path-dfa/1",
+            "start": "s0",
+            "states": [
+                { "id": "s0", "keys": [{ "key": "dose", "to": "s1" }] },
+                { "id": "s1", "bindings": [{
+                    "jsonKind": "number",
+                    "tag": 3,
+                    "basis": ["schema-type"],
+                    "sources": ["test-source"]
+                }] }
+            ]
+        }
+    });
+    serde_json::to_vec(&artifact).expect("synthetic artifact must serialize")
+}
+
+/// A profile that also enforces a declared value rule, through `SchemaValidator`.
+///
+/// This is where a value-domain narrowing belongs. ROAX-CANON/1 section 4.2 orders profile
+/// validation BEFORE map resolution, and ruled decision D13a keeps value-domain validation in
+/// "a separate, independently versioned conformance layer" rather than in the canonicalization
+/// layer, so this crate deliberately carries no such rule of its own and exposes this seam
+/// instead (`docs/decisions.md`, D13; `docs/profiles/vaccination-healthcert.md` section 6).
+struct PositiveDoseProfile {
+    inner: DfaProfile,
+}
+
+impl SchemaValidator for PositiveDoseProfile {
+    fn validate_record(&self, record: &JsonValue) -> roax_canon::Result<()> {
+        let JsonValue::Object(members) = record else {
+            return Err(Error::ProfileValidation("record must be an object".into()));
+        };
+        for (key, value) in members {
+            if key != "dose" {
+                continue;
+            }
+            // The rule is stated over the exact numeric TEXT, never a parsed float: the whole
+            // point of ROAX-CANON/1 sections 3.2 and 6.4 is that a record number never passes
+            // through one, and a profile rule reading `as_f64` would reintroduce that hazard at
+            // the validation layer.
+            let text = match value {
+                JsonValue::Number(literal) => literal.as_str(),
+                _ => {
+                    return Err(Error::ProfileValidation(
+                        "dose must be a JSON number".into(),
+                    ))
+                }
+            };
+            if !text.starts_with(['1', '2', '3', '4', '5', '6', '7', '8', '9'])
+                || !text.bytes().all(|b| b.is_ascii_digit())
+            {
+                return Err(Error::ProfileValidation(format!(
+                    "dose-positive-integer: {text} is not a positive integer"
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl TypeResolver for PositiveDoseProfile {
+    fn resolve(&self, path: &Path, kind: JsonKind) -> roax_canon::Result<TypeTag> {
+        self.inner.resolve(path, kind)
+    }
+}
+
+impl Profile for PositiveDoseProfile {
+    fn record_type(&self) -> &str {
+        self.inner.record_type()
+    }
+
+    fn validate_context(&self, context: &CommitmentContext) -> roax_canon::Result<()> {
+        self.inner.validate_context(context)
+    }
+
+    fn resolver(&self) -> &dyn TypeResolver {
+        self
+    }
+
+    fn minimum_disclosure_paths(&self) -> Vec<Path> {
+        Vec::new()
+    }
+}
+
+#[test]
+fn a_declared_profile_value_rule_narrows_what_the_integer_binding_admits() {
+    // The RULED `dose` binding is INTEGER, and the ruling carries a positive-integer narrowing.
+    // The two halves land in different layers and this test pins both, plus the fact that the
+    // narrowing is not something the type map could express.
+    let bytes = integer_artifact();
+    let id = content_id(&bytes);
+    let map = DfaTypeMap::from_exact_bytes(&bytes, &id).expect("synthetic artifact loads");
+    let context = context_for(&map, "record-1");
+    let inner = DfaProfile {
+        map,
+        floor: Vec::new(),
+    };
+    let ruled = PositiveDoseProfile { inner };
+
+    // The values the shipped vaccination sample carries.
+    for text in ["1", "2"] {
+        let record = JsonValue::from_str(&format!("{{\"dose\":{text}}}"))
+            .expect("record parses");
+        issue_full_copy(&record, &context, &ruled)
+            .unwrap_or_else(|error| panic!("dose {text} must issue: {error}"));
+    }
+
+    // `0` and the negatives are grammar-valid ROAX INTEGERs, so the TAG alone admits them.
+    // Without the profile rule each would commit, which is precisely why the ruling is not a
+    // bare type-map edit. A fractional value is refused one layer down by the section 6.2
+    // INTEGER grammar and is therefore not the discriminating case.
+    for text in ["0", "-0", "-1", "-999"] {
+        let record = JsonValue::from_str(&format!("{{\"dose\":{text}}}"))
+            .expect("record parses");
+        let error = issue_full_copy(&record, &context, &ruled)
+            .expect_err(&format!("dose {text} must be refused by the profile rule"));
+        assert!(
+            matches!(error, Error::ProfileValidation(ref detail)
+                if detail.contains("dose-positive-integer")),
+            "dose {text} was refused by {error} rather than by the declared profile rule"
+        );
+
+        // And the CANONICALIZATION layer accepts the same value, which is the layering this
+        // test exists to state: the tag is INTEGER and `0` is a valid INTEGER, so nothing
+        // below the profile refuses it.
+        let bare = DfaProfile {
+            map: DfaTypeMap::from_exact_bytes(&bytes, &id).expect("synthetic artifact loads"),
+            floor: Vec::new(),
+        };
+        issue_full_copy(&record, &context, &bare)
+            .unwrap_or_else(|error| panic!("the canonicalization layer must accept {text}: {error}"));
+    }
+}

@@ -328,22 +328,39 @@ MOH_TYPE_MAP_VECTORS = [
     ("typemap-pdt-polymorphic-type", "sg.gov.moh.pdt-healthcert",
      [{"key": "type"}], "string"),
 
+    # The two RULED vaccination bindings. Both were fail-closed rows until 2026-07-30, and the
+    # rows are kept at the same paths rather than deleted so the change of verdict is visible in
+    # the corpus rather than only in a document. Neither tag is written here: like every other
+    # row in this file the expected outcome is COMPUTED against the committed type map, so what
+    # this pins is that the ruling reached the map that class 10 resolves against.
+    #
+    #   dose            RULED INTEGER, Strong. `type: "number"` chooses neither ROAX numeric
+    #                   tag; the EU DCC dose-sequence number these certificates mirror is a
+    #                   positive integer. The positive-integer half is a profile-validation rule
+    #                   rather than a tag - see corpus/tools/profile_rules.py.
+    #   expiryDateTime  RULED STRING, Moderate, by explicit profile declaration rather than by
+    #                   the schema, which carries a `format` and `examples` and no `type` at all
+    #                   and therefore formally admits every JSON kind.
+    ("typemap-vaccination-dose-ruled-integer", "sg.gov.moh.vaccination-healthcert",
+     [{"key": "notarisationMetadata"}, {"key": "signedEuHealthCerts"}, {"index": 0},
+      {"key": "dose"}], "number"),
+    ("typemap-vaccination-expiry-ruled-string", "sg.gov.moh.vaccination-healthcert",
+     [{"key": "notarisationMetadata"}, {"key": "signedEuHealthCerts"}, {"index": 0},
+      {"key": "expiryDateTime"}], "string"),
+    # A ruling binds ONE observed kind and widens nothing else. `dose` arriving as a JSON string
+    # still fails closed, which is what separates a ruled binding from a coercion.
+    ("typemap-vaccination-dose-other-kind-fails-closed", "sg.gov.moh.vaccination-healthcert",
+     [{"key": "notarisationMetadata"}, {"key": "signedEuHealthCerts"}, {"index": 0},
+      {"key": "dose"}], "string"),
+
     # Fail-closed, on paths that are genuinely present in the shipped samples and that the
     # reference schemas do not determine a ROAX tag for. These are not invented gaps.
     #
-    #   dose            declared "type": "number" with no pattern. ROAX has two numeric tags
-    #                   and JSON Schema's `number` chooses neither. FHIR's own lite schema
-    #                   distinguishes `integer` from `decimal` by PATTERN, both being
-    #                   "type": "number"; the notarise schema carries no such pattern.
-    #   expiryDateTime  declared with a `format` and `examples` and no `type` at all.
     #   issuers[*].name PDT's root object declares no `issuers` member and does not close
-    #                   itself, so the member is permitted and undeclared.
-    ("typemap-vaccination-dose-fails-closed", "sg.gov.moh.vaccination-healthcert",
-     [{"key": "notarisationMetadata"}, {"key": "signedEuHealthCerts"}, {"index": 0},
-      {"key": "dose"}], "number"),
-    ("typemap-vaccination-expiry-fails-closed", "sg.gov.moh.vaccination-healthcert",
-     [{"key": "notarisationMetadata"}, {"key": "signedEuHealthCerts"}, {"index": 0},
-      {"key": "expiryDateTime"}], "string"),
+    #                   itself, so the member is permitted and undeclared. The 20 PDT
+    #                   endorsed-sample pairs are NOT ruled: `docs/type-maps.md` section 1.2
+    #                   records that the clean answer is a versioned composition profile rather
+    #                   than 20 authored bindings, and nobody has ruled one.
     ("typemap-pdt-issuers-fails-closed", "sg.gov.moh.pdt-healthcert",
      [{"key": "issuers"}, {"index": 0}, {"key": "name"}], "string"),
     ("typemap-pdt-template-fails-closed", "sg.gov.moh.pdt-healthcert",

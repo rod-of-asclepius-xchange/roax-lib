@@ -27,6 +27,7 @@ import { fileURLToPath } from "node:url";
 
 import * as env from "./envelope.mjs";
 import { parse as parseRecord } from "./json_literal.mjs";
+import * as profileRules from "./profile_rules.mjs";
 import * as ref from "./roax_ref.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -438,6 +439,11 @@ for (const v of V.record ?? []) {
   // is declared rather than sniffed: guessing wrong would pair a real salt with the wrong leaf
   // and yield a plausible wrong root instead of an error.
   const ordered = ref.orderedLeaves(loaded, map, identity);
+  // Specification section 4.2 step 1, and this runner is the issuer when it recomputes a
+  // record. A declared profile value rule is checked before any salt is paired or root
+  // computed, so a record violating one is refused rather than committed. profile_rules.mjs
+  // states why such a rule lives there and not in the canonicalization layer (ruled D13a).
+  profileRules.checkRecord(v.recordType, ordered);
   const saltDoc = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, v.saltsFile), "utf8"));
   if (saltDoc.pairing !== v.saltPairing) {
     throw new Error(`corpus defect: record ${v.name} declares saltPairing ${v.saltPairing}, `

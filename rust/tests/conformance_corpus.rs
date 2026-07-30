@@ -261,7 +261,10 @@ fn compile_legacy_pattern(pattern: &str) -> Result<Vec<LegacyPatternSegment>, St
             key = prefix;
         }
         if !key.is_empty() {
-            compiled.push(LegacyPatternSegment::Key(key.to_owned()));
+            // Ruled decision D14a: the lookup matches over NFC-normalized keys, on BOTH
+            // sides. The pattern token is normalized once here at compile time and the
+            // segment key in `legacy_pattern_matches`.
+            compiled.push(LegacyPatternSegment::Key(key.nfc().collect()));
         }
         for _ in 0..indexes {
             compiled.push(LegacyPatternSegment::AnyIndex);
@@ -283,7 +286,9 @@ fn legacy_pattern_matches(pattern: &[LegacyPatternSegment], path: &[Segment]) ->
                 let Some(Segment::Key(actual)) = path.get(path_index) else {
                     return false;
                 };
-                if actual != expected {
+                // Ruled decision D14a. The pattern token is already NFC, so only the
+                // segment key is normalized here.
+                if actual.nfc().ne(expected.chars()) {
                     return false;
                 }
                 path_index += 1;
@@ -1047,7 +1052,7 @@ fn committed_conformance_corpus() {
     assert_eq!(corpus.hash_alg, HashAlgorithm::Sha256.name());
     assert_eq!(
         vector_count(&corpus.vectors),
-        471,
+        475,
         "every committed vector array must be consumed"
     );
 
