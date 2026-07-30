@@ -1,5 +1,5 @@
 {
-  "typeMapVersion": "0.1.0",
+  "typeMapVersion": "0.2.0",
   "recordType": "sg.gov.moh.vaccination-healthcert",
   "schemaVersion": "1.0",
   "sourceSchemas": [
@@ -315,6 +315,18 @@
       "jsonKind": "string",
       "tag": 2,
       "source": "references/schemata/src/sg/gov/tech/notarise/1.0/schema.json: type string"
+    },
+    {
+      "pattern": "notarisationMetadata.signedEuHealthCerts[*].dose",
+      "jsonKind": "number",
+      "tag": 3,
+      "source": "ruled profile binding, evidence grade Strong. RULED INTEGER 2026-07-30. The pinned schema declares only `type: \"number\"`, which JSON Schema draft-07 section 4.2.1 models as an arbitrary-precision base-10 value and which therefore chooses neither ROAX numeric tag. The EU Digital COVID Certificate these certificates mirror defines its dose-sequence number `v/dn` as a positive integer through `dose_posint`, which is `integer` with minimum 1 (EU DCC JSON Schema Specification 1.3.0, eu-dcc-schema commit a603410d760fefc9073931c8c807759d9714c136). Strong rather than decisive: the Singapore wrapper never states that its `dose` IS the EU DCC `dn` field. The ruling also carries a positive-integer narrowing, which is a profile-validation rule and NOT a tag - see `docs/profiles/vaccination-healthcert.md` section 6."
+    },
+    {
+      "pattern": "notarisationMetadata.signedEuHealthCerts[*].expiryDateTime",
+      "jsonKind": "string",
+      "tag": 2,
+      "source": "ruled profile binding, evidence grade Moderate. RULED STRING 2026-07-30 BY EXPLICIT PROFILE DECLARATION, not by the schema. Both pinned signed-certificate branches attach `format: \"date-time\"` and a string example and declare NO instance type, and JSON Schema Validation draft-07 sections 7.2 and 7.3.1 make `format` an annotation that neither creates a string type nor rejects a non-string instance. The schema therefore formally admits every JSON kind and settles nothing. Moderate: this rests on the profile declaration at `docs/profiles/vaccination-healthcert.md` section 6 plus the field name, both examples and the standard meaning of `date-time`. No separate governing specification for this wrapper field was found."
     },
     {
       "pattern": "notarisationMetadata.signedEuHealthCerts[*].qr",

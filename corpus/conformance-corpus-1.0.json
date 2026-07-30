@@ -5641,7 +5641,7 @@
         "expectTag": 2
       },
       {
-        "name": "typemap-vaccination-dose-fails-closed",
+        "name": "typemap-vaccination-dose-ruled-integer",
         "class": 11,
         "recordType": "sg.gov.moh.vaccination-healthcert",
         "segments": [
@@ -5659,10 +5659,10 @@
           }
         ],
         "jsonKind": "number",
-        "expectFailClosed": true
+        "expectTag": 3
       },
       {
-        "name": "typemap-vaccination-expiry-fails-closed",
+        "name": "typemap-vaccination-expiry-ruled-string",
         "class": 11,
         "recordType": "sg.gov.moh.vaccination-healthcert",
         "segments": [
@@ -5677,6 +5677,27 @@
           },
           {
             "key": "expiryDateTime"
+          }
+        ],
+        "jsonKind": "string",
+        "expectTag": 2
+      },
+      {
+        "name": "typemap-vaccination-dose-other-kind-fails-closed",
+        "class": 11,
+        "recordType": "sg.gov.moh.vaccination-healthcert",
+        "segments": [
+          {
+            "key": "notarisationMetadata"
+          },
+          {
+            "key": "signedEuHealthCerts"
+          },
+          {
+            "index": 0
+          },
+          {
+            "key": "dose"
           }
         ],
         "jsonKind": "string",
@@ -5890,6 +5911,33 @@
         "leafCount": 10,
         "root": "de356f8f967a2a166f012172e339df1ecc31b5a45f406fd8da03b3a6ca356953",
         "issuerKeyId": "did:web:corpus.roax.invalid#key-1"
+      },
+      {
+        "name": "record-sg.gov.moh.vaccination-healthcert-no-key-id",
+        "class": 10,
+        "recordType": "sg.gov.moh.vaccination-healthcert",
+        "schemaVersion": "1.0",
+        "issuerId": "did:web:corpus.roax.invalid",
+        "recordFile": "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/sample-data.ts#sampleVaccineHealthCert",
+        "saltsFile": "corpus/fixtures/salts/record-sg.gov.moh.vaccination-healthcert-no-key-id.json",
+        "saltPairing": "positional",
+        "recordId": "urn:uuid:aaaaaaa1-0000-4000-8000-000000000001",
+        "leafCount": 91,
+        "root": "0006a8bb35adada03b698db10929ed4191291d7b0d51278dbfb09564c102cc47"
+      },
+      {
+        "name": "record-sg.gov.moh.vaccination-healthcert-with-key-id",
+        "class": 10,
+        "recordType": "sg.gov.moh.vaccination-healthcert",
+        "schemaVersion": "1.0",
+        "issuerId": "did:web:corpus.roax.invalid",
+        "issuerKeyId": "did:web:corpus.roax.invalid#key-1",
+        "recordFile": "references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/sample-data.ts#sampleVaccineHealthCert",
+        "saltsFile": "corpus/fixtures/salts/record-sg.gov.moh.vaccination-healthcert-with-key-id.json",
+        "saltPairing": "positional",
+        "recordId": "urn:uuid:aaaaaaa1-0000-4000-8000-000000000001",
+        "leafCount": 92,
+        "root": "b69865a8b8482969907993a2de31664e7c100fcf990116bda33d837786f4f7d6"
       },
       {
         "name": "record-sg.gov.moh.recovery-healthcert-no-key-id",
