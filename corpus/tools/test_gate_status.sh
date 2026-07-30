@@ -31,7 +31,10 @@ run_wrapper_case() {
   build_status="$3"
   check_status="$4"
   schema_status="$5"
-  shift 5
+  # Required rather than defaulted, because a defaulted status would be indistinguishable from
+  # the first `--references` of a case that passes flags, and every step's status is stated.
+  profile_rule_status="$6"
+  shift 6
 
   output="$TEST_TMP/$label.out"
   log="$TEST_TMP/$label.log"
@@ -46,6 +49,7 @@ run_wrapper_case() {
     ROAX_GATE_STUB_BUILD_STATUS="$build_status" \
     ROAX_GATE_STUB_CHECK_STATUS="$check_status" \
     ROAX_GATE_STUB_SCHEMA_STATUS="$schema_status" \
+    ROAX_GATE_STUB_PROFILE_RULE_STATUS="$profile_rule_status" \
     bash "$HERE/run.sh" "$@" > "$output" 2>&1
   actual=$?
   [ "$actual" -eq "$expected" ] ||
@@ -65,7 +69,7 @@ run_direct_case() {
 }
 
 # The four dependency combinations.
-run_wrapper_case neither 2 2 2 0
+run_wrapper_case neither 2 2 2 0 0
 grep -F "class 10: NOT RUN" "$TEST_TMP/neither.out" >/dev/null ||
   fail "missing --references did not report class 10 NOT RUN"
 grep -F -- "--references <path-to-schemata>" "$TEST_TMP/neither.out" >/dev/null ||
@@ -79,21 +83,21 @@ fi
 grep -F "ROAX_EXTRACTED_RECORDS=<>" "$TEST_TMP/neither.log" >/dev/null ||
   fail "run.sh allowed an ambient extracted-records directory to bypass missing --references"
 
-run_wrapper_case references_only 2 0 0 0 --references /stub/references
+run_wrapper_case references_only 2 0 0 0 0 --references /stub/references
 grep -F -- "--records" "$TEST_TMP/references_only.log" >/dev/null ||
   fail "run.sh did not pass extracted --records when --references was configured"
 
-run_wrapper_case modules_only 2 2 2 0 --modules /stub/node_modules
+run_wrapper_case modules_only 2 2 2 0 0 --modules /stub/node_modules
 if grep -F -- "--records" "$TEST_TMP/modules_only.log" >/dev/null; then
   fail "run.sh passed --records when only --modules was configured"
 fi
 
-run_wrapper_case both 0 0 0 0 \
+run_wrapper_case both 0 0 0 0 0 \
   --references /stub/references --modules /stub/node_modules
 grep -F "ALL CHECKS PASSED" "$TEST_TMP/both.out" >/dev/null ||
   fail "fully configured wrapper did not report a complete pass"
 
-run_wrapper_case invalid_modules 2 0 0 2 \
+run_wrapper_case invalid_modules 2 0 0 2 0 \
   --references /stub/references --modules /stub/node_modules
 grep -F "schema dependencies were unavailable" "$TEST_TMP/invalid_modules.out" >/dev/null ||
   fail "unavailable configured schema dependencies did not report NOT RUN"
@@ -101,13 +105,22 @@ grep -F -- "--modules <node_modules-with-ajv@8-and-ajv-formats>" \
   "$TEST_TMP/invalid_modules.out" >/dev/null ||
   fail "unavailable configured schema dependencies did not name the --modules remedy"
 
-run_wrapper_case schema_failure 1 0 0 1 \
+run_wrapper_case schema_failure 1 0 0 1 0 \
   --references /stub/references --modules /stub/node_modules
 grep -F "CHECKS FAILED" "$TEST_TMP/schema_failure.out" >/dev/null ||
   fail "a schema verdict failure did not make the wrapper fail"
 
+# The declared profile value rules are a gate step, so a refusal there fails the gate. Both
+# implementations run, so the case is covered from each side independently.
+run_wrapper_case profile_rule_failure 1 0 0 0 1 \
+  --references /stub/references --modules /stub/node_modules
+grep -F "CHECKS FAILED" "$TEST_TMP/profile_rule_failure.out" >/dev/null ||
+  fail "a declared profile value rule failure did not make the wrapper fail"
+grep -F "declared profile value rules" "$TEST_TMP/profile_rule_failure.out" >/dev/null ||
+  fail "the profile value rule step did not name itself in the report"
+
 # A real failure wins over an independently missing step.
-run_wrapper_case failure_precedence 1 1 0 0 --references /stub/references
+run_wrapper_case failure_precedence 1 1 0 0 0 --references /stub/references
 grep -F "NOT A PASS" "$TEST_TMP/failure_precedence.out" >/dev/null ||
   fail "byte equality obscured a preceding implementation failure"
 grep -F "CHECKS FAILED" "$TEST_TMP/failure_precedence.out" >/dev/null ||
