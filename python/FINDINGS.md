@@ -6,8 +6,9 @@ The two implementations under `corpus/tools/` were not read while this was built
 **The disagreements are the point of this document.**
 The library and its corpus results are in [`README.md`](README.md).
 
-Every item below states which of three things it is, because that distinction is what five independent builds are for:
+Every item below states which of four things it is, because that distinction is what five independent builds are for:
 
+- **SPECIFICATION DEFECT** - the specification states a requirement that no conforming implementation can ever apply, so the text needs an edit rather than an implementation needing to choose a reading.
 - **DIVERGENCE** - the specification and the committed corpus require different things, and one of them is wrong.
 - **AMBIGUITY** - the specification admits two honest readings and no committed vector discriminates.
 - **CONFIRMATION** - something this repository already records, re-measured independently here.
@@ -312,3 +313,66 @@ Unlike the Node reference implementation, which runs Unicode 16.0 tables against
   The corpus has 45 disclosed fixtures across classes 11, 14, 17 and 18, but fixtures
   rejected by earlier checks do not all reach the proof fold, so focused unit tests pin
   recomputation rather than crediting every fixture with that coverage.
+
+---
+
+## 14. SPECIFICATION DEFECT: section 3.3 states a MUST that its own flatten makes unreachable
+
+**This is not a divergence and it is not an ambiguity.**
+It is a requirement in the standard that no conforming implementation can ever apply, so the text needs an edit rather than an implementation needing to pick a reading.
+It is reported here rather than resolved, because which requirement was intended is the specification author's call.
+
+**The requirement.**
+Specification section 3.3 states:
+
+> A record that contributes zero leaves of its own MUST be rejected at issuance rather than anchored.
+
+**Why it can never fire.**
+The flatten stated in the same section emits a leaf for every input.
+A scalar emits itself.
+An empty map and an empty array each emit one leaf at their own path, as EMPTY_OBJECT and EMPTY_ARRAY respectively.
+A non-empty container recurses until it reaches a scalar or an empty container, so it contributes at least one.
+There is therefore no record that contributes zero leaves of its own, and the MUST has no reachable case.
+The tree floor of 6 that the same paragraph derives is consequently reached by every record rather than approached by some.
+
+**Reproduced, measured on CPython 3.13.5.**
+`flatten` in structural mode, which is `authorize_empty_containers=False` and the mode `python/tools/run_corpus.py` documents as its default:
+
+| Input | Leaves | Path | `encode_path` | Tag |
+|---|---:|---|---|---|
+| `{}` | 1 | `()` | `00000000` | 7 EMPTY_OBJECT |
+| `[]` | 1 | `()` | `00000000` | 6 EMPTY_ARRAY |
+
+One leaf, not zero, which is the whole of the defect: the guarded state does not exist.
+
+**Two conditions on that reproduction, both measured rather than assumed, because an unconditioned version of this claim would be wrong.**
+The `[]` row is a `flatten` result and not an issuable record: a full copy's record body must be a JSON object under specification section 7.3, so `[]` as a whole record is refused at issuance with `envelope-shape` before the leaf count is ever consulted.
+And `{}` commits but does not verify unconditionally.
+`build_tree(loads("{}"), ..., authorize_empty_containers=False)` yields a 5-leaf tree with a root, so the record is anchored rather than rejected, which is what section 3.3 forbids.
+`verify_envelope(full_copy(built))` then returns accepted with reason `ok` **only when the verifier carries the same structural setting**, `VerifierConfig(authorize_empty_containers=False)`.
+Under this library's default authorized verifier the same envelope is rejected with `type-unresolved`, because the zero-segment path is one no display-pattern map can address.
+So the commit-and-anchor half of the defect holds under the corpus's own mode, while a full round trip additionally requires the verifier to be in that mode.
+Either way the `empty-record` branch never runs: under the structural reading nothing reaches it, and under the authorized reading `type-unresolved` refuses the record first.
+
+**The edit available to the specification author, which is the point of reporting it.**
+Section 9.1 keeps `MTH([])` for exactly this reason - so the function is total - and it says outright that the case is unreachable.
+Section 3.3 does not, so a reader looks for the reachable state its MUST guards and finds none.
+Two different repairs are available and they are not equivalent:
+say so in section 3.3 the way section 9.1 already does, which keeps the algorithm as written;
+or move the requirement onto the record body, where `{}` is an object with zero keys and the check would have something to test, which changes what is admissible at issuance.
+Choosing between them is a specification decision, so this build does neither.
+
+**What this build does, and why that is not a reading of the defect.**
+The guard stays at `python/src/roax_canon/flatten.py:192-197`, on the footing section 9.1 gives `MTH([])`: a total function with an unreachable branch.
+`{}` stays a one-leaf record.
+`python/tests/test_pipeline.py` pins the measured values above so that a later edit cannot quietly convert the unreachable guard into a live rejection.
+
+**Cross-implementation agreement is the finding.**
+Three independent readings reached this without conferring.
+The TypeScript build recorded it as finding 7 of [`docs/typescript-implementation-findings.md`](../docs/typescript-implementation-findings.md) and pinned `{}` in `test/unit.ts` for the same reason this build pins it.
+This branch's automated code review reproduced it against `corpus/type-maps/org.roax.corpus.synthetic.json` and reported it as the one result that surprised it.
+A separate manual re-measurement here reached the same values by a third route.
+That agreement is what makes this a defect report rather than an opinion.
+One implementation reporting an unreachable MUST is a candidate for a misreading of the specification.
+Three implementations, each written from the specification alone and each forbidden from reading the others, arriving at the same reading is evidence that the reading is the natural one and that the text is what is at fault.
+Producing exactly that kind of evidence is why `docs/decisions.md` decision D ruled for five independent libraries rather than one shared core.

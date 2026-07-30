@@ -38,6 +38,8 @@ from roax_canon import (  # noqa: E402
     PINNED_UNICODE_VERSION,
     PositionalSalts,
     RecordIdentity,
+    RESERVED_V1,
+    RESERVED_V2,
     RoaxError,
     VerifierConfig,
     audit_path,
@@ -394,6 +396,23 @@ def run_record(vectors, maps, r: Results, references, authorize_empty) -> None:
         if "envelopeFile" in x:
             r.bad(cls, name, "unsupported record-vector envelope carrier")
             continue
+        reserved_set = _reserved_set(x)
+        if reserved_set == RESERVED_V2:
+            # NOT RUN rather than FAIL. This package deliberately implements no
+            # published-DFA artifact loader and no content-ID reproduction, so a vector
+            # selecting envelope 2.0 is one this runner CANNOT run, not one it ran and
+            # disagreed with. Reporting it as a failure would collapse the three-way
+            # contract in this module's own docstring, where could-not-check is a third
+            # status that is neither a pass nor a failure (`FINDINGS.md` item 13;
+            # specification section 4.2).
+            r.unavailable(
+                cls,
+                name,
+                "vector selects envelope 2.0 through `typeMapId`, which this package does "
+                "not implement: specification section 4.2 requires selecting the exact "
+                "map by a reproduced content ID from a published DFA artifact",
+            )
+            continue
         record, why_not_run, failure = _record_for(x, references)
         if failure is not None:
             r.bad(cls, name, failure)
@@ -430,7 +449,7 @@ def run_record(vectors, maps, r: Results, references, authorize_empty) -> None:
                 identity,
                 maps(x["recordType"]),
                 salts,
-                reserved_set=_reserved_set(x),
+                reserved_set=reserved_set,
                 authorize_empty_containers=authorize_empty,
             )
         except FileNotFoundError as exc:
@@ -452,8 +471,6 @@ def run_record(vectors, maps, r: Results, references, authorize_empty) -> None:
 
 
 def _reserved_set(vector) -> str:
-    from roax_canon import RESERVED_V1, RESERVED_V2
-
     return RESERVED_V2 if vector.get("typeMapId") else RESERVED_V1
 
 

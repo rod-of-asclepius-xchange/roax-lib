@@ -175,6 +175,43 @@ class RunnerStatusTests(unittest.TestCase):
         )
         self.assertFalse(results.not_run)
 
+    def test_envelope_two_record_vector_is_not_run_rather_than_a_failure(self) -> None:
+        """A vector this package CANNOT run must not render as one that ran and failed.
+
+        `typeMapId` selects `RESERVED_V2`, which `build_tree` rejects because specification
+        section 4.2 requires selecting the exact map by a reproduced content ID from a
+        published DFA artifact and this package implements neither. That is a
+        could-not-check, which this module's docstring makes a third status contributing to
+        exit 2, so reporting it through `bad` would collapse the three-way contract.
+
+        No committed corpus 1.0 record vector carries `typeMapId`, so this is unreachable
+        today and becomes reachable on the corpus rebuild `AGENTS.md` records as pending.
+        """
+        results = run_corpus.Results()
+
+        run_corpus.run_record(
+            [
+                {
+                    "class": 10,
+                    "name": "envelope-two-selector",
+                    "recordType": "org.roax.corpus.synthetic",
+                    "schemaVersion": "1.0",
+                    "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
+                    "issuerId": "did:web:example.invalid",
+                    "typeMapId": "sha256:" + "0" * 64,
+                }
+            ],
+            lambda _record_type: None,
+            results,
+            references=None,
+            authorize_empty=False,
+        )
+
+        self.assertFalse(results.failed, "a vector that cannot run must never report FAIL")
+        self.assertEqual(len(results.not_run[10]), 1)
+        self.assertIn("envelope-two-selector", results.not_run[10][0])
+        self.assertIn("typeMapId", results.not_run[10][0])
+
     def test_record_salt_pairing_disagreement_is_a_failure(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

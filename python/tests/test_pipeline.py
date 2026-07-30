@@ -21,6 +21,7 @@ from roax_canon import (
     JsonNumber,
     Key,
     MappingSalts,
+    PositionalSalts,
     Profile,
     RecordIdentity,
     RoaxError,
@@ -28,6 +29,7 @@ from roax_canon import (
     build_tree,
     disclosed_copy,
     draw_salt,
+    encode_path,
     flatten,
     full_copy,
     issue,
@@ -209,6 +211,38 @@ class TestFlatten(unittest.TestCase):
         flattened = flatten(loads('{"count": 5, "amount": 5}'), resolver())
         leaves = {leaf.path[0].value: leaf.tag for leaf in flattened}
         self.assertEqual(leaves, {"count": 3, "amount": 4})
+
+    def test_an_empty_container_record_is_one_leaf_so_the_zero_leaf_guard_never_fires(self):
+        """Pins `FINDINGS.md` item 14, a SPECIFICATION DEFECT rather than a choice made here.
+
+        Specification section 3.3 requires a record contributing zero leaves of its own to
+        be rejected at issuance, and its own flatten makes that state unreachable: `{}` and
+        `[]` each emit ONE leaf, at the zero-segment path.
+
+        **Do not "fix" this into a rejection.** The guard is kept on the footing section
+        9.1 gives `MTH([])` - a total function with an unreachable branch - and
+        `docs/typescript-implementation-findings.md` finding 7 pins the same behaviour in
+        `test/unit.ts`. Changing one library alone would manufacture exactly the
+        cross-implementation divergence the corpus exists to catch.
+        """
+        bare = DisplayPatternTypeMap(
+            {**SYNTHETIC_MAP, "entries": [{"pattern": "marker", "jsonKind": "string", "tag": 2}]}
+        )
+        for text, tag in (("{}", 7), ("[]", 6)):
+            with self.subTest(record=text):
+                leaves = flatten(loads(text), bare, authorize_empty_containers=False)
+                self.assertEqual(len(leaves), 1, "zero-leaf is unreachable, so this is never 0")
+                self.assertEqual(leaves[0].path, ())
+                self.assertEqual(encode_path(leaves[0].path).hex(), "00000000")
+                self.assertEqual(leaves[0].tag, tag)
+
+        # Under the library-default authorized reading the record is refused too, but by
+        # `type-unresolved` rather than `empty-record`: the zero-segment path is one no
+        # display-pattern map can address. So the guard is unreachable under BOTH readings
+        # of section 3.3, which is why no test can assert `empty-record` is ever raised.
+        with self.assertRaises(RoaxError) as ctx:
+            flatten(loads("{}"), bare)
+        self.assertEqual(ctx.exception.code, ErrorCode.TYPE_UNRESOLVED)
 
 
 class TestReservedLeaves(unittest.TestCase):
@@ -396,6 +430,38 @@ class TestRecordAndEnvelope(unittest.TestCase):
         envelope = full_copy(self.built)
         result = verify_envelope(envelope, self.config)
         self.assertTrue(result.accepted, result.detail)
+
+    def test_an_empty_object_record_anchors_rather_than_being_rejected(self):
+        """The half of `FINDINGS.md` item 14 that section 3.3 actually forbids.
+
+        Section 3.3 requires a zero-leaf record to be "rejected at issuance rather than
+        anchored". `{}` contributes one leaf, so it is anchored: it gets a leaf count and a
+        root. Pinned here so the defect report stays checkable against the code.
+        """
+        bare = DisplayPatternTypeMap(
+            {**SYNTHETIC_MAP, "entries": [{"pattern": "marker", "jsonKind": "string", "tag": 2}]}
+        )
+        salts = PositionalSalts([draw_salt() for _ in range(8)])
+        built = build_tree(loads("{}"), IDENTITY, bare, salts, authorize_empty_containers=False)
+        self.assertEqual(built.leaf_count, 1 + 4, "one record leaf plus the four reserved ones")
+        self.assertEqual(len(built.root), 32)
+
+        # It verifies only when the verifier carries the same structural setting; the
+        # library default refuses the zero-segment path. Both directions are asserted
+        # because an unconditioned claim about this round trip would be wrong.
+        floorless = DEFAULT_PROFILES.with_profile(Profile("org.roax.corpus.synthetic", ()))
+        for authorize, accepted, reason in ((False, True, "ok"), (True, False, "type-unresolved")):
+            with self.subTest(verifier_authorize_empty_containers=authorize):
+                result = verify_envelope(
+                    full_copy(built),
+                    VerifierConfig(
+                        profiles=floorless,
+                        resolvers={"org.roax.corpus.synthetic": bare},
+                        authorize_empty_containers=authorize,
+                    ),
+                )
+                self.assertEqual(result.accepted, accepted, result.detail)
+                self.assertEqual(result.reason, reason)
 
     def test_full_copy_record_must_be_a_json_object(self):
         for record in (loads("[]"), loads('"scalar"'), loads("5"), None):
