@@ -219,9 +219,7 @@ class BuiltRecord:
         for i, encoded in enumerate(self.encoded_paths):
             if encoded == target:
                 return i
-        raise RoaxError(
-            ErrorCode.SALT_MISSING_FOR_LEAF, f"no leaf at {display_path(segments)!r}"
-        )
+        raise RoaxError(ErrorCode.SALT_MISSING_FOR_LEAF, f"no leaf at {display_path(segments)!r}")
 
 
 def build_tree(
@@ -239,9 +237,7 @@ def build_tree(
     This is the whole of steps (A) through (D) of specification section 3.1.
     """
     hasher = get_hash(hash_alg)
-    record_leaves = flatten(
-        record, resolver, authorize_empty_containers=authorize_empty_containers
-    )
+    record_leaves = flatten(record, resolver, authorize_empty_containers=authorize_empty_containers)
     all_leaves = record_leaves + reserved_leaves(identity, reserved_set=reserved_set)
     ordered = order_leaves(all_leaves)
 
