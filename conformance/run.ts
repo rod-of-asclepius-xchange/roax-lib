@@ -184,7 +184,6 @@ function runReject(corpus: Corpus, report: Report): void {
       // silently turning a rejection into a pass.
       if (v.recordType !== undefined) {
         const record = readJson((v.input as { $jsonText: string }).$jsonText);
-        assertRecordPathAllowed([]);
         return flattenRecord(record, {
           resolver: resolverFor(v.recordType),
           emptyContainerPolicy: 'map-authorized',

@@ -35,22 +35,25 @@ TYPE_MAP_DIR = os.path.join(CORPUS_DIR, "type-maps")
 
 AUTHORED = "corpus fixture: authored declaration, not derived from any reference schema"
 
-# U+212A KELVIN SIGN followed by "elvin". Its NFC form is ASCII "Kelvin".
+# Class 19's key site: `é` composed, whose decomposed twin `e\u0301` renders identically.
 #
-# The map below declares the ASCII spelling ALONE. It used to declare both, so that
-# `record-guard-kelvin-key` resolved under either reading of whether the type-map lookup
-# normalizes; decision D14 is ruled D14a, so that workaround is gone and this vector now
-# discriminates: `\u212Aelvin` reaches the ASCII pattern only through NFC.
-KELVIN_KEY = "Kelvin"
-
-# Class 19's key site. `é` composed against `e\u0301` decomposed, which render identically.
-# The map declares the COMPOSED spelling alone, so the key-site vector discriminates D14a
-# rather than agreeing with either reading.
+# The map declares ONE spelling, the composed one, and that is what makes the key-site vector
+# discriminate ruled decision D14a rather than agree with either reading of it. The decomposed
+# twin is deliberately NOT a constant here: it lives in the committed fixture text as the
+# escape `\u0301`, so nothing between this module and those bytes can quietly compose it. The
+# U+212A KELVIN SIGN key is the same situation now that its duplicate pattern is gone: the map
+# below declares the ASCII spelling ALONE, so `\u212Aelvin` reaches it only through NFC and
+# `record-guard-kelvin-key` discriminates D14a instead of resolving under either reading.
 KEY_ACCENTED_NFC = "é"
-KEY_ACCENTED_NFD = "é"
 
 SYNTHETIC_TYPE_MAP = {
-    "typeMapVersion": "1.0.0",
+    # MAJOR under `docs/type-maps.md` section 5.2, because this revision REMOVED a selector:
+    # the duplicate U+212A Kelvin pattern that stood in for decision D14 while it was open.
+    # That section governs the published `type-maps/` artifacts, and this map is corpus-only
+    # and listed by no registry, so the rule binds it by analogy rather than by governance. It
+    # is worth following anyway: nothing else tells a reader comparing two checkouts of this
+    # file that the selector set changed.
+    "typeMapVersion": "2.0.0",
     "recordType": SYNTHETIC_RECORD_TYPE,
     "schemaVersion": SYNTHETIC_SCHEMA_VERSION,
     "sourceSchemas": [{

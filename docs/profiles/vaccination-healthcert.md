@@ -3,7 +3,9 @@
 **`recordType`:** `sg.gov.moh.vaccination-healthcert`
 **`schemaVersion`:** `1.0`
 **Status:** the fail-closed map is published as [`type-maps/sg.gov.moh.vaccination-healthcert-1.0.json`](../../type-maps/sg.gov.moh.vaccination-healthcert-1.0.json) at exact artifact ID `sha256:de7bb92226af5fa5dc5064d9cb203329abc69160f4280fdf739e66e5e0151e93`.
-`notarisationMetadata.signedEuHealthCerts[*].dose` and `notarisationMetadata.signedEuHealthCerts[*].expiryDateTime` remain unbound, so the shipped sample is uncommittable under fail-closed, and 26 object-intended schema paths leave their non-object alternatives unbound, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.1, 1.4 and 2.
+`notarisationMetadata.signedEuHealthCerts[*].dose` and `notarisationMetadata.signedEuHealthCerts[*].expiryDateTime` were **ruled on 2026-07-30** with their evidence grades, and 26 object-intended schema paths leave their non-object alternatives unbound, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.1, 1.4 and 2.
+**The published artifact does not yet carry either ruled binding**: it still declares both slots `unresolved`, because regeneration is blocked on 34 merged object states, and section 1.6 of that document states why hand-editing a generated artifact is the wrong fix and what the next change must do.
+The two bindings are operative in the corpus-side map class 10 resolves against, which is what unblocked the shipped sample.
 
 **This is the structurally different one.**
 Read section 2 before anything else; it is the reason this family cannot share a `fhirBundle` handler with PDT and recovery, and it is the place where a well-intentioned normalization would break every commitment already made.
@@ -92,9 +94,9 @@ Additional scope for this profile:
 - `attachments` and `logo`.
 
 The published artifact materializes this exact flattened scope as a DFA with 143 states, 122 exact KEY transitions, 20 INDEX transitions, 81 scalar STRING outputs, six EMPTY_ARRAY outputs and seven EMPTY_OBJECT outputs, as reported in [`docs/type-maps.md`](../type-maps.md) section 2.3.
-The finite scalar audit counts 83 intended path patterns, of which 81 are confident and the two named below are unresolved, with no inferred binding, as reported in [`docs/type-maps.md`](../type-maps.md) section 2.2.
+The finite scalar audit counts 83 intended path patterns, of which 81 are confident and the two named below are unresolved in the published bytes, with no inferred binding, as reported in [`docs/type-maps.md`](../type-maps.md) section 2.2.
 Its exact artifact ID, `recordType` and `schemaVersion` are checked together when selecting this map, under [`docs/type-maps.md`](../type-maps.md) section 4 and specification section 4.2.
-No numeric output is present because `dose` remains unresolved.
+No numeric output is present in those bytes, because they predate the `dose` ruling below and still declare that slot `unresolved` ([`docs/type-maps.md`](../type-maps.md) section 1.6).
 
 ### 3.1 The `dose` trap, RULED INTEGER
 
@@ -120,7 +122,7 @@ An upstream `type: "string"` correction would strengthen the footing without cha
 [`docs/type-maps.md`](../type-maps.md) section 1.1 holds the full evidence.
 
 **Together the two rulings unblocked the shipped vaccination sample**, which now commits at 91 leaves without an issuer key identifier and 92 with one, and moved conformance class 10 from 1 of 3 records to 2 of 3.
-The published FHIR artifacts are a separate matter and section 1.6 of [`docs/type-maps.md`](../type-maps.md) states where the three FHIR rulings have and have not landed.
+That is the CORPUS-SIDE map, not this profile's published artifact, which still declares both slots `unresolved`: section 1.6 of [`docs/type-maps.md`](../type-maps.md) states where all five rulings have and have not landed.
 
 ### 3.3 Blobs
 

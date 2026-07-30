@@ -634,7 +634,10 @@ fn ordered_v1_paths(record: &JsonValue, context: &CommitmentContext) -> Result<V
     paths.sort_by_key(|path| path.encode().expect("corpus paths are encodable"));
     let mut encoded = HashSet::new();
     for path in &paths {
-        if !encoded.insert(path.encode().map_err(|error| error.to_string())?) {
+        if !encoded.insert(
+            path.encode()
+                .map_err(|error| canonical_rejection_reason(&error, None).to_owned())?,
+        ) {
             return Err("duplicate-normalized-path".into());
         }
     }
@@ -926,8 +929,10 @@ fn run_reject_vector(vector: &Value, maps: &HashMap<String, LegacyTypeMap>) -> R
             "did:web:corpus.roax.invalid",
             None,
         );
-        let ordered = ordered_v1_paths(&record, &context)
-            .map_err(|_| "type-map-uncovered-path".to_owned())?;
+        // `ordered_v1_paths` reports its own canonical reason code, and a duplicate encoded path
+        // or an out-of-range index is NOT a fail-closed type binding: the declared comparison
+        // only holds if each of those reaches the vector under its own name.
+        let ordered = ordered_v1_paths(&record, &context)?;
         let salts = generate_salts(&ordered).map_err(|error| error.to_string())?;
         return commit_full_copy_with_salts(&record, &context, &LegacyProfile::new(map), &salts)
             .map(|_| ())

@@ -107,7 +107,8 @@ if cmp -s "$CORPUS_DIR/conformance-corpus-1.0.json" "$WORK/corpus-b.json"; then
     echo "  NOT CHECKED: copied-through fields are not a cross-implementation assertion"
   fi
   # A byte comparison can say nothing about rows that were never generated into the committed
-  # corpus, including the two class-10 records blocked by unresolved type-map paths.
+  # corpus, including the class-10 PDT record, which stays blocked on the 20 endorsed-sample
+  # path-kind pairs its base map leaves undeclared.
   echo "  scope: rows not generated into the committed corpus are not cross-checked here"
 else
   echo "  FAIL: the two implementations disagree"

@@ -1,7 +1,6 @@
 use roax_canon::type_map::content_id;
 use roax_canon::{
-    DfaTypeMap, Error, JsonKind, Path, Segment, TypeMapDescriptor, TypeResolver,
-    TypeTag,
+    DfaTypeMap, Error, JsonKind, Path, Segment, TypeMapDescriptor, TypeResolver, TypeTag,
 };
 use serde::Deserialize;
 use serde_json::json;
