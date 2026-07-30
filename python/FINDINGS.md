@@ -31,6 +31,8 @@ So under the section 3.3 rule those two records have no type tag at `a.b` and MU
 **Measured, from this implementation.**
 These are the two reference-available rows of [`README.md`](README.md)'s table, which owns those
 figures; both moved when the corpus grew on 2026-07-30 and the delta between them did not.
+Both need the third-party checkout `.gitignore` excludes, and that table's two reference-unavailable
+rows show the same delta of 4 without it, so the divergence below is reproducible from a bare clone.
 
 | Empty-container rule | Corpus result |
 |---|---|
@@ -140,7 +142,8 @@ No committed vector carries such a record.
 
 ## 7. SUPERSEDED BY THE RULING, and the measurement is why it reads that way: the corpus was neutral about decision D14, and is not any more
 
-**As measured during this build**, this implementation's matcher compared raw and passed all 738 assertions, and patching an NFC normalization onto both sides of the comparison gave **the same 738 passes**.
+**As measured during this build, against the corpus as it stood before the 2026-07-30 rebuild**, this implementation's matcher compared raw and passed all 738 assertions, and patching an NFC normalization onto both sides of the comparison gave **the same 738 passes**.
+That 738 is the historical total and is left as measured; item 1's table carries the current figures.
 So no committed vector depended on the answer, which is what the synthetic map's two `Kelvin` spellings - U+212A and ASCII `K`, confirmed by reading the file's code points - were put there to guarantee.
 
 **That neutrality was a workaround standing in for a decision, and decision D14 was ruled D14a on 2026-07-30: the lookup matches over the NFC-normalized key** (specification section 4.2, `docs/type-maps.md` section 3.1).

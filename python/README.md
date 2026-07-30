@@ -43,11 +43,17 @@ The runner does not deliberately write files or modify `corpus/`; the interprete
 
 Measured on CPython 3.13.5: Pass and fail are assertion counts; not-run entries are vectors or required classes.
 
-| Mode | Pass | Fail | Not run | Classes passed | Result | Exit |
-|---|---:|---:|---:|---:|---|---:|
-| structural, references available | 759 | 0 | 0 | 19/19 | `PASS` | 0 |
-| structural, references unavailable | 751 | 0 | 4 | 18/19 | `INCOMPLETE / NOT RUN` | 2 |
-| authorized, references available | 755 | 2 | 0 | 18/19 | `FAIL` | 1 |
+| Mode | Pass | Fail | Not run | Classes passed | Result | Exit | Needs the checkout |
+|---|---:|---:|---:|---:|---|---:|---|
+| structural, references available | 759 | 0 | 0 | 19/19 | `PASS` | 0 | yes |
+| structural, references unavailable | 751 | 0 | 4 | 18/19 | `INCOMPLETE / NOT RUN` | 2 | no |
+| authorized, references available | 755 | 2 | 0 | 18/19 | `FAIL` | 1 | yes |
+| authorized, references unavailable | 747 | 2 | 4 | 17/19 | `FAIL` | 1 | no |
+
+**The last column is the provenance of each row, and the four did not come from one run.**
+The two `no` rows are reproducible from a bare clone of this repository and were measured that way.
+The two `yes` rows need the third-party schemata checkout that `.gitignore` excludes, so reproducing either one means supplying `--references` from outside the tree.
+Each `yes` row is its `no` twin plus class 10's four vectors and the eight assertions they carry: 751 + 8 = 759, and 747 + 8 = 755 with the same two class-5 failures on both sides.
 
 The first row is the only conforming PASS.
 Class 10 reproduces both roots of the MOH recovery sample at `references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/sample-data.ts`, at 69 and 70 leaves, and both roots of the vaccination sample at `references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/sample-data.ts`, at 91 and 92 leaves.
@@ -56,10 +62,10 @@ That vaccination pair commits at all only because its two blocking paths were ru
 
 `--references` defaults first to `ROAX_REFERENCES`, then to `references/` at the repository root.
 The checkout is third-party, `.gitignore` excludes it, and it is never committed.
-Without it, class 10 reports its four vectors as NOT RUN with the attempted path and `--references /path/to/schemata` remedy, the terminal result is `INCOMPLETE / NOT RUN`, and the process exits 2.
+Without it, class 10 reports its four vectors as NOT RUN with the attempted path and `--references /path/to/schemata` remedy; in structural mode the terminal result is `INCOMPLETE / NOT RUN` and the process exits 2, and in authorized mode the two class-5 failures still decide the exit, which is the table's fourth row.
 It never reports PASS for those 751 assertions.
-The whole difference is class 10's four vectors and the 8 assertions they carry, whose records resolve out of that checkout through the `recordFile` strings committed at `corpus/conformance-corpus-1.0.json:6048`, `:6062`, `:6075` and `:6089`.
-The authorized-mode 755 is a different measurement: the checkout is present, the two class-5 empty-container records fail closed, and the process exits 1 ([`FINDINGS.md`](FINDINGS.md), item 1).
+Those four vectors resolve their records out of the checkout through the `recordFile` strings committed at `corpus/conformance-corpus-1.0.json:6048`, `:6062`, `:6075` and `:6089`.
+The two authorized-mode rows are a different measurement, in which the two class-5 empty-container records fail closed and the process exits 1 ([`FINDINGS.md`](FINDINGS.md), item 1).
 An unsupported reject-vector shape, an unsupported record-vector envelope carrier, a missing committed type map, or a present reference module that cannot be extracted is a failure and also exits 1.
 
 A record vector carrying `typeMapId` is the other NOT RUN case, and it is deliberately not a failure.
