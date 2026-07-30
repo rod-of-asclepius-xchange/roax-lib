@@ -1,6 +1,6 @@
 use roax_canon::type_map::content_id;
 use roax_canon::{
-    DfaTypeMap, Error, JsonKind, LookupKeyMode, Path, Segment, TypeMapDescriptor, TypeResolver,
+    DfaTypeMap, Error, JsonKind, Path, Segment, TypeMapDescriptor, TypeResolver,
     TypeTag,
 };
 use serde::Deserialize;
@@ -34,8 +34,6 @@ const EXPECTED_MAPS: [(&str, &str, &str, &str); 4] = [
         "sha256:de7bb92226af5fa5dc5064d9cb203329abc69160f4280fdf739e66e5e0151e93",
     ),
 ];
-
-const LOOKUP_MODES: [LookupKeyMode; 2] = [LookupKeyMode::Raw, LookupKeyMode::Nfc15_1];
 
 #[derive(Debug, Deserialize)]
 struct Registry {
@@ -91,8 +89,8 @@ fn artifact_bytes(row: &RegistryRow) -> Vec<u8> {
     fs::read(repository_root().join(relative)).expect("published type-map artifact")
 }
 
-fn load(row: &RegistryRow, mode: LookupKeyMode) -> DfaTypeMap {
-    DfaTypeMap::from_exact_bytes(&artifact_bytes(row), &row.id, mode)
+fn load(row: &RegistryRow) -> DfaTypeMap {
+    DfaTypeMap::from_exact_bytes(&artifact_bytes(row), &row.id)
         .unwrap_or_else(|error| panic!("{} must load: {error}", row.record_type))
 }
 
@@ -147,233 +145,221 @@ fn registry_ids_select_all_four_exact_published_artifacts() {
         let bytes = artifact_bytes(row);
         assert_eq!(content_id(&bytes), row.id);
 
-        for mode in LOOKUP_MODES {
-            let map = load(row, mode);
-            assert_eq!(map.id(), row.id);
-            assert_eq!(map.record_type(), row.record_type);
-            assert_eq!(map.schema_version(), row.schema_version);
-            assert_eq!(map.version(), row.type_map_version);
+        let map = load(row);
+        assert_eq!(map.id(), row.id);
+        assert_eq!(map.record_type(), row.record_type);
+        assert_eq!(map.schema_version(), row.schema_version);
+        assert_eq!(map.version(), row.type_map_version);
 
-            let descriptor = TypeMapDescriptor {
-                id: row.id.clone(),
-                version: row.type_map_version.clone(),
-            };
+        let descriptor = TypeMapDescriptor {
+            id: row.id.clone(),
+            version: row.type_map_version.clone(),
+        };
+        map.select(
+            &row.record_type,
+            &row.schema_version,
+            &descriptor,
+            "did:example:any-profile-issuer",
+        )
+        .expect("the exact registry identity must select its base map");
+
+        let wrong_id = TypeMapDescriptor {
+            id: format!("{}0", row.id),
+            version: row.type_map_version.clone(),
+        };
+        assert_eq!(
             map.select(
                 &row.record_type,
                 &row.schema_version,
+                &wrong_id,
+                "did:example:any-profile-issuer",
+            ),
+            Err(Error::TypeMapIdentityMismatch)
+        );
+
+        let wrong_version = TypeMapDescriptor {
+            id: row.id.clone(),
+            version: "1.0.1".to_owned(),
+        };
+        assert_eq!(
+            map.select(
+                &row.record_type,
+                &row.schema_version,
+                &wrong_version,
+                "did:example:any-profile-issuer",
+            ),
+            Err(Error::TypeMapIdentityMismatch)
+        );
+        assert_eq!(
+            map.select(
+                "org.roax.corpus.synthetic",
+                &row.schema_version,
                 &descriptor,
                 "did:example:any-profile-issuer",
-            )
-            .expect("the exact registry identity must select its base map");
-
-            let wrong_id = TypeMapDescriptor {
-                id: format!("{}0", row.id),
-                version: row.type_map_version.clone(),
-            };
-            assert_eq!(
-                map.select(
-                    &row.record_type,
-                    &row.schema_version,
-                    &wrong_id,
-                    "did:example:any-profile-issuer",
-                ),
-                Err(Error::TypeMapIdentityMismatch)
-            );
-
-            let wrong_version = TypeMapDescriptor {
-                id: row.id.clone(),
-                version: "1.0.1".to_owned(),
-            };
-            assert_eq!(
-                map.select(
-                    &row.record_type,
-                    &row.schema_version,
-                    &wrong_version,
-                    "did:example:any-profile-issuer",
-                ),
-                Err(Error::TypeMapIdentityMismatch)
-            );
-            assert_eq!(
-                map.select(
-                    "org.roax.corpus.synthetic",
-                    &row.schema_version,
-                    &descriptor,
-                    "did:example:any-profile-issuer",
-                ),
-                Err(Error::TypeMapIdentityMismatch)
-            );
-            assert_eq!(
-                map.select(
-                    &row.record_type,
-                    "not-the-pinned-schema-version",
-                    &descriptor,
-                    "did:example:any-profile-issuer",
-                ),
-                Err(Error::TypeMapIdentityMismatch)
-            );
-        }
+            ),
+            Err(Error::TypeMapIdentityMismatch)
+        );
+        assert_eq!(
+            map.select(
+                &row.record_type,
+                "not-the-pinned-schema-version",
+                &descriptor,
+                "did:example:any-profile-issuer",
+            ),
+            Err(Error::TypeMapIdentityMismatch)
+        );
     }
 
     let first = row(&registry, EXPECTED_MAPS[0].0);
     let second = row(&registry, EXPECTED_MAPS[1].0);
-    for mode in LOOKUP_MODES {
-        assert_eq!(
-            DfaTypeMap::from_exact_bytes(&artifact_bytes(first), &second.id, mode)
-                .expect_err("bytes from one registry row cannot select another row"),
-            Error::TypeMapIdMismatch
-        );
-    }
+    assert_eq!(
+        DfaTypeMap::from_exact_bytes(&artifact_bytes(first), &second.id)
+            .expect_err("bytes from one registry row cannot select another row"),
+        Error::TypeMapIdMismatch
+    );
 }
 
 #[test]
 fn fhir_map_preserves_pinned_operative_and_fail_closed_bindings() {
     let registry = registry();
-    for mode in LOOKUP_MODES {
-        let fhir = load(row(&registry, "hl7.fhir.bundle"), mode);
-        assert_tag(
-            &fhir,
-            &[K("resourceType")],
-            JsonKind::String,
-            TypeTag::String,
-        );
-        assert_tag(
-            &fhir,
-            &[K("multipleBirthInteger")],
-            JsonKind::Number,
-            TypeTag::Integer,
-        );
-        assert_tag(
-            &fhir,
-            &[K("valueQuantity"), K("value")],
-            JsonKind::Number,
-            TypeTag::Decimal,
-        );
-        assert_tag(
-            &fhir,
-            &[
-                K("extension"),
-                I(0),
-                K("extension"),
-                I(1),
-                K("valueDecimal"),
-            ],
-            JsonKind::Number,
-            TypeTag::Decimal,
-        );
-        assert_unbound(&fhir, &[K("text"), K("div")], JsonKind::String);
-        assert_unbound(&fhir, &[K("data")], JsonKind::String);
-        assert_unbound(&fhir, &[K("notInSchema")], JsonKind::String);
-    }
+    let fhir = load(row(&registry, "hl7.fhir.bundle"));
+    assert_tag(
+        &fhir,
+        &[K("resourceType")],
+        JsonKind::String,
+        TypeTag::String,
+    );
+    assert_tag(
+        &fhir,
+        &[K("multipleBirthInteger")],
+        JsonKind::Number,
+        TypeTag::Integer,
+    );
+    assert_tag(
+        &fhir,
+        &[K("valueQuantity"), K("value")],
+        JsonKind::Number,
+        TypeTag::Decimal,
+    );
+    assert_tag(
+        &fhir,
+        &[
+            K("extension"),
+            I(0),
+            K("extension"),
+            I(1),
+            K("valueDecimal"),
+        ],
+        JsonKind::Number,
+        TypeTag::Decimal,
+    );
+    assert_unbound(&fhir, &[K("text"), K("div")], JsonKind::String);
+    assert_unbound(&fhir, &[K("data")], JsonKind::String);
+    assert_unbound(&fhir, &[K("notInSchema")], JsonKind::String);
 }
 
 #[test]
 fn pdt_map_preserves_pinned_operative_and_fail_closed_bindings() {
     let registry = registry();
-    for mode in LOOKUP_MODES {
-        let pdt = load(row(&registry, "sg.gov.moh.pdt-healthcert"), mode);
-        assert_tag(&pdt, &[K("id")], JsonKind::String, TypeTag::String);
-        assert_tag(&pdt, &[K("type"), I(0)], JsonKind::String, TypeTag::String);
-        assert_unbound(&pdt, &[K("type")], JsonKind::Array);
-        assert_tag(
-            &pdt,
-            &[
-                K("fhirBundle"),
-                K("entry"),
-                I(0),
-                K("resource"),
-                K("valueQuantity"),
-                K("value"),
-            ],
-            JsonKind::Number,
-            TypeTag::Decimal,
-        );
-        assert_unbound(&pdt, &[K("$template"), K("name")], JsonKind::String);
-        assert_unbound(
-            &pdt,
-            &[K("notarisationMetadata"), K("reference")],
-            JsonKind::String,
-        );
-        assert_unbound(&pdt, &[K("issuerAddedEmptyArray")], JsonKind::Array);
-        assert_unbound(&pdt, &[K("issuerAddedEmptyObject")], JsonKind::Object);
-    }
+    let pdt = load(row(&registry, "sg.gov.moh.pdt-healthcert"));
+    assert_tag(&pdt, &[K("id")], JsonKind::String, TypeTag::String);
+    assert_tag(&pdt, &[K("type"), I(0)], JsonKind::String, TypeTag::String);
+    assert_unbound(&pdt, &[K("type")], JsonKind::Array);
+    assert_tag(
+        &pdt,
+        &[
+            K("fhirBundle"),
+            K("entry"),
+            I(0),
+            K("resource"),
+            K("valueQuantity"),
+            K("value"),
+        ],
+        JsonKind::Number,
+        TypeTag::Decimal,
+    );
+    assert_unbound(&pdt, &[K("$template"), K("name")], JsonKind::String);
+    assert_unbound(
+        &pdt,
+        &[K("notarisationMetadata"), K("reference")],
+        JsonKind::String,
+    );
+    assert_unbound(&pdt, &[K("issuerAddedEmptyArray")], JsonKind::Array);
+    assert_unbound(&pdt, &[K("issuerAddedEmptyObject")], JsonKind::Object);
 }
 
 #[test]
 fn recovery_map_preserves_pinned_operative_and_fail_closed_bindings() {
     let registry = registry();
-    for mode in LOOKUP_MODES {
-        let recovery = load(row(&registry, "sg.gov.moh.recovery-healthcert"), mode);
-        assert_tag(
-            &recovery,
-            &[K("validUntil")],
-            JsonKind::String,
-            TypeTag::String,
-        );
-        assert_unbound(&recovery, &[K("type"), I(0)], JsonKind::String);
-        assert_unbound(&recovery, &[K("issuerAdded")], JsonKind::String);
-    }
+    let recovery = load(row(&registry, "sg.gov.moh.recovery-healthcert"));
+    assert_tag(
+        &recovery,
+        &[K("validUntil")],
+        JsonKind::String,
+        TypeTag::String,
+    );
+    assert_unbound(&recovery, &[K("type"), I(0)], JsonKind::String);
+    assert_unbound(&recovery, &[K("issuerAdded")], JsonKind::String);
 }
 
 #[test]
 fn vaccination_map_preserves_pinned_operative_and_fail_closed_bindings() {
     let registry = registry();
-    for mode in LOOKUP_MODES {
-        let vaccination = load(row(&registry, "sg.gov.moh.vaccination-healthcert"), mode);
-        assert_tag(
-            &vaccination,
-            &[K("attachments")],
-            JsonKind::Array,
-            TypeTag::EmptyArray,
-        );
-        assert_tag(
-            &vaccination,
-            &[K("attachments"), I(0)],
-            JsonKind::Object,
-            TypeTag::EmptyObject,
-        );
-        assert_tag(
-            &vaccination,
-            &[K("fhirBundle"), K("entry"), I(0), K("birthDate")],
-            JsonKind::String,
-            TypeTag::String,
-        );
-        assert_unbound(
-            &vaccination,
-            &[
-                K("fhirBundle"),
-                K("entry"),
-                I(0),
-                K("resource"),
-                K("birthDate"),
-            ],
-            JsonKind::String,
-        );
-        assert_unbound(
-            &vaccination,
-            &[
-                K("notarisationMetadata"),
-                K("signedEuHealthCerts"),
-                I(0),
-                K("dose"),
-            ],
-            JsonKind::Number,
-        );
-        assert_unbound(
-            &vaccination,
-            &[
-                K("notarisationMetadata"),
-                K("signedEuHealthCerts"),
-                I(0),
-                K("expiryDateTime"),
-            ],
-            JsonKind::String,
-        );
-        assert_unbound(
-            &vaccination,
-            &[K("notarisationMetadata"), K("issuerAdded")],
-            JsonKind::String,
-        );
-    }
+    let vaccination = load(row(&registry, "sg.gov.moh.vaccination-healthcert"));
+    assert_tag(
+        &vaccination,
+        &[K("attachments")],
+        JsonKind::Array,
+        TypeTag::EmptyArray,
+    );
+    assert_tag(
+        &vaccination,
+        &[K("attachments"), I(0)],
+        JsonKind::Object,
+        TypeTag::EmptyObject,
+    );
+    assert_tag(
+        &vaccination,
+        &[K("fhirBundle"), K("entry"), I(0), K("birthDate")],
+        JsonKind::String,
+        TypeTag::String,
+    );
+    assert_unbound(
+        &vaccination,
+        &[
+            K("fhirBundle"),
+            K("entry"),
+            I(0),
+            K("resource"),
+            K("birthDate"),
+        ],
+        JsonKind::String,
+    );
+    assert_unbound(
+        &vaccination,
+        &[
+            K("notarisationMetadata"),
+            K("signedEuHealthCerts"),
+            I(0),
+            K("dose"),
+        ],
+        JsonKind::Number,
+    );
+    assert_unbound(
+        &vaccination,
+        &[
+            K("notarisationMetadata"),
+            K("signedEuHealthCerts"),
+            I(0),
+            K("expiryDateTime"),
+        ],
+        JsonKind::String,
+    );
+    assert_unbound(
+        &vaccination,
+        &[K("notarisationMetadata"), K("issuerAdded")],
+        JsonKind::String,
+    );
 }
 
 #[test]
@@ -383,34 +369,32 @@ fn exact_bytes_and_strict_json_are_enforced_before_artifact_interpretation() {
     let mut tampered = artifact_bytes(row);
     tampered.push(b' ');
 
-    for mode in LOOKUP_MODES {
-        assert_eq!(
-            DfaTypeMap::from_exact_bytes(&tampered, &row.id, mode)
-                .expect_err("a byte change must not retain the registry identity"),
-            Error::TypeMapIdMismatch
-        );
+    assert_eq!(
+        DfaTypeMap::from_exact_bytes(&tampered, &row.id)
+            .expect_err("a byte change must not retain the registry identity"),
+        Error::TypeMapIdMismatch
+    );
 
-        let malformed = b"{";
-        assert!(matches!(
-            DfaTypeMap::from_exact_bytes(malformed, &content_id(malformed), mode),
-            Err(Error::InvalidJson { .. })
-        ));
+    let malformed = b"{";
+    assert!(matches!(
+        DfaTypeMap::from_exact_bytes(malformed, &content_id(malformed)),
+        Err(Error::InvalidJson { .. })
+    ));
 
-        let invalid_utf8 = [0xff];
-        assert!(matches!(
-            DfaTypeMap::from_exact_bytes(&invalid_utf8, &content_id(&invalid_utf8), mode),
-            Err(Error::InvalidUtf8(_))
-        ));
+    let invalid_utf8 = [0xff];
+    assert!(matches!(
+        DfaTypeMap::from_exact_bytes(&invalid_utf8, &content_id(&invalid_utf8)),
+        Err(Error::InvalidUtf8(_))
+    ));
 
-        let duplicate_member = br#"{"format":"ROAX-TYPE-MAP/1","format":"ROAX-TYPE-MAP/1"}"#;
-        assert_eq!(
-            DfaTypeMap::from_exact_bytes(duplicate_member, &content_id(duplicate_member), mode,)
-                .expect_err("duplicate JSON object names must have no interpretation"),
-            Error::DuplicateKey {
-                key: "format".to_owned(),
-            }
-        );
-    }
+    let duplicate_member = br#"{"format":"ROAX-TYPE-MAP/1","format":"ROAX-TYPE-MAP/1"}"#;
+    assert_eq!(
+        DfaTypeMap::from_exact_bytes(duplicate_member, &content_id(duplicate_member))
+            .expect_err("duplicate JSON object names must have no interpretation"),
+        Error::DuplicateKey {
+            key: "format".to_owned(),
+        }
+    );
 }
 
 fn synthetic_artifact(key: &str) -> serde_json::Value {
@@ -476,13 +460,11 @@ fn exact_json_number(literal: &str) -> serde_json::Value {
 #[test]
 fn malformed_dfa_transition_keys_are_rejected() {
     let non_nfc = encoded_artifact(&synthetic_artifact("e\u{301}"));
-    for mode in LOOKUP_MODES {
-        assert_eq!(
-            DfaTypeMap::from_exact_bytes(&non_nfc, &content_id(&non_nfc), mode)
-                .expect_err("transition keys must already be NFC"),
-            Error::InvalidTypeMap("transition key is not NFC".to_owned())
-        );
-    }
+    assert_eq!(
+        DfaTypeMap::from_exact_bytes(&non_nfc, &content_id(&non_nfc))
+            .expect_err("transition keys must already be NFC"),
+        Error::InvalidTypeMap("transition key is not NFC".to_owned())
+    );
 
     let mut duplicate = synthetic_artifact("key");
     let keys = duplicate["automaton"]["states"][0]["keys"]
@@ -490,13 +472,11 @@ fn malformed_dfa_transition_keys_are_rejected() {
         .expect("synthetic root state keys");
     keys.push(keys[0].clone());
     let duplicate = encoded_artifact(&duplicate);
-    for mode in LOOKUP_MODES {
-        assert_eq!(
-            DfaTypeMap::from_exact_bytes(&duplicate, &content_id(&duplicate), mode)
-                .expect_err("a state cannot contain duplicate KEY transitions"),
-            Error::InvalidTypeMap("duplicate KEY transition".to_owned())
-        );
-    }
+    assert_eq!(
+        DfaTypeMap::from_exact_bytes(&duplicate, &content_id(&duplicate))
+            .expect_err("a state cannot contain duplicate KEY transitions"),
+        Error::InvalidTypeMap("duplicate KEY transition".to_owned())
+    );
 }
 
 #[test]
@@ -505,14 +485,12 @@ fn nested_unknown_carrier_members_are_rejected() {
     artifact["automaton"]["states"][1]["bindings"][0]["unexpected"] = json!(true);
     let bytes = encoded_artifact(&artifact);
 
-    for mode in LOOKUP_MODES {
-        let error = DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes), mode)
-            .expect_err("unknown members inside bindings must be rejected");
-        assert!(
-            matches!(&error, Error::InvalidTypeMap(message) if message.contains("unknown field `unexpected`")),
-            "unexpected error: {error}"
-        );
-    }
+    let error = DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes))
+        .expect_err("unknown members inside bindings must be rejected");
+    assert!(
+        matches!(&error, Error::InvalidTypeMap(message) if message.contains("unknown field `unexpected`")),
+        "unexpected error: {error}"
+    );
 }
 
 #[test]
@@ -521,14 +499,12 @@ fn source_uris_match_the_executable_checker_url_semantics() {
     artifact["sourceSchemas"][0]["uri"] = json!("https://");
     let bytes = encoded_artifact(&artifact);
 
-    for mode in LOOKUP_MODES {
-        let error = DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes), mode)
-            .expect_err("a special-scheme URL without a host must be rejected");
-        assert!(
-            matches!(&error, Error::InvalidTypeMap(message) if message.contains("sourceSchema")),
-            "unexpected error: {error}"
-        );
-    }
+    let error = DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes))
+        .expect_err("a special-scheme URL without a host must be rejected");
+    assert!(
+        matches!(&error, Error::InvalidTypeMap(message) if message.contains("sourceSchema")),
+        "unexpected error: {error}"
+    );
 }
 
 #[test]
@@ -561,14 +537,12 @@ fn explicit_null_is_rejected_for_all_omittable_carrier_members() {
         object.insert(member.to_owned(), serde_json::Value::Null);
         let bytes = encoded_artifact(&artifact);
 
-        for mode in LOOKUP_MODES {
-            let error = DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes), mode)
-                .expect_err("explicit null in an omittable carrier member must be rejected");
-            assert!(
-                matches!(&error, Error::InvalidTypeMap(message) if message.contains("invalid type: null")),
-                "unexpected error for {label}: {error}"
-            );
-        }
+        let error = DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes))
+            .expect_err("explicit null in an omittable carrier member must be rejected");
+        assert!(
+            matches!(&error, Error::InvalidTypeMap(message) if message.contains("invalid type: null")),
+            "unexpected error for {label}: {error}"
+        );
     }
 }
 
@@ -587,10 +561,8 @@ fn mathematical_integer_number_forms_are_accepted_without_float_conversion() {
     artifact["coverage"]["byBasis"]["schema-type"] = exact_json_number("10e-1");
     let bytes = encoded_artifact(&artifact);
 
-    for mode in LOOKUP_MODES {
-        DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes), mode)
-            .expect("mathematically integral JSON numbers must satisfy integer carriers");
-    }
+    DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes))
+        .expect("mathematically integral JSON numbers must satisfy integer carriers");
 }
 
 #[test]
@@ -650,14 +622,12 @@ fn invalid_mathematical_integer_number_forms_are_rejected() {
             .insert(member.to_owned(), exact_json_number(literal));
         let bytes = encoded_artifact(&artifact);
 
-        for mode in LOOKUP_MODES {
-            let error = DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes), mode)
-                .expect_err("invalid mathematical integer carrier must be rejected");
-            assert!(
-                matches!(error, Error::InvalidTypeMap(_)),
-                "unexpected error for {label}: {error}"
-            );
-        }
+        let error = DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes))
+            .expect_err("invalid mathematical integer carrier must be rejected");
+        assert!(
+            matches!(error, Error::InvalidTypeMap(_)),
+            "unexpected error for {label}: {error}"
+        );
     }
 }
 
@@ -667,13 +637,11 @@ fn stale_coverage_counts_are_rejected() {
     artifact["coverage"]["resolvedOutputs"] = json!(2);
     let bytes = encoded_artifact(&artifact);
 
-    for mode in LOOKUP_MODES {
-        assert_eq!(
-            DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes), mode)
-                .expect_err("coverage must match the materialized DFA"),
-            Error::InvalidTypeMap("coverage metadata is invalid or stale".to_owned())
-        );
-    }
+    assert_eq!(
+        DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes))
+            .expect_err("coverage must match the materialized DFA"),
+        Error::InvalidTypeMap("coverage metadata is invalid or stale".to_owned())
+    );
 }
 
 #[test]
@@ -692,15 +660,13 @@ fn noncanonical_breadth_first_state_numbering_is_rejected() {
     artifact["coverage"]["keyTransitions"] = json!(2);
     let bytes = encoded_artifact(&artifact);
 
-    for mode in LOOKUP_MODES {
-        assert_eq!(
-            DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes), mode)
-                .expect_err("state IDs must follow canonical breadth-first discovery"),
-            Error::InvalidTypeMap(
-                "DFA state numbering is not canonical breadth-first order".to_owned()
-            )
-        );
-    }
+    assert_eq!(
+        DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes))
+            .expect_err("state IDs must follow canonical breadth-first discovery"),
+        Error::InvalidTypeMap(
+            "DFA state numbering is not canonical breadth-first order".to_owned()
+        )
+    );
 }
 
 #[test]
@@ -719,58 +685,48 @@ fn issuer_child_artifacts_require_parent_and_additivity_validation() {
     }]);
     let bytes = encoded_artifact(&artifact);
 
-    for mode in LOOKUP_MODES {
-        assert_eq!(
-            DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes), mode)
-                .expect_err("standalone loading cannot validate child additivity"),
-            Error::InvalidTypeMap(
-                "issuer child artifacts require parent and additivity validation".to_owned()
-            )
-        );
-    }
+    assert_eq!(
+        DfaTypeMap::from_exact_bytes(&bytes, &content_id(&bytes))
+            .expect_err("standalone loading cannot validate child additivity"),
+        Error::InvalidTypeMap(
+            "issuer child artifacts require parent and additivity validation".to_owned()
+        )
+    );
 }
 
 #[test]
-fn lookup_key_modes_make_the_open_normalization_choice_explicit() {
+fn the_lookup_matches_a_key_under_nfc_on_both_sides() {
+    // Ruled decision D14a. The artifact declares the COMPOSED spelling, and the two
+    // structured paths below render identically to a reader.
+    //
+    // Under the retired raw reading the decomposed path resolved to
+    // `UnknownTypeBinding` while its composed twin resolved to STRING, so one of two
+    // records that look the same was refused outright by the fail-closed rule. Under
+    // D14a both resolve to the same tag, which is what makes the two spellings behave
+    // identically end to end.
     let bytes = encoded_artifact(&synthetic_artifact("\u{e9}"));
     let id = content_id(&bytes);
     let composed = structured_path(&[K("\u{e9}")]);
     let decomposed = structured_path(&[K("e\u{301}")]);
+    assert_ne!(composed.encode(), decomposed.encode().map(|_| Vec::new()));
 
-    let raw = DfaTypeMap::from_exact_bytes(&bytes, &id, LookupKeyMode::Raw)
-        .expect("valid synthetic type map");
+    let map = DfaTypeMap::from_exact_bytes(&bytes, &id).expect("valid synthetic type map");
     assert_eq!(
-        raw.resolve(&composed, JsonKind::String),
+        map.resolve(&composed, JsonKind::String),
         Ok(TypeTag::String)
     );
     assert_eq!(
-        raw.resolve(&decomposed, JsonKind::String),
-        Err(Error::UnknownTypeBinding {
-            path: decomposed.clone(),
-            kind: JsonKind::String,
-        })
-    );
-    assert_eq!(
-        raw.ensure_lookup_decision_independent(&decomposed, JsonKind::String),
-        Err(Error::LookupNormalizationUndecided(decomposed.clone()))
-    );
-    assert_eq!(
-        raw.ensure_lookup_decision_independent(&composed, JsonKind::String),
-        Ok(())
+        map.resolve(&decomposed, JsonKind::String),
+        Ok(TypeTag::String)
     );
 
-    let nfc = DfaTypeMap::from_exact_bytes(&bytes, &id, LookupKeyMode::Nfc15_1)
-        .expect("valid synthetic type map");
+    // Both sides are normalized rather than only the segment key: an artifact whose
+    // transition key is NOT already NFC is refused at load, so a DECOMPOSED artifact
+    // key can never become a live transition that only a decomposed record reaches.
+    let decomposed_artifact = encoded_artifact(&synthetic_artifact("e\u{301}"));
     assert_eq!(
-        nfc.resolve(&composed, JsonKind::String),
-        Ok(TypeTag::String)
-    );
-    assert_eq!(
-        nfc.resolve(&decomposed, JsonKind::String),
-        Ok(TypeTag::String)
-    );
-    assert_eq!(
-        nfc.ensure_lookup_decision_independent(&decomposed, JsonKind::String),
-        Err(Error::LookupNormalizationUndecided(decomposed))
+        DfaTypeMap::from_exact_bytes(&decomposed_artifact, &content_id(&decomposed_artifact))
+            .expect_err("a non-NFC transition key must be refused"),
+        Error::InvalidTypeMap("transition key is not NFC".to_owned())
     );
 }

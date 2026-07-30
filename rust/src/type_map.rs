@@ -70,15 +70,6 @@ impl TryFrom<u8> for TypeTag {
     }
 }
 
-/// Explicit selection for open decision D14.
-///
-/// There is intentionally no `Default` implementation.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum LookupKeyMode {
-    Raw,
-    Nfc15_1,
-}
-
 /// Exact descriptor carried by a current envelope.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TypeMapDescriptor {
@@ -87,11 +78,14 @@ pub struct TypeMapDescriptor {
 }
 
 /// Fail-closed schema-selected tag resolver.
+///
+/// A KEY segment is matched under NFC, which is ruled decision D14a and is stated by
+/// ROAX-CANON/1 section 4.2. The `LookupKeyMode` selector and the
+/// `ensure_lookup_decision_independent` guard this trait carried while D14 was open are gone:
+/// the guard existed to refuse a lookup whose answer differed between the two readings, and
+/// there is now one reading.
 pub trait TypeResolver {
     fn resolve(&self, path: &Path, kind: JsonKind) -> Result<TypeTag>;
-
-    /// Refuse a lookup whose result changes across the two open D14 readings.
-    fn ensure_lookup_decision_independent(&self, path: &Path, kind: JsonKind) -> Result<()>;
 }
 
 /// Validated structured-path DFA over exact immutable artifact bytes.
@@ -102,7 +96,6 @@ pub struct DfaTypeMap {
     record_type: String,
     schema_version: String,
     states: Vec<CompiledState>,
-    lookup_key_mode: LookupKeyMode,
 }
 
 #[derive(Clone, Debug)]
@@ -114,11 +107,12 @@ struct CompiledState {
 
 impl DfaTypeMap {
     /// Identify, decode, validate, and compile exact artifact bytes.
-    pub fn from_exact_bytes(
-        bytes: &[u8],
-        expected_id: &str,
-        lookup_key_mode: LookupKeyMode,
-    ) -> Result<Self> {
+    ///
+    /// The `LookupKeyMode` parameter this took while decision D14 was open is gone: D14 is
+    /// ruled D14a, so a KEY segment is matched under NFC and there is nothing to select.
+    /// [`assert_unicode_version`] still runs, because a normalized lookup is only well defined
+    /// against the Unicode version ROAX-CANON/1 section 6.1 pins.
+    pub fn from_exact_bytes(bytes: &[u8], expected_id: &str) -> Result<Self> {
         assert_unicode_version()?;
         let actual_id = content_id(bytes);
         if actual_id != expected_id {
@@ -147,7 +141,6 @@ impl DfaTypeMap {
             record_type: artifact.record_type,
             schema_version: artifact.schema_version,
             states,
-            lookup_key_mode,
         })
     }
 
@@ -196,30 +189,16 @@ impl DfaTypeMap {
 }
 
 impl TypeResolver for DfaTypeMap {
+    /// Take the transition whose key equals the segment key's NFC form.
+    ///
+    /// Ruled decision D14a, stated by ROAX-CANON/1 section 4.2. Both sides are normalized:
+    /// [`compile_states`] rejects a transition key that is not already NFC, so the lookup
+    /// normalizes only the segment key.
+    ///
+    /// Matching raw would compare bytes the record never commits, since an encoded KEY segment
+    /// commits `NFC(key)` under section 5.1, and would let two records that render identically
+    /// diverge with one of them refused outright by the fail-closed rule.
     fn resolve(&self, path: &Path, kind: JsonKind) -> Result<TypeTag> {
-        self.resolve_with_mode(path, kind, self.lookup_key_mode)
-    }
-
-    fn ensure_lookup_decision_independent(&self, path: &Path, kind: JsonKind) -> Result<()> {
-        let raw = self.resolve_with_mode(path, kind, LookupKeyMode::Raw);
-        let nfc = self.resolve_with_mode(path, kind, LookupKeyMode::Nfc15_1);
-        match (raw, nfc) {
-            (Ok(left), Ok(right)) if left == right => Ok(()),
-            (Err(Error::UnknownTypeBinding { .. }), Err(Error::UnknownTypeBinding { .. })) => {
-                Ok(())
-            }
-            _ => Err(Error::LookupNormalizationUndecided(path.clone())),
-        }
-    }
-}
-
-impl DfaTypeMap {
-    fn resolve_with_mode(
-        &self,
-        path: &Path,
-        kind: JsonKind,
-        lookup_key_mode: LookupKeyMode,
-    ) -> Result<TypeTag> {
         let mut state_index = 0_usize;
         for segment in path.segments() {
             let state = self.states.get(state_index).ok_or_else(|| {
@@ -227,10 +206,7 @@ impl DfaTypeMap {
             })?;
             state_index = match segment {
                 Segment::Key(key) => {
-                    let lookup = match lookup_key_mode {
-                        LookupKeyMode::Raw => key.clone(),
-                        LookupKeyMode::Nfc15_1 => key.nfc().collect(),
-                    };
+                    let lookup: String = key.nfc().collect();
                     *state
                         .keys
                         .get(&lookup)

@@ -695,6 +695,12 @@ class TypeMap:
     Unknown paths fail closed (section 4.2). There is deliberately no default tag and no
     fallback to the observed JSON kind: either would let two libraries carrying different maps
     produce different roots silently.
+
+    **The lookup matches over NFC-normalized keys on BOTH sides** (section 4.2, decision D14
+    ruled D14a on 2026-07-30). `parse_pattern` normalizes each pattern token and `_match_from`
+    normalizes each segment key, so a key written decomposed resolves to the same binding as its
+    composed twin. Section 11.2's rule is "check the bytes you commit", and a STRING leaf commits
+    its NFC form, so matching raw would check bytes the record never commits.
     """
 
     def __init__(self, doc):
@@ -717,6 +723,10 @@ def parse_pattern(pattern: str):
     """Parse a display-notation pattern into segment matchers.
 
     `*` matches any single array index; `**` matches any run of segments.
+
+    A key token is NFC-normalized here, under ruled decision D14a: the lookup compares
+    normalized keys on both sides, so a pattern authored in either spelling denotes the same
+    path language.
 
     LIMIT, reported rather than papered over: because the pattern is written in display
     notation, it cannot address a key containing `.`, `[` or `]`, while section 5 deliberately
@@ -750,7 +760,7 @@ def parse_pattern(pattern: str):
         else:
             if "]" in token:
                 raise RoaxError("type-map-pattern", pattern)
-            out.append(("key", token))
+            out.append(("key", nfc(token)))
         i = j
         if i < n and pattern[i] == ".":
             i += 1
@@ -773,7 +783,9 @@ def _match_from(pattern, pi: int, segments, si: int) -> bool:
             return False
         seg = segments[si]
         if kind == "key":
-            if "key" not in seg or seg["key"] != arg:
+            # Ruled decision D14a: compare the NFC-normalized key, which is the key the leaf
+            # actually commits (section 11.2), rather than the bytes as received.
+            if "key" not in seg or nfc(seg["key"]) != arg:
                 return False
         else:
             if "index" not in seg:

@@ -1460,33 +1460,31 @@ class TestTypeMapMatcher(unittest.TestCase):
                         {**SYNTHETIC_MAP, "entries": [{"pattern": pattern, "tag": 2}]}
                     )
 
-    def test_lookup_compares_raw_because_d14_is_open(self):
-        # Decision D14 asks whether the type-map LOOKUP matches over an NFC-normalized
-        # key or over the bytes as received, and it is OPEN (`docs/decisions.md` part 2a).
-        # Both existing reference implementations compare raw and so does this one.
-        # Adding an nfc() on either side would rule D14 silently, so this test pins the
-        # current behaviour rather than endorsing it: U+212A renders as "K" and does not
-        # match an ASCII "K" pattern, even though the leaf it names commits as ASCII.
+    def test_lookup_matches_a_key_under_nfc_on_both_sides(self):
+        # Ruled decision D14a on 2026-07-30 (`docs/decisions.md` part 2a): the type-map
+        # LOOKUP matches over NFC-normalized keys rather than over the bytes as received.
+        # U+212A KELVIN SIGN renders as "K" and its NFC form IS ASCII "K", so the leaf it
+        # names commits as ASCII and the lookup now agrees with that.
         m = DisplayPatternTypeMap(
             {**SYNTHETIC_MAP, "entries": [{"pattern": "Kelvin", "jsonKind": "string", "tag": 2}]}
         )
         self.assertEqual(m.resolve((Key("Kelvin"),), "string"), 2)
+        self.assertEqual(m.resolve((Key("\u212aelvin"),), "string"), 2)
+
+        # BOTH sides normalize, so a pattern authored decomposed denotes the same path
+        # language as one authored composed and either reaches either spelling.
+        for pattern in ("\u00e9", "e\u0301"):
+            authored = DisplayPatternTypeMap(
+                {**SYNTHETIC_MAP, "entries": [{"pattern": pattern, "jsonKind": "string", "tag": 2}]}
+            )
+            self.assertEqual(authored.resolve((Key("\u00e9"),), "string"), 2)
+            self.assertEqual(authored.resolve((Key("e\u0301"),), "string"), 2)
+
+        # Normalizing the lookup key does NOT widen the map to a different character:
+        # fail-closed still applies to a key whose NFC form is not the pattern's.
         with self.assertRaises(RoaxError) as ctx:
-            m.resolve((Key("\u212aelvin"),), "string")
+            m.resolve((Key("kelvin"),), "string")
         self.assertEqual(ctx.exception.code, ErrorCode.TYPE_UNRESOLVED)
-        # And the corpus is deliberately neutral about which reading is right: its
-        # synthetic map carries the key under BOTH spellings.
-        both = DisplayPatternTypeMap(
-            {
-                **SYNTHETIC_MAP,
-                "entries": [
-                    {"pattern": "\u212aelvin", "jsonKind": "string", "tag": 2},
-                    {"pattern": "Kelvin", "jsonKind": "string", "tag": 2},
-                ],
-            }
-        )
-        self.assertEqual(both.resolve((Key("\u212aelvin"),), "string"), 2)
-        self.assertEqual(both.resolve((Key("Kelvin"),), "string"), 2)
 
 
 if __name__ == "__main__":  # pragma: no cover

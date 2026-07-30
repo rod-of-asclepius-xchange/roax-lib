@@ -32,7 +32,7 @@ pub use error::{Error, Result};
 pub use json::JsonValue;
 pub use merkle::{audit_path, fold_inclusion_proof_untrusted, merkle_tree_hash, Hash};
 pub use path::{Path, Segment};
-pub use type_map::{DfaTypeMap, JsonKind, LookupKeyMode, TypeMapDescriptor, TypeResolver, TypeTag};
+pub use type_map::{DfaTypeMap, JsonKind, TypeMapDescriptor, TypeResolver, TypeTag};
 pub use value::{BlobRef, LeafValue};
 
 /// Canonicalization version placed in every leaf domain.

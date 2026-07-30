@@ -550,7 +550,6 @@ where
             Frame::Visit(value) => {
                 let leaf_path = Path::from_segments(segments.clone());
                 let kind = JsonKind::of(value);
-                resolver.ensure_lookup_decision_independent(&leaf_path, kind)?;
                 let tag = resolver.resolve(&leaf_path, kind)?;
                 let leaf_value = LeafValue::from_json(tag, value)?;
                 leaves.push(UnsaltedLeaf {

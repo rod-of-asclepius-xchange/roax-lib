@@ -12,6 +12,7 @@
  * syntax, or apply a fallback tag.
  */
 
+import { nfc } from './bytes.js';
 import { fail } from './errors.js';
 import { isKeySegment, displayPath, type Path } from './path.js';
 import type { JsonKind } from './json.js';
@@ -173,7 +174,9 @@ function compilePattern(pattern: string): PatternMatcher[] {
       // `a..b` cannot be told apart from a legitimate empty key, which section 5 admits.
       fail('type-map-rejected', `pattern ${JSON.stringify(pattern)} has an empty key token`);
     }
-    matchers.push({ kind: 'key', key: base });
+    // Ruled decision D14a: the lookup compares NFC-normalized keys on BOTH sides, so a pattern
+    // token is normalized once at compile time rather than on every comparison.
+    matchers.push({ kind: 'key', key: nfc(base) });
     matchers.push(...indexers);
   }
   return matchers;
@@ -182,12 +185,18 @@ function compilePattern(pattern: string): PatternMatcher[] {
 /**
  * Matches compiled matchers against structured segments.
  *
- * **A key is compared RAW, with no NFC on either side, and that is deliberate.** Whether type-map
- * LOOKUP normalizes the key it matches on is decision D14 and it is OPEN (`docs/decisions.md`
- * part 2a). The specification pins NFC for hashing (section 6.1) and is silent on the lookup that
- * precedes it. Adding an `nfc()` call to either side here would rule D14 silently, so it is not
- * added. The corpus's synthetic map carries the Kelvin key under BOTH spellings - U+212A and
- * ASCII `K` - precisely so no committed vector depends on the answer.
+ * **A key is compared under NFC on BOTH sides** (specification section 4.2, decision D14 ruled
+ * D14a on 2026-07-30). The pattern token was normalized by `compilePattern`; the segment key is
+ * normalized here.
+ *
+ * Two reasons, and the second is why the first is not merely a preference. Section 11.2's rule is
+ * "check the bytes you commit, not the bytes you received", and a STRING leaf commits `utf8(NFC(s))`
+ * while an encoded KEY segment commits `NFC(key)` (section 5.1), so a raw comparison checks bytes no
+ * part of the record ever commits. And under a raw comparison two records that RENDER IDENTICALLY
+ * diverge: the composed spelling resolves and commits while the decomposed one is refused outright
+ * by the fail-closed rule of section 4.2. That is the invisible divergence decision D12 was ruled to
+ * prevent, arriving one layer up, so ruling raw here would reintroduce at the type-map layer the
+ * hazard already ruled out at the leaf layer.
  */
 function matches(
   matchers: readonly PatternMatcher[],
@@ -209,7 +218,7 @@ function matches(
     return false;
   }
   if (m.kind === 'key') {
-    if (!isKeySegment(segment) || segment.key !== m.key) {
+    if (!isKeySegment(segment) || nfc(segment.key) !== m.key) {
       return false;
     }
   } else if (isKeySegment(segment)) {

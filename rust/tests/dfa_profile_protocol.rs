@@ -10,7 +10,7 @@
 use roax_canon::type_map::content_id;
 use roax_canon::{
     disclose, issue_full_copy, parse_envelope, verify_disclosed, verify_full, CommitmentContext,
-    DfaTypeMap, Error, HashAlgorithm, Issuer, JsonKind, JsonValue, LookupKeyMode, ParsedEnvelope,
+    DfaTypeMap, Error, HashAlgorithm, Issuer, JsonKind, JsonValue, ParsedEnvelope,
     Path, Profile, ReservedLeafSet, SchemaValidator, Segment, TypeMapDescriptor, TypeResolver,
     TypeTag, VerificationPolicy,
 };
@@ -38,14 +38,6 @@ impl SchemaValidator for DfaProfile {
 impl TypeResolver for DfaProfile {
     fn resolve(&self, path: &Path, kind: JsonKind) -> roax_canon::Result<TypeTag> {
         self.map.resolve(path, kind)
-    }
-
-    fn ensure_lookup_decision_independent(
-        &self,
-        path: &Path,
-        kind: JsonKind,
-    ) -> roax_canon::Result<()> {
-        self.map.ensure_lookup_decision_independent(path, kind)
     }
 }
 
@@ -161,7 +153,7 @@ fn a_published_artifact_drives_issue_verify_disclose_and_verify() {
     let bytes =
         fs::read(repository_root().join("type-maps/sg.gov.moh.recovery-healthcert-2.0.json"))
             .expect("published recovery type map");
-    let map = DfaTypeMap::from_exact_bytes(&bytes, RECOVERY_MAP_ID, LookupKeyMode::Nfc15_1)
+    let map = DfaTypeMap::from_exact_bytes(&bytes, RECOVERY_MAP_ID)
         .expect("the published recovery artifact must load");
 
     let profile = DfaProfile {
@@ -235,12 +227,19 @@ fn verify_text(text: &str, profile: &dyn Profile, policy: VerificationPolicy) ->
 }
 
 #[test]
-fn both_high_level_call_sites_refuse_a_decision_d14_sensitive_key() {
+fn both_high_level_call_sites_resolve_a_decomposed_key_like_its_composed_twin() {
+    // Ruled decision D14a: the lookup matches under NFC, so the two spellings behave
+    // identically end to end. Under the retired raw reading the decomposed record was
+    // refused outright by the fail-closed rule while its composed twin issued, and the
+    // two render identically to whoever typed the key.
+    //
+    // The artifact declares the COMPOSED spelling. Both call sites are covered because
+    // each resolves independently: commitment.rs at issuance, envelope.rs at disclosed
+    // verification.
     let bytes = lookup_artifact("\u{e9}");
     let id = content_id(&bytes);
     let profile = DfaProfile {
-        map: DfaTypeMap::from_exact_bytes(&bytes, &id, LookupKeyMode::Nfc15_1)
-            .expect("synthetic artifact loads"),
+        map: DfaTypeMap::from_exact_bytes(&bytes, &id).expect("synthetic artifact loads"),
         floor: Vec::new(),
     };
     let context = context_for(&profile.map, "record-1");
@@ -250,10 +249,9 @@ fn both_high_level_call_sites_refuse_a_decision_d14_sensitive_key() {
     let decomposed = JsonValue::from_str("{\"e\\u0301\":\"x\"}").expect("decomposed record parses");
     let (copy, commitment) =
         issue_full_copy(&composed, &context, &profile).expect("the composed key must issue");
-    assert_eq!(
-        issue_full_copy(&decomposed, &context, &profile).map(|_| ()),
-        Err(Error::LookupNormalizationUndecided(key_path(&["e\u{301}"])))
-    );
+    let (decomposed_copy, _) =
+        issue_full_copy(&decomposed, &context, &profile).expect("the decomposed key must issue");
+    assert_eq!(decomposed_copy.leaf_count(), copy.leaf_count());
 
     let policy = VerificationPolicy {
         anchored_root: copy.root(),
@@ -263,15 +261,15 @@ fn both_high_level_call_sites_refuse_a_decision_d14_sensitive_key() {
         .expect("the composed disclosure must build");
     verify_disclosed(&disclosure, &profile, policy).expect("the composed disclosure must verify");
 
-    // Disclosed verification, at envelope.rs's resolver call site. The encoded
-    // path normalizes before hashing, so the leaf hash and its inclusion proof
-    // still match the genuine root and the D14 refusal is what stops it.
+    // Disclosed verification, at envelope.rs's resolver call site. The encoded path
+    // normalizes before hashing, so rewriting the disclosed key to its decomposed
+    // spelling leaves the leaf hash and the inclusion proof matching the genuine root.
+    // Under raw matching the lookup then failed closed and refused an envelope whose
+    // arithmetic is intact; under D14a it verifies.
     let rewritten = disclosure
         .to_json_string()
         .replace("\"\u{e9}\"", "\"e\u{301}\"");
     assert_ne!(rewritten, disclosure.to_json_string());
-    assert_eq!(
-        verify_text(&rewritten, &profile, policy),
-        Err(Error::LookupNormalizationUndecided(key_path(&["e\u{301}"])))
-    );
+    verify_text(&rewritten, &profile, policy)
+        .expect("a decomposed disclosed key must verify under D14a");
 }
