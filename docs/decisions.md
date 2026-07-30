@@ -539,10 +539,16 @@ more.
 treated content-addressing as a later question.
 
 **Written into the spec:** explicitly typed healthcert blobs are hashed inline and bound as `STRING`
-over the base64 text, while FHIR `base64Binary` remains unresolved between STRING and BYTES
+over the base64 text, and FHIR `base64Binary` was left unresolved between STRING and BYTES
 (specification section 6.3); the content-addressed binding is **defined** as type tag 8 `BLOB_REF`
 and **selected by no version-1 profile**, so a record that selects it MUST be rejected (section
 6.5); and one canonical base64 form is pinned (section 6.3).
+
+**That last gap was closed on 2026-07-30, after this ruling.** FHIR `base64Binary` is ruled `BYTES`
+over the decoded octets at evidence grade Strong, which makes the pinned canonical form an
+input-admissibility condition rather than the committed value; specification section 6.3 now says
+so. The four published artifacts do not yet carry that binding, for the regeneration reason
+`docs/type-maps.md` section 1.6 records.
 
 `logo` and `attachments[].data` are **60-70% of all hashed bytes** across the three reference
 records: 14,314 bytes in the vaccination sample, 17,440 in the endorsed PDT, 2,618 in recovery.
@@ -737,7 +743,7 @@ Recorded so that nobody mistakes a gap for a conclusion.
 
 | Gap | Status |
 |---|---|
-| **Some reference-schema paths remain untyped.** | **Mostly closed on 2026-07-30.** Five undetermined bindings were ruled with their evidence grades: vaccination `dose` INTEGER plus a positive-integer profile narrowing (Strong), `expiryDateTime` STRING by profile declaration (Moderate), FHIR `base64Binary` BYTES over the decoded octets (Strong), FHIR `Narrative.div` STRING over the escaped XHTML text (Decisive), and FHIR primitive-array null placeholders publishing no NULL binding and rejecting the record (Decisive). What remains open is PDT's 20 endorsed-sample path-kind pairs, which need a versioned composition profile rather than 20 authored bindings and have no ruling, so the PDT sample stays uncommittable. Two of the five rulings are operative in the corpus maps; the three FHIR rulings are not yet in the published artifacts because regeneration is blocked, which `docs/type-maps.md` section 1.6 states along with what the next change must do. |
+| **Some reference-schema paths remain untyped.** | **Mostly closed on 2026-07-30.** Five undetermined bindings were ruled with their evidence grades: vaccination `dose` INTEGER plus a positive-integer profile narrowing (Strong), `expiryDateTime` STRING by profile declaration (Moderate), FHIR `base64Binary` BYTES over the decoded octets (Strong), FHIR `Narrative.div` STRING over the escaped XHTML text (Decisive), and FHIR primitive-array null placeholders publishing no NULL binding and rejecting the record (Decisive). What remains open is PDT's 20 endorsed-sample path-kind pairs, which need a versioned composition profile rather than 20 authored bindings and have no ruling, so the PDT sample stays uncommittable. Two of the five rulings are operative in the corpus-side maps; none of the four that are bindings is yet in the four published artifacts, because regeneration is blocked, while the fifth is an absence those artifacts already satisfy, which `docs/type-maps.md` section 1.6 states along with what the next change must do. |
 | **Kotlin/JVM literal-preserving JSON is unverified.** | Every other target language has a confirmed mechanism. Kotlin was not tested by any research leg. |
 | **The five reference implementations share one author.** | They do not share a JSON parser, number representation, Unicode API, map or sort. They do share one reading of the specification. Hence gate 3 in the corpus. |
 | **No character with version-dependent NFC has been identified.** | The Unicode pin is inferred from dogtag having found it necessary in code, not from an exhibited failing character. Conformance class 16 says so explicitly. |

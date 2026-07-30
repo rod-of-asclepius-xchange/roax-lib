@@ -10,9 +10,9 @@
 use roax_canon::type_map::content_id;
 use roax_canon::{
     disclose, issue_full_copy, parse_envelope, verify_disclosed, verify_full, CommitmentContext,
-    DfaTypeMap, Error, HashAlgorithm, Issuer, JsonKind, JsonValue, ParsedEnvelope,
-    Path, Profile, ReservedLeafSet, SchemaValidator, Segment, TypeMapDescriptor, TypeResolver,
-    TypeTag, VerificationPolicy,
+    DfaTypeMap, Error, HashAlgorithm, Issuer, JsonKind, JsonValue, ParsedEnvelope, Path, Profile,
+    ReservedLeafSet, SchemaValidator, Segment, TypeMapDescriptor, TypeResolver, TypeTag,
+    VerificationPolicy,
 };
 use serde_json::json;
 use std::fs;
@@ -405,8 +405,7 @@ fn a_declared_profile_value_rule_narrows_what_the_integer_binding_admits() {
 
     // The values the shipped vaccination sample carries.
     for text in ["1", "2"] {
-        let record = JsonValue::from_str(&format!("{{\"dose\":{text}}}"))
-            .expect("record parses");
+        let record = JsonValue::from_str(&format!("{{\"dose\":{text}}}")).expect("record parses");
         issue_full_copy(&record, &context, &ruled)
             .unwrap_or_else(|error| panic!("dose {text} must issue: {error}"));
     }
@@ -416,8 +415,7 @@ fn a_declared_profile_value_rule_narrows_what_the_integer_binding_admits() {
     // bare type-map edit. A fractional value is refused one layer down by the section 6.2
     // INTEGER grammar and is therefore not the discriminating case.
     for text in ["0", "-0", "-1", "-999"] {
-        let record = JsonValue::from_str(&format!("{{\"dose\":{text}}}"))
-            .expect("record parses");
+        let record = JsonValue::from_str(&format!("{{\"dose\":{text}}}")).expect("record parses");
         let error = issue_full_copy(&record, &context, &ruled)
             .expect_err(&format!("dose {text} must be refused by the profile rule"));
         assert!(
@@ -433,7 +431,8 @@ fn a_declared_profile_value_rule_narrows_what_the_integer_binding_admits() {
             map: DfaTypeMap::from_exact_bytes(&bytes, &id).expect("synthetic artifact loads"),
             floor: Vec::new(),
         };
-        issue_full_copy(&record, &context, &bare)
-            .unwrap_or_else(|error| panic!("the canonicalization layer must accept {text}: {error}"));
+        issue_full_copy(&record, &context, &bare).unwrap_or_else(|error| {
+            panic!("the canonicalization layer must accept {text}: {error}")
+        });
     }
 }

@@ -2,7 +2,7 @@
 
 **Status:** base artifacts published at `typeMapVersion: 1.0.0`.
 The five undetermined bindings were ruled on 2026-07-30 and the lookup normalizes its key under ruled decision D14a.
-Two of the five rulings are operative in the corpus maps; the three FHIR rulings are recorded here and are not yet in the published artifacts, for the reason section 1.6 states.
+Two of the five rulings are operative in the corpus-side maps; none of the four that are bindings is yet in the four published artifacts, for the reason section 1.6 states.
 Every path outside those five still fails closed.
 
 This document defines the type-map artifact lifecycle required by decision D7 and reports exactly what the pinned reference schemas do and do not type.
@@ -78,6 +78,7 @@ The declaration is in `docs/profiles/vaccination-healthcert.md` section 6, and a
 #### What the two rulings unblocked
 
 The shipped vaccination sample now commits, at 91 leaves without an issuer key identifier and 92 with one, and class 10 goes from 1 of 3 records to 2 of 3 (`corpus/README.md`).
+It commits against the CORPUS-SIDE map, which carries both bindings; the published `type-maps/sg.gov.moh.vaccination-healthcert-1.0.json` still declares both slots `unresolved`, as section 1.6 states.
 Both rulings are held apart from the schema walk in `corpus/tools/build_type_maps.py`, which refuses to build if a ruling names a path the walk did not independently report unbound, or collides with a binding the schema determines.
 That guard is what keeps a ruling able only to resolve a measured gap rather than to change a derived tag.
 
@@ -220,28 +221,40 @@ The artifacts do not guess tags for any of these schema-silent non-object cases.
 They retain the KEY transitions needed for object instances, mark each affected DFA state with non-operative `structurallyUntypedObject: true`, and emit no scalar, array or null output merely because an object keyword is inapplicable.
 Complete profile validation still decides whether a particular context admits the observed non-object value before map resolution, under ROAX-CANON/1 section 4.2.
 
-### 1.6 Where the three FHIR rulings have and have not landed
+### 1.6 Where the five rulings have and have not landed
 
 **Stated plainly, because a ruling recorded as if it were operative is worse than one recorded as open.**
-The three rulings above are made.
-They are **not** yet bindings in `type-maps/hl7.fhir.bundle-4.0.1.json`, `sg.gov.moh.pdt-healthcert-2.0.json` or `sg.gov.moh.recovery-healthcert-2.0.json`, which still carry their pre-ruling `unresolved` rows for those slots, and the coverage figures in section 2 still count them as unresolved.
+The five rulings of sections 1.1 and 1.3 are made: vaccination `dose` INTEGER and `expiryDateTime` STRING, and the three FHIR ones for `base64Binary`, `Narrative.div` and the primitive-array null placeholders.
 
-The reason is section 6: those four artifacts can currently be neither regenerated nor `--check`ed, because the generator fails closed on 34 merged object states.
+**Four of the five rulings are bindings, and not one of those four is in the four published artifacts.**
+All four artifacts lag, not three.
+`type-maps/hl7.fhir.bundle-4.0.1.json`, `sg.gov.moh.pdt-healthcert-2.0.json` and `sg.gov.moh.recovery-healthcert-2.0.json` still carry their pre-ruling `unresolved` rows for `base64Binary` and `Narrative.div`, and `type-maps/sg.gov.moh.vaccination-healthcert-1.0.json` still carries them for `dose` and `expiryDateTime` at states `s64` and `s65`.
+The coverage figures in section 2 are measured on those bytes and still count every one of them as unresolved.
+The fifth ruling is the exception in kind rather than in status: the primitive-array null-placeholder outcome IS "publish no NULL binding", so the artifacts already satisfy it by carrying no NULL output, and nothing has to land for it.
+
+**The two vaccination rulings ARE operative, in a different artifact.**
+`corpus/tools/build_type_maps.py` holds them in its `RULED_BINDINGS` table and writes them into `corpus/type-maps/sg.gov.moh.vaccination-healthcert.json`, which is the corpus-side map conformance class 10 resolves the shipped vaccination sample against.
+That is why the sample commits at all, at the 91 leaves section 1.1 reports, and why class 10 moved from 1 of 3 records to 2 of 3.
+The corpus-side map and the published artifact are separate bytes with separate version lines, so the sample committing is not evidence that a published artifact carries a binding.
+
+The reason the published side lags is section 6: those four artifacts can currently be neither regenerated nor `--check`ed, because the generator fails closed on 34 merged object states.
+`tools/build-type-maps.mjs` also has no ruling mechanism at all - nothing corresponding to the corpus-side `RULED_BINDINGS` - so even an unblocked regeneration would reproduce every one of those `unresolved` rows today.
 Hand-editing a generated artifact would replace a regeneration blocked by a recorded ruling with one that is unreproducible in principle, and it would move four content IDs, the registry, the section 2.1 identity table and the IDs pinned in `rust/tests/published_type_maps.rs` on bytes no generator can reproduce.
 `tools/check-type-maps.mjs` passing on the untouched artifacts is the signal that this is still the safe regime.
 
 **What is pinned today, and what it does and does not prove.**
-The ruled tag SEMANTICS are exercised by corpus vectors over the synthetic profile: BYTES committing decoded octets and refusing four non-canonical spellings, STRING committing escaped XHTML unparsed, and the null placeholder failing closed.
+The ruled tag SEMANTICS of the three FHIR rulings are exercised by corpus vectors over the synthetic profile: BYTES committing decoded octets and refusing four non-canonical spellings, STRING committing escaped XHTML unparsed, and the null placeholder failing closed.
 Those hold five independent implementations to what each ruling means.
 They are **not** the FHIR profile binding, and `corpus/README.md` says the same where the vectors live.
 
 **What the next change must do**, in one change so that no intermediate state has a ruling in prose and a contradicting artifact:
 
 1. Resolve the 34 merged object states combinator-aware, so the generator runs again.
-2. Regenerate the four artifacts with the three rulings applied, which converts the affected `unresolved` rows into bindings.
-3. Bump `typeMapVersion` by MINOR under section 5.2, since the change is additive and makes previously rejected records issuable.
-4. Update the section 2.1 identity table, `type-maps/registry-1.0.0.json`, the section 2 coverage figures and the pinned IDs in `rust/tests/published_type_maps.rs`.
-5. Delete this section.
+2. Give `tools/build-type-maps.mjs` a ruling table held apart from the schema walk, under the same guards as the corpus-side one: a ruling may only resolve a path the walk independently reported unbound, and may never overwrite a tag the schema determines.
+3. Regenerate all four artifacts with the four ruled bindings applied, which converts the affected `unresolved` rows into bindings; the null-placeholder ruling needs no row and must stay an absence.
+4. Bump `typeMapVersion` by MINOR under section 5.2 on each artifact that gained a binding, since the change is additive and makes previously rejected records issuable.
+5. Update the section 2.1 identity table, `type-maps/registry-1.0.0.json`, the section 2 coverage figures and the pinned IDs in `rust/tests/published_type_maps.rs`.
+6. Delete this section.
 
 ## 2. Published artifacts and finite coverage
 

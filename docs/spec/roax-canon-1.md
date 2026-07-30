@@ -126,9 +126,10 @@ carries either form.
   Decision D7 requires that path to fail closed rather than receive a syntactic guess, so the PDT
   endorsed sample remains uncommittable until profile governance or an issuer-scoped extension
   supplies determining evidence under section 4.2.
-  Two of the five rulings are operative in the corpus maps today and the three FHIR rulings are not
-  yet in the published artifacts, which `docs/type-maps.md` section 1.6 states along with what the
-  next change must do.
+  Two of the five rulings are operative in the corpus-side maps today, and none of the four that are
+  bindings is yet in the four published artifacts, while the fifth is an absence those artifacts
+  already satisfy, which `docs/type-maps.md` section 1.6 states along with what the next change must
+  do.
 - **No absence proofs, and the capability is deliberately preserved.** Proving "this record asserts
   no allergy" is possible under the leaf ordering chosen in section 9: sorting by encoded path makes
   the tree shape a function of the path set alone, so showing the two adjacent leaves in canonical
@@ -427,6 +428,9 @@ The gap list remains part of the deliverable rather than a reason to guess.
 The vaccination sample now issues, because its two unresolved paths were ruled on 2026-07-30, and
 FHIR `Narrative.div`, `base64Binary` and null-placeholder semantics were ruled in the same change
 with their evidence grades recorded in `docs/type-maps.md` section 1.
+None of the four ruled bindings is in the four published artifacts yet, so the sample issues against
+the corpus-side map that carries its two; the null-placeholder ruling is an absence those artifacts
+already satisfy, and `docs/type-maps.md` section 1.6 states what the next change must do.
 The PDT endorsed sample still cannot be issued against the base map, because 20 path-kind pairs are
 outside the base schema rather than ambiguous within it and no composition profile has been ruled.
 

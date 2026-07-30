@@ -349,15 +349,15 @@ def derive(profile, src_root, record):
 def apply_rulings(record_type, entries, unbound):
     """Move each ruled binding out of `unbound` and into `entries`, or fail loudly.
 
-    Three guards, and each of them exists so that this table can only ever resolve a gap the
+    Two guards, and each of them exists so that this table can only ever resolve a gap the
     schema walk independently reported:
 
-      - a ruling whose path the walk did NOT report unbound is a build failure, so a typo or a
-        drifted upstream schema is loud rather than a binding nobody derived;
       - a ruling that collides with a DERIVED entry is a build failure, so this table can never
         silently change a tag the schema determines;
-      - a ruling declared for a path the sample never reaches is reported, because a corpus map
-        is shaped by the schema and the sample together and a dead ruling is a stale one.
+      - a ruling whose path the walk did NOT report unbound is a build failure, which covers
+        both a typo or a drifted upstream schema and a ruling the sample never reaches, since a
+        corpus map is shaped by the schema and the sample together and a dead ruling is a stale
+        one.
     """
     for (ruled_type, pattern, kind), (tag, grade, evidence) in RULED_BINDINGS.items():
         if ruled_type != record_type:
@@ -372,7 +372,9 @@ def apply_rulings(record_type, entries, unbound):
         if key not in unbound:
             raise SystemExit(
                 f"{record_type}: ruled binding {pattern!r} at kind {kind!r} is not a path this "
-                f"build reported unbound, so there is no gap for it to resolve"
+                f"build reported unbound, so there is no gap for it to resolve - either the "
+                f"pattern or kind is wrong, the upstream schema drifted, or the sample no longer "
+                f"reaches this path and the ruling is stale"
             )
         del unbound[key]
         entries[key] = {

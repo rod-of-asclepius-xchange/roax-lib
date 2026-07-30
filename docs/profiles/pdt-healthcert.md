@@ -3,7 +3,9 @@
 **`recordType`:** `sg.gov.moh.pdt-healthcert`
 **`schemaVersion`:** `2.0`
 **Status:** the base profile map is published as [`type-maps/sg.gov.moh.pdt-healthcert-2.0.json`](../../type-maps/sg.gov.moh.pdt-healthcert-2.0.json) at exact artifact ID `sha256:4f8cecc59c85101b8b567658c90651bcbf8f9d4dc279571aa40a03cf04f434ff`.
-The published base artifact intentionally excludes 20 path/kind pairs present in the endorsed sample because no clinic or endorsed composition artifact has been selected, the lite-FHIR `Narrative.div` and four `base64Binary` slots remain unresolved, and 65 Bundle-reachable lite-FHIR object nodes omit an object type, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.2, 1.3, 1.5 and 2.
+The published base artifact intentionally excludes 20 path/kind pairs present in the endorsed sample because no clinic or endorsed composition artifact has been selected, the lite-FHIR `Narrative.div` and four `base64Binary` slots were **ruled on 2026-07-30** with their evidence grades, and 65 Bundle-reachable lite-FHIR object nodes omit an object type, as audited in [`docs/type-maps.md`](../type-maps.md) sections 1.2, 1.3, 1.5 and 2.
+**The published artifact does not yet carry the two new bindings**: it still declares those slots `unresolved`, because regeneration is blocked on 34 merged object states, and section 1.6 of that document states why hand-editing a generated artifact is the wrong fix and what the next change must do.
+The 20 endorsed-sample pairs are a different case and are still open: they need a versioned composition profile that nobody has ruled, so the endorsed sample stays uncommittable.
 
 PDT is the pre-departure test certificate. It is the most structurally complex of the three
 healthcert families, because it is not one schema but three compositional views of a workflow.

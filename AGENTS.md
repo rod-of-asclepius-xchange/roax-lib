@@ -278,11 +278,14 @@ These are the things a future agent is most likely to get wrong.
   the decoded octets (Strong); FHIR `Narrative.div` STRING over the escaped XHTML text, unparsed
   (Decisive); FHIR primitive-array null placeholders getting NO NULL binding and the record REJECTED
   (Decisive). Full evidence in `docs/type-maps.md` sections 1.1 and 1.3.
-  **The two vaccination rulings are operative and unblocked its sample**, so class 10 is 2 of 3
-  records. **The three FHIR rulings are NOT in the published artifacts yet**, because regeneration is
-  blocked on the 34 merged object states below; `docs/type-maps.md` section 1.6 states why
-  hand-editing a generated artifact is the wrong fix and what the next change must do. Do not
-  "finish" them by editing artifact bytes.
+  **The two vaccination rulings are operative in the CORPUS-SIDE map class 10 resolves against, and
+  that is what unblocked its sample**, so class 10 is 2 of 3 records. **NOT ONE of the four ruled
+  BINDINGS is in the published `type-maps/` artifacts yet, and all four of those artifacts lag**,
+  because regeneration is blocked on the 34 merged object states below and `tools/build-type-maps.mjs`
+  has no ruling table at all. The fifth ruling is the null-placeholder one, which is expressed as an
+  absence and is therefore already in force. `docs/type-maps.md` section 1.6 states why hand-editing
+  a generated artifact is the wrong fix and what the next change must do. Do not "finish" them by
+  editing artifact bytes.
   **PDT is still uncommittable**, on the 20 endorsed-sample `(pattern, kind)` pairs its open root
   leaves undeclared (`docs/type-maps.md` section 1.2). Those need a versioned composition profile
   rather than 20 authored bindings, and nobody has ruled one.
