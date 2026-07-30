@@ -58,7 +58,10 @@ RESULT: PASS (738 assertions)
 All 19 classes, no skips.
 Class 10 reproduces both roots of the genuine MOH recovery sample, at 69 and 70 leaves.
 
-Without `--references` class 10 reports SKIPPED and contributes no assertions; it never reports green unrun.
+`--references` defaults to `references/` at the repository root, so the table above is what the first command prints in an environment that already has that checkout.
+It is third-party, `.gitignore` excludes it, and it is never committed, so a reader without it gets a different and equally correct result: 18 classes PASS with **734 passing assertions**, and class 10 reports SKIPPED with its reason printed rather than green unrun.
+The whole difference is class 10's two vectors and the 4 assertions they carry, whose records resolve out of that checkout through the `recordFile` strings committed at `corpus/conformance-corpus-1.0.json:5900` and `:5914`.
+That 734 is not the 734 in [`FINDINGS.md`](FINDINGS.md) item 1, which is a different measurement: that one has the checkout present, runs `--empty-containers=authorized`, and reports 734 passing plus **2 failures**.
 
 ## Running the unit tests
 
@@ -66,8 +69,9 @@ Without `--references` class 10 reports SKIPPED and contributes no assertions; i
 PYTHONPATH=python/src python3 -m unittest discover -s python/tests -t python
 ```
 
-87 tests, standard library `unittest`.
+103 tests, standard library `unittest`.
 They cover what the corpus reaches plus the Python-specific traps it cannot see, because a trap closed by accident reopens on the next edit.
+`tests/test_ts_sample.py` covers `tools/ts_sample.py` for the same reason: its only consumer is the class-10 record path, so a run without the reference checkout exercises none of it.
 
 ## Unicode
 
