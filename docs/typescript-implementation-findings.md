@@ -306,10 +306,15 @@ Recorded so a passing run does not read as coverage it does not have.
   nearest committed vector, `full-copy-salts-length-not-leaf-count`, is caught one step earlier by
   the salts-length rule of class 17, so the derived-count comparison itself is unexercised. It is
   implemented and unit-tested.
-- **The base64 rules of section 6.3.** RFC 4648 section 4 with padding, no line wrapping, and a
-  final quantum whose unused bits are zero. No version-1 profile binds `BYTES`, so no vector
-  reaches `decodeBase64Strict`. It is implemented and unit-tested, including the non-canonical
-  final quantum that RFC 4648 section 3.5 identifies.
+- **The base64 rules of section 6.3 - REACHED SINCE, so this bullet is an exception to the heading
+  above it.** RFC 4648 section 4 with padding, no line wrapping, and a final quantum whose unused
+  bits are zero. No version-1 PUBLISHED profile binds `BYTES` still: FHIR `base64Binary` was ruled
+  `BYTES` over the decoded octets on 2026-07-30, and the `type-maps/` artifacts do not carry that
+  ruling yet (`docs/type-maps.md` section 1.6). What changed is the corpus-only map, which binds
+  `blob.bytes` at tag 5 (`corpus/type-maps/org.roax.corpus.synthetic.json:96-101`), so the four
+  `reject-bytes-base64-*` vectors and the `record-fhir-ruled-bindings` record now drive
+  `decodeBase64Strict` through `carrierFromJson`. It is implemented and unit-tested as well,
+  including the non-canonical final quantum that RFC 4648 section 3.5 identifies.
 - **The `BYTES` carrier form, which is hex and not the record's base64.** The two are different
   spellings of the same bytes and the code had them confused: `carrierFromJson` kept the base64
   and `encodeValue` decoded it, so a disclosed tag-5 leaf was emitted as `AAECAw==` where both
@@ -319,7 +324,7 @@ Recorded so a passing run does not read as coverage it does not have.
   carrier was rejected or decoded as different bytes - the failure was symmetric and silent.
   Base64 is now decoded once, at record projection in `carrierFromJson`, and `encodeValue` reads
   strict lowercase even-length hex through `fromHex`.
-  **No committed vector moved, because no vector carries a tag-5 value at all**: the conformance
+  **No committed vector moved, because no vector carried a tag-5 value at all then**: the conformance
   total is unchanged at 680 passed, 0 failed, 2 NOT RUN, which is the measurement that shows the
   committed bytes and roots were preserved.
   That covers the two class-10 vectors this run could not execute as well, and by argument rather
@@ -330,9 +335,13 @@ Recorded so a passing run does not read as coverage it does not have.
   outlier: `rust/src/value.rs:54` decodes canonical base64 at record projection, `:157-158`
   requires an envelope carrier to be hex that survives a re-encode round trip, so uppercase is
   refused there too, and `:180` emits `hex::encode` into a disclosed leaf.
-  **Because no published map selects `BYTES`, synthetic coverage is the only coverage possible**
+  **Because no published map selects `BYTES`, synthetic coverage was the only coverage possible**
   and is therefore required rather than optional - nothing in `type-maps/`, `corpus/type-maps/` or
-  the corpus reaches the path. `test/unit.ts` carries the base64-to-hex projection with its
+  the corpus reached the path when this was written. The corpus reaches the RECORD-PROJECTION half
+  now, through the corpus-only tag-5 binding the section 6.3 bullet above records, but none of the
+  54 envelope fixtures carries a disclosed tag-5 value and no published map selects `BYTES` still,
+  so the CARRIER half this paragraph is about remains synthetic coverage alone.
+  `test/unit.ts` carries the base64-to-hex projection with its
   non-canonical rejections, strict hex decoding including the uppercase, odd-length and non-hex
   cases, an issue-disclose-parse-verify round trip under a synthetic tag-5 map that emits
   `00010203`, empty bytes carried the whole way as `""`, and a check of the emitted carrier against
