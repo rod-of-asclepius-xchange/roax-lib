@@ -469,8 +469,7 @@ which lives in a third-party checkout that `.gitignore` excludes and that no par
 repository may copy in.
 To run it:
 
-1. Extract the record with `corpus/tools/extract_reference_record.py --out
-   <dir>/sg.gov.moh.recovery-healthcert.json`, pointed at a reference checkout.
+1. Extract the record with `corpus/tools/extract_reference_record.py --out <dir>/sg.gov.moh.recovery-healthcert.json`, pointed at a reference checkout.
    That utility is a data-extraction tool and NOT one of the two reference implementations, so
    reading it while writing a library does not compromise the independence rule.
 2. Set **`ROAX_REFERENCE_RECORDS=<dir>`**, which is the one flag that enables the class.
