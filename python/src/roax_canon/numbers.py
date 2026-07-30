@@ -53,8 +53,9 @@ DIGIT_BOUND = 1024
 INTEGER_GRAMMAR = re.compile(r"\A-?(0|[1-9][0-9]*)\Z")
 
 #: Specification section 6.2, "Canonical decimal", input form.
-#: This is exactly the FHIR R4 `decimal` pattern as shipped in the reference
-#: `fhir/4.0.1/schema.json`, cited by path only.
+#: This is exactly the FHIR R4 `decimal` pattern in the gitignored reference checkout at
+#: `references/schemata/src/sg/gov/moh/fhir/4.0.1/schema.json`, upstream commit
+#: `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`.
 DECIMAL_INPUT_GRAMMAR = re.compile(
     r"\A(?P<sign>-?)(?P<int>0|[1-9][0-9]*)(?:\.(?P<frac>[0-9]+))?"
     r"(?:[eE](?P<exp>[+-]?[0-9]+))?\Z"

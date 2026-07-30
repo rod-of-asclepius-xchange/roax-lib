@@ -13,7 +13,8 @@ Requires CPython 3.10 or later for the `X | Y` type syntax; developed and measur
 ## Read this first
 
 [`FINDINGS.md`](FINDINGS.md) is the more valuable half of this deliverable.
-It records every place this build disagreed with the conformance corpus or found the specification ambiguous, marked as a divergence, an ambiguity or a confirmation, with the measurement behind each.
+It records the divergences, ambiguities, confirmations and Python-specific hazards documented
+during this build, with the measurement behind each.
 
 ## Why it is written from the specification
 
@@ -30,38 +31,43 @@ The corpus was run only after each piece was written.
 ```sh
 python3 python/tools/run_corpus.py
 python3 python/tools/run_corpus.py --references /path/to/schemata   # class 10 needs it
-python3 python/tools/run_corpus.py --empty-containers=authorized    # see FINDINGS item 1
+ROAX_REFERENCES=/path/to/schemata python3 python/tools/run_corpus.py
+python3 python/tools/run_corpus.py --references /path/to/schemata \
+    --empty-containers=authorized                                  # see FINDINGS item 1
 ```
 
 This is a third runner and it is standalone.
 It does not extend `corpus/tools/run.sh`, which is the existing two-implementation gate; it consumes the vector file, the fixtures and the corpus-side type maps, which is the interface `corpus/README.md` documents for an implementation that is not one of those two.
-Nothing under `corpus/` is modified, and the runner writes no files.
+The runner does not deliberately write files or modify `corpus/`; the interpreter's normal
+`__pycache__` writes may still occur.
 
-Current result, on CPython 3.13.5 with the reference checkout available:
+Measured on CPython 3.13.5:
+Pass and fail are assertion counts; not-run entries are vectors or required classes.
 
-```
-class    pass    fail    skip  status
-    1      44       0       0  PASS      11      26       0       0  PASS
-    2      12       0       0  PASS      12       9       0       0  PASS
-    3      24       0       0  PASS      13       4       0       0  PASS
-    4      32       0       0  PASS      14      68       0       0  PASS
-    5      12       0       0  PASS      15      33       0       0  PASS
-    6      59       0       0  PASS      16      20       0       0  PASS
-    7      16       0       0  PASS      17      16       0       0  PASS
-    8     338       0       0  PASS      18       8       0       0  PASS
-    9      11       0       0  PASS      19       2       0       0  PASS
-   10       4       0       0  PASS
+| Mode | Pass | Fail | Not run | Classes passed | Result | Exit |
+|---|---:|---:|---:|---:|---|---:|
+| structural, references available | 738 | 0 | 0 | 19/19 | `PASS` | 0 |
+| structural, references unavailable | 734 | 0 | 2 | 18/19 | `INCOMPLETE / NOT RUN` | 2 |
+| authorized, references available | 734 | 2 | 0 | 18/19 | `FAIL` | 1 |
 
-RESULT: PASS (738 assertions)
-```
+The first row is the only conforming PASS.
+Class 10 reproduces both roots of the MOH recovery sample at
+`references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/sample-data.ts`, upstream commit
+`09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`, at 69 and 70 leaves.
 
-All 19 classes, no skips.
-Class 10 reproduces both roots of the genuine MOH recovery sample, at 69 and 70 leaves.
-
-`--references` defaults to `references/` at the repository root, so the table above is what the first command prints in an environment that already has that checkout.
-It is third-party, `.gitignore` excludes it, and it is never committed, so a reader without it gets a different and equally correct result: 18 classes PASS with **734 passing assertions**, and class 10 reports SKIPPED with its reason printed rather than green unrun.
+`--references` defaults first to `ROAX_REFERENCES`, then to `references/` at the repository root.
+The checkout is third-party, `.gitignore` excludes it, and it is never committed.
+Without it, class 10 reports its two vectors as NOT RUN with the attempted path and
+`--references /path/to/schemata` remedy, the terminal result is `INCOMPLETE / NOT RUN`, and
+the process exits 2.
+It never reports PASS for those 734 assertions.
 The whole difference is class 10's two vectors and the 4 assertions they carry, whose records resolve out of that checkout through the `recordFile` strings committed at `corpus/conformance-corpus-1.0.json:5900` and `:5914`.
-That 734 is not the 734 in [`FINDINGS.md`](FINDINGS.md) item 1, which is a different measurement: that one has the checkout present, runs `--empty-containers=authorized`, and reports 734 passing plus **2 failures**.
+The authorized-mode 734 is a different measurement: the checkout is present, the two
+class-5 empty-container records fail closed, and the process exits 1
+([`FINDINGS.md`](FINDINGS.md), item 1).
+An unsupported reject-vector shape, an unsupported record-vector envelope carrier, a missing
+committed type map, or a present reference module that cannot be extracted is a failure and
+also exits 1.
 
 ## Running the unit tests
 
@@ -69,7 +75,7 @@ That 734 is not the 734 in [`FINDINGS.md`](FINDINGS.md) item 1, which is a diffe
 PYTHONPATH=python/src python3 -m unittest discover -s python/tests -t python
 ```
 
-103 tests, standard library `unittest`.
+144 tests, standard library `unittest`.
 They cover what the corpus reaches plus the Python-specific traps it cannot see, because a trap closed by accident reopens on the next edit.
 `tests/test_ts_sample.py` covers `tools/ts_sample.py` for the same reason: its only consumer is the class-10 record path, so a run without the reference checkout exercises none of it.
 
@@ -93,6 +99,21 @@ Note also what a passing run does and does not show: this build is not running a
 ## Using it
 
 Runnable as written, from the repository root, with `PYTHONPATH=python/src`.
+
+### Full-copy serialization warning
+
+Plain `json.dumps(full_copy(...))` is not a supported wire serializer.
+`JsonNumber` subclasses `str`, so `json.dumps` quotes record numbers and changes their observed
+JSON kind from `number` to `string` when the envelope is read again.
+Specification section 7.3 requires a full copy's record body to preserve the original JSON
+number form.
+This package ships no serializer, so callers writing a full copy to the wire must emit those
+original numeric tokens unquoted ([`FINDINGS.md`](FINDINGS.md), item 12).
+
+The example below uses `org.roax.corpus.synthetic` only because its authored type map covers
+the example record.
+That profile is corpus-only and must never be issued against
+([`corpus/README.md`](../corpus/README.md), "The synthetic profile").
 
 ```python
 import roax_canon as roax
@@ -121,11 +142,13 @@ built = roax.issue(record, identity, type_map)
 built.root.hex()          # 2 record leaves + 4 reserved leaves
 built.leaf_count          # 6
 
-# 4. Carry it. A full copy carries every salt; a disclosed copy carries only the salts of
-#    the leaves it reveals and never a `salts` array.
+# 4. Carry it. The commitment retains the exact identity, algorithm, reserved set and an
+#    isolated snapshot of the original record, so neither emitter accepts replacement
+#    issuance context. A full copy carries every salt; a disclosed copy carries only the
+#    salts of the leaves it reveals and never a `salts` array.
 profile = roax.Profile("org.roax.corpus.synthetic", ((roax.Key("marker"),),))
-full = roax.full_copy(record, identity, built)
-partial = roax.disclosed_copy(list(profile.floor()), identity, built, profile=profile)
+full = roax.full_copy(built)
+partial = roax.disclosed_copy(list(profile.floor()), built, profile=profile)
 "salts" in partial        # False, and unrepresentable rather than merely absent
 
 # 5. Verify. Authority comes from the verifier's configuration, never from the document.
@@ -147,8 +170,9 @@ roax.verify_envelope(partial, config).reason     # 'ok'
 | `errors` | The rejection codes, which are the corpus's `reason` strings |
 | `text` | The Unicode pin, NFC, and the surrogate rejection that precedes it |
 | `numbers` | Canonical INTEGER and DECIMAL, over strings, never through a float |
-| `path` | Segments, `encodePath`, and a display path nothing parses back |
+| `path` | Segments, `encodePath`, and a display rendering not accepted as structured input |
 | `value` | Type tags, value encoding, and the pinned RFC 4648 base64 form |
+| `leaf` | The algorithm-qualified leaf preimage and leaf hash |
 | `jsonio` | The literal-preserving JSON reader and the section 3.2 rejections |
 | `typemap` | The display-pattern resolver; fails closed, never defaults |
 | `flatten` | Flattening and the reserved-namespace guard |
@@ -165,10 +189,12 @@ roax.verify_envelope(partial, config).reason     # 'ok'
    `roax.loads` carries every numeric literal verbatim as `JsonNumber`, a distinct `str` subclass so that a JSON number is never confused with a JSON string.
    The type map is keyed on observed kind, so that second distinction is load-bearing too.
 2. **Hash a display path.**
-   `encode_path` accepts segments only, and there is no display-path parser anywhere in the package.
-   A unit test asserts that no function with `parse` in its name exists in `roax_canon.path`, so the specification section 5.2 trap cannot be reintroduced quietly.
+   `encode_path` accepts segments only, and the package exposes no parser that reconstructs segments from `display_path` output.
+   A unit test asserts that no function with `parse` in its name exists in `roax_canon.path`, holding that API boundary against the specification section 5.2 trap.
 3. **Default an unknown path.**
-   `TypeResolver` raises; every caller propagates.
+   The built-in `DisplayPatternTypeMap` raises.
+   Build APIs bind that built-in map's declared `recordType` and `schemaVersion` to the issuance identity.
+   They also accept custom `TypeResolver` implementations, which must preserve the fail-closed contract and whose trusted caller must bind resolver provenance and scope because the protocol itself carries no metadata.
 4. **Emit a withheld leaf's salt.**
    `disclosed_copy` builds its `leaves` array from the revealed set and never emits a `salts` member, so a withheld salt is unrepresentable rather than merely prohibited.
 5. **Accept a caller-supplied leaf hash.**
@@ -180,3 +206,4 @@ roax.verify_envelope(partial, config).reason     # 'ok'
 The structured-path DFA artifacts in `type-maps/`, content-ID reproduction, issuer extensions and any anchoring registry read.
 [`FINDINGS.md`](FINDINGS.md) item 13 states each with its reason.
 The short version: no committed corpus vector exercises them, and adding a large unexercised surface to a library whose acceptance criterion is byte-identical agreement on the corpus would be adding untested code, not coverage.
+Consequently `RESERVED_V2` is structural only: `reserved_leaves` can model the extra committed selector leaf, while issuance, envelope emission and verification reject with `type-map-rejected` until an artifact-aware resolver can reproduce and select the exact content ID (`src/roax_canon/record.py:53-63` and `:242-252`; `src/roax_canon/disclose.py:47-56`; `src/roax_canon/verify.py:404-410`; specification section 4.2).

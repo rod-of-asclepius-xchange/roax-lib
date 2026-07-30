@@ -9,18 +9,24 @@ The two implementations under `corpus/tools/` were deliberately not read while t
 built, because their agreement is the only evidence the specification says one thing, and
 a third opinion produced by reading one of them would be a port wearing a costume.
 
-Three invariants this package will not let a caller break:
+High-level API safeguards:
 
-* **A number is never parsed through a float.**
+* **A record read through this package never parses a number through a float.**
   :func:`roax_canon.jsonio.loads` carries every numeric literal verbatim as
   :class:`~roax_canon.jsonio.JsonNumber`, and :mod:`roax_canon.numbers` moves the decimal
   point by slicing text.
-* **The display path is never hashed.**
-  :func:`~roax_canon.path.encode_path` accepts segments only, and nothing here parses
-  :func:`~roax_canon.path.display_path` output.
-* **An unresolved path fails closed.**
-  :class:`~roax_canon.typemap.TypeResolver` raises rather than defaulting, and every
-  caller propagates.
+* **The display path is not a structured-path input.**
+  :func:`~roax_canon.path.encode_path` accepts segments, and the package provides no
+  parser that reconstructs segments from :func:`~roax_canon.path.display_path` output.
+* **The built-in display-pattern matcher fails closed.**
+  :class:`~roax_canon.typemap.DisplayPatternTypeMap` raises rather than defaulting.
+  Custom :class:`~roax_canon.typemap.TypeResolver` implementations must uphold the same
+  contract.
+* **Envelope verification recomputes disclosed leaf hashes.**
+  :func:`~roax_canon.verify.verify_envelope` accepts leaf fields rather than a
+  caller-supplied leaf hash.
+  :func:`~roax_canon.tree.verify_inclusion` is a lower-level fold primitive and provides
+  no disclosure defence on its own.
 
 Unicode: `ROAX-CANON/1` pins Unicode 15.1.
 Check :func:`roax_canon.text.unicode_tables_match_pin` on the interpreter you deploy on;

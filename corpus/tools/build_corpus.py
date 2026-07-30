@@ -10,8 +10,7 @@ Usage:
     python3 build_corpus.py [--out PATH] [--references DIR]
 
 `--references` points at a read-only checkout of the Open-Attestation schemata package. When it
-is absent the three class-10 record vectors are omitted and the omission is reported, never
-silently passed over.
+is absent class 10 reports NOT RUN and `--check` exits 2, never success.
 """
 
 from __future__ import annotations
@@ -419,8 +418,10 @@ def build_moh_type_map_vectors(notes):
     for name, record_type, segments, kind in plan.MOH_TYPE_MAP_VECTORS:
         type_map = moh_records.load_type_map(record_type)
         if type_map is None:
-            notes.append(f"class 11 SKIPPED for {name}: corpus/type-maps/{record_type}.json missing")
-            continue
+            raise SystemExit(
+                f"class 11 FAILED for {name}: "
+                f"corpus/type-maps/{record_type}.json is missing"
+            )
         vec = {"name": name, "class": 11, "recordType": record_type,
                "segments": segments, "jsonKind": kind}
         try:
@@ -439,6 +440,9 @@ def build(references=None, notes=None, check=False):
     dirtied a clean checkout doing it. Generation is explicit now, and the mode is set first.
     """
     fixture_io.set_mode("check" if check else "write")
+    salt_sets.begin_build()
+    if not salt_sets.drawing():
+        salt_sets.validate_all()
     notes = notes if notes is not None else []
     trees, inclusions = build_tree_and_inclusion()
 
@@ -511,6 +515,15 @@ def _external_record_vectors(corpus):
     return {v["name"] for v in corpus["vectors"].get("record", []) if _is_external_record(v)}
 
 
+def _external_salt_names(corpus):
+    """Salt carriers retained for external rows when this run cannot load their records."""
+    return {
+        salt_sets.name_from_reference(v["saltsFile"])
+        for v in corpus["vectors"].get("record", [])
+        if _is_external_record(v)
+    }
+
+
 def _without_external_records(corpus):
     trimmed = dict(corpus)
     trimmed["vectors"] = dict(corpus["vectors"])
@@ -531,20 +544,30 @@ def extract_samples(references, out_dir, notes):
 
     src_root = moh_records.find_src_root(references)
     if src_root is None:
-        notes.append("extraction SKIPPED: no reference checkout supplied")
+        notes.append(
+            moh_records.NotRunNote(
+                "extraction NOT RUN: no reference checkout supplied; rerun with "
+                "--references <path-to-schemata>"
+            )
+        )
         return
     os.makedirs(out_dir, exist_ok=True)
     for profile in build_type_maps_profiles():
         module = os.path.join(src_root, profile["module"])
         if not os.path.exists(module):
-            notes.append(f"extraction SKIPPED for {profile['export']}: {module} not found")
+            notes.append(
+                moh_records.NotRunNote(
+                    f"extraction NOT RUN for {profile['export']}: {module} not found"
+                )
+            )
             continue
         with open(module, "r", encoding="utf-8") as handle:
             try:
                 text = extract(handle.read(), profile["export"])
             except ExtractError as exc:
-                notes.append(f"extraction FAILED for {profile['export']}: {exc}")
-                continue
+                raise SystemExit(
+                    f"extraction FAILED for {profile['export']}: {exc}"
+                ) from exc
         with open(os.path.join(out_dir, profile["export"] + ".json"), "w",
                   encoding="utf-8") as handle:
             handle.write(text)
@@ -559,6 +582,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default=os.path.join(CORPUS_DIR, "conformance-corpus-1.0.json"))
     ap.add_argument("--references", default=os.environ.get("ROAX_REFERENCES"))
+    ap.add_argument(
+        "--salt-sets",
+        default=None,
+        help="read committed salt-set inputs from DIR instead of corpus/fixtures/salts",
+    )
     ap.add_argument("--report", action="store_true", help="print per-class coverage")
     ap.add_argument("--draw-salts", action="store_true",
                     help="draw fresh salt sets into corpus/fixtures/salts/ and exit. Run ONCE "
@@ -575,6 +603,8 @@ def main():
     ap.add_argument("--extract-to", default=None,
                     help="also write the extracted MOH samples here, for the runner to read")
     args = ap.parse_args()
+    if args.salt_sets is not None:
+        salt_sets.set_directory(args.salt_sets)
 
     if args.draw_salts:
         # Draw and exit. Deliberately not part of any build: a build that drew its own salts
@@ -597,8 +627,17 @@ def main():
     notes = []
     corpus = build(args.references, notes, check=args.check)
     text = serialize(corpus)
+    check_incomplete = args.check and any(
+        isinstance(note, moh_records.NotRunNote) for note in notes
+    )
 
     if args.check:
+        with open(args.out, "r", encoding="utf-8") as handle:
+            committed_for_salts = json.load(handle)
+        salt_sets.assert_name_set(
+            salt_sets.used_names() | _external_salt_names(committed_for_salts)
+        )
+
         # The fixtures first. The corpus vectors reference them by path, so a corpus that
         # round-trips over a tampered fixture is not a pass.
         differences = fixture_io.differences()
@@ -614,6 +653,11 @@ def main():
         if committed_text == text:
             print(f"ok: {args.out} and every fixture round-trip through implementation A "
                   f"byte for byte")
+            if check_incomplete:
+                print(
+                    "INCOMPLETE: class 10 external records were NOT CHECKED; rerun with "
+                    "--references <path-to-schemata>"
+                )
         else:
             # Class 10 names records that live outside this repository, so without a reference
             # checkout a fresh build legitimately cannot contain them. Compare everything else
@@ -623,10 +667,14 @@ def main():
             fresh = json.loads(text)
             missing = _external_record_vectors(committed) - _external_record_vectors(fresh)
             if missing and _without_external_records(committed) == _without_external_records(fresh):
-                print(f"ok: {args.out} round-trips through implementation A, EXCEPT "
-                      f"{len(missing)} record vector(s) naming records outside this repository")
+                check_incomplete = True
+                print(f"INCOMPLETE: {args.out} round-trips through implementation A except for "
+                      f"{len(missing)} external record vector(s)")
                 for name in sorted(missing):
-                    print(f"  NOT CHECKED: {name} - pass --references to check it")
+                    print(
+                        f"  NOT CHECKED: {name} - rerun with "
+                        "--references <path-to-schemata>"
+                    )
             else:
                 print(f"MISMATCH: {args.out} differs from a fresh build by implementation A")
                 raise SystemExit(1)
@@ -641,6 +689,10 @@ def main():
 
     if args.extract_to:
         extract_samples(args.references, args.extract_to, notes)
+        check_incomplete = check_incomplete or (
+            args.check
+            and any(isinstance(note, moh_records.NotRunNote) for note in notes)
+        )
 
     total = sum(len(v) for v in corpus["vectors"].values())
     print(f"{'checked' if args.check else 'wrote'} {args.out}: {total} vectors")
@@ -655,8 +707,16 @@ def main():
             if cls in cov:
                 detail = ", ".join(f"{k}={n}" for k, n in sorted(cov[cls].items()))
                 print(f"  class {cls:2d}: {detail}")
+            elif cls == 10 and check_incomplete:
+                print(
+                    "  class 10: NOT RUN - rerun with "
+                    "--references <path-to-schemata>"
+                )
             else:
                 print(f"  class {cls:2d}: NO VECTORS - coverage gap")
+
+    if check_incomplete:
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":

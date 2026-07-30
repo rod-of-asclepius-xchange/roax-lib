@@ -5,19 +5,20 @@
 //
 // As a RUNNER it is the worked example of "how do I check my implementation against the
 // corpus": every vector class is consumed here, and porting this file to a new language is the
-// whole job. It reports per class, and it distinguishes SKIPPED from PASSED - a runner that
+// whole job. It reports per class, and it distinguishes NOT RUN from PASSED - a runner that
 // reports green with class 10 unrun is the defect docs/conformance-corpus.md exists to prevent.
 //
-// As a CROSS-CHECK, `--emit FILE` rewrites the corpus with every derived value recomputed here
-// and leaves every input untouched. Comparing that output byte for byte against the shipped
-// file is the assertion that two independent implementations agree on all of it, not just on
-// the roots.
+// As a CROSS-CHECK, `--emit FILE` rewrites the corpus with every derived value this run
+// recomputed and leaves every input untouched. A NOT RUN vector is copied through and explicitly
+// excluded from the cross-implementation assertion.
 //
 // Usage:
-//   node check_corpus.mjs [--corpus FILE] [--records DIR] [--emit FILE] [--quiet]
+//   node check_corpus.mjs [--corpus FILE] [--records DIR] [--salt-sets DIR]
+//                         [--emit FILE] [--quiet]
 //
 // `--records` points at a directory holding the MOH samples already extracted to JSON text by
-// `extract_reference_record.py`. Without it, class 10 reports SKIPPED.
+// `extract_reference_record.py`. Without it, class 10 reports NOT RUN and this process exits 2.
+// Exit 0 is a complete pass, exit 1 is an assertion failure, and exit 2 is incomplete.
 
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
@@ -32,24 +33,61 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CORPUS_DIR = path.dirname(HERE);
 const REPO_ROOT = path.dirname(CORPUS_DIR);
 
-const args = process.argv.slice(2);
-const opt = (name, fallback) => {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : fallback;
+const DEFAULT_CORPUS_FILE = path.join(CORPUS_DIR, "conformance-corpus-1.0.json");
+const VALUE_OPTIONS = new Map([
+  ["--corpus", "corpus"],
+  ["--records", "records"],
+  ["--salt-sets", "saltSets"],
+  ["--emit", "emit"],
+]);
+
+function usageError(message) {
+  console.error(`NOT RUN: ${message}`);
+  console.error("usage: node corpus/tools/check_corpus.mjs [--corpus FILE] [--records DIR]");
+  console.error("       [--salt-sets DIR] [--emit FILE] [--quiet]");
+  process.exit(2);
+}
+
+const parsedOptions = {
+  corpus: DEFAULT_CORPUS_FILE,
+  records: process.env.ROAX_EXTRACTED_RECORDS,
+  saltSets: path.join(CORPUS_DIR, "fixtures", "salts"),
+  emit: null,
+  quiet: false,
 };
-const CORPUS_FILE = opt("--corpus", path.join(CORPUS_DIR, "conformance-corpus-1.0.json"));
-const RECORDS_DIR = opt("--records", process.env.ROAX_EXTRACTED_RECORDS);
-const EMIT = opt("--emit", null);
-const QUIET = args.includes("--quiet");
+const cliArgs = process.argv.slice(2);
+for (let index = 0; index < cliArgs.length; index++) {
+  const argument = cliArgs[index];
+  if (argument === "--quiet") {
+    parsedOptions.quiet = true;
+    continue;
+  }
+  const property = VALUE_OPTIONS.get(argument);
+  if (property === undefined) usageError(`unknown argument ${JSON.stringify(argument)}`);
+  if (index + 1 >= cliArgs.length || cliArgs[index + 1] === ""
+      || cliArgs[index + 1].startsWith("--")) {
+    usageError(`${argument} requires a value`);
+  }
+  parsedOptions[property] = cliArgs[++index];
+}
+
+const CORPUS_FILE = parsedOptions.corpus;
+const RECORDS_DIR = parsedOptions.records;
+const SALT_SET_DIR = parsedOptions.saltSets;
+const EMIT = parsedOptions.emit;
+const QUIET = parsedOptions.quiet;
 
 const corpus = JSON.parse(fs.readFileSync(CORPUS_FILE, "utf8"));
+const committedCorpus = CORPUS_FILE === DEFAULT_CORPUS_FILE
+  ? corpus
+  : JSON.parse(fs.readFileSync(DEFAULT_CORPUS_FILE, "utf8"));
 const HASH_ALG = corpus.hashAlg;
 const V = corpus.vectors;
 
 const typeMaps = env.loadTypeMaps(path.join(CORPUS_DIR, "type-maps"));
 
 const results = [];
-const skips = [];
+const notRun = [];
 
 function check(vector, what, got, want) {
   const ok = JSON.stringify(got) === JSON.stringify(want);
@@ -58,8 +96,172 @@ function check(vector, what, got, want) {
 }
 
 function note(cls, message) {
-  skips.push({ cls, message });
+  notRun.push({ cls, message });
 }
+
+function carrierError(label, message) {
+  throw new Error(`salt-set carrier ${label}: ${message}`);
+}
+
+function objectMembers(value, label) {
+  if (!(value instanceof ref.RecordMap)) carrierError(label, "expected an object");
+  const members = new Map();
+  for (const [key, member] of value.entries) {
+    if (members.has(key)) carrierError(label, `duplicate member ${JSON.stringify(key)}`);
+    members.set(key, member);
+  }
+  return members;
+}
+
+function requireExactMembers(members, expected, label) {
+  const allowed = new Set(expected);
+  const unknown = [...members.keys()].filter((key) => !allowed.has(key));
+  const missing = expected.filter((key) => !members.has(key));
+  if (unknown.length) {
+    carrierError(label, `unknown member(s) ${unknown.map(JSON.stringify).join(", ")}`);
+  }
+  if (missing.length) {
+    carrierError(label, `missing member(s) ${missing.map(JSON.stringify).join(", ")}`);
+  }
+}
+
+function unsignedInteger(value, label) {
+  if (!(value instanceof ref.NumberLiteral) || !/^(0|[1-9][0-9]*)$/.test(value.text)) {
+    carrierError(label, "expected a canonical non-negative JSON integer");
+  }
+  return BigInt(value.text);
+}
+
+function saltHex(value, label) {
+  if (typeof value !== "string" || !/^[0-9a-f]{32}$/.test(value)) {
+    carrierError(label, "salt must be exactly 16 bytes as lowercase 32-hex");
+  }
+}
+
+function structuredPath(value, label) {
+  if (!Array.isArray(value)) carrierError(label, "segments must be an array");
+  const segments = value.map((raw, index) => {
+    const segmentLabel = `${label}.segments[${index}]`;
+    const members = objectMembers(raw, segmentLabel);
+    if (members.has("key")) {
+      requireExactMembers(members, ["key"], segmentLabel);
+      const key = members.get("key");
+      if (typeof key !== "string") carrierError(segmentLabel, "key must be a string");
+      return { key };
+    }
+    requireExactMembers(members, ["index"], segmentLabel);
+    const parsed = unsignedInteger(members.get("index"), `${segmentLabel}.index`);
+    if (parsed > 0xffffffffn) {
+      carrierError(`${segmentLabel}.index`, "index must be at most 4294967295");
+    }
+    return { index: Number(parsed) };
+  });
+
+  // This also rejects unpaired surrogates and gives duplicate detection the same NFC path
+  // identity that section 5 hashes.
+  try {
+    return { segments, encoded: ref.encodePath(segments).toString("hex") };
+  } catch (err) {
+    carrierError(label, err instanceof Error ? err.message : String(err));
+  }
+}
+
+function validatePathSaltSet(root, label) {
+  requireExactMembers(root, ["pairing", "salts"], label);
+  const salts = root.get("salts");
+  if (!Array.isArray(salts)) carrierError(`${label}.salts`, "must be an array");
+  // Path pairing is the envelope-1.0 salts carrier, whose tree floor is five.
+  if (salts.length < 5) carrierError(`${label}.salts`, "must contain at least 5 entries");
+
+  const seen = new Set();
+  salts.forEach((raw, index) => {
+    const entryLabel = `${label}.salts[${index}]`;
+    const entry = objectMembers(raw, entryLabel);
+    requireExactMembers(entry, ["segments", "salt"], entryLabel);
+    saltHex(entry.get("salt"), `${entryLabel}.salt`);
+    const path = structuredPath(entry.get("segments"), entryLabel);
+    if (seen.has(path.encoded)) carrierError(entryLabel, "duplicates an earlier encoded path");
+    seen.add(path.encoded);
+  });
+}
+
+function validatePositionalSaltSet(root, label) {
+  requireExactMembers(root, ["pairing", "leafCount", "salts"], label);
+  const salts = root.get("salts");
+  if (!Array.isArray(salts)) carrierError(`${label}.salts`, "must be an array");
+  const leafCount = unsignedInteger(root.get("leafCount"), `${label}.leafCount`);
+  if (leafCount < 5n) carrierError(`${label}.leafCount`, "must be at least 5");
+  if (leafCount !== BigInt(salts.length)) {
+    carrierError(label, `leafCount ${leafCount} does not equal ${salts.length} salts`);
+  }
+  salts.forEach((salt, index) => saltHex(salt, `${label}.salts[${index}]`));
+}
+
+function expectedSaltSetNames(plan) {
+  const expected = new Set();
+  for (const vectors of Object.values(plan.vectors)) {
+    for (const vector of vectors) {
+      if (vector.saltsFile !== undefined) expected.add(path.basename(vector.saltsFile));
+    }
+  }
+
+  const envelopeVectors = plan.vectors.envelope ?? [];
+  const floorSources = envelopeVectors.filter((vector) =>
+    (vector.class === 14 && vector.name.startsWith("floor-")
+      && vector.name.endsWith("-complete"))
+    || vector.name === "algorithm-sha-256-accepted");
+  for (const vector of floorSources) {
+    const envelope = JSON.parse(
+      fs.readFileSync(path.join(REPO_ROOT, vector.envelopeFile), "utf8")
+    );
+    const keyMode = envelope.issuer.keyId === undefined ? "no-key-id" : "with-key-id";
+    expected.add(
+      `envelope-floor-${envelope.recordType}-${keyMode}-${envelope.leafCount}.json`
+    );
+  }
+
+  for (const vector of envelopeVectors) {
+    if (vector.name.startsWith("guard-accept-")) {
+      expected.add(`envelope-guard-${vector.name}.json`);
+    }
+  }
+  if (envelopeVectors.some((vector) => vector.name === "full-copy-complete-salts")) {
+    expected.add("envelope-full-copy-typed-scalars.json");
+  }
+  return expected;
+}
+
+function validateSaltSetDirectory(dir, expectedNames) {
+  const names = fs.readdirSync(dir).filter((name) => name.endsWith(".json")).sort();
+  if (names.length === 0) carrierError(dir, "contains no JSON salt-set carriers");
+  for (const name of names) {
+    const label = path.join(dir, name);
+    const parsed = parseRecord(fs.readFileSync(label, "utf8"));
+    const root = objectMembers(parsed, label);
+    const pairing = root.get("pairing");
+    if (pairing === "path") validatePathSaltSet(root, label);
+    else if (pairing === "positional") validatePositionalSaltSet(root, label);
+    else {
+      carrierError(label,
+        `pairing must be "path" or "positional", got ${JSON.stringify(pairing)}`);
+    }
+  }
+  const present = new Set(names);
+  const missing = [...expectedNames].filter((name) => !present.has(name)).sort();
+  const orphaned = names.filter((name) => !expectedNames.has(name));
+  if (missing.length) {
+    carrierError(dir, `missing committed carrier(s) ${missing.map(JSON.stringify).join(", ")}`);
+  }
+  if (orphaned.length) {
+    carrierError(dir, `orphan carrier(s) no committed vector or fixture uses: `
+      + orphaned.map(JSON.stringify).join(", "));
+  }
+  return names.length;
+}
+
+const validatedSaltSetCount = validateSaltSetDirectory(
+  SALT_SET_DIR, expectedSaltSetNames(committedCorpus)
+);
 
 // The input escape forms documented in corpus/README.md. A lone surrogate never appears
 // literally in the corpus file, because a JSON writer cannot emit one as well-formed UTF-8.
@@ -203,8 +405,7 @@ for (const v of V.negativeProof ?? []) {
 for (const v of V.typeMap ?? []) {
   const map = typeMaps[v.recordType];
   if (map === undefined) {
-    note(v.class, `type map ${v.recordType} not found`);
-    continue;
+    throw new Error(`corpus defect: committed type map ${v.recordType} not found`);
   }
   let tag = null;
   let failedClosed = false;
@@ -223,8 +424,7 @@ for (const v of V.record ?? []) {
   if (loaded === null) continue;
   const map = typeMaps[v.recordType];
   if (map === undefined) {
-    note(v.class, `record ${v.name}: type map ${v.recordType} not found`);
-    continue;
+    throw new Error(`corpus defect: record ${v.name} names missing type map ${v.recordType}`);
   }
   const identity = {
     recordType: v.recordType,
@@ -240,8 +440,8 @@ for (const v of V.record ?? []) {
   const ordered = ref.orderedLeaves(loaded, map, identity);
   const saltDoc = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, v.saltsFile), "utf8"));
   if (saltDoc.pairing !== v.saltPairing) {
-    note(v.class, `record ${v.name}: saltPairing ${v.saltPairing} but the set says ${saltDoc.pairing}`);
-    continue;
+    throw new Error(`corpus defect: record ${v.name} declares saltPairing ${v.saltPairing}, `
+      + `but ${v.saltsFile} declares ${saltDoc.pairing}`);
   }
   const salts = ref.saltSetFromDocument(saltDoc, ordered);
   const { root, leaves } = ref.buildTree(HASH_ALG, loaded, map, salts, identity);
@@ -251,13 +451,12 @@ for (const v of V.record ?? []) {
 
 function loadRecord(v) {
   // The corpus schema admits two carriers, and this runner consumes one of them. A full envelope
-  // copy carries the record body and its salts together and is a self-sufficient carrier, so the
-  // schema is right to permit it; nothing here unpacks one yet. Say so and skip, rather than
-  // dereferencing an absent recordFile and dying with a TypeError on a schema-valid vector.
+  // copy carries the record body and its salts together and is a self-sufficient carrier.
+  // Failing to implement that schema-valid carrier is an implementation failure, not an
+  // unavailable external input.
   if (v.recordFile === undefined) {
-    note(v.class, `record ${v.name} SKIPPED: carried as ${v.envelopeFile}, and this runner reads `
-      + `only the recordFile carrier`);
-    return null;
+    throw new Error(`runner failure: record ${v.name} uses unsupported envelopeFile carrier `
+      + `${v.envelopeFile}`);
   }
   // A corpus fixture lives in this repository. A MOH sample does not, by design, so it is named
   // by module and export and must be extracted first.
@@ -265,13 +464,16 @@ function loadRecord(v) {
     return parseRecord(fs.readFileSync(path.join(REPO_ROOT, v.recordFile), "utf8"));
   }
   if (!RECORDS_DIR) {
-    note(v.class, `record ${v.name} SKIPPED: no --records directory for ${v.recordFile}`);
+    note(v.class, `record ${v.name}: external sample ${v.recordFile} was not extracted; rerun `
+      + `corpus/tools/run.sh with --references <path-to-schemata>, or pass --records `
+      + `<extracted-records> to this tool`);
     return null;
   }
   const exportName = v.recordFile.split("#")[1];
   const file = path.join(RECORDS_DIR, `${exportName}.json`);
   if (!fs.existsSync(file)) {
-    note(v.class, `record ${v.name} SKIPPED: ${file} not extracted`);
+    note(v.class, `record ${v.name}: ${file} was not extracted; rerun corpus/tools/run.sh `
+      + `with --references <path-to-schemata>`);
     return null;
   }
   return parseRecord(fs.readFileSync(file, "utf8"));
@@ -340,8 +542,8 @@ for (const v of V.unlinkability ?? []) {
 for (const v of V.normalization ?? []) {
   const map = typeMaps[v.recordType];
   if (map === undefined) {
-    note(v.class, `normalization ${v.name}: type map ${v.recordType} not found`);
-    continue;
+    throw new Error(`corpus defect: normalization ${v.name} names missing type map `
+      + `${v.recordType}`);
   }
   const identity = {
     recordType: v.recordType,
@@ -390,38 +592,48 @@ for (const r of results) {
 }
 
 let failed = 0;
+let incomplete = 0;
 if (!QUIET) {
   console.log(`corpus ${CORPUS_FILE}`);
   console.log(`  corpusVersion ${corpus.corpusVersion}  canon ${corpus.canon}  hashAlg ${corpus.hashAlg}`);
   console.log(`  corpus pins Unicode ${corpus.unicodeVersion}; this runtime's NFC tables are Unicode ${process.versions.unicode}`);
+  console.log(`  validated ${validatedSaltSetCount} committed salt-set carriers`);
 }
 for (let cls = 1; cls <= CLASS_COUNT; cls++) {
   const bucket = byClass.get(cls);
-  const notes = skips.filter((s) => s.cls === cls);
+  const notes = notRun.filter((s) => s.cls === cls);
   if (bucket === undefined && notes.length === 0) {
-    if (!QUIET) console.log(`  class ${String(cls).padStart(2)}: NO VECTORS - coverage gap`);
+    const message = `  class ${String(cls).padStart(2)}: NO VECTORS - coverage gap`;
+    if (QUIET) console.error(message);
+    else console.log(message);
+    incomplete += 1;
     continue;
   }
   const pass = bucket?.pass ?? 0;
   const fail = bucket?.fail ?? 0;
   failed += fail;
-  // A class with skips and NO assertions is SKIPPED, never PASS. Reporting green for a class
-  // that did not run is the failure docs/conformance-corpus.md is written against.
-  const status = fail ? "FAIL" : pass === 0 ? "SKIPPED - NOT RUN" : notes.length ? "PASS (with skips)" : "PASS";
-  if (!QUIET) {
-    console.log(`  class ${String(cls).padStart(2)}: ${status}  ${pass} assertions` +
-      (fail ? `, ${fail} FAILED` : "") + (notes.length ? `, ${notes.length} skipped` : ""));
-    for (const n of notes) console.log(`      SKIPPED: ${n.message}`);
+  incomplete += notes.length;
+  // Any class with a NOT RUN vector is incomplete, even when its other assertions pass.
+  // Reporting PASS when work was not run is the failure docs/conformance-corpus.md guards against.
+  let status;
+  if (fail) status = notes.length ? "FAIL (also incomplete)" : "FAIL";
+  else if (notes.length) status = pass === 0 ? "NOT RUN" : "INCOMPLETE - some vectors NOT RUN";
+  else status = pass === 0 ? "NOT RUN" : "PASS";
+  if (!QUIET || fail || notes.length) {
+    const log = QUIET ? console.error : console.log;
+    log(`  class ${String(cls).padStart(2)}: ${status}  ${pass} assertions` +
+      (fail ? `, ${fail} FAILED` : "") + (notes.length ? `, ${notes.length} NOT RUN` : ""));
+    for (const n of notes) log(`      NOT RUN: ${n.message}`);
     for (const f of (bucket?.failures ?? []).slice(0, 8)) {
-      console.log(`      FAIL ${f.name} ${f.what}: got ${JSON.stringify(f.got)} want ${JSON.stringify(f.want)}`);
+      log(`      FAIL ${f.name} ${f.what}: got ${JSON.stringify(f.got)} want `
+        + `${JSON.stringify(f.want)}`);
     }
   }
 }
 
 if (EMIT) {
-  // Rewrite the corpus with every derived value recomputed here. Inputs are copied through
-  // untouched, so a byte-for-byte match against the shipped file is the two-implementation
-  // agreement assertion.
+  // Rewrite fields backed by this run's results. Inputs and NOT RUN vectors are copied through,
+  // so the caller must exclude those vectors from any byte-comparison claim.
   const out = JSON.parse(fs.readFileSync(CORPUS_FILE, "utf8"));
   const byName = new Map(results.map((r) => [`${r.name} ${r.what}`, r.got]));
   const put = (vec, field, key = field) => {
@@ -451,7 +663,14 @@ if (EMIT) {
   if (!QUIET) console.log(`  emitted ${EMIT}`);
 }
 
-if (!QUIET) {
-  console.log(failed ? `FAILED: ${failed} assertions` : `OK: ${results.length} assertions passed`);
+if (failed) {
+  const log = QUIET ? console.error : console.log;
+  log(`FAILED: ${failed} assertions`);
+} else if (incomplete) {
+  const log = QUIET ? console.error : console.log;
+  log(`INCOMPLETE: ${results.length} assertions passed; ${incomplete} vector(s) or `
+    + `class(es) NOT RUN`);
+} else if (!QUIET) {
+  console.log(`OK: ${results.length} assertions passed`);
 }
-process.exit(failed ? 1 : 0);
+process.exit(failed ? 1 : incomplete ? 2 : 0);

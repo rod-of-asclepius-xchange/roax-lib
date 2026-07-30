@@ -15,8 +15,15 @@ It would look valid to every check a verifier runs while leaking every withheld 
 and never emits a ``salts`` member, which makes a withheld leaf's salt unrepresentable
 rather than merely prohibited.
 
-The minimum-disclosure floor is applied here too, so an unusable copy is not produced in
-the first place.
+When :func:`disclosed_copy` receives a profile, it applies the minimum-disclosure floor
+before building the copy.
+Passing ``profile=None`` is reserved for negative fixtures and can produce a copy that
+the verifier rejects.
+
+This module emits envelope 1.0 only.
+Envelope 2.0 requires exact structured-path DFA selection by a reproduced content ID
+under specification section 4.2, so selecting :data:`roax_canon.record.RESERVED_V2`
+rejects until that artifact-aware implementation exists.
 """
 
 from __future__ import annotations
@@ -24,12 +31,12 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 from .errors import ErrorCode, RoaxError
-from .hashes import DEFAULT_HASH_ALG, get_hash
+from .hashes import get_hash
 from .leaf import CANON
 from .numbers import canonical_decimal, canonical_integer
 from .path import Segment, display_path, encode_path, segments_to_json
 from .profiles import Profile
-from .record import RESERVED_V1, BuiltRecord, RecordIdentity
+from .record import RESERVED_V1, RESERVED_V2, BuiltRecord
 from .text import nfc
 from .tree import audit_path
 from .value import BYTES, DECIMAL, INTEGER, STRING, VALUELESS_TAGS
@@ -37,12 +44,23 @@ from .value import BYTES, DECIMAL, INTEGER, STRING, VALUELESS_TAGS
 __all__ = ["full_copy", "disclosed_copy"]
 
 
-def _envelope_head(
-    identity: RecordIdentity, built: BuiltRecord, hash_alg: str, reserved_set: str
-) -> dict[str, Any]:
+def _require_emittable_reserved_set(reserved_set: str) -> None:
+    if reserved_set == RESERVED_V2:
+        raise RoaxError(
+            ErrorCode.TYPE_MAP_REJECTED,
+            "envelope 2.0 emission requires exact structured-path DFA artifact loading "
+            "and content-ID reproduction, which this package does not implement "
+            "(specification section 4.2)",
+        )
+    if reserved_set != RESERVED_V1:
+        raise RoaxError(ErrorCode.ENVELOPE_SHAPE, f"unknown reserved leaf set {reserved_set!r}")
+
+
+def _envelope_head(built: BuiltRecord) -> dict[str, Any]:
+    identity = built.identity
     head: dict[str, Any] = {
         "canon": CANON,
-        "hashAlg": hash_alg,
+        "hashAlg": built.hash_alg,
         "recordType": identity.record_type,
         "schemaVersion": identity.schema_version,
         "recordId": identity.record_id,
@@ -52,8 +70,6 @@ def _envelope_head(
     }
     if identity.issuer_key_id is not None:
         head["issuer"]["keyId"] = identity.issuer_key_id
-    if reserved_set != RESERVED_V1 and identity.type_map_id is not None:
-        head["typeMap"] = {"id": identity.type_map_id}
     # `recordType` is placed before `root` above only for readability; the envelope is
     # JSON and member order carries no meaning, because nothing here is hashed over the
     # serialized envelope (specification section 13.2).
@@ -114,14 +130,7 @@ def _carrier_value(tag: int, value: Any) -> Any:
     return str(committed)
 
 
-def full_copy(
-    record: Any,
-    identity: RecordIdentity,
-    built: BuiltRecord,
-    *,
-    hash_alg: str = DEFAULT_HASH_ALG,
-    reserved_set: str = RESERVED_V1,
-) -> dict[str, Any]:
+def full_copy(built: BuiltRecord) -> dict[str, Any]:
     """A full copy: the whole record plus the salt of **every** leaf.
 
     Without rule 1 of specification section 7.3 a full copy is not verifiable at all:
@@ -130,9 +139,15 @@ def full_copy(
 
     Carrying every salt discloses nothing extra, because a full copy already reveals every
     value at every path and a salt is only useful for confirming a value you do not have.
+
+    The record and all issuance context come from ``built``.
+    No replacement arguments are accepted, so this API cannot combine a commitment with
+    another issuance's safe-looking identity, algorithm, reserved set or record
+    (specification sections 10 and 11.3).
     """
-    envelope = _envelope_head(identity, built, hash_alg, reserved_set)
-    envelope["record"] = record
+    _require_emittable_reserved_set(built.reserved_set)
+    envelope = _envelope_head(built)
+    envelope["record"] = built.record_copy()
     envelope["salts"] = [
         {"segments": segments_to_json(leaf.path), "salt": salt.hex()}
         for leaf, salt in zip(built.leaves, built.salts)
@@ -142,12 +157,9 @@ def full_copy(
 
 def disclosed_copy(
     reveal: Sequence[Sequence[Segment]],
-    identity: RecordIdentity,
     built: BuiltRecord,
     *,
     profile: Profile | None = None,
-    hash_alg: str = DEFAULT_HASH_ALG,
-    reserved_set: str = RESERVED_V1,
     include_display_path: bool = True,
 ) -> dict[str, Any]:
     """A disclosed copy revealing exactly ``reveal`` and nothing else.
@@ -159,12 +171,24 @@ def disclosed_copy(
     The display path is emitted for humans when ``include_display_path`` is set.
     It is display only and is never an input to anything a verifier computes
     (specification section 5.2).
+
+    Identity, hash algorithm and reserved leaf set come only from ``built``.
+    A supplied profile must name that sealed identity's exact ``recordType``; otherwise it
+    is not the profile for this commitment and cannot select its disclosure floor
+    (specification sections 10.2 and 11.3).
     """
+    _require_emittable_reserved_set(built.reserved_set)
     wanted = [tuple(path) for path in reveal]
     encoded_wanted = {encode_path(path) for path in wanted}
 
     if profile is not None:
-        for floor_path in profile.floor(reserved_set=reserved_set):
+        if profile.record_type != built.identity.record_type:
+            raise RoaxError(
+                ErrorCode.PROFILE_UNKNOWN,
+                f"profile {profile.record_type!r} does not match the commitment's "
+                f"recordType {built.identity.record_type!r}",
+            )
+        for floor_path in profile.floor(reserved_set=built.reserved_set):
             if encode_path(floor_path) not in encoded_wanted:
                 raise RoaxError(
                     ErrorCode.MINIMUM_DISCLOSURE_FLOOR,
@@ -172,7 +196,7 @@ def disclosed_copy(
                     f"{profile.record_type!r} (specification section 10.2)",
                 )
 
-    hasher = get_hash(hash_alg)
+    hasher = get_hash(built.hash_alg)
     leaves_out: list[dict[str, Any]] = []
     for encoded in sorted(encoded_wanted):
         try:
@@ -196,7 +220,7 @@ def disclosed_copy(
         ]
         leaves_out.append(entry)
 
-    envelope = _envelope_head(identity, built, hash_alg, reserved_set)
+    envelope = _envelope_head(built)
     envelope["disclosure"] = {"mode": "selective", "leaves": leaves_out}
     # No `salts` member, ever. See the module docstring.
     return envelope

@@ -32,13 +32,25 @@ section 4.2), so a collapsed representation resolves the wrong tag.
 
 from __future__ import annotations
 
+import ipaddress
 import json
+import re
 from typing import Any
 
 from .errors import ErrorCode, InputError
 from .text import has_unpaired_surrogate
 
-__all__ = ["JsonNumber", "loads", "load_file", "json_kind", "as_int", "is_json_string"]
+__all__ = [
+    "JsonNumber",
+    "loads",
+    "load_file",
+    "json_kind",
+    "as_int",
+    "is_json_string",
+    "is_uri_string",
+    "is_nonnegative_schema_integer",
+    "is_record_type_string",
+]
 
 
 class JsonNumber(str):
@@ -181,39 +193,272 @@ def is_json_string(value: Any) -> bool:
     return isinstance(value, str) and not isinstance(value, JsonNumber)
 
 
+_URI_SCHEME = re.compile(r"\A[A-Za-z][A-Za-z0-9+.-]*\Z")
+_RECORD_TYPE = re.compile(
+    r"\A[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)+\Z"
+)
+_IPV_FUTURE = re.compile(r"\A[vV][0-9A-Fa-f]+\.[A-Za-z0-9._~!$&'()*+,;=:-]+\Z")
+_URI_UNRESERVED = frozenset(
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+)
+_URI_SUB_DELIMITERS = frozenset("!$&'()*+,;=")
+_URI_PCHAR = _URI_UNRESERVED | _URI_SUB_DELIMITERS | frozenset(":@")
+_URI_QUERY_OR_FRAGMENT = _URI_PCHAR | frozenset("/?")
+_URI_USERINFO = _URI_UNRESERVED | _URI_SUB_DELIMITERS | frozenset(":")
+_URI_REG_NAME = _URI_UNRESERVED | _URI_SUB_DELIMITERS
+
+
+def _uri_component_is_valid(value: str, allowed: frozenset[str]) -> bool:
+    index = 0
+    while index < len(value):
+        character = value[index]
+        if character == "%":
+            escape = value[index + 1 : index + 3]
+            if len(escape) != 2 or any(ch not in "0123456789abcdefABCDEF" for ch in escape):
+                return False
+            index += 3
+            continue
+        if character not in allowed:
+            return False
+        index += 1
+    return True
+
+
+def _uri_authority_is_valid(authority: str) -> bool:
+    if authority.count("@") > 1:
+        return False
+    if "@" in authority:
+        userinfo, host_and_port = authority.split("@", 1)
+        if not _uri_component_is_valid(userinfo, _URI_USERINFO):
+            return False
+    else:
+        host_and_port = authority
+
+    if "[" not in host_and_port and "]" not in host_and_port:
+        if host_and_port.count(":") > 1:
+            return False
+        if ":" in host_and_port:
+            host, port = host_and_port.rsplit(":", 1)
+            if any(digit not in "0123456789" for digit in port):
+                return False
+        else:
+            host = host_and_port
+        return _uri_component_is_valid(host, _URI_REG_NAME)
+
+    if not host_and_port.startswith("[") or host_and_port.count("[") != 1:
+        return False
+    closing = host_and_port.find("]")
+    if closing < 0 or host_and_port.count("]") != 1:
+        return False
+    literal = host_and_port[1:closing]
+    suffix = host_and_port[closing + 1 :]
+    if suffix and (
+        not suffix.startswith(":")
+        or any(digit not in "0123456789" for digit in suffix[1:])
+    ):
+        return False
+    if _IPV_FUTURE.match(literal) is not None:
+        return True
+    try:
+        ipaddress.IPv6Address(literal)
+    except ipaddress.AddressValueError:
+        return False
+    return True
+
+
+def is_uri_string(value: Any) -> bool:
+    """Whether a genuine JSON string has an RFC 3986 generic absolute-URI shape.
+
+    The envelope schema permits any URI scheme, including ``did``, ``urn`` and
+    ``https``, so this boundary deliberately does not invent scheme-specific host or path
+    rules.
+    It requires an ASCII scheme, a colon, a non-empty scheme-specific part, only RFC 3986
+    unreserved/reserved characters, well-formed percent escapes, and brackets only around
+    a valid IP literal in the authority host position.
+    This is stricter than the pinned Ajv format checker for malformed percent escapes but
+    does not claim to validate the semantics of any individual scheme.
+    """
+    if not is_json_string(value):
+        return False
+    scheme, separator, remainder = value.partition(":")
+    if not separator or not remainder or _URI_SCHEME.match(scheme) is None:
+        return False
+
+    if remainder.count("#") > 1:
+        return False
+    before_fragment, fragment_separator, fragment = remainder.partition("#")
+    hierarchy, query_separator, query = before_fragment.partition("?")
+    if not hierarchy:
+        return False
+    if query_separator and not _uri_component_is_valid(query, _URI_QUERY_OR_FRAGMENT):
+        return False
+    if fragment_separator and not _uri_component_is_valid(fragment, _URI_QUERY_OR_FRAGMENT):
+        return False
+
+    if hierarchy.startswith("//"):
+        authority_and_path = hierarchy[2:]
+        path_start = authority_and_path.find("/")
+        if path_start < 0:
+            authority, path = authority_and_path, ""
+        else:
+            authority = authority_and_path[:path_start]
+            path = authority_and_path[path_start:]
+        return _uri_authority_is_valid(authority) and _uri_component_is_valid(
+            path, _URI_PCHAR | frozenset("/")
+        )
+    return _uri_component_is_valid(hierarchy, _URI_PCHAR | frozenset("/"))
+
+
+def is_record_type_string(value: Any) -> bool:
+    """Whether a genuine JSON string has the envelope's reverse-DNS profile form."""
+    return is_json_string(value) and _RECORD_TYPE.match(value) is not None
+
+
+def is_nonnegative_schema_integer(value: Any) -> bool:
+    """Whether a value satisfies JSON Schema ``integer`` and ``minimum: 0``.
+
+    Unlike :func:`as_int`, this predicate imposes no conversion-size bound.
+    It is for schema metadata such as ``anchor.chainId`` that is validated but never used
+    arithmetically, and it decides integrality from decimal text without constructing a
+    potentially enormous Python integer.
+    """
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return value >= 0
+    if not isinstance(value, JsonNumber):
+        return False
+
+    from .numbers import DECIMAL_INPUT_GRAMMAR
+
+    match = DECIMAL_INPUT_GRAMMAR.match(value)
+    if match is None:
+        return False
+    coefficient = match.group("int") + (match.group("frac") or "")
+    if not coefficient.strip("0"):
+        return True
+    if match.group("sign"):
+        return False
+
+    fraction_length = len(match.group("frac") or "")
+    exponent_text = match.group("exp") or "0"
+    exponent_negative = exponent_text.startswith("-")
+    exponent_magnitude_text = exponent_text.lstrip("+-").lstrip("0") or "0"
+    # Past this threshold a positive exponent necessarily leaves an integer, while a
+    # negative one necessarily asks to remove more decimal places than this non-zero
+    # coefficient contains. Compare text first so an attacker cannot choose an int()
+    # conversion larger than CPython's configured limit.
+    relevant_exponent = len(coefficient) + fraction_length
+    relevant_text = str(relevant_exponent)
+    if len(exponent_magnitude_text) > len(relevant_text) or (
+        len(exponent_magnitude_text) == len(relevant_text)
+        and exponent_magnitude_text > relevant_text
+    ):
+        return not exponent_negative
+
+    exponent_magnitude = int(exponent_magnitude_text)
+    exponent = -exponent_magnitude if exponent_negative else exponent_magnitude
+    scale = exponent - fraction_length
+    if scale >= 0:
+        return True
+    removed = -scale
+    return removed <= len(coefficient) and all(
+        digit == "0" for digit in coefficient[len(coefficient) - removed :]
+    )
+
+
 #: The most decimal digits :func:`as_int` will convert.
-#: Every field it reads is a count, an index or a tag, and specification section 5 bounds
-#: an array index below 2^32, so a bound at the 20 digits of 2^64 - 1 is generous by
-#: twelve orders of magnitude and still rejects on this specification's own terms.
-#: Without it CPython's 4300-digit :func:`int` conversion cap raises :class:`ValueError`
-#: out of a verifier that promises a result rather than an exception; that is the same
-#: interpreter hazard :mod:`roax_canon.numbers` already refuses for a decimal exponent
-#: (numbers.py, ``_MAX_EXPONENT_DIGITS``), met here at a second site.
+#: Every field it reads is integer protocol metadata rather than a record value, and
+#: specification section 5 bounds an array index below 2^32, so a bound at the 20 digits
+#: of 2^64 - 1 is generous by roughly ten orders of magnitude and still rejects on this
+#: specification's own terms.
+#: Without it CPython's configurable :func:`int` conversion limit, whose default is 4300
+#: digits, raises :class:`ValueError` out of a verifier that converts the explicitly
+#: enumerated malformed-member failures into results; that is the same interpreter hazard
+#: :mod:`roax_canon.numbers` already refuses for a decimal exponent (numbers.py,
+#: ``_MAX_EXPONENT_DIGITS``), met here at a second site.
 _MAX_INT_DIGITS = 20
 
 
 def as_int(value: Any, *, field: str) -> int:
-    """Read an envelope field that is genuinely an integer count or index.
+    """Read a JSON Schema ``integer`` field without passing it through a float.
 
     The whole envelope is read through :func:`loads` so that a full copy's ``record``
     keeps its literals (specification section 7.3), which means ``leafCount`` and
     ``index`` arrive as :class:`JsonNumber` too.
     They are counts rather than record values, so converting them here is correct; doing
     it by an explicit call keeps that decision visible.
+
+    JSON Schema classifies a numeric value by its mathematical value, not by its lexical
+    spelling, so ``1``, ``1.0`` and ``1e0`` are all integers.
+    The conversion below implements that rule over decimal text and never uses
+    :class:`float`, preserving specification section 6.4's parser boundary.
     """
     if isinstance(value, bool) or not isinstance(value, (JsonNumber, int)):
         raise InputError(ErrorCode.ENVELOPE_SHAPE, f"{field} must be an integer")
     if isinstance(value, JsonNumber):
-        from .numbers import INTEGER_GRAMMAR
+        from .numbers import DECIMAL_INPUT_GRAMMAR
 
-        if INTEGER_GRAMMAR.match(value) is None:
+        match = DECIMAL_INPUT_GRAMMAR.match(value)
+        if match is None:
             raise InputError(ErrorCode.ENVELOPE_SHAPE, f"{field} must be an integer")
-        digits = value[1:] if value.startswith("-") else value
-        if len(digits) > _MAX_INT_DIGITS:
+        integer_digits = match.group("int")
+        fraction_digits = match.group("frac") or ""
+        coefficient = integer_digits + fraction_digits
+        if not coefficient.strip("0"):
+            return 0
+
+        exponent_text = match.group("exp") or "0"
+        exponent_negative = exponent_text.startswith("-")
+        exponent_magnitude_text = exponent_text.lstrip("+-").lstrip("0") or "0"
+        # An exponent larger than the coefficient plus the accepted output bound either
+        # pads far past the bound or requires more trailing zeros than the coefficient
+        # contains. Compare its decimal text before calling int(), so CPython's
+        # configurable string-conversion limit never chooses the rejection.
+        relevant_exponent = len(coefficient) + len(fraction_digits) + _MAX_INT_DIGITS
+        relevant_text = str(relevant_exponent)
+        if len(exponent_magnitude_text) > len(relevant_text) or (
+            len(exponent_magnitude_text) == len(relevant_text)
+            and exponent_magnitude_text > relevant_text
+        ):
+            if exponent_negative:
+                raise InputError(ErrorCode.ENVELOPE_SHAPE, f"{field} must be an integer")
             raise InputError(
                 ErrorCode.ENVELOPE_SHAPE,
-                f"{field} carries {len(digits)} digits, past the {_MAX_INT_DIGITS}-digit "
-                f"bound this reader converts",
+                f"{field} is past the {_MAX_INT_DIGITS}-digit bound this reader converts",
             )
-        return int(value)
+        exponent_magnitude = int(exponent_magnitude_text)
+        exponent = -exponent_magnitude if exponent_negative else exponent_magnitude
+        scale = exponent - len(fraction_digits)
+
+        if scale < 0:
+            removed = -scale
+            if removed > len(coefficient) or any(
+                digit != "0" for digit in coefficient[len(coefficient) - removed :]
+            ):
+                raise InputError(ErrorCode.ENVELOPE_SHAPE, f"{field} must be an integer")
+            integral_digits = coefficient[: len(coefficient) - removed]
+        else:
+            significant = coefficient.lstrip("0")
+            if len(significant) + scale > _MAX_INT_DIGITS:
+                raise InputError(
+                    ErrorCode.ENVELOPE_SHAPE,
+                    f"{field} is past the {_MAX_INT_DIGITS}-digit bound this reader converts",
+                )
+            integral_digits = coefficient + "0" * scale
+
+        integral_digits = integral_digits.lstrip("0") or "0"
+        if len(integral_digits) > _MAX_INT_DIGITS:
+            raise InputError(
+                ErrorCode.ENVELOPE_SHAPE,
+                f"{field} carries {len(integral_digits)} digits, past the "
+                f"{_MAX_INT_DIGITS}-digit bound this reader converts",
+            )
+        parsed = int(integral_digits)
+        return -parsed if match.group("sign") else parsed
+    if abs(value) >= 10**_MAX_INT_DIGITS:
+        raise InputError(
+            ErrorCode.ENVELOPE_SHAPE,
+            f"{field} is past the {_MAX_INT_DIGITS}-digit bound this reader converts",
+        )
     return value

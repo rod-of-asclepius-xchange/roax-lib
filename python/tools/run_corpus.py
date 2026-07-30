@@ -12,9 +12,10 @@ fixtures and the corpus-side type maps, which is exactly what
 `corpus/README.md` documents as the interface for "an implementation that is not one of
 these two".
 
-Exit status is 0 only when every reachable class passes.
-A class that cannot run says SKIPPED and contributes no assertions; it never reports green
-unrun.
+Exit status is 0 only when all 19 classes pass with no unavailable vectors.
+An assertion failure exits 1.
+A vector or class that cannot run says NOT RUN with the reason and exits 2; it never
+reports green unrun.
 """
 
 from __future__ import annotations
@@ -56,6 +57,7 @@ from roax_canon import (  # noqa: E402
 )
 from roax_canon.errors import ErrorCode  # noqa: E402
 from roax_canon.flatten import check_reserved_namespace  # noqa: E402
+from roax_canon.jsonio import as_int, is_json_string  # noqa: E402
 from roax_canon.path import segments_from_json  # noqa: E402
 from roax_canon.profiles import CORPUS_SYNTHETIC_PROFILE  # noqa: E402
 from ts_sample import load_export  # noqa: E402
@@ -63,6 +65,8 @@ from ts_sample import load_export  # noqa: E402
 REPO = os.path.dirname(os.path.dirname(_HERE))
 CORPUS = os.path.join(REPO, "corpus", "conformance-corpus-1.0.json")
 TYPE_MAP_DIR = os.path.join(REPO, "corpus", "type-maps")
+EXPECTED_CLASSES = tuple(range(1, 20))
+REFERENCES_INSTRUCTION = "rerun with --references /path/to/schemata"
 
 
 # ---------------------------------------------------------------------------------
@@ -74,7 +78,7 @@ class Results:
     def __init__(self) -> None:
         self.passed: dict[int, int] = defaultdict(int)
         self.failed: dict[int, list[str]] = defaultdict(list)
-        self.skipped: dict[int, list[str]] = defaultdict(list)
+        self.not_run: dict[int, list[str]] = defaultdict(list)
 
     def ok(self, cls: int) -> None:
         self.passed[cls] += 1
@@ -82,8 +86,8 @@ class Results:
     def bad(self, cls: int, name: str, detail: str) -> None:
         self.failed[cls].append(f"{name}: {detail}")
 
-    def skip(self, cls: int, name: str, why: str) -> None:
-        self.skipped[cls].append(f"{name}: {why}")
+    def unavailable(self, cls: int, name: str, why: str) -> None:
+        self.not_run[cls].append(f"{name}: {why}")
 
     def check(self, cls: int, name: str, got: Any, want: Any, what: str = "") -> None:
         if got == want:
@@ -120,18 +124,65 @@ def unescape(node: Any) -> Any:
     return node
 
 
-def salts_by_path(path: str) -> dict[bytes, bytes]:
+def _salt_entries(path: str, expected_pairing: str) -> list[Any]:
     doc = load_file(path)
-    entries = doc["salts"] if isinstance(doc, dict) else doc
-    return {
-        encode_path(segments_from_json(e["segments"])): bytes.fromhex(e["salt"]) for e in entries
-    }
+    if not isinstance(doc, dict):
+        raise ValueError(f"{path}: salt document must be an object")
+    allowed = (
+        frozenset({"pairing", "leafCount", "salts"})
+        if expected_pairing == "positional"
+        else frozenset({"pairing", "salts"})
+    )
+    unknown = sorted(set(doc) - allowed)
+    if unknown:
+        raise ValueError(f"{path}: unknown salt document members {unknown}")
+    actual_pairing = doc.get("pairing")
+    if actual_pairing != expected_pairing:
+        raise ValueError(
+            f"{path}: salt document declares pairing {actual_pairing!r}, "
+            f"vector requires {expected_pairing!r}"
+        )
+    entries = doc.get("salts")
+    if not isinstance(entries, list):
+        raise ValueError(f"{path}: salt document must carry a `salts` array")
+    if expected_pairing == "positional":
+        if "leafCount" not in doc:
+            raise ValueError(f"{path}: positional salt document must carry `leafCount`")
+        count = as_int(doc["leafCount"], field="leafCount")
+        if count != len(entries):
+            raise ValueError(
+                f"{path}: positional salt document declares {count} leaves "
+                f"but carries {len(entries)} salts"
+            )
+    return entries
+
+
+def _salt_bytes(value: Any, *, path: str) -> bytes:
+    if (
+        not is_json_string(value)
+        or len(value) != 32
+        or any(ch not in "0123456789abcdef" for ch in value)
+    ):
+        raise ValueError(f"{path}: salt must be exactly 32 lowercase hex characters")
+    return bytes.fromhex(value)
+
+
+def salts_by_path(path: str) -> dict[bytes, bytes]:
+    entries = _salt_entries(path, "path")
+    by_path: dict[bytes, bytes] = {}
+    for entry in entries:
+        if not isinstance(entry, dict) or set(entry) != {"segments", "salt"}:
+            raise ValueError(f"{path}: each path-paired salt needs only `segments` and `salt`")
+        encoded = encode_path(segments_from_json(entry["segments"]))
+        if encoded in by_path:
+            raise ValueError(f"{path}: duplicate salt path {display_path(segments_from_json(entry['segments']))!r}")
+        by_path[encoded] = _salt_bytes(entry["salt"], path=path)
+    return by_path
 
 
 def positional_salts(path: str) -> list[bytes]:
-    doc = load_file(path)
-    entries = doc["salts"] if isinstance(doc, dict) else doc
-    return [bytes.fromhex(s) for s in entries]
+    entries = _salt_entries(path, "positional")
+    return [_salt_bytes(salt, path=path) for salt in entries]
 
 
 # ---------------------------------------------------------------------------------
@@ -179,7 +230,7 @@ def run_reject(vectors, r: Results) -> None:
             elif x.get("tag") is not None:
                 encode_value(x["tag"], unescape(raw))
             else:
-                r.skip(cls, name, "no input shape this runner recognizes")
+                r.bad(cls, name, "unsupported reject-vector input shape")
                 continue
         except RoaxError as exc:
             r.check(cls, name, exc.code, x["reason"], "reason: ")
@@ -228,8 +279,10 @@ def run_negative_proof(vectors, r: Results) -> None:
     hash from. What this asserts is the RFC 9162 half.
     The defence specification section 10 step 2 actually requires - never accepting a
     caller-supplied leaf hash - is structural in this implementation, because
-    :func:`roax_canon.verify.verify_envelope` has no parameter that takes one, and it is
-    exercised by every class-14 through class-18 envelope vector.
+    :func:`roax_canon.verify.verify_envelope` has no parameter that takes one.
+    This runner invokes that full-verifier entry point for 54 envelope vectors: 3 in
+    class 11, 34 in class 14, 5 in class 15, 8 in class 17 and 4 in class 18.
+    That is an entry-point count, not a claim that all 54 reach leaf recomputation.
     """
     for x in vectors:
         got = verify_inclusion(
@@ -253,8 +306,9 @@ def run_type_map(vectors, maps, r: Results) -> None:
             else:
                 r.bad(cls, name, f"map rejected with {exc.code}")
             continue
-        except FileNotFoundError:
-            r.skip(cls, name, f"no corpus type map for {x['recordType']}")
+        except FileNotFoundError as exc:
+            path = exc.filename or os.path.join(TYPE_MAP_DIR, f"{x['recordType']}.json")
+            r.bad(cls, name, f"committed corpus type map is missing: {path}")
             continue
         if x.get("expectMapRejected"):
             r.bad(cls, name, "map was accepted; expected rejection")
@@ -277,36 +331,73 @@ def run_type_map(vectors, maps, r: Results) -> None:
 
 
 def _record_for(vector, references: str | None):
-    """Load a record vector's record, which may live outside this repository."""
+    """Return ``(record, unavailable_reason, failure_reason)`` for one record vector.
+
+    Exactly one reason is populated when no record can be returned.
+    """
     ref = vector["recordFile"]
     if "#" in ref:
         module, export = ref.split("#", 1)
-        if references is None:
-            return None, "no --references checkout supplied"
+        if not references:
+            return (
+                None,
+                f"no reference checkout was configured; {REFERENCES_INSTRUCTION}",
+                None,
+            )
+        references = os.path.abspath(references)
+        if not os.path.isdir(references):
+            return (
+                None,
+                f"reference checkout path is not a directory: {references}; "
+                f"{REFERENCES_INSTRUCTION}",
+                None,
+            )
         rel = module
         prefix = "references/"
         if rel.startswith(prefix):
             rel = rel[len(prefix) :]
-        candidate = os.path.join(references, rel)
-        if not os.path.exists(candidate):
-            # Allow --references to point either at the parent of `schemata/` or at the
-            # checkout itself.
-            candidate = os.path.join(references, rel.split("/", 1)[1] if "/" in rel else rel)
-        if not os.path.exists(candidate):
-            return None, f"{candidate} not found"
-        return load_export(candidate, export), None
-    return load_file(os.path.join(REPO, ref)), None
+        candidates = [os.path.join(references, rel)]
+        # Allow --references to point either at the parent of `schemata/` or at the
+        # checkout itself.
+        fallback = os.path.join(references, rel.split("/", 1)[1] if "/" in rel else rel)
+        if fallback not in candidates:
+            candidates.append(fallback)
+        candidate = next((path for path in candidates if os.path.exists(path)), None)
+        if candidate is None:
+            attempted = " and ".join(candidates)
+            return (
+                None,
+                f"reference module was not found; attempted {attempted}; "
+                f"{REFERENCES_INSTRUCTION}",
+                None,
+            )
+        try:
+            return load_export(candidate, export), None, None
+        except Exception as exc:
+            # The extractor is an input boundary. Any ordinary read or parse exception
+            # is reported as a failed attempt rather than escaping without a terminal
+            # corpus result.
+            return (
+                None,
+                None,
+                f"could not extract {export!r} from reference module {candidate}: "
+                f"{type(exc).__name__}: {exc}",
+            )
+    return load_file(os.path.join(REPO, ref)), None, None
 
 
 def run_record(vectors, maps, r: Results, references, authorize_empty) -> None:
     for x in vectors:
         cls, name = x["class"], x["name"]
         if "envelopeFile" in x:
-            r.skip(cls, name, "envelope-carrier record vectors are covered by the envelope class")
+            r.bad(cls, name, "unsupported record-vector envelope carrier")
             continue
-        record, why = _record_for(x, references)
+        record, why_not_run, failure = _record_for(x, references)
+        if failure is not None:
+            r.bad(cls, name, failure)
+            continue
         if record is None:
-            r.skip(cls, name, why or "record unavailable")
+            r.unavailable(cls, name, why_not_run or "record unavailable")
             continue
         identity = RecordIdentity(
             record_type=x["recordType"],
@@ -317,10 +408,20 @@ def run_record(vectors, maps, r: Results, references, authorize_empty) -> None:
             type_map_id=x.get("typeMapId"),
         )
         salts_path = os.path.join(REPO, x["saltsFile"])
-        if x["saltPairing"] == "positional":
-            salts = PositionalSalts(positional_salts(salts_path))
-        else:
-            salts = MappingSalts(salts_by_path(salts_path))
+        try:
+            if x["saltPairing"] == "positional":
+                salt_values = positional_salts(salts_path)
+                salts = PositionalSalts(salt_values)
+                salt_count = len(salt_values)
+            elif x["saltPairing"] == "path":
+                by_path = salts_by_path(salts_path)
+                salts = MappingSalts(by_path)
+                salt_count = len(by_path)
+            else:
+                raise ValueError(f"unknown vector saltPairing {x['saltPairing']!r}")
+        except (OSError, KeyError, TypeError, ValueError, RoaxError) as exc:
+            r.bad(cls, name, f"invalid committed salt set: {type(exc).__name__}: {exc}")
+            continue
         try:
             built = build_tree(
                 record,
@@ -330,8 +431,19 @@ def run_record(vectors, maps, r: Results, references, authorize_empty) -> None:
                 reserved_set=_reserved_set(x),
                 authorize_empty_containers=authorize_empty,
             )
+        except FileNotFoundError as exc:
+            path = exc.filename or os.path.join(TYPE_MAP_DIR, f"{x['recordType']}.json")
+            r.bad(cls, name, f"committed corpus type map is missing: {path}")
+            continue
         except RoaxError as exc:
             r.bad(cls, name, f"rejected with {exc.code}: {exc.detail}")
+            continue
+        if salt_count != built.leaf_count:
+            r.bad(
+                cls,
+                name,
+                f"committed salt set has {salt_count} entries for {built.leaf_count} leaves",
+            )
             continue
         r.check(cls, name, built.leaf_count, x["leafCount"], "leafCount: ")
         r.check(cls, name, built.root.hex(), x["root"], "root: ")
@@ -396,7 +508,11 @@ def run_normalization(vectors, maps, r: Results, authorize_empty) -> None:
             issuer_id=x["issuerId"],
             issuer_key_id=x.get("issuerKeyId"),
         )
-        by_path = salts_by_path(os.path.join(REPO, x["saltsFile"]))
+        try:
+            by_path = salts_by_path(os.path.join(REPO, x["saltsFile"]))
+        except (OSError, KeyError, TypeError, ValueError, RoaxError) as exc:
+            r.bad(cls, name, f"invalid committed salt set: {type(exc).__name__}: {exc}")
+            continue
         roots = []
         for key in ("recordFileNFD", "recordFileNFC"):
             record = load_file(os.path.join(REPO, x[key]))
@@ -407,7 +523,18 @@ def run_normalization(vectors, maps, r: Results, authorize_empty) -> None:
                 MappingSalts(by_path),
                 authorize_empty_containers=authorize_empty,
             )
+            if len(by_path) != built.leaf_count:
+                r.bad(
+                    cls,
+                    name,
+                    f"committed salt set has {len(by_path)} entries for "
+                    f"{built.leaf_count} leaves",
+                )
+                roots = []
+                break
             roots.append(built.root.hex())
+        if not roots:
+            continue
         r.check(cls, name, roots[0] == roots[1], x["expectSameRoot"], "same root: ")
         if "root" in x:
             r.check(cls, name, roots[0], x["root"], "root: ")
@@ -446,8 +573,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--references",
-        default=os.path.join(REPO, "references"),
-        help="checkout holding the third-party reference schemata; class 10 needs it",
+        default=os.environ.get("ROAX_REFERENCES") or os.path.join(REPO, "references"),
+        help=(
+            "checkout holding the third-party reference schemata; class 10 needs it "
+            "(default: ROAX_REFERENCES, then repository references/)"
+        ),
     )
     parser.add_argument(
         "--empty-containers",
@@ -464,7 +594,7 @@ def main() -> int:
     args = parser.parse_args()
 
     authorize_empty = args.empty_containers == "authorized"
-    references = args.references if os.path.isdir(args.references) else None
+    references = args.references
 
     corpus = json.load(open(CORPUS, encoding="utf-8"))
     vectors = corpus["vectors"]
@@ -488,8 +618,13 @@ def main() -> int:
             "    structured path and observed kind before EMPTY_ARRAY or EMPTY_OBJECT is\n"
             "    emitted. Run with --empty-containers=authorized to see the difference."
         )
-    if references is None:
-        print("  references        NOT SUPPLIED - class 10 will report SKIPPED")
+    if not references:
+        print(f"  references        NOT RUN - not configured; {REFERENCES_INSTRUCTION}")
+    elif not os.path.isdir(references):
+        print(
+            f"  references        NOT RUN - {os.path.abspath(references)} is not a directory;\n"
+            f"                    {REFERENCES_INSTRUCTION}"
+        )
     else:
         print(f"  references        {references}")
     print()
@@ -540,27 +675,41 @@ def main() -> int:
     run_normalization(vectors.get("normalization", []), maps, r, authorize_empty)
     run_envelope(vectors.get("envelope", []), config, r)
 
-    classes = sorted(set(r.passed) | set(r.failed) | set(r.skipped))
-    print(f"{'class':>5}  {'pass':>6}  {'fail':>6}  {'skip':>6}  status")
+    observed_classes = set(r.passed) | set(r.failed) | set(r.not_run)
+    missing_classes = [cls for cls in EXPECTED_CLASSES if cls not in observed_classes]
+    for cls in missing_classes:
+        r.unavailable(
+            cls,
+            "entire class",
+            "no assertion, failure, or unavailable vector was recorded for this class",
+        )
+
+    classes = sorted(set(EXPECTED_CLASSES) | observed_classes)
+    print(f"{'class':>5}  {'pass':>6}  {'fail':>6}  {'not run':>7}  status")
     total_fail = 0
+    total_not_run = 0
+    classes_passed = 0
     for cls in classes:
-        passed = r.passed[cls]
-        failed = len(r.failed[cls])
-        skipped = len(r.skipped[cls])
+        passed = r.passed.get(cls, 0)
+        failed = len(r.failed.get(cls, ()))
+        not_run = len(r.not_run.get(cls, ()))
         total_fail += failed
-        status = "FAIL" if failed else ("PASS" if passed else "SKIPPED - NOT RUN")
-        if not failed and skipped:
-            status += f" ({skipped} skipped)"
-        print(f"{cls:>5}  {passed:>6}  {failed:>6}  {skipped:>6}  {status}")
+        total_not_run += not_run
+        if failed:
+            status = "FAIL"
+        elif not_run:
+            status = "INCOMPLETE - NOT RUN" if passed else "NOT RUN"
+        elif passed:
+            status = "PASS"
+            classes_passed += 1
+        else:
+            status = "NOT RUN"
+        print(f"{cls:>5}  {passed:>6}  {failed:>6}  {not_run:>7}  {status}")
 
-    missing = [c for c in range(1, 20) if c not in classes]
-    if missing:
-        print(f"\nclasses with no assertions at all: {missing}")
-
-    if r.skipped:
-        print("\nSkipped:")
-        for cls in sorted(r.skipped):
-            for line in r.skipped[cls]:
+    if total_not_run:
+        print("\nNot run:")
+        for cls in sorted(r.not_run):
+            for line in r.not_run[cls]:
                 print(f"  class {cls}: {line}")
 
     if total_fail:
@@ -570,10 +719,23 @@ def main() -> int:
                 print(f"  class {cls}: {line}")
             if not args.verbose and len(r.failed[cls]) > 12:
                 print(f"  class {cls}: ... and {len(r.failed[cls]) - 12} more (--verbose)")
-        print("\nRESULT: FAIL")
+        print(
+            f"\nRESULT: FAIL ({sum(r.passed.values())} passed; {total_fail} failed; "
+            f"{total_not_run} not run; {classes_passed}/19 classes passed)"
+        )
         return 1
 
-    print(f"\nRESULT: PASS ({sum(r.passed.values())} assertions)")
+    if total_not_run:
+        print(
+            f"\nRESULT: INCOMPLETE / NOT RUN ({sum(r.passed.values())} assertions passed; "
+            f"{total_not_run} not run; {classes_passed}/19 classes passed)"
+        )
+        return 2
+
+    print(
+        f"\nRESULT: PASS ({sum(r.passed.values())} assertions; "
+        f"{classes_passed}/19 classes passed; 0 not run)"
+    )
     return 0
 
 

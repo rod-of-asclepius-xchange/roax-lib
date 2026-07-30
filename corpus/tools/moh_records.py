@@ -27,8 +27,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 CORPUS_DIR = os.path.dirname(HERE)
 TYPE_MAP_DIR = os.path.join(CORPUS_DIR, "type-maps")
 
-# One stable record identifier per sample. These are corpus identifiers, not anything the
-# samples carry: `recordId` is an envelope field and is in every salt preimage (section 7).
+
+class NotRunNote(str):
+    """A displayed note that also makes a check incomplete."""
+
+
+# One stable record identifier per sample.
+# These are corpus identifiers, not anything the samples carry: `recordId` is committed as the
+# reserved envelope identity leaf (specification section 11.2), while every salt is an independent
+# draw with no identity preimage (specification section 7).
 RECORD_IDS = {
     "sg.gov.moh.vaccination-healthcert": "urn:uuid:aaaaaaa1-0000-4000-8000-000000000001",
     "sg.gov.moh.pdt-healthcert": "urn:uuid:aaaaaaa2-0000-4000-8000-000000000002",
@@ -39,9 +46,15 @@ RECORD_IDS = {
 def find_src_root(references):
     if not references:
         return None
-    candidate = os.path.join(references, "schemata", "src")
-    if os.path.isdir(candidate):
-        return candidate
+    # Accept the parent layout used by this repository's gitignored `references/schemata`
+    # checkout, the checkout root documented as `--references /path/to/schemata`, and a direct
+    # path to its `src` directory.
+    for candidate in (
+        os.path.join(references, "schemata", "src"),
+        os.path.join(references, "src"),
+    ):
+        if os.path.isdir(candidate):
+            return candidate
     return references if os.path.isdir(references) else None
 
 
@@ -77,8 +90,11 @@ def build_record_vectors(references):
     src_root = find_src_root(references)
     if src_root is None:
         notes.append(
-            "class 10 SKIPPED: no reference checkout supplied (--references / ROAX_REFERENCES). "
-            "The three MOH samples live outside this repository by design."
+            NotRunNote(
+                "class 10 NOT RUN: no reference checkout supplied. "
+                "Rerun with --references <path-to-schemata>; the three MOH samples live outside "
+                "this repository by design."
+            )
         )
         return [], notes
 
@@ -90,19 +106,26 @@ def build_record_vectors(references):
         record_type = profile["recordType"]
         type_map = load_type_map(record_type)
         if type_map is None:
-            notes.append(f"class 10 SKIPPED for {record_type}: no type map in corpus/type-maps")
-            continue
+            raise SystemExit(
+                f"class 10 FAILED for {record_type}: committed corpus type map is missing"
+            )
 
         module = os.path.join(src_root, profile["module"])
         if not os.path.exists(module):
-            notes.append(f"class 10 SKIPPED for {record_type}: {profile['module']} not found")
+            notes.append(
+                NotRunNote(
+                    f"class 10 NOT RUN for {record_type}: {profile['module']} not found under "
+                    f"--references"
+                )
+            )
             continue
         with open(module, "r", encoding="utf-8") as handle:
             try:
                 text = extract(handle.read(), profile["export"])
             except ExtractError as exc:
-                notes.append(f"class 10 SKIPPED for {record_type}: extraction failed - {exc}")
-                continue
+                raise SystemExit(
+                    f"class 10 FAILED for {record_type}: extraction failed - {exc}"
+                ) from exc
         record = json_literal.loads(text)
         record_id = RECORD_IDS[record_type]
         record_file = "references/schemata/src/" + profile["module"] + "#" + profile["export"]

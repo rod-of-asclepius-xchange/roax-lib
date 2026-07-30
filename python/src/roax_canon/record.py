@@ -15,18 +15,20 @@ An implementation that flattens the record only produces a different root.
 
 from __future__ import annotations
 
+from copy import deepcopy
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Iterable, Sequence
 
 from .errors import ErrorCode, InputError, RoaxError
 from .flatten import flatten
 from .hashes import DEFAULT_HASH_ALG, get_hash
+from .jsonio import is_json_string, is_record_type_string, is_uri_string
 from .leaf import SALT_BYTES, Leaf, leaf_hash
 from .path import Key, Segment, display_path, encode_path
 from .text import nfc
 from .tree import merkle_tree_head
-from .typemap import TypeResolver
+from .typemap import DisplayPatternTypeMap, TypeResolver
 from .value import STRING
 
 __all__ = [
@@ -55,6 +57,11 @@ RESERVED_V1 = "envelope-1.0"
 #: 11.2).
 #: No committed corpus vector exercises it; `AGENTS.md` records closing that difference as
 #: corpus-rebuild work.
+#: The constant and :func:`reserved_leaves` retain this structural model for an eventual
+#: artifact-aware implementation.
+#: :func:`build_tree` and :func:`issue` reject it today because specification section 4.2
+#: requires exact structured-path DFA selection by a reproduced content ID, which this
+#: package does not implement.
 RESERVED_V2 = "envelope-2.0"
 
 
@@ -67,8 +74,10 @@ class RecordIdentity:
     are three different roots and only one of them can be right (specification section
     11.2).
 
-    ``type_map_id`` is always emitted under :data:`RESERVED_V2` and is absent under
-    :data:`RESERVED_V1`.
+    ``type_map_id`` is required when :func:`reserved_leaves` models
+    :data:`RESERVED_V2` and is absent from :data:`RESERVED_V1`.
+    The issue and envelope pipelines reject V2 until exact artifact selection is
+    implemented, as the constant's note records.
     """
 
     record_type: str
@@ -77,6 +86,53 @@ class RecordIdentity:
     issuer_id: str
     issuer_key_id: str | None = None
     type_map_id: str | None = None
+
+    def __post_init__(self) -> None:
+        """Reject a JSON-number carrier anywhere an identity requires a string.
+
+        :class:`~roax_canon.jsonio.JsonNumber` subclasses :class:`str`, so annotations
+        and a bare ``isinstance(value, str)`` check both accept it.
+        That would let issuance emit an envelope whose own verifier rejects even though
+        the reserved STRING leaf hashes to the same bytes (specification sections 6.4,
+        11.2 and 11.3).
+        """
+        required = (
+            ("record_type", self.record_type),
+            ("schema_version", self.schema_version),
+            ("record_id", self.record_id),
+            ("issuer_id", self.issuer_id),
+        )
+        optional = (
+            ("issuer_key_id", self.issuer_key_id),
+            ("type_map_id", self.type_map_id),
+        )
+        for field_name, value in required:
+            if not is_json_string(value):
+                raise RoaxError(
+                    ErrorCode.ENVELOPE_SHAPE,
+                    f"RecordIdentity.{field_name} must be a genuine JSON string",
+                )
+            if field_name in ("schema_version", "record_id") and not value:
+                raise RoaxError(
+                    ErrorCode.ENVELOPE_SHAPE,
+                    f"RecordIdentity.{field_name} must not be empty",
+                )
+            if field_name == "record_type" and not is_record_type_string(value):
+                raise RoaxError(
+                    ErrorCode.ENVELOPE_SHAPE,
+                    "RecordIdentity.record_type must be a lowercase reverse-DNS profile name",
+                )
+            if field_name == "issuer_id" and not is_uri_string(value):
+                raise RoaxError(
+                    ErrorCode.ENVELOPE_SHAPE,
+                    "RecordIdentity.issuer_id must be an absolute URI",
+                )
+        for field_name, value in optional:
+            if value is not None and not is_json_string(value):
+                raise RoaxError(
+                    ErrorCode.ENVELOPE_SHAPE,
+                    f"RecordIdentity.{field_name} must be a genuine JSON string when present",
+                )
 
 
 def reserved_leaves(identity: RecordIdentity, *, reserved_set: str = RESERVED_V1) -> list[Leaf]:
@@ -200,18 +256,86 @@ class PositionalSalts(SaltSource):
 
 
 @dataclass(frozen=True, slots=True)
+class _FrozenObject:
+    items: tuple[tuple[str, Any], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _FrozenArray:
+    items: tuple[Any, ...]
+
+
+def _freeze_record(node: Any) -> Any:
+    """Recursively remove every mutable container from an internal record snapshot."""
+    if isinstance(node, dict):
+        return _FrozenObject(tuple((key, _freeze_record(value)) for key, value in node.items()))
+    if isinstance(node, list):
+        return _FrozenArray(tuple(_freeze_record(value) for value in node))
+    return node
+
+
+def _thaw_record(node: Any) -> Any:
+    """Rebuild ordinary JSON containers while preserving scalar carrier types."""
+    if isinstance(node, _FrozenObject):
+        return {key: _thaw_record(value) for key, value in node.items}
+    if isinstance(node, _FrozenArray):
+        return [_thaw_record(value) for value in node.items]
+    return node
+
+
+def _bind_builtin_resolver(identity: RecordIdentity, resolver: TypeResolver) -> None:
+    """Bind the built-in map's declared scope to the identity being committed."""
+    if not isinstance(resolver, DisplayPatternTypeMap):
+        return
+    disagreements = []
+    if resolver.record_type != identity.record_type:
+        disagreements.append(f"recordType {resolver.record_type!r} != {identity.record_type!r}")
+    if resolver.schema_version != identity.schema_version:
+        disagreements.append(
+            f"schemaVersion {resolver.schema_version!r} != {identity.schema_version!r}"
+        )
+    if disagreements:
+        raise RoaxError(
+            ErrorCode.TYPE_MAP_REJECTED,
+            f"{resolver.source}: type-map metadata does not match the record identity: "
+            + "; ".join(disagreements)
+            + " (specification sections 4.2 and 12.1)",
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class BuiltRecord:
-    """The result of committing a record: the ordered leaves, their hashes and the root."""
+    """A commitment together with the exact context from which it was issued.
+
+    Envelope construction derives the original record, identity, hash algorithm and
+    reserved leaf set from this object.
+    It accepts no replacement context, because mixing independently safe values from two
+    issuances can produce an envelope whose own verifier rejects at outer-identity
+    binding (specification sections 10 and 11.3).
+
+    The private record snapshot recursively replaces mutable containers, and
+    :meth:`record_copy` reconstructs fresh JSON containers for each caller.
+    That preserves :class:`~roax_canon.jsonio.JsonNumber` while preventing mutation of
+    the caller's record, or of one emitted full copy, from changing a later envelope.
+    """
 
     leaves: tuple[Leaf, ...]
     encoded_paths: tuple[bytes, ...]
     salts: tuple[bytes, ...]
     leaf_hashes: tuple[bytes, ...]
     root: bytes
+    identity: RecordIdentity
+    hash_alg: str
+    reserved_set: str
+    _record_snapshot: Any = field(repr=False, compare=False)
 
     @property
     def leaf_count(self) -> int:
         return len(self.leaves)
+
+    def record_copy(self) -> Any:
+        """Return an isolated copy of the exact record committed into this root."""
+        return _thaw_record(self._record_snapshot)
 
     def index_of(self, segments: Sequence[Segment]) -> int:
         """The leaf index for a path, or raise."""
@@ -236,8 +360,26 @@ def build_tree(
 
     This is the whole of steps (A) through (D) of specification section 3.1.
     """
+    if reserved_set == RESERVED_V2:
+        raise RoaxError(
+            ErrorCode.TYPE_MAP_REJECTED,
+            "envelope 2.0 issuance requires exact structured-path DFA artifact loading "
+            "and content-ID reproduction, which this package does not implement "
+            "(specification section 4.2)",
+        )
+    if not isinstance(record, dict):
+        raise RoaxError(
+            ErrorCode.ENVELOPE_SHAPE,
+            "a full-copy record must be a JSON object " "(schemas/envelope-1.0.json:118-120)",
+        )
+    _bind_builtin_resolver(identity, resolver)
+    record_snapshot = deepcopy(record)
     hasher = get_hash(hash_alg)
-    record_leaves = flatten(record, resolver, authorize_empty_containers=authorize_empty_containers)
+    record_leaves = flatten(
+        record_snapshot,
+        resolver,
+        authorize_empty_containers=authorize_empty_containers,
+    )
     all_leaves = record_leaves + reserved_leaves(identity, reserved_set=reserved_set)
     ordered = order_leaves(all_leaves)
 
@@ -249,7 +391,17 @@ def build_tree(
         for leaf, salt in zip(leaves, drawn)
     )
     root = merkle_tree_head(hashes, hasher=hasher)
-    return BuiltRecord(leaves, encoded_paths, drawn, hashes, root)
+    return BuiltRecord(
+        leaves=leaves,
+        encoded_paths=encoded_paths,
+        salts=drawn,
+        leaf_hashes=hashes,
+        root=root,
+        identity=identity,
+        hash_alg=hasher.name,
+        reserved_set=reserved_set,
+        _record_snapshot=_freeze_record(record_snapshot),
+    )
 
 
 def issue(
