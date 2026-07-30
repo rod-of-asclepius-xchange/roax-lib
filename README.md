@@ -26,7 +26,7 @@ The Go, Swift and Kotlin libraries have not been added.
 | [`docs/conformance-corpus.md`](docs/conformance-corpus.md) | What cross-language agreement has to be proven against, and why that is a release gate rather than decoration. |
 | [`schemas/`](schemas/) | JSON Schemas for the envelope, the type map and the conformance corpus. |
 | [`rust/`](rust/) | The independent Rust implementation, its protocol boundaries and validation commands. |
-| [`python/`](python/) | The independent Python implementation, standard library only. [`python/FINDINGS.md`](python/FINDINGS.md) records where it disagreed with the corpus and where the specification was ambiguous. |
+| [`python/`](python/) | The independent Python implementation, standard library only. [`python/FINDINGS.md`](python/FINDINGS.md) records what that build found. |
 
 ## Why not OpenAttestation
 

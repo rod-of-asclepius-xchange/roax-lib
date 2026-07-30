@@ -9,7 +9,7 @@ Specification, schemas, the conformance corpus, and three of the five ruled libr
 Decision D was ruled to five independent, corpus-enforced libraries on 2026-07-29 (`docs/decisions.md`, decision D).
 The specifications came first so the design could be reviewed before five language implementations existed to be re-litigated, and that ordering held.
 `rust/README.md` owns that crate's protocol boundaries, its build, test and lint commands, and the open-decision behaviour it preserves.
-`python/README.md` owns that package's surface, its standalone corpus runner, its test commands and its per-class figures, and `python/FINDINGS.md` records the divergences and ambiguities found while building it.
+`python/README.md` owns that package's surface, its standalone corpus runner, its test commands and its per-class figures, and `python/FINDINGS.md` records what that build found.
 
 Do not add the Go, Swift or Kotlin library without an explicit instruction to do so.
 

@@ -15,8 +15,8 @@ Importing the package on an older interpreter raises a `RuntimeError` naming tha
 ## Read this first
 
 [`FINDINGS.md`](FINDINGS.md) is the more valuable half of this deliverable.
-It records the divergences, ambiguities, confirmations and Python-specific hazards documented
-during this build, with the measurement behind each.
+It records the specification defects, divergences, ambiguities, confirmations and
+Python-specific hazards documented during this build, with the measurement behind each.
 
 ## Why it is written from the specification
 
