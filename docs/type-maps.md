@@ -301,9 +301,10 @@ The map reaches 678 of 680 definitions; unused named primitives `oid` and `uuid`
 
 Full FHIR's 574 scalar outputs are 34 BOOL, 458 STRING, 61 INTEGER and 21 DECIMAL.
 PDT and recovery each expose 7 BOOL, 80 STRING, 9 INTEGER and 2 DECIMAL outputs.
-Vaccination exposes 81 STRING outputs and no numeric output because `dose` is unresolved.
+Vaccination exposes 81 STRING outputs and no numeric output, and every figure in this table is measured on the PUBLISHED artifact bytes, which do not carry the 2026-07-30 rulings.
+So `dose` is still counted unresolved here even though it is ruled INTEGER, and the corpus-side map class 10 resolves against does carry it; section 1.6 owns that difference.
 No artifact emits NULL, BYTES or BLOB_REF.
-No version-1 profile selects BLOB_REF, as ruled by decision D9 and defined in ROAX-CANON/1 section 6.5.
+That sentence is measured rather than aspirational, and it remains true after the rulings for three different reasons: the ruled FHIR primitive-array null-placeholder outcome IS "publish no NULL binding", so the absence of NULL is the ruling being in force; BYTES is absent because the `base64Binary` ruling is not in these bytes yet; and no version-1 profile selects BLOB_REF, as ruled by decision D9 and defined in ROAX-CANON/1 section 6.5.
 
 The earlier estimate of 15 lite-FHIR decimal sites omitted inline `Extension.valueDecimal`.
 The audited source has 15 decimal `$ref` slots plus that inline field, for 16 schema-local decimal slots.
