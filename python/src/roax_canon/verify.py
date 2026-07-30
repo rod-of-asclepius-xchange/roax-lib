@@ -656,8 +656,10 @@ def _decode_carrier(tag: int, value: Any) -> Any:
     carriers at tag 2, so the successful STRING path is corpus-exercised.
     None replaces one of those strings with a hostile JSON number, and none carries a
     disclosed value at tag 3, 4 or 5.
-    No version-1 profile binds `BYTES`, because the healthcert blob fields bind STRING and
-    FHIR ``base64Binary`` is unresolved (specification section 6.3).
+    No version-1 published profile binds `BYTES` yet: the healthcert blob fields bind
+    STRING, and FHIR ``base64Binary`` was RULED `BYTES` over the decoded octets on
+    2026-07-30, but that ruling is not in the published ``type-maps/`` artifacts because
+    regeneration is blocked (docs/type-maps.md section 1.6).
     The `BYTES` decoder exists because :func:`roax_canon.disclose.disclosed_copy` emits
     that carrier, and an encoder without a decoder is a round trip that does not close.
     """
