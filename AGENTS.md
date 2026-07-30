@@ -105,7 +105,7 @@ These are the things a future agent is most likely to get wrong.
   The Rust artifact loader follows the executable checker for that demonstrated edge (`rust/src/type_map.rs:1200-1202`; `rust/tests/published_type_maps.rs:518-532`).
 
 - **Issuer-scope membership does not state a Unicode comparison rule.**
-  The specification requires the disclosed issuer identity to be a member of `scope.issuerIds`, while the executable extension checker compares inherited scope strings byte-for-byte and neither source says whether to NFC-normalize the membership check (`docs/spec/roax-canon-1.md:1162-1164`; `tools/check-type-map-extension.mjs:890-900`).
+  The specification requires the disclosed issuer identity to be a member of `scope.issuerIds`, while the executable extension checker compares inherited scope strings byte-for-byte and neither source says whether to NFC-normalize the membership check (`docs/spec/roax-canon-1.md:911-912`; `tools/check-type-map-extension.mjs:890-900`).
   The Rust loader rejects every issuer child artifact until it has exact parent/additivity inputs, so this ambiguity cannot silently select an issuer in the current API.
 
 - **An extension point does not open the whole subtree beneath it.**
@@ -119,8 +119,9 @@ These are the things a future agent is most likely to get wrong.
   A child must carry every inherited row unchanged except for kinds it resolves with a binding - it may not invent a row, restate one with its own evidence, or drop one it did not resolve.
   Do not describe them as purely non-operative anywhere.
 
-- **`tools/check-type-maps.mjs` is the only checker that runs against the committed tree.**
+- **`tools/check-type-maps.mjs` is the only TYPE-MAP checker that runs against the committed tree.**
   `build-type-maps.mjs --check` needs the gitignored reference checkout and still fails closed on the 34 object-branch disagreements once it has one; this one needs neither and passes.
+  It was the only checker of any kind that ran against the committed tree until `tools/reflow-markdown.mjs` was added, which also needs nothing outside the tree and also passes on it; the qualifier is there so the two do not read as a contradiction.
   It recomputes the content IDs, validates the four artifacts and the registry against their JSON Schemas, exercises both branches of the artifact schema's `parentTypeMapId` conditional in both directions, reuses `validateArtifact` from the extension checker rather than re-encoding the carrier rules, and pins a set of operative and fail-closed bindings.
   It needs Ajv 8 and `ajv-formats` installed outside the tree and named by `ROAX_AJV`; `--skip-schema-validation` runs the dependency-free subset.
   See `docs/type-maps.md` section 6.
@@ -321,10 +322,17 @@ Things to know:
   Use a plain hyphen.
 - In long Markdown, put each full sentence on its own line.
   It keeps diffs readable when a single sentence changes.
-  This is the target rather than a description of the repository as it stands.
-  The files here are currently hard-wrapped at roughly 100 columns and put several sentences on a line, so adoption is incremental.
-  Hold new and substantially rewritten prose to the convention.
+  **Every Markdown file in the tree now holds to this**, measured at zero prose lines carrying more than one sentence, against 932 before the tree was reflowed; code blocks, tables and headings are excluded from that measure because a line of code and a table row are not sentences.
+  An earlier version of this section described the convention as a target that the repository did not yet meet, and it was true when written.
+  `tools/reflow-markdown.mjs` is the executable form of the rule rather than a description of it, so what gets applied is readable rather than reconstructed from a diff.
+  Run `node tools/reflow-markdown.mjs` to check and `--write` to apply, `--self-test` for the sentence-splitter cases, and `--verify-render` to additionally compare rendered HTML before and after.
+  It is zero-dependency except for `--verify-render`, which takes markdown-it 14 from `ROAX_MARKDOWN_IT` outside the tree exactly as the schema tooling takes Ajv 8 from `ROAX_AJV`, and reports NOT RUN with exit 2 when it is absent.
+  The reflow was verified against markdown-it 14.3.0, so name the major version when you re-run it: a later one could move the comparison baseline without saying so.
+  It fails closed on any construct it does not model rather than guessing at one, and a second run is a no-op, so it does not churn future diffs.
+  `docs/type-maps.md` is the single exclusion and is a named constant in the tool: separate in-flight work owns that file and reflows its own prose to this same convention, so remove the entry once that lands.
+  Hold new and substantially rewritten prose to the convention, and reach for the tool rather than rewrapping by hand.
   Do not reflow a file wholesale as a side effect of an unrelated change, because the cosmetic diff buries the real one.
+  That should not arise now that the tree conforms, since a change that edits one sentence rewrites one line.
 - **Every normative claim carries a citation:** specification name, version and section for standards; file and line for code.
   Where something is inferred rather than confirmed, the text says so in the sentence.
   Keep this - the documents are written to be checkable rather than trusted, and a reader who spot-checks one uncited claim loses confidence in all of them.
