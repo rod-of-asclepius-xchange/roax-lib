@@ -491,7 +491,7 @@ ROAX_AJV=/tmp/roax-ajv node tools/check-type-maps.mjs
 
 That checker recomputes every content ID from the exact bytes, validates the four artifacts and `type-maps/registry-1.0.0.json` against `schemas/type-map-artifact-1.0.json` and `schemas/type-map-registry-1.0.json`, exercises both branches of the artifact schema's `parentTypeMapId` conditional with a valid child instance and with instances each branch must reject, applies the shared carrier validation in `tools/check-type-map-extension.mjs` so the carrier invariants have one executable encoding, re-verifies the pinned repository, path and commit of every source and binding reference, and asserts a fixed set of operative and fail-closed path bindings.
 
-It needs Ajv 8 and `ajv-formats` installed outside this tree, because the repository deliberately carries no npm package manifest:
+It needs Ajv 8 and `ajv-formats` installed outside this tree, because the root `package.json` is the TypeScript library's rather than a place to add schema tooling (`AGENTS.md`, "Validating the schemas"):
 
 ```sh
 npm install --prefix /tmp/roax-ajv ajv ajv-formats

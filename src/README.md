@@ -11,7 +11,8 @@ the specification admitted two honest readings.
 
 ## Why this exists and what it is not
 
-This is the first of the five independent libraries.
+This is the second of the five independent libraries, after the Rust crate under
+[`rust/`](../rust).
 It was written from the specification text, and `corpus/tools/roax_ref.py`,
 `corpus/tools/roax_ref.mjs` and `corpus/tools/check_corpus.mjs` were deliberately not read while
 writing it.

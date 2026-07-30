@@ -337,6 +337,13 @@ Recorded so a passing run does not read as coverage it does not have.
   cases, an issue-disclose-parse-verify round trip under a synthetic tag-5 map that emits
   `00010203`, empty bytes carried the whole way as `""`, and a check of the emitted carrier against
   the tag-5 pattern read out of both live envelope schema files rather than restated in the test.
+  **One value in that round trip is letter-bearing on purpose**, `q83v` emitting `abcdef`, because
+  `00010203` and `""` are unchanged by `toUpperCase` and so satisfy every other assertion here even
+  if `toHex` emits uppercase nibbles - which the case-sensitive schema pattern would then reject.
+  Measured rather than reasoned about: uppercasing the carrier in `carrierFromJson` fails exactly
+  those two tests, 34 passed and 2 failed, both on `envelope-malformed: a BYTES value is not
+  lowercase hex of even length`. That the same mutation left the suite green BEFORE this value was
+  added to the fixture is the measurement recorded in the commit that added it, not one re-run here.
 
 ---
 
