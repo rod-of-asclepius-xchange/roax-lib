@@ -333,7 +333,7 @@ A scalar emits itself.
 An empty map and an empty array each emit one leaf at their own path, as EMPTY_OBJECT and EMPTY_ARRAY respectively.
 A non-empty container recurses until it reaches a scalar or an empty container, so it contributes at least one.
 There is therefore no record that contributes zero leaves of its own, and the MUST has no reachable case.
-The tree floor of 6 that the same paragraph derives is consequently reached by every record rather than approached by some.
+The tree floor of 6 that the same paragraph derives is consequently reached by every record rather than approached by some, counting section 11.2's five reserved leaves rather than the four the committed envelope 1.0 emits, which is item 2 above.
 
 **Reproduced, measured on CPython 3.13.5.**
 `flatten` in structural mode, which is `authorize_empty_containers=False` and the mode `python/tools/run_corpus.py` documents as its default:
@@ -346,7 +346,7 @@ The tree floor of 6 that the same paragraph derives is consequently reached by e
 One leaf, not zero, which is the whole of the defect: the guarded state does not exist.
 
 **Two conditions on that reproduction, both measured rather than assumed, because an unconditioned version of this claim would be wrong.**
-The `[]` row is a `flatten` result and not an issuable record: a full copy's record body must be a JSON object under specification section 7.3, so `[]` as a whole record is refused at issuance with `envelope-shape` before the leaf count is ever consulted.
+The `[]` row is a `flatten` result and not an issuable record: specification section 11.1 shapes `record` as an object present in a full copy only (`docs/spec/roax-canon-1.md:1330-1331`) and requires exactly one of `record` and `disclosure` (`docs/spec/roax-canon-1.md:1402`), and `schemas/envelope-1.0.json:118-120` types it `"object"`, so `[]` as a whole record is refused at issuance with `envelope-shape` before the leaf count is ever consulted.
 And `{}` commits but does not verify unconditionally.
 `build_tree(loads("{}"), ..., authorize_empty_containers=False)` yields a 5-leaf tree with a root, so the record is anchored rather than rejected, which is what section 3.3 forbids.
 `verify_envelope(full_copy(built))` then returns accepted with reason `ok` **only when the verifier carries the same structural setting**, `VerifierConfig(authorize_empty_containers=False)`.
