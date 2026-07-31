@@ -27,7 +27,10 @@ enum class TypeTag(val code: Int) {
         private val BY_CODE = entries.associateBy { it.code }
 
         fun ofCode(code: Int): TypeTag =
-            BY_CODE[code] ?: throw IllegalArgumentException("no ROAX type tag with code $code")
+            ofCodeOrNull(code) ?: throw IllegalArgumentException("no ROAX type tag with code $code")
+
+        /** The total form, for a caller that must report an unknown code through a [Reason]. */
+        fun ofCodeOrNull(code: Int): TypeTag? = BY_CODE[code]
     }
 }
 

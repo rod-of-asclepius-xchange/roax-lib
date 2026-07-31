@@ -112,13 +112,33 @@ private fun flatten(
     }
 }
 
+/**
+ * The one place a tag enters the flattener, so section 6.5's refusal of tag 8 is stated once.
+ *
+ * Both type-map loaders here reject an artifact that binds `BLOB_REF`, but [TypeResolver] is public
+ * API, so a caller's own resolver reaches this path without passing either loader. Checking after
+ * the lookup and before anything is done with the tag is what makes the refusal report
+ * `blob-ref-not-declared` rather than whatever the tag fails to carry.
+ */
+private fun resolveTag(segments: List<Segment>, kind: JsonKind, options: FlattenOptions): TypeTag? {
+    val tag = options.resolver.resolve(segments, kind) ?: return null
+    if (tag == TypeTag.BLOB_REF) {
+        fail(
+            Reason.BLOB_REF_NOT_DECLARED,
+            "${displayPath(segments)} resolves to tag 8 BLOB_REF, which no version-1 profile " +
+                "declares (specification section 6.5)",
+        )
+    }
+    return tag
+}
+
 private fun emptyContainerTag(
     segments: List<Segment>,
     kind: JsonKind,
     options: FlattenOptions,
 ): TypeTag {
     val fallback = if (kind == JsonKind.ARRAY) TypeTag.EMPTY_ARRAY else TypeTag.EMPTY_OBJECT
-    val resolved = options.resolver.resolve(segments, kind)
+    val resolved = resolveTag(segments, kind, options)
     if (resolved != null) {
         if (resolved != fallback) {
             fail(
@@ -137,7 +157,7 @@ private fun emptyContainerTag(
 
 private fun scalarLeaf(node: JsonValue, segments: List<Segment>, options: FlattenOptions): FlatLeaf {
     val kind = JsonKind.of(node)
-    val tag = options.resolver.resolve(segments, kind) ?: failClosed(segments, kind)
+    val tag = resolveTag(segments, kind, options) ?: failClosed(segments, kind)
 
     // The tag comes from the schema, not from the JSON literal's syntax (section 4). What is
     // checked here is only that the tag can CARRY the observed kind: a map that bound a string
@@ -171,13 +191,6 @@ private fun scalarLeaf(node: JsonValue, segments: List<Segment>, options: Flatte
         else -> throw IllegalStateException("container reached the scalar path")
     }
 
-    if (tag == TypeTag.BLOB_REF) {
-        fail(
-            Reason.BLOB_REF_NOT_DECLARED,
-            "${displayPath(segments)} resolves to tag 8 BLOB_REF, which no version-1 profile " +
-                "declares (specification section 6.5)",
-        )
-    }
     return FlatLeaf(segments, tag, value)
 }
 

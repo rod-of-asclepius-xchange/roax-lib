@@ -76,10 +76,13 @@ object Corpus {
      * `docs/typescript-implementation-findings.md`, and it is the reason
      * [io.roax.canon.TypeResolver] is an interface.
      */
-    private val typeMaps = HashMap<String, TypeResolver>()
+    // Keyed on the [Nfc] INSTANCE as well as the record type. Two normalizers can report the same
+    // Unicode version and still disagree - `RawNfc` reports one and normalizes nothing - so a cache
+    // hit that ignored the requested one would hand a D14a test the opposite matcher and pass.
+    private val typeMaps = HashMap<Pair<String, Nfc>, TypeResolver>()
 
     fun typeMap(recordType: String, nfc: Nfc = PlatformNfc): TypeResolver =
-        typeMaps.getOrPut(recordType) {
+        typeMaps.getOrPut(recordType to nfc) {
             DisplayPatternTypeMap.load(bytes("corpus/type-maps/$recordType.json"), nfc)
         }
 

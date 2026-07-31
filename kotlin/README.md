@@ -21,7 +21,7 @@ gradle -p kotlin :roax-canon:test
 ```
 
 That runs the corpus and every other test.
-Four class-10 vectors need the three Singapore MOH sample records, which live in a third-party checkout outside this repository by design.
+Four class-10 vectors need the two Singapore MOH sample records, recovery and vaccination, each asserted with and without an issuer key id; both live in a third-party checkout outside this repository by design.
 Without them those four report **NOT RUN**, naming the exact directory and filenames probed; they are never counted as passed.
 
 To run them, extract the records first with the corpus's own utility and point `ROAX_REFERENCE_RECORDS` at the output directory:

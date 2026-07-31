@@ -124,12 +124,10 @@ class EnvelopeProfileV2Test {
 
         // Withhold `roax.typeMap.id`. Under V2 the outer-identity binding fires, exactly as it does
         // for the other four reserved leaves - the binding subsumes the reserved half of the floor.
-        val without = EnvelopeWriter.disclosedCopy(commitment.disclose(floor.dropLast(3) + floor.drop(3), nfc), nfc)
         val stripped = EnvelopeWriter.disclosedCopy(
             commitment.disclose(floor.filter { it != listOf(Segment.Key(Reserved.TYPE_MAP_ID)) }, nfc),
             nfc,
         )
-        assertTrue(without.isNotEmpty())
         val rejected = EnvelopeVerifier.verify(stripped.toByteArray(), configV2())
         assertTrue(rejected is VerificationResult.Rejected)
         assertEquals(

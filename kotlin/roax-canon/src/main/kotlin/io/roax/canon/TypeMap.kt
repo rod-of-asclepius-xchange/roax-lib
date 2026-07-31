@@ -23,7 +23,10 @@ enum class JsonKind(val label: String) {
         private val BY_LABEL = entries.associateBy { it.label }
 
         fun ofLabel(label: String): JsonKind =
-            BY_LABEL[label] ?: throw IllegalArgumentException("unknown JSON kind '$label'")
+            ofLabelOrNull(label) ?: throw IllegalArgumentException("unknown JSON kind '$label'")
+
+        /** The total form, for a caller that must report an unknown label through a [Reason]. */
+        fun ofLabelOrNull(label: String): JsonKind? = BY_LABEL[label]
 
         fun of(value: JsonValue): JsonKind = when (value) {
             is JsonString -> STRING
@@ -53,6 +56,26 @@ enum class JsonKind(val label: String) {
 interface TypeResolver {
     fun resolve(segments: List<Segment>, kind: JsonKind): TypeTag?
 }
+
+/**
+ * Reads a `tag` literal out of a type-map artifact, refusing through the [Reason] taxonomy.
+ *
+ * The 1024-digit bound [Numbers.canonicalInteger] enforces is far wider than an `Int`, so a
+ * twenty-digit literal reaches the conversion intact: the overflow is caught here rather than
+ * assumed away by the bound. An artifact is parsed before its content ID can authenticate it, so
+ * every defect in one has to be reportable.
+ */
+private fun artifactTag(literal: String, where: String): TypeTag {
+    val code = Numbers.canonicalInteger(literal).toIntOrNull()
+        ?: fail(Reason.JSON_SYNTAX, "$where declares tag $literal, which is no ROAX type tag")
+    return TypeTag.ofCodeOrNull(code)
+        ?: fail(Reason.JSON_SYNTAX, "$where declares tag $code, which is no ROAX type tag")
+}
+
+/** Reads a `jsonKind` label out of a type-map artifact, refusing through the [Reason] taxonomy. */
+private fun artifactKind(label: String, where: String): JsonKind =
+    JsonKind.ofLabelOrNull(label)
+        ?: fail(Reason.JSON_SYNTAX, "$where declares jsonKind '$label', which is no JSON kind")
 
 /**
  * The **operative** resolver: the structured-path DFA of `schemas/type-map-artifact-1.0.json`,
@@ -171,7 +194,7 @@ class DfaTypeMap private constructor(
                         ?: fail(Reason.JSON_SYNTAX, "binding has no 'jsonKind'")
                     val tagLiteral = (binding["tag"] as? JsonNumber)?.literal
                         ?: fail(Reason.JSON_SYNTAX, "binding has no 'tag'")
-                    val tag = TypeTag.ofCode(Numbers.canonicalInteger(tagLiteral).toInt())
+                    val tag = artifactTag(tagLiteral, "state $id")
                     if (tag == TypeTag.BLOB_REF) {
                         fail(
                             Reason.BLOB_REF_NOT_DECLARED,
@@ -179,7 +202,7 @@ class DfaTypeMap private constructor(
                                 "(specification section 6.5)",
                         )
                     }
-                    val kind = JsonKind.ofLabel(kindLabel)
+                    val kind = artifactKind(kindLabel, "state $id")
                     if (bindings.put(kind, tag) != null) {
                         // The DFA intentionally carries no first-match rule.
                         fail(
@@ -316,7 +339,7 @@ class DisplayPatternTypeMap private constructor(
                     ?: fail(Reason.JSON_SYNTAX, "entry has no 'pattern'")
                 val tagLiteral = (entry["tag"] as? JsonNumber)?.literal
                     ?: fail(Reason.JSON_SYNTAX, "entry has no 'tag'")
-                val tag = TypeTag.ofCode(Numbers.canonicalInteger(tagLiteral).toInt())
+                val tag = artifactTag(tagLiteral, "pattern '$pattern'")
                 if (tag == TypeTag.BLOB_REF) {
                     fail(
                         Reason.BLOB_REF_NOT_DECLARED,
@@ -324,7 +347,8 @@ class DisplayPatternTypeMap private constructor(
                             "declares (specification section 6.5)",
                     )
                 }
-                val kind = (entry["jsonKind"] as? JsonString)?.value?.let { JsonKind.ofLabel(it) }
+                val kind = (entry["jsonKind"] as? JsonString)?.value
+                    ?.let { artifactKind(it, "pattern '$pattern'") }
                 Entry(tokenize(pattern, nfc), kind, tag, pattern)
             }
 
@@ -343,12 +367,21 @@ class DisplayPatternTypeMap private constructor(
          * The notation cannot address a key containing `.`, `[` or `]` - keys section 5
          * deliberately admits with no rejection rule - which is the fifth ambiguity
          * `corpus/README.md` records. An ambiguous pattern is **rejected** rather than mis-parsed.
+         *
+         * An **empty component** is one of those: display notation cannot address an empty key at
+         * all, so a leading `.`, an interior `..` and a trailing `.` are refused rather than
+         * dropped. Dropping one would compile a pattern the author never wrote - `a..b` would bind
+         * the two-segment path `a.b` - and a fail-closed resolver silently widening its own path
+         * language is decision D7 defeated from inside the map.
          */
         private fun tokenize(pattern: String, nfc: Nfc): List<Token> {
             val tokens = ArrayList<Token>()
             val current = StringBuilder()
             var i = 0
             var sawKeyChar = false
+            // What separates `a..b` from `entry[0].fullUrl`, where the `.` after a `]` also arrives
+            // with no pending key characters: there, the preceding component is the index token.
+            var justClosedIndex = false
 
             fun flushKey() {
                 val raw = current.toString()
@@ -364,15 +397,22 @@ class DisplayPatternTypeMap private constructor(
             while (i < pattern.length) {
                 when (val c = pattern[i]) {
                     '.' -> {
-                        if (!sawKeyChar && current.isEmpty() && tokens.isEmpty()) {
-                            fail(Reason.JSON_SYNTAX, "pattern '$pattern' starts with '.'")
+                        if (!sawKeyChar && !justClosedIndex) {
+                            if (tokens.isEmpty()) {
+                                fail(Reason.JSON_SYNTAX, "pattern '$pattern' starts with '.'")
+                            }
+                            fail(Reason.JSON_SYNTAX, "pattern '$pattern' has an empty component")
                         }
-                        if (sawKeyChar || current.isNotEmpty()) flushKey()
+                        if (sawKeyChar) flushKey()
+                        justClosedIndex = false
                         i++
                     }
 
                     '[' -> {
-                        if (sawKeyChar || current.isNotEmpty()) flushKey()
+                        if (!sawKeyChar && !justClosedIndex && tokens.isNotEmpty()) {
+                            fail(Reason.JSON_SYNTAX, "pattern '$pattern' has an empty component")
+                        }
+                        if (sawKeyChar) flushKey()
                         val close = pattern.indexOf(']', i)
                         if (close < 0) fail(Reason.JSON_SYNTAX, "pattern '$pattern' has an unclosed '['")
                         val inner = pattern.substring(i + 1, close)
@@ -380,15 +420,27 @@ class DisplayPatternTypeMap private constructor(
                             if (inner == "*") {
                                 Token.AnyIndex
                             } else {
+                                // ASCII digits only, tested explicitly: a numeric parse admits the
+                                // signs `[+1]` and `[-1]`, the second of which is an index no
+                                // record can carry and so a permanently dead binding, and
+                                // `Char.isDigit` admits every Unicode decimal digit.
+                                if (inner.isEmpty() || inner.any { it !in '0'..'9' }) {
+                                    fail(
+                                        Reason.JSON_SYNTAX,
+                                        "pattern '$pattern' has a non-numeric index '[$inner]'",
+                                    )
+                                }
                                 val n = inner.toLongOrNull()
                                     ?: fail(
                                         Reason.JSON_SYNTAX,
-                                        "pattern '$pattern' has a non-numeric index '[$inner]'",
+                                        "pattern '$pattern' has an index '[$inner]' too large to " +
+                                            "name any array element",
                                     )
                                 Token.LiteralIndex(n)
                             },
                         )
                         i = close + 1
+                        justClosedIndex = true
                     }
 
                     ']' -> fail(Reason.JSON_SYNTAX, "pattern '$pattern' has an unmatched ']'")
@@ -396,11 +448,16 @@ class DisplayPatternTypeMap private constructor(
                     else -> {
                         current.append(c)
                         sawKeyChar = true
+                        justClosedIndex = false
                         i++
                     }
                 }
             }
-            if (sawKeyChar || current.isNotEmpty()) flushKey()
+            if (sawKeyChar) {
+                flushKey()
+            } else if (!justClosedIndex && tokens.isNotEmpty()) {
+                fail(Reason.JSON_SYNTAX, "pattern '$pattern' ends with '.'")
+            }
             return tokens
         }
     }

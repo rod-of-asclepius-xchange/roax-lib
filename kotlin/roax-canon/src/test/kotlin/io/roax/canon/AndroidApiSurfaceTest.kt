@@ -15,7 +15,8 @@ import java.util.TreeSet
  * the Android Gradle Plugin and it compiled" - needs an SDK, a licence acceptance and a network,
  * none of which this repository has in CI (there is no CI at all). So the check is done directly on
  * the bytecode: every JDK type the class files reference is compared against an allow-list of types
- * that exist in the Android runtime, and the class-file version is asserted to be the Java 11 floor.
+ * that exist in the Android runtime - plus the two `java.lang.invoke` bootstrap types D8 rewrites
+ * away, named individually below - and the class-file version is asserted to be the Java 11 floor.
  *
  * This is what actually catches the two mistakes that would break the Android build:
  * `java.util.Base64` (API 26+) and `java.util.HexFormat` (absent entirely), both of which are easy
@@ -24,36 +25,71 @@ import java.util.TreeSet
 class AndroidApiSurfaceTest {
 
     /**
-     * JDK packages and types this library may reference, all present on Android API 21+.
+     * The JDK types this library may reference, named EXACTLY, each present on Android API 21+.
      *
-     * Kept as a deliberately short list rather than a broad package allowance: the point is that
-     * the surface is small enough to enumerate, and a new entry should be a decision rather than an
-     * accident.
+     * Exact rather than by package prefix, because a prefix cannot enforce the claim built on it:
+     * `java/lang/` would admit `java/lang/StackWalker`, `java/lang/Runtime$Version` and the whole
+     * `java/lang/invoke` tree, none of which API 21 has, and the allowance would then have to be
+     * remembered rather than checked. The list is short on purpose: a new entry is a decision.
      */
-    private val allowedPrefixes = listOf(
-        "java/lang/",
+    private val allowedTypes = setOf(
+        "java/lang/Boolean",
+        "java/lang/CharSequence",
+        "java/lang/Character",
+        "java/lang/Enum",
+        "java/lang/IllegalArgumentException",
+        "java/lang/IllegalStateException",
+        "java/lang/Integer",
+        "java/lang/Iterable",
+        "java/lang/Long",
+        "java/lang/Math",
+        "java/lang/NoSuchFieldError",
+        "java/lang/Number",
+        "java/lang/Object",
+        "java/lang/RuntimeException",
+        "java/lang/String",
+        "java/lang/StringBuilder",
+        "java/lang/System",
         "java/io/IOException",
         "java/nio/ByteBuffer",
         "java/nio/CharBuffer",
-        "java/nio/charset/",
+        "java/nio/charset/CharacterCodingException",
+        "java/nio/charset/Charset",
+        "java/nio/charset/CharsetDecoder",
+        "java/nio/charset/CodingErrorAction",
+        "java/nio/charset/StandardCharsets",
         "java/security/MessageDigest",
-        "java/security/SecureRandom",
         "java/security/NoSuchAlgorithmException",
+        "java/security/SecureRandom",
         "java/text/Normalizer",
-        "java/util/List",
-        "java/util/Map",
-        "java/util/Set",
-        "java/util/Collection",
-        "java/util/Iterator",
+        "java/text/Normalizer\$Form",
         "java/util/ArrayList",
+        "java/util/Arrays",
+        "java/util/Collection",
+        "java/util/Comparator",
         "java/util/HashMap",
         "java/util/HashSet",
+        "java/util/Iterator",
         "java/util/LinkedHashMap",
         "java/util/LinkedHashSet",
-        "java/util/Arrays",
-        "java/util/Objects",
+        "java/util/List",
+        "java/util/Map",
         "java/util/NoSuchElementException",
-        "java/util/Comparator",
+        "java/util/Objects",
+        "java/util/Set",
+
+        // The one class of entry that is NOT on API 21, and it is admitted deliberately rather
+        // than by accident. These two appear only as `invokedynamic` bootstrap references, which
+        // the Kotlin compiler emits for SAM conversion and for string concatenation at JVM target
+        // 9 and above. D8 rewrites both away while building the APK - lambdas into classes and
+        // concatenation into StringBuilder - so neither reaches a device. A THIRD bootstrap type
+        // appearing here would be a new fact about the build, so it fails until someone checks it.
+        "java/lang/invoke/LambdaMetafactory",
+        "java/lang/invoke/StringConcatFactory",
+    )
+
+    /** Package trees whose contents ship with the app rather than with the platform. */
+    private val allowedPackages = listOf(
         "kotlin/",
         "org/jetbrains/annotations/",
         "io/roax/canon/",
@@ -68,6 +104,8 @@ class AndroidApiSurfaceTest {
         "java/util/function/" to "API 24+",
         "java/util/Optional" to "API 24+",
         "java/lang/ProcessHandle" to "absent on Android",
+        "java/lang/StackWalker" to "JDK 9+ only, absent on Android",
+        "java/lang/Runtime\$Version" to "JDK 9+ only, absent on Android",
         "javax/" to "not part of the Android runtime",
     )
 
@@ -103,7 +141,7 @@ class AndroidApiSurfaceTest {
         for (f in files) referenced.addAll(classReferences(f))
 
         val violations = referenced.filter { name ->
-            allowedPrefixes.none { name.startsWith(it) }
+            name !in allowedTypes && allowedPackages.none { name.startsWith(it) }
         }
         assertEquals(
             emptyList<String>(),

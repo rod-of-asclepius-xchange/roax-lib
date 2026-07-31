@@ -180,7 +180,10 @@ object EnvelopeVerifier {
         bindOuterIdentity(identity, committed, config)
 
         // --- step 3: the floor, selected from the COMMITTED recordType leaf (section 10.2) ---
-        val committedRecordType = committed.singleKeyStrings.getValue(Reserved.RECORD_TYPE)
+        val committedRecordType = committed.singleKeyStrings[Reserved.RECORD_TYPE] ?: fail(
+            Reason.OUTER_IDENTITY_MISMATCH,
+            "this copy reveals no ${Reserved.RECORD_TYPE} leaf, so no floor can be selected",
+        )
         // The `profile-unknown` branch here is unreachable while step 2 stands: the binding has
         // just proved the outer field NFC-equal to this leaf, so both sources yield the same floor
         // table and no vector can tell them apart. It is kept so that a later edit cannot quietly

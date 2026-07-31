@@ -41,7 +41,6 @@ val androidSdk: String? = if (skipAndroid) null else sequenceOf(
 ).filterNotNull().firstOrNull { File(it, "platforms").isDirectory }
 
 if (androidSdk != null) {
-    gradle.extra["roax.androidSdk"] = androidSdk
     include(":roax-canon-android")
 } else {
     logger.lifecycle(
