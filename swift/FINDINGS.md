@@ -22,10 +22,11 @@ Everything below was measured on Apple Swift 6.2.4 (swiftlang-6.2.4.1.4), macOS 
 | 8 | Specification section 3.3's empty-container rule is unsatisfiable against the committed corpus | specification vs corpus | Inverted: the corpus fails an implementation that follows the specification |
 | 9 | Section 3.3's zero-leaf MUST can never fire from a JSON record | specification | No, and it cannot |
 | 10 | The corpus covers the verifying side of an envelope and not the producing side | corpus | **No - it caught a real bug in this library that all 488 vectors missed** |
+| 11 | `schemas/envelope-2.0.json` is only partly verifiable here, and its last check has no evidence to run on | specification **and** library | **No - the committed corpus is envelope-1.0 throughout** |
 
 Findings 8 and 9 were reported by the TypeScript and Python builds before this one and are restated here only because a fourth independent implementation reaching the same place is the evidence those reports were about.
 Findings 1 to 5 are Swift-specific.
-Findings 6, 7 and 10 are new here.
+Findings 6, 7, 10 and 11 are new here.
 
 ## 1. `JSONSerialization` destroys numeric literals, and the failure is inconsistent
 
@@ -269,6 +270,41 @@ Reverting the fix fails that test on five leaves, which is how the coverage was 
 **The general shape is worth a corpus vector rather than four library-local tests.**
 A class asking an implementation to *produce* a disclosed copy from a record, a salt set and a path list, and to verify the result, would catch this in every language at once.
 It is a genuine gap in what `docs/conformance-corpus.md` defines rather than a gap in what the corpus happens to contain, so closing it is a corpus change and is not made here.
+
+## 11. `schemas/envelope-2.0.json` is only partly verifiable here, and its last check has no evidence to run on
+
+**Kind: specification and library.
+The library half is fixed; the specification half is stated rather than worked around.**
+
+All 54 committed envelope fixtures are `schemas/envelope-1.0.json` and not one carries a `typeMap` member, so nothing in the corpus reaches the 2.0 binding in either direction.
+This library nevertheless parses a `typeMap` member and commits `roax.typeMap.id` as a fifth reserved leaf, which makes it partly a 2.0 implementation and therefore worth saying exactly how far it goes.
+
+**The library half, which was a defect.**
+The outer-identity binding for `typeMap.id` was gated on the outer `typeMap` member being present, and so was the leaf's place in the minimum-disclosure floor.
+That put the trigger in the hands of the party the check constrains: a holder who deleted the outer member and withheld the leaf got a copy where the binding never ran and the floor never asked, while every remaining inclusion proof stayed genuine.
+Specification section 11.3 says a field outside the root is never authority, and `docs/profiles/*.md` section 4 calls `roax.typeMap.id` mandatory to disclose **by arithmetic** because it selects and authenticates the exact map.
+A check whose execution the presenter controls is not a check.
+The binding now fires whenever **either** side names a type map, absence and disagreement are the same `outer-identity-mismatch`, and the floor is sourced from the committed leaf rather than the outer optional.
+
+**What a single envelope cannot evidence, and why that is not a fifth gate.**
+A copy that drops both the outer member and the leaf is byte-indistinguishable from a legitimate 1.0 copy.
+The only signal that a fifth reserved leaf was ever committed is `leafCount`, and specification section 11.1 measured that `leafCount` is **not** authenticated in a disclosed copy, so a check leaning on it would reintroduce the forged-size attack that section corrects.
+That case is therefore the verifier's own decision rather than something read out of the envelope: `TypeMapBindingPolicy.required` demands that a copy name a type map at all, in the same shape as `HashAlgorithmAllowList`, and it defaults to `.boundWhenPresent` because the committed corpus is 1.0 throughout.
+A verifier that accepts only 2.0 records must select it.
+
+**What this library does NOT check about a type map**, named one by one rather than summarized, because a reader has to be able to tell without reading the source:
+
+- It never **fetches** the artifact `typeMap.id` names.
+  There is no retrieval of any kind in this package.
+- It never **reproduces the artifact's content identifier** from fetched bytes, so `typeMap.id` is compared as an opaque string and is not verified to be the digest of anything.
+- It never compares the artifact's own `recordType`, `schemaVersion` or `typeMapVersion` against the envelope's, which is the check that would catch a well-formed map for the wrong record shape.
+- It never evaluates **issuer-scope membership** against an extension artifact's `scope.issuerIds`, so an issuer extension is neither admitted nor refused here; the Unicode comparison rule that membership would need is itself unstated (`docs/spec/roax-canon-1.md:912-913`).
+- The resolver it does use is the **superseded display-pattern format**, for the reason finding 8's neighbour records: no published artifact exists for `org.roax.corpus.synthetic` and every corpus vector needs one.
+
+So what this library verifies about a type map is exactly one thing: that the identifier a copy presents is the identifier its root commits.
+That is worth having and it is not 2.0 support.
+
+`CorpusGapTests.testTypeMapIdBindingIsDrivenByTheCommittedLeafNotTheOuterMember` pins every case above, including the one the default policy accepts, because the corpus cannot reach any of them.
 
 ## What this build did not find
 

@@ -60,6 +60,15 @@ public enum ROAXError: Error, Equatable, CustomStringConvertible {
     case saltLength(Int)
     /// No salt was supplied for a leaf the record produced.
     case saltMissingForLeaf(String)
+    /// A disclosure named a path this commitment has no leaf for.
+    ///
+    /// Deliberately distinct from `saltMissingForLeaf`: that one names a salt
+    /// carrier that failed to supply a salt for a leaf the record produced, and
+    /// the corpus uses it for exactly that envelope condition. Folding the two
+    /// together points a caller with a wrong path list at the salt set, and
+    /// breaks the one-to-one between a reason code and a condition that
+    /// `ReasonEquivalence` depends on.
+    case unknownDisclosurePath(String)
     /// The salt carrier named one encoded path twice.
     case saltsDuplicatePath(String)
     /// Two leaves of one record share a complete encoded path.
@@ -96,6 +105,13 @@ public enum ROAXError: Error, Equatable, CustomStringConvertible {
     case profileUnknown(String)
     /// `hashAlg` is not on the verifier's allow-list (spec section 7.4, H3).
     case hashAlgNotAllowed(String)
+    /// The declared `hashAlg` and the hash actually being computed disagree.
+    ///
+    /// `DOMAIN` is `"ROAX-CANON/1/" ‖ hashAlg` (spec sections 7 and 8), so the
+    /// declared name and the digest function are two carriers of one fact. A
+    /// commitment domained `ROAX-CANON/1/Poseidon-BN254` but hashed with SHA-256
+    /// is the issuance spec section 7.4 says MUST NOT be made.
+    case hashAlgMismatch(declared: String, computing: String)
     /// `canon` is not `ROAX-CANON/1`.
     case canonUnknown(String)
 
@@ -119,6 +135,7 @@ public enum ROAXError: Error, Equatable, CustomStringConvertible {
         case .emptyRecord: return "empty-record"
         case .saltLength: return "salt-length"
         case .saltMissingForLeaf: return "salt-missing-for-leaf"
+        case .unknownDisclosurePath: return "unknown-disclosure-path"
         case .saltsDuplicatePath: return "salts-duplicate-path"
         case .duplicateLeafPath: return "duplicate-leaf-path"
         case .saltsLengthNotLeafCount: return "salts-length-not-leaf-count"
@@ -132,6 +149,7 @@ public enum ROAXError: Error, Equatable, CustomStringConvertible {
         case .minimumDisclosureFloor: return "minimum-disclosure-floor"
         case .profileUnknown: return "profile-unknown"
         case .hashAlgNotAllowed: return "hash-alg-not-allowed"
+        case .hashAlgMismatch: return "hash-alg-mismatch"
         case .canonUnknown: return "canon-unknown"
         }
     }
@@ -155,6 +173,7 @@ public enum ROAXError: Error, Equatable, CustomStringConvertible {
         case .emptyRecord: return "record contributed zero leaves of its own"
         case .saltLength(let n): return "salt is \(n) bytes, not 16"
         case .saltMissingForLeaf(let p): return "no salt supplied for leaf \(p)"
+        case .unknownDisclosurePath(let p): return "this commitment has no leaf at \(p)"
         case .saltsDuplicatePath(let p): return "salts array names \(p) twice"
         case .duplicateLeafPath(let p): return "two leaves share the encoded path \(p)"
         case .saltsLengthNotLeafCount(let e, let a): return "salts.length \(a) != leafCount \(e)"
@@ -168,6 +187,8 @@ public enum ROAXError: Error, Equatable, CustomStringConvertible {
         case .minimumDisclosureFloor(let p): return "disclosed copy omits non-redactable path \(p)"
         case .profileUnknown(let t): return "no profile registered for recordType \(t.debugDescription)"
         case .hashAlgNotAllowed(let a): return "hashAlg \(a.debugDescription) is not on the allow-list"
+        case .hashAlgMismatch(let d, let c):
+            return "declared hashAlg \(d.debugDescription) but the hash being computed is \(c.debugDescription)"
         case .canonUnknown(let c): return "canon \(c.debugDescription) is not ROAX-CANON/1"
         }
     }

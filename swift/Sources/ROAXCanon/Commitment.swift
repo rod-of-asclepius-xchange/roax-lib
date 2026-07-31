@@ -222,6 +222,17 @@ public struct Committer<H: ROAXHash> {
         salts: SaltAssignment,
         context: CommitmentContext
     ) throws -> Commitment {
+        // The algorithm is carried twice - `H` supplies the digest function and
+        // `context.hashAlg` supplies the `DOMAIN` tail of sections 7 and 8 - and
+        // this is what stops the two disagreeing. Without it a caller can issue
+        // leaves domained `ROAX-CANON/1/Poseidon-BN254` while hashing with
+        // SHA-256, which is the record specification section 7.4 says MUST NOT
+        // be issued. Every issuance funnels through here, so one guard covers
+        // both public `commit` overloads.
+        guard context.hashAlg == H.identifier else {
+            throw ROAXError.hashAlgMismatch(declared: context.hashAlg, computing: H.identifier)
+        }
+
         // Sort by ascending encodePath bytes, plain unsigned byte comparison.
         // Paths are unique by construction, so the order is total and tie-free.
         var sortable = flattened.map { leaf -> (encoded: [UInt8], leaf: FlattenedLeaf) in

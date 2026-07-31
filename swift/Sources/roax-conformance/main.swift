@@ -28,21 +28,44 @@ var rootArgument: String? = ProcessInfo.processInfo.environment["ROAX_CORPUS_ROO
 var referencesArgument: String? = ProcessInfo.processInfo.environment["ROAX_REFERENCE_RECORDS"]
 var emptyContainerPolicy = EmptyContainerPolicy.assignedWithoutMapAuthorization
 
+func usageError(_ detail: String) -> Never {
+    FileHandle.standardError.write(Data("\(detail)\n".utf8))
+    // 64 rather than 2: a mistyped flag is a usage error, and a caller that
+    // treats NOT RUN as tolerable must not also tolerate this.
+    exit(64)
+}
+
 var arguments = Array(CommandLine.arguments.dropFirst())
 while let flag = arguments.first {
     arguments.removeFirst()
+
+    /// A flag's value, or a usage error. Taking `arguments.first` and
+    /// tolerating nil would overwrite an environment-supplied value with
+    /// nothing, so a missing value would silently un-set `ROAX_CORPUS_ROOT`.
+    func value(of flag: String) -> String {
+        guard let next = arguments.first, !next.hasPrefix("--") else {
+            usageError("\(flag) needs a value")
+        }
+        arguments.removeFirst()
+        return next
+    }
+
     switch flag {
     case "--root":
-        rootArgument = arguments.first; if !arguments.isEmpty { arguments.removeFirst() }
+        rootArgument = value(of: flag)
     case "--references":
-        referencesArgument = arguments.first; if !arguments.isEmpty { arguments.removeFirst() }
+        referencesArgument = value(of: flag)
     case "--empty-containers":
-        let mode = arguments.first ?? "corpus"
-        if !arguments.isEmpty { arguments.removeFirst() }
-        emptyContainerPolicy = mode == "spec" ? .mapAuthorized : .assignedWithoutMapAuthorization
+        // An unrecognized mode is a usage error, never a silent fallback to the
+        // corpus reading: falling back would exit 0 while the operator believed
+        // they had run the specification reading that costs 2 class-5 vectors.
+        switch value(of: flag) {
+        case "spec": emptyContainerPolicy = .mapAuthorized
+        case "corpus": emptyContainerPolicy = .assignedWithoutMapAuthorization
+        case let mode: usageError("--empty-containers takes spec or corpus, not \(mode.debugDescription)")
+        }
     default:
-        FileHandle.standardError.write(Data("unknown flag \(flag)\n".utf8))
-        exit(64)
+        usageError("unknown flag \(flag)")
     }
 }
 

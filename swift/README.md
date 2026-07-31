@@ -15,13 +15,13 @@ A library produced by reading an existing one passes the corpus while destroying
 | Measure | Result |
 |---|---|
 | Corpus vectors | 488 pass, 0 fail, 0 NOT RUN with a reference checkout |
-| Unit and gap tests | 33 pass |
+| Unit and gap tests | 37 pass |
 | Vaccination sample | commits at 91 leaves without an issuer key identifier, 92 with one |
 | Recovery sample | commits at 69 leaves without an issuer key identifier, 70 with one |
 | Runtime dependencies | none; CryptoKit where it exists, and an in-tree SHA-256 otherwise |
 
 What that pass does and does not mean is in [`FINDINGS.md`](FINDINGS.md), which is worth more than the code.
-Three findings are new with this build: a Swift `String` comparison rule that silently answers an open specification ambiguity in the opposite direction from the rest of the family, and two corpus gaps - the forged-tree-size attack, and the fact that no vector covers the ENVELOPE-PRODUCING side, which hid a real bug in this library that all 488 vectors missed.
+Four findings are new with this build: a Swift `String` comparison rule that silently answers an open specification ambiguity in the opposite direction from the rest of the family; two corpus gaps - the forged-tree-size attack, and the fact that no vector covers the ENVELOPE-PRODUCING side, which hid a real bug in this library that all 488 vectors missed; and the envelope-2.0 type-map binding, which the corpus cannot reach in either direction.
 
 ## Running it
 
@@ -82,7 +82,7 @@ Inside `ROAXCanon`, the pieces that carry a protocol boundary:
 | `Envelope.swift` | Both copy kinds, the outer-identity binding and the minimum-disclosure floor, in the order section 11.3 derives. |
 | `MerkleTree.swift` | RFC 9162 with the section 9.1 adaptation, over already-hashed leaves. |
 
-## Five things a reader should know before changing anything here
+## Six things a reader should know before changing anything here
 
 ### The type-map resolver is an interface because the corpus forces it to be
 
@@ -111,6 +111,31 @@ See [`FINDINGS.md`](FINDINGS.md) finding 7.
 No corpus vector checks that: every committed envelope fixture was built by something else, so the corpus only ever runs the verifier against a third party's bytes.
 `Commitment.disclose` therefore fills in each leaf's carrier through `Leaf.carrierValue`, and the carriers are per tag rather than the record's spellings - BYTES is lowercase hex here even though the record spelled it base64.
 See [`FINDINGS.md`](FINDINGS.md) finding 10, which records the bug this gap hid.
+
+### What this library verifies about a type map is one thing, and this is not envelope-2.0 support
+
+The committed corpus is `schemas/envelope-1.0.json` throughout, and this package parses a `typeMap` member and commits `roax.typeMap.id` as a fifth reserved leaf.
+That makes it *partly* a 2.0 implementation, which is worth stating precisely rather than leaving a reader to infer from the source.
+
+**Implemented.**
+In a disclosed copy, the outer `typeMap.id` is bound to the `roax.typeMap.id` leaf the root commits, and the leaf joins the minimum-disclosure floor.
+Both are driven by what is **committed**, never by whether the holder chose to present the outer member: the binding fires whenever either side names a type map, and absence is the same `outer-identity-mismatch` as disagreement.
+A check whose execution the presenter controls is not a check.
+
+**Not implemented, and each one is named individually because a summary would read as more coverage than there is:**
+
+| Check `schemas/envelope-2.0.json` implies | Status here |
+|---|---|
+| Fetching the artifact `typeMap.id` names | Not done; this package retrieves nothing. |
+| Reproducing the artifact content identifier from fetched bytes | Not done; `typeMap.id` is compared as an opaque string. |
+| Comparing the artifact's `recordType`, `schemaVersion` and `typeMapVersion` against the envelope's | Not done. |
+| Issuer-scope membership against an extension artifact's `scope.issuerIds` | Not done; no issuer extension is admitted or refused here. |
+| Resolving through the operative structured-path DFA | Not done; the display-pattern resolver above is what runs. |
+
+**One case a single envelope carries no evidence for.**
+A disclosed copy that omits both the outer member and the leaf is byte-indistinguishable from a legitimate 1.0 copy, and the only signal a fifth reserved leaf was committed is `leafCount`, which specification section 11.1 measured is not authenticated in a disclosed copy.
+So it is the verifier's decision rather than the envelope's: `EnvelopeVerifier(typeMapBinding: .required)` demands a copy name a type map at all, and `.boundWhenPresent` is the default because the corpus is 1.0.
+See [`FINDINGS.md`](FINDINGS.md) finding 11.
 
 ### There is one leaf-preimage builder and nothing else assembles those bytes
 

@@ -15,6 +15,13 @@ public struct CorpusRunner {
     public let referenceRecords: URL?
     public let report = Report()
 
+    /// Parsed maps, held in a reference box for the same reason `report` is:
+    /// this runner is a struct and `typeMap(for:)` is non-mutating, so a stored
+    /// dictionary would be unreachable by construction and every reject and
+    /// record vector would re-read and re-parse its map - the FHIR-shaped ones
+    /// included - once per vector.
+    private let typeMaps = TypeMapCache()
+
     /// The empty-container reading the record and envelope classes run under.
     ///
     /// See `EmptyContainerPolicy`: specification section 3.3 requires the map to
@@ -330,13 +337,14 @@ public struct CorpusRunner {
 
     // MARK: type maps
 
-    private var typeMapCache = [String: DisplayPatternTypeMap]()
-
     private func typeMap(for recordType: String) throws -> DisplayPatternTypeMap {
         // `typeMapVector` identifies its map by `recordType` alone, so the
         // runner resolves it by the convention corpus/type-maps/<recordType>.json.
+        if let cached = typeMaps.map(for: recordType) { return cached }
         let file = path("corpus/type-maps/\(recordType).json")
-        return try DisplayPatternTypeMap(json: try loadJSON(file))
+        let map = try DisplayPatternTypeMap(json: try loadJSON(file))
+        typeMaps.store(map, for: recordType)
+        return map
     }
 
     private func runTypeMap() {

@@ -398,6 +398,223 @@ final class CorpusGapTests: XCTestCase {
         }
     }
 
+    // MARK: the type-map binding, which no committed vector can reach
+
+    /// **The presenter must not be able to decide whether a check runs.**
+    ///
+    /// Every committed envelope fixture is `schemas/envelope-1.0.json` and none
+    /// carries a `typeMap` member, so the corpus cannot reach any of this. The
+    /// hazard is specific: `roax.typeMap.id` is mandatory to disclose *by
+    /// arithmetic* (`docs/profiles/*.md` section 4) because it selects and
+    /// authenticates the exact map, and type-map selection is what decides how
+    /// a field is typed and canonicalized. A binding gated on the outer,
+    /// holder-supplied `typeMap` member is switched off by the party it
+    /// constrains.
+    func testTypeMapIdBindingIsDrivenByTheCommittedLeafNotTheOuterMember() throws {
+        let committer = try syntheticCommitter()
+        let identity = RecordIdentity(
+            recordType: syntheticIdentity.recordType,
+            schemaVersion: syntheticIdentity.schemaVersion,
+            recordId: syntheticIdentity.recordId,
+            issuerId: syntheticIdentity.issuerId,
+            typeMapId: "urn:roax:type-map:org.roax.corpus.synthetic:1.0.0"
+        )
+        let record = try JSONScanner.parse("{\"marker\":\"m\",\"flag\":true}")
+        let commitment = try committer.commit(
+            record: record, context: CommitmentContext(identity: identity)
+        )
+        XCTAssertEqual(commitment.leafCount, 7, "5 reserved leaves plus 2 record leaves")
+
+        let reserved: [Path] = [
+            [.key("roax.recordType")], [.key("roax.schemaVersion")],
+            [.key("roax.recordId")], [.key("roax.issuer.id")],
+            [.key("roax.typeMap.id")],
+        ]
+        let full = try commitment.disclose(paths: reserved + [[.key("marker")]], hash: SHA256Hash.self)
+
+        func envelope(_ leaves: [DisclosedLeaf], typeMapId: String?) -> Envelope {
+            Envelope(
+                recordType: identity.recordType, schemaVersion: identity.schemaVersion,
+                recordId: identity.recordId, issuerId: identity.issuerId,
+                typeMapId: typeMapId,
+                root: commitment.root, leafCount: commitment.leafCount,
+                disclosedLeaves: leaves
+            )
+        }
+        let verifier = EnvelopeVerifier<SHA256Hash>()
+        let withoutLeaf = full.filter { $0.segments != [.key("roax.typeMap.id")] }
+
+        // A matched pair verifies, so the tightening did not simply close the
+        // door on every 2.0-shaped copy.
+        XCTAssertNoThrow(try verifier.verify(envelope(full, typeMapId: identity.typeMapId)))
+
+        // The attack the outer gate allowed: the leaf is committed and
+        // disclosed, and deleting the outer member used to skip the binding
+        // entirely. Absence is now the same failure as disagreement.
+        XCTAssertThrowsError(try verifier.verify(envelope(full, typeMapId: nil))) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "outer-identity-mismatch")
+        }
+        // The other direction, which was already refused and must stay so.
+        XCTAssertThrowsError(try verifier.verify(envelope(withoutLeaf, typeMapId: identity.typeMapId))) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "outer-identity-mismatch")
+        }
+        XCTAssertThrowsError(try verifier.verify(envelope(full, typeMapId: "urn:roax:type-map:other:9.9.9"))) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "outer-identity-mismatch")
+        }
+
+        // **The limit, stated rather than hidden.** Dropping BOTH leaves an
+        // envelope byte-indistinguishable from a legitimate 1.0 copy: the only
+        // signal a fifth reserved leaf was committed is `leafCount`, which
+        // specification section 11.1 measured is not authenticated in a
+        // disclosed copy. A default verifier accepts it.
+        XCTAssertNoThrow(try verifier.verify(envelope(withoutLeaf, typeMapId: nil)))
+
+        // So the last case is the VERIFIER's decision, never the presenter's.
+        let requiring = EnvelopeVerifier<SHA256Hash>(typeMapBinding: .required)
+        XCTAssertThrowsError(try requiring.verify(envelope(withoutLeaf, typeMapId: nil))) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "outer-identity-mismatch")
+        }
+        XCTAssertNoThrow(try requiring.verify(envelope(full, typeMapId: identity.typeMapId)))
+    }
+
+    // MARK: a known member with the wrong JSON shape
+
+    /// A present-but-wrong-typed known member is `malformed-json`, never a
+    /// silent absence.
+    ///
+    /// `Envelope.parse` enforces the `additionalProperties: false` closure of
+    /// `schemas/envelope-*.json` itself rather than deferring to a validator
+    /// this package does not ship, so it owns the shapes too. Reading a
+    /// wrong-typed member as absent turned off the guards keyed on presence:
+    /// `"salts": {}` beside a `disclosure` parsed with `salts == nil`, so the
+    /// section 10.1 salt-leak prohibition never fired and a copy carrying salts
+    /// for withheld leaves verified. No committed fixture carries a wrong-typed
+    /// member, so nothing in the corpus notices either way.
+    func testWrongTypedKnownEnvelopeMemberIsMalformedRatherThanAbsent() throws {
+        func text(_ extra: String) -> String {
+            """
+            {"canon":"ROAX-CANON/1","hashAlg":"SHA-256",
+             "recordType":"org.roax.corpus.synthetic","schemaVersion":"1.0",
+             "recordId":"urn:uuid:11111111-1111-4111-8111-111111111111",
+             "issuer":{"id":"did:web:corpus.roax.invalid"},
+             "root":"\(String(repeating: "0", count: 64))","leafCount":6\(extra)}
+            """
+        }
+
+        // The control: the same envelope with every known member well-typed.
+        XCTAssertNoThrow(try Envelope.parse(jsonText: text(",\"record\":{\"a\":\"1\"}")))
+
+        for extra in [
+            ",\"record\":{\"a\":\"1\"},\"salts\":{}",              // the load-bearing one
+            ",\"record\":{\"a\":\"1\"},\"salts\":\"deadbeef\"",
+            ",\"record\":{\"a\":\"1\"},\"disclosure\":[]",
+            ",\"record\":{\"a\":\"1\"},\"typeMap\":\"urn:roax:type-map:x:1.0.0\"",
+            ",\"record\":{\"a\":\"1\"},\"typeMap\":{\"id\":5}",
+            ",\"record\":{\"a\":\"1\"},\"typeMap\":{\"id\":\"x\",\"version\":[]}",
+            // `record` is the last known member, and its schema types it as an
+            // object. Without this a scalar record surfaces as a fail-closed
+            // type-map lookup at the empty path rather than as a malformed
+            // envelope.
+            ",\"record\":\"not-an-object\"",
+            ",\"record\":[]",
+        ] {
+            XCTAssertThrowsError(try Envelope.parse(jsonText: text(extra)), extra) {
+                XCTAssertEqual(($0 as? ROAXError)?.reason, "malformed-json", extra)
+            }
+        }
+        // `issuer.keyId` is the conditional leaf, and a wrong-typed one must not
+        // read as the absence that means "no leaf".
+        XCTAssertThrowsError(try Envelope.parse(jsonText: """
+        {"canon":"ROAX-CANON/1","hashAlg":"SHA-256",
+         "recordType":"org.roax.corpus.synthetic","schemaVersion":"1.0",
+         "recordId":"urn:uuid:11111111-1111-4111-8111-111111111111",
+         "issuer":{"id":"did:web:corpus.roax.invalid","keyId":7},
+         "root":"\(String(repeating: "0", count: 64))","leafCount":6,"record":{"a":"1"}}
+        """)) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "malformed-json")
+        }
+
+        // And a WELL-typed `salts` beside a disclosure still reaches the
+        // section 10.1 rejection, which is the reason code the corpus pins.
+        let leaking = try Envelope.parse(jsonText: text(",\"salts\":[],\"disclosure\":{\"leaves\":[]}"))
+        XCTAssertThrowsError(try EnvelopeVerifier<SHA256Hash>().verify(leaking)) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "disclosed-copy-carries-salts")
+        }
+    }
+
+    // MARK: the two carriers of the hash algorithm
+
+    /// `DOMAIN` is `"ROAX-CANON/1/" ‖ hashAlg` (specification sections 7 and 8),
+    /// so the declared name and the digest function are two carriers of one
+    /// fact and nothing used to check they agreed. Every corpus vector declares
+    /// SHA-256, so no vector can tell.
+    func testDeclaredHashAlgMustBeTheHashBeingComputed() throws {
+        let committer = try syntheticCommitter()
+        let record = try JSONScanner.parse("{\"marker\":\"m\"}")
+
+        // Issuance: leaves domained `ROAX-CANON/1/Poseidon-BN254` while hashed
+        // with SHA-256 is the record section 7.4 says MUST NOT be issued.
+        XCTAssertThrowsError(try committer.commit(
+            record: record,
+            context: CommitmentContext(identity: syntheticIdentity, hashAlg: "Poseidon-BN254")
+        )) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "hash-alg-mismatch")
+        }
+        XCTAssertNoThrow(try committer.commit(
+            record: record, context: CommitmentContext(identity: syntheticIdentity)
+        ))
+
+        // Verification: the allow-list settles which names this verifier runs,
+        // and the check settles that the name it accepted is what it computes.
+        let envelope = Envelope(
+            hashAlg: "Poseidon-BN254",
+            recordType: syntheticIdentity.recordType,
+            schemaVersion: syntheticIdentity.schemaVersion,
+            recordId: syntheticIdentity.recordId,
+            issuerId: syntheticIdentity.issuerId,
+            root: [UInt8](repeating: 0, count: 32), leafCount: 6,
+            disclosedLeaves: []
+        )
+        // The default allow-list refuses it first, and that ordering is kept.
+        XCTAssertThrowsError(try EnvelopeVerifier<SHA256Hash>().verify(envelope)) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "hash-alg-not-allowed")
+        }
+        let widened = EnvelopeVerifier<SHA256Hash>(
+            allowList: HashAlgorithmAllowList(allowed: ["SHA-256", "Poseidon-BN254"])
+        )
+        XCTAssertThrowsError(try widened.verify(envelope)) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "hash-alg-mismatch")
+        }
+    }
+
+    /// A disclosure naming a path the commitment has no leaf for is its own
+    /// condition, not a missing salt.
+    ///
+    /// `salt-missing-for-leaf` names a salt carrier that failed to supply a salt
+    /// for a leaf the record produced, and the corpus uses it for exactly that
+    /// envelope case; `SaltAssignment` still throws it there. Keeping the two
+    /// one-to-one is what `ReasonEquivalence` depends on.
+    func testDiscloseNamesAnUnknownPathRatherThanAMissingSalt() throws {
+        let committer = try syntheticCommitter()
+        let commitment = try committer.commit(
+            record: try JSONScanner.parse("{\"marker\":\"m\"}"),
+            context: CommitmentContext(identity: syntheticIdentity)
+        )
+        XCTAssertThrowsError(
+            try commitment.disclose(paths: [[.key("nosuchfield")]], hash: SHA256Hash.self)
+        ) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "unknown-disclosure-path")
+        }
+        // The salt carrier's own condition keeps its code.
+        XCTAssertThrowsError(try committer.commit(
+            record: try JSONScanner.parse("{\"marker\":\"m\"}"),
+            salts: try SaltAssignment.byPath([([.key("marker")], [UInt8](repeating: 3, count: 16))]),
+            context: CommitmentContext(identity: syntheticIdentity)
+        )) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "salt-missing-for-leaf")
+        }
+    }
+
     /// A record contributing zero leaves of its own is rejected at issuance
     /// rather than anchored (specification sections 3.3 and 9.1).
     ///

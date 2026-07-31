@@ -128,16 +128,45 @@ public extension Envelope {
         let schemaVersion = try requiredString("schemaVersion")
         let recordId = try requiredString("recordId")
 
-        guard case .object? = json["issuer"], case .string(let issuerId)? = json["issuer"]?["id"] else {
+        // A KNOWN member that is present but carries the wrong JSON shape is a
+        // `malformed-json` rejection, never a silent absence.
+        //
+        // Reading it as absent is the same defect class as an unauthenticated
+        // check trigger one layer up: `"salts": {}` beside a `disclosure` would
+        // parse with `salts == nil`, so `verifyDisclosedCopy`'s salt-leak guard
+        // would never fire and the copy would verify while carrying salts for
+        // withheld leaves. A guard that turns itself off on malformed input is
+        // worse than no guard, because it reports safety it is not providing.
+        func optionalString(_ container: JSONValue?, _ key: String, _ label: String) throws -> String? {
+            guard let member = container?[key] else { return nil }
+            guard case .string(let s) = member else {
+                throw ROAXError.malformedJSON("envelope member \(label) is present but is not a string")
+            }
+            return s
+        }
+        func presentObject(_ key: String) throws -> JSONValue? {
+            guard let member = json[key] else { return nil }
+            guard case .object = member else {
+                throw ROAXError.malformedJSON("envelope member \(key) is present but is not an object")
+            }
+            return member
+        }
+        func presentArray(_ key: String) throws -> [JSONValue]? {
+            guard let member = json[key] else { return nil }
+            guard case .array(let rows) = member else {
+                throw ROAXError.malformedJSON("envelope member \(key) is present but is not an array")
+            }
+            return rows
+        }
+
+        guard let issuer = try presentObject("issuer"), case .string(let issuerId)? = issuer["id"] else {
             throw ROAXError.malformedJSON("envelope issuer.id is missing")
         }
-        var issuerKeyId: String? = nil
-        if case .string(let k)? = json["issuer"]?["keyId"] { issuerKeyId = k }
+        let issuerKeyId = try optionalString(issuer, "keyId", "issuer.keyId")
 
-        var typeMapId: String? = nil
-        var typeMapVersion: String? = nil
-        if case .string(let id)? = json["typeMap"]?["id"] { typeMapId = id }
-        if case .string(let v)? = json["typeMap"]?["version"] { typeMapVersion = v }
+        let typeMap = try presentObject("typeMap")
+        let typeMapId = try optionalString(typeMap, "id", "typeMap.id")
+        let typeMapVersion = try optionalString(typeMap, "version", "typeMap.version")
 
         let rootHex = try requiredString("root")
         guard let root = [UInt8].roaxFromHex(rootHex), root.count == 32 else {
@@ -148,7 +177,7 @@ public extension Envelope {
         }
 
         var salts: [SaltEntry]? = nil
-        if case .array(let rows)? = json["salts"] {
+        if let rows = try presentArray("salts") {
             salts = try rows.map { row in
                 guard case .array(let segs)? = row["segments"],
                       case .string(let saltHex)? = row["salt"],
@@ -162,8 +191,8 @@ public extension Envelope {
         }
 
         var disclosedLeaves: [DisclosedLeaf]? = nil
-        if case .object? = json["disclosure"] {
-            guard case .array(let rows)? = json["disclosure"]?["leaves"] else {
+        if let disclosure = try presentObject("disclosure") {
+            guard case .array(let rows)? = disclosure["leaves"] else {
                 throw ROAXError.malformedJSON("disclosure carries no leaves array")
             }
             disclosedLeaves = try rows.map { row in
@@ -200,7 +229,13 @@ public extension Envelope {
             issuerId: issuerId, issuerKeyId: issuerKeyId,
             typeMapId: typeMapId, typeMapVersion: typeMapVersion,
             root: root, leafCount: leafCount,
-            record: json["record"], salts: salts, disclosedLeaves: disclosedLeaves
+            // `schemas/envelope-*.json` types `record` as an object, and the
+            // section 3.3 flattener walks a map. Letting a scalar through would
+            // leave one known member unshaped, and it would surface later as a
+            // fail-closed type-map lookup at the empty path rather than as the
+            // malformed envelope it is.
+            record: try presentObject("record"),
+            salts: salts, disclosedLeaves: disclosedLeaves
         )
     }
 
@@ -221,6 +256,32 @@ public extension Envelope {
 }
 
 // MARK: - verification
+
+/// Whether this verifier will accept a copy that names no type map at all.
+///
+/// **The presenter must never decide whether a check runs.** Specification
+/// section 11.3 says a field outside the root is never authority, so the outer
+/// `typeMap` member cannot be what selects whether `roax.typeMap.id` is bound
+/// and floored: a holder who deletes it would be switching off the check that
+/// constrains them. The binding therefore fires whenever EITHER side is present,
+/// which closes every case a single envelope can evidence.
+///
+/// It cannot close the last one. A disclosed copy that omits both the outer
+/// member and the leaf is byte-indistinguishable from an envelope-1.0 copy: the
+/// only signal that a fifth reserved leaf was ever committed is `leafCount`,
+/// which specification section 11.1 measured is **not** authenticated in a
+/// disclosed copy. So that case is the verifier's own decision, in the same
+/// shape as `HashAlgorithmAllowList`, and not a policy read out of the envelope.
+public enum TypeMapBindingPolicy: Sendable {
+    /// Bind and floor `roax.typeMap.id` whenever either side names it.
+    ///
+    /// The default, because the committed corpus is envelope-1.0 throughout and
+    /// a 1.0 copy legitimately names no type map.
+    case boundWhenPresent
+    /// Additionally require that a copy name one, which is what a verifier
+    /// accepting only `schemas/envelope-2.0.json` records must select.
+    case required
+}
 
 /// Verifying an envelope of either copy kind.
 ///
@@ -248,17 +309,20 @@ public struct EnvelopeVerifier<H: ROAXHash> {
     public let allowList: HashAlgorithmAllowList
     public let resolver: TypeResolver?
     public let emptyContainerPolicy: EmptyContainerPolicy
+    public let typeMapBinding: TypeMapBindingPolicy
 
     public init(
         registry: ProfileRegistry = .versionOne,
         allowList: HashAlgorithmAllowList = .versionOneDefault,
         resolver: TypeResolver? = nil,
-        emptyContainerPolicy: EmptyContainerPolicy = .mapAuthorized
+        emptyContainerPolicy: EmptyContainerPolicy = .mapAuthorized,
+        typeMapBinding: TypeMapBindingPolicy = .boundWhenPresent
     ) {
         self.registry = registry
         self.allowList = allowList
         self.resolver = resolver
         self.emptyContainerPolicy = emptyContainerPolicy
+        self.typeMapBinding = typeMapBinding
     }
 
     public func verify(_ envelope: Envelope) throws {
@@ -270,6 +334,14 @@ public struct EnvelopeVerifier<H: ROAXHash> {
             throw ROAXError.canonUnknown(envelope.canon)
         }
         try allowList.check(envelope.hashAlg)
+        // The allow-list settles which names this verifier will run; this
+        // settles that the name it accepted is the hash it is about to compute.
+        // `DOMAIN` carries the declared name, so without this the two carriers
+        // of one fact can disagree and a widened allow-list verifies a
+        // Poseidon-declaring envelope with SHA-256 math.
+        guard envelope.hashAlg == H.identifier else {
+            throw ROAXError.hashAlgMismatch(declared: envelope.hashAlg, computing: H.identifier)
+        }
         _ = try registry.profile(for: envelope.recordType)
 
         // Exactly one of `record` and `disclosure` MUST be present.
@@ -381,8 +453,18 @@ public struct EnvelopeVerifier<H: ROAXHash> {
         try bind("schemaVersion", outer: envelope.schemaVersion, committed: committed["roax.schemaVersion"])
         try bind("recordId", outer: envelope.recordId, committed: committed["roax.recordId"])
         try bind("issuer.id", outer: envelope.issuerId, committed: committed["roax.issuer.id"])
-        if envelope.typeMapId != nil {
-            try bind("typeMap.id", outer: envelope.typeMapId!, committed: committed["roax.typeMap.id"])
+
+        // The type-map binding fires on what the ROOT COMMITS, not on what the
+        // holder chose to present. Gating it on `envelope.typeMapId != nil`
+        // alone would let the party the check constrains switch it off by
+        // deleting the outer member, and a check whose execution the presenter
+        // controls is not a check. Either side naming a type map is therefore
+        // enough to demand both, and `.required` additionally demands that one
+        // be named at all - see `TypeMapBindingPolicy` for the case a single
+        // envelope carries no evidence of.
+        let committedTypeMapId = committed["roax.typeMap.id"]
+        if typeMapBinding == .required || committedTypeMapId != nil || envelope.typeMapId != nil {
+            try bind("typeMap.id", outer: envelope.typeMapId, committed: committedTypeMapId)
         }
         // `roax.issuer.keyId` is deliberately NOT bound: it is the one
         // conditional leaf and the one reserved leaf that is OPTIONAL to
@@ -397,6 +479,11 @@ public struct EnvelopeVerifier<H: ROAXHash> {
         // NFC-equal, so both sources yield the same floor table and no vector
         // can tell them apart. It puts the structural claim where a reader of
         // the code can see it.
+        //
+        // The type-map entry is a different case: sourcing it from the leaf is
+        // load-bearing rather than a convention, because driving it off the
+        // outer optional would put a second presenter-controlled trigger behind
+        // the same leaf and undo step 2's work one step later.
         let committedRecordType = committed["roax.recordType"] ?? envelope.recordType
         let identity = RecordIdentity(
             recordType: committedRecordType,
@@ -404,7 +491,7 @@ public struct EnvelopeVerifier<H: ROAXHash> {
             recordId: envelope.recordId,
             issuerId: envelope.issuerId,
             issuerKeyId: envelope.issuerKeyId,
-            typeMapId: envelope.typeMapId
+            typeMapId: committedTypeMapId ?? envelope.typeMapId
         )
         let disclosedPaths = Set(leaves.map { PathEncoding.encode($0.segments) })
         for required in try registry.floor(for: identity) {
@@ -414,8 +501,11 @@ public struct EnvelopeVerifier<H: ROAXHash> {
         }
     }
 
-    private func bind(_ field: String, outer: String, committed: String?) throws {
-        guard let committed, NFC.normalize(committed) == NFC.normalize(outer) else {
+    /// `outer` is optional so that an ABSENT outer field is a mismatch rather
+    /// than an unreachable branch: absence and disagreement are the same
+    /// failure once the committed leaf says the field exists.
+    private func bind(_ field: String, outer: String?, committed: String?) throws {
+        guard let outer, let committed, NFC.normalize(committed) == NFC.normalize(outer) else {
             throw ROAXError.outerIdentityMismatch(field)
         }
     }
@@ -476,7 +566,7 @@ public extension Commitment {
         let hashes = leaves.map(\.hash)
         return try paths.map { path in
             guard let index = index(of: path) else {
-                throw ROAXError.saltMissingForLeaf(PathEncoding.display(path))
+                throw ROAXError.unknownDisclosurePath(PathEncoding.display(path))
             }
             let leaf = leaves[index]
             return DisclosedLeaf(

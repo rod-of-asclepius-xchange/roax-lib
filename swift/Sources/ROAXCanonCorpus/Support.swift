@@ -61,6 +61,15 @@ public final class Report {
     public var exitCode: Int32 { failed > 0 ? 1 : (notRun > 0 ? 2 : 0) }
 }
 
+/// The runner's parsed type maps, keyed by `recordType`.
+final class TypeMapCache {
+    private var maps = [String: DisplayPatternTypeMap]()
+
+    func map(for recordType: String) -> DisplayPatternTypeMap? { maps[recordType] }
+
+    func store(_ map: DisplayPatternTypeMap, for recordType: String) { maps[recordType] = map }
+}
+
 /// Mapping a corpus `reason` to this library's own code.
 ///
 /// `corpus/README.md` measured that four implementations name the fail-closed
