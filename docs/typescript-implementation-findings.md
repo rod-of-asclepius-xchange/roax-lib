@@ -47,7 +47,7 @@ Specification section 3.3 says, in the sentence added to guard decision D7:
 So under the specification's rule both records **fail closed and have no root at all**, while `record-structure-empty-array` and `record-structure-empty-object` assert one.
 
 **Measured, by running this implementation both ways on a bare checkout**, where class 10 reports 4 skipped because its records live outside this repository.
-The `mechanical` row is the `npm test` default that section 10 below reports; neither row was run against a reference checkout, so no `map-authorized` count with those records is claimed here.
+The `mechanical` row is the `npm test` default that section 11 below reports; neither row was run against a reference checkout, so no `map-authorized` count with those records is claimed here.
 
 | Empty-container policy | Corpus result |
 |---|---|
@@ -290,7 +290,29 @@ This library was already correct on every row, which is what this finding having
 
 ---
 
-## 10. What was measured
+## 10. DEFECT IN THIS LIBRARY: issuance invented a type-map version rather than refusing to guess one
+
+**Kind: library.
+Fixed.
+PRE-EXISTING and unchanged since base commit `411de0c`, and fixed here because this is the change that made the opposite rule explicit in the sibling emitters.**
+
+`issueFullCopy` wrote `['version', { kind: 'string', value: options.typeMapVersion ?? '1.0.0' }]`, so a caller naming `identity.typeMapId` without a `typeMapVersion` received an envelope declaring an artifact version it never named.
+
+**Inventing a value rather than failing closed IS the defect class this whole change is about**, which is why the pre-existing status does not carry the day.
+`schemas/envelope-1.0.json` requires the `typeMap` member to carry `id` and `version` together, and the version is metadata the issuer holds rather than anything a library can derive: the content ID names the artifact's bytes, and nothing in this library reads them.
+An issued envelope is unrecoverable once anchored, so a substituted version is not a default a caller can correct later.
+
+**The impact was bounded and this was NOT a fourth instance of the class-20 defect.**
+`1.0.0` satisfies the schema's `^[0-9]+\.[0-9]+\.[0-9]+$`, the version is not a committed leaf, and the content ID transitively binds every artifact byte including that version (specification section 12.1), so the result was misleading metadata on an otherwise valid, self-verifying envelope rather than one its own verifier refuses.
+It is recorded as a finding anyway because the cost was **cross-library divergence on a rule this very change introduced**: `python/FINDINGS.md` and `kotlin/FINDINGS.md` both record their emitters being made to fail closed here, which would have left this library the only one of the three that substitutes.
+That is exactly the shape the corpus exists to prevent, and no vector can see it - every class-20 vector supplies a version, so all three emitters agree on every committed row while disagreeing about the case none of them covers.
+
+The refusal now reads like the one immediately above it, which refuses an issuance with no `typeMapId` at all: the same `envelope-malformed` code, at the same point, before anything is committed.
+`test/unit.ts` pins both directions - an issuance naming both members round-trips through this library's own verifier carrying exactly the version supplied, and an issuance naming the artifact without its version is refused rather than emitting an invented one.
+
+---
+
+## 11. What was measured
 
 Node v22.21.0, TypeScript 5.9.3, `SHA-256`, corpus `1.1.0`.
 

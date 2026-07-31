@@ -183,6 +183,12 @@ Rust, TypeScript and Python already rejected it; Kotlin read `config.anchorHashA
 Swift's is a different pair, because its verifier is generic over the hash type: the declared name and the computing function are independent carriers there and `envelope.hashAlg == H.identifier` is what holds them together.
 The corpus cannot reach any of this - class 18's registry rows are the named gap section 2.2 blocks - so `kotlin/SpecificationGapTest` carries it.
 
+**No emitter may GUESS a `typeMap` version, and the three that write one refuse rather than substitute.**
+`schemas/envelope-1.0.json` requires the member to carry `id` and `version` together, and the version is metadata the issuer holds rather than anything a library can derive, so an issuance naming the artifact without its version has nothing valid to write.
+TypeScript substituted `1.0.0`, Kotlin coerced an absent version to the empty string, and Python emitted the identifier alone; all three now fail closed on their envelope-shape code, with the same reason at the same point as their existing refusal of an issuance naming no artifact at all.
+Rust cannot express the case, because `TypeMapDescriptor` carries both fields as non-optional, and Swift emits no JSON at all, so it holds whatever a caller supplies.
+No vector can see any of this - every class-20 vector supplies a version - so the three refusals are pinned by each library's own tests.
+
 **A KNOWN envelope member present with the WRONG JSON TYPE must never read as ABSENT.**
 `"salts": {}` beside a `disclosure` parses to nothing in a naive reader, so the salt-leak guard never fires and the copy verifies while carrying it: a guard that turns itself off on malformed input is worse than no guard.
 `salt-leak-disclosed-copy-with-wrong-typed-salts` is the vector, and all five libraries reject it - TypeScript as `envelope-malformed` and Swift as `malformed-json`, both one layer earlier than the references, each with a declared PER-VECTOR equivalence rather than a code-wide one, because `disclosed-copy-carries-salts` is correct for the sibling vector.

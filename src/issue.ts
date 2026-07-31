@@ -31,7 +31,15 @@ export interface IssueOptions {
   readonly identity: RecordIdentity;
   readonly resolver: TypeTagResolver;
   readonly hashAlg?: HashAlgName | undefined;
-  /** The type-map artifact version, carried beside its ID in the envelope's discovery hint. */
+  /**
+   * The type-map artifact version, carried beside its ID in the envelope's discovery hint.
+   *
+   * REQUIRED AT ISSUANCE and optional only in the type: `schemas/envelope-1.0.json` requires the
+   * `typeMap` member to carry `id` and `version` together, and `issueFullCopy` always emits that
+   * member, so an issuance without this refuses rather than substituting a version the caller
+   * never named. It stays optional here so the refusal is expressible and testable, exactly as
+   * `RecordIdentity.typeMapId` is.
+   */
   readonly typeMapVersion?: string | undefined;
   readonly anchor?:
     | { readonly chainId: number; readonly registry: string; readonly txHash?: string | undefined }
@@ -83,6 +91,18 @@ export function issueFullCopy(options: IssueOptions): FullCopy {
         'roax.typeMap.id and carried in the envelope (specification sections 4.2 and 11.2)',
     );
   }
+  // Both members or neither, and a version is never guessed. `schemas/envelope-1.0.json` requires
+  // the `typeMap` member to carry `id` and `version` together, and the version is metadata the
+  // issuer knows rather than anything derivable here, so substituting one writes an artifact
+  // version the caller never named into an envelope that is unrecoverable once anchored.
+  if (options.typeMapVersion === undefined) {
+    fail(
+      'envelope-malformed',
+      'issuance requires the type-map artifact version: the envelope carries the type-map id ' +
+        'and version together, and neither is derivable from the other (specification ' +
+        'section 12.1)',
+    );
+  }
 
   const commitment = commitRecord(options.record, {
     hash,
@@ -116,7 +136,7 @@ export function issueFullCopy(options: IssueOptions): FullCopy {
         kind: 'object',
         members: [
           ['id', { kind: 'string', value: options.identity.typeMapId }],
-          ['version', { kind: 'string', value: options.typeMapVersion ?? '1.0.0' }],
+          ['version', { kind: 'string', value: options.typeMapVersion }],
         ],
       },
     ],

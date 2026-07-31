@@ -692,21 +692,6 @@ class ConformanceCorpusTest {
     }
 
     /**
-     * An envelope's comparison form with the aspects the specification does not fix removed.
-     * Applied to BOTH sides, so what survives the comparison is what the specification says.
-     *
-     * Three things are relaxed and nothing else. `disclosure.leaves` is ordered by leaf index and
-     * a full copy's `salts` by its entry's structured path, because every leaf carries its own
-     * index and every salt entry its own path, so neither array order carries anything.
-     * `displayPath` is DROPPED: it is display only and never hashed (specification section 5.2),
-     * and `schemas/envelope-1.0.json` leaves it out of `disclosedLeaf.required`, so a conforming
-     * producer may omit it and a comparison that noticed would fail conforming work.
-     *
-     * Everything else stays exact - both array LENGTHS, every leaf's segments, index, tag, value
-     * carrier, salt and audit path, and every scalar identity field - so a producer that omitted a
-     * per-leaf value carrier still fails, which is the defect this class exists for.
-     */
-    /**
      * A rendering that depends on a value's CONTENT and never on the order it was built in.
      *
      * A [Map]'s own `toString` renders insertion order, so keying a sort on it would order two
@@ -723,6 +708,21 @@ class ConformanceCorpusTest {
         else -> value.toString()
     }
 
+    /**
+     * An envelope's comparison form with the aspects the specification does not fix removed.
+     * Applied to BOTH sides, so what survives the comparison is what the specification says.
+     *
+     * Three things are relaxed and nothing else. `disclosure.leaves` is ordered by leaf index and
+     * a full copy's `salts` by its entry's structured path, because every leaf carries its own
+     * index and every salt entry its own path, so neither array order carries anything.
+     * `displayPath` is DROPPED: it is display only and never hashed (specification section 5.2),
+     * and `schemas/envelope-1.0.json` leaves it out of `disclosedLeaf.required`, so a conforming
+     * producer may omit it and a comparison that noticed would fail conforming work.
+     *
+     * Everything else stays exact - both array LENGTHS, every leaf's segments, index, tag, value
+     * carrier, salt and audit path, and every scalar identity field - so a producer that omitted a
+     * per-leaf value carrier still fails, which is the defect this class exists for.
+     */
     private fun normalizedForComparison(envelope: Any?): Any? {
         if (envelope !is Map<*, *>) return envelope
         val out = LinkedHashMap<Any?, Any?>(envelope)
