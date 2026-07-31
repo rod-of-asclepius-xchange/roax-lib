@@ -280,6 +280,14 @@ public enum TypeMapBindingPolicy: Sendable {
     case boundWhenPresent
     /// Additionally require that a copy name one, which is what a verifier
     /// accepting only `schemas/envelope-2.0.json` records must select.
+    ///
+    /// **This holds for BOTH copy kinds, and enforcing it on only one would be a
+    /// false promise in the API surface.** Not-exploitable-today is not the bar:
+    /// the documented meaning is what a caller relies on, and what the other
+    /// four ROAX libraries will mirror when they gain the same knob. Narrowing
+    /// this sentence to disclosed copies instead would have made the
+    /// documentation honest while leaving `.required` weaker than its name,
+    /// which is exactly the misreading this project exists to prevent.
     case required
 }
 
@@ -360,6 +368,25 @@ public struct EnvelopeVerifier<H: ROAXHash> {
     // MARK: full copy
 
     private func verifyFullCopy(_ envelope: Envelope, record: JSONValue) throws {
+        // The type-map policy is honoured here as well as on the disclosed path.
+        //
+        // What it buys is a clearer diagnostic rather than the only thing
+        // standing between this record and acceptance: a full copy re-flattens
+        // its record against `envelope.identity`, so a stripped outer `typeMap`
+        // drops the fifth reserved leaf and changes both `leafCount` and the
+        // root, and the copy would be refused a few lines below anyway. It is
+        // here because a public knob whose documented meaning is enforced on one
+        // path only is a false promise in the API surface; do not delete it as
+        // redundant.
+        //
+        // There is no committed-versus-outer disagreement to distinguish on this
+        // path, because the leaf set is DERIVED from the outer identity rather
+        // than presented alongside it, which is why the disclosed path needs a
+        // second case here and this one does not.
+        if typeMapBinding == .required && envelope.typeMapId == nil {
+            throw ROAXError.typeMapNotNamed
+        }
+
         guard let salts = envelope.salts else {
             throw ROAXError.envelopeCopyKind("a full copy carries no salts array")
         }
@@ -462,9 +489,18 @@ public struct EnvelopeVerifier<H: ROAXHash> {
         // enough to demand both, and `.required` additionally demands that one
         // be named at all - see `TypeMapBindingPolicy` for the case a single
         // envelope carries no evidence of.
+        //
+        // The two failures are kept apart. Either side naming a type map makes a
+        // difference between them a genuine DISAGREEMENT, which is
+        // `outer-identity-mismatch`. Neither side naming one is not a
+        // disagreement at all - the two agree, both being absent - so refusing
+        // it is this verifier acting on its own configuration, which is
+        // `type-map-not-named` in the same shape as `hash-alg-not-allowed`.
         let committedTypeMapId = committed["roax.typeMap.id"]
-        if typeMapBinding == .required || committedTypeMapId != nil || envelope.typeMapId != nil {
+        if committedTypeMapId != nil || envelope.typeMapId != nil {
             try bind("typeMap.id", outer: envelope.typeMapId, committed: committedTypeMapId)
+        } else if typeMapBinding == .required {
+            throw ROAXError.typeMapNotNamed
         }
         // `roax.issuer.keyId` is deliberately NOT bound: it is the one
         // conditional leaf and the one reserved leaf that is OPTIONAL to

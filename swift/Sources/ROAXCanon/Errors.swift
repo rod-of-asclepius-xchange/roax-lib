@@ -112,6 +112,15 @@ public enum ROAXError: Error, Equatable, CustomStringConvertible {
     /// commitment domained `ROAX-CANON/1/Poseidon-BN254` but hashed with SHA-256
     /// is the issuance spec section 7.4 says MUST NOT be made.
     case hashAlgMismatch(declared: String, computing: String)
+    /// This verifier requires a copy to name a type map and this one names none.
+    ///
+    /// A verifier-policy refusal, the same shape as `hashAlgNotAllowed`, and
+    /// deliberately NOT `outerIdentityMismatch`: nothing disagrees in this case,
+    /// because the outer field and the committed leaf are both absent and
+    /// therefore agree. Reporting it as a mismatch would point a reader at a
+    /// disagreement that did not occur and would break the one-code-per-condition
+    /// mapping `ReasonEquivalence` depends on.
+    case typeMapNotNamed
     /// `canon` is not `ROAX-CANON/1`.
     case canonUnknown(String)
 
@@ -150,6 +159,7 @@ public enum ROAXError: Error, Equatable, CustomStringConvertible {
         case .profileUnknown: return "profile-unknown"
         case .hashAlgNotAllowed: return "hash-alg-not-allowed"
         case .hashAlgMismatch: return "hash-alg-mismatch"
+        case .typeMapNotNamed: return "type-map-not-named"
         case .canonUnknown: return "canon-unknown"
         }
     }
@@ -189,6 +199,7 @@ public enum ROAXError: Error, Equatable, CustomStringConvertible {
         case .hashAlgNotAllowed(let a): return "hashAlg \(a.debugDescription) is not on the allow-list"
         case .hashAlgMismatch(let d, let c):
             return "declared hashAlg \(d.debugDescription) but the hash being computed is \(c.debugDescription)"
+        case .typeMapNotNamed: return "this verifier requires a type map and the copy names none"
         case .canonUnknown(let c): return "canon \(c.debugDescription) is not ROAX-CANON/1"
         }
     }

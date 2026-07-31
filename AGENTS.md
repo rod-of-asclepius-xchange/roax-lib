@@ -88,6 +88,8 @@ That pair is an asset rather than drift only because the test exists, so do not 
 Gating it on the outer member put the trigger in the hands of the party the check constrains, so a holder could delete the member, withhold the leaf and have the binding never run - and the same optional drove the minimum-disclosure floor, so nothing asked for it either.
 `EnvelopeVerifier` now binds whenever either side names a type map and sources the floor from the leaf; do not reintroduce a presenter-controlled gate.
 The residual case - a copy dropping BOTH, which is byte-indistinguishable from a legitimate envelope-1.0 copy because `leafCount` is not authenticated in a disclosed copy - is `TypeMapBindingPolicy`, defaulting to `.boundWhenPresent` so the 1.0 corpus still passes.
+`.required` is enforced on BOTH copy kinds, because a knob whose documented meaning holds on one path only is a false promise in the API surface, and its refusal carries its own reason code `type-map-not-named` rather than `outer-identity-mismatch`: with neither side naming a type map the two agree, so nothing is mismatched.
+Keep those two codes apart when you touch either.
 `swift/README.md` enumerates which envelope-2.0 checks that package does and does not implement, and `swift/FINDINGS.md` finding 11 owns the measurement; this is NOT envelope-2.0 support and must not be described as such.
 
 ## This repository is PUBLIC

@@ -15,7 +15,7 @@ A library produced by reading an existing one passes the corpus while destroying
 | Measure | Result |
 |---|---|
 | Corpus vectors | 488 pass, 0 fail, 0 NOT RUN with a reference checkout |
-| Unit and gap tests | 37 pass |
+| Unit and gap tests | 38 pass |
 | Vaccination sample | commits at 91 leaves without an issuer key identifier, 92 with one |
 | Recovery sample | commits at 69 leaves without an issuer key identifier, 70 with one |
 | Runtime dependencies | none; CryptoKit where it exists, and an in-tree SHA-256 otherwise |
@@ -135,6 +135,7 @@ A check whose execution the presenter controls is not a check.
 **One case a single envelope carries no evidence for.**
 A disclosed copy that omits both the outer member and the leaf is byte-indistinguishable from a legitimate 1.0 copy, and the only signal a fifth reserved leaf was committed is `leafCount`, which specification section 11.1 measured is not authenticated in a disclosed copy.
 So it is the verifier's decision rather than the envelope's: `EnvelopeVerifier(typeMapBinding: .required)` demands a copy name a type map at all, and `.boundWhenPresent` is the default because the corpus is 1.0.
+That demand is enforced on **both** copy kinds, and refusing it reports `type-map-not-named` rather than `outer-identity-mismatch`, because with neither the outer member nor the leaf present the two sides agree and nothing is mismatched.
 See [`FINDINGS.md`](FINDINGS.md) finding 11.
 
 ### There is one leaf-preimage builder and nothing else assembles those bytes

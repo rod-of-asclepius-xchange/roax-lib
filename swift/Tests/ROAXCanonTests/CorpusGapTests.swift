@@ -469,12 +469,108 @@ final class CorpusGapTests: XCTestCase {
         // disclosed copy. A default verifier accepts it.
         XCTAssertNoThrow(try verifier.verify(envelope(withoutLeaf, typeMapId: nil)))
 
-        // So the last case is the VERIFIER's decision, never the presenter's.
+        // So the last case is the VERIFIER's decision, never the presenter's,
+        // and it reports the verifier's own policy rather than a disagreement
+        // that did not occur: with both sides absent, the two AGREE.
         let requiring = EnvelopeVerifier<SHA256Hash>(typeMapBinding: .required)
         XCTAssertThrowsError(try requiring.verify(envelope(withoutLeaf, typeMapId: nil))) {
-            XCTAssertEqual(($0 as? ROAXError)?.reason, "outer-identity-mismatch")
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "type-map-not-named")
         }
         XCTAssertNoThrow(try requiring.verify(envelope(full, typeMapId: identity.typeMapId)))
+
+        // A genuine disagreement keeps reporting one, under `.required` too:
+        // the two codes name different conditions and must not collapse.
+        XCTAssertThrowsError(try requiring.verify(envelope(full, typeMapId: nil))) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "outer-identity-mismatch")
+        }
+        XCTAssertThrowsError(try requiring.verify(envelope(withoutLeaf, typeMapId: identity.typeMapId))) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "outer-identity-mismatch")
+        }
+    }
+
+    /// **The same policy on the FULL-copy path, because a public knob whose
+    /// documented meaning is enforced on one path only is a false promise.**
+    ///
+    /// `.required` says it is what a verifier accepting only
+    /// `schemas/envelope-2.0.json` records selects, and that sentence has to be
+    /// true wherever the verifier is pointed. Not-exploitable-today is not the
+    /// bar: what a caller relies on is the contract, and the other four ROAX
+    /// libraries will mirror this knob when they gain it.
+    ///
+    /// What the check buys on this path is a clearer diagnostic rather than the
+    /// rejection itself - a full copy re-flattens against `envelope.identity`,
+    /// so a stripped outer `typeMap` drops the fifth reserved leaf and changes
+    /// both `leafCount` and the root. This asserts that second rejection too,
+    /// so a later reader can see the check is additive and not load-bearing on
+    /// its own. The committed corpus is envelope-1.0 and carries no `typeMap`
+    /// member, so no vector reaches any of this.
+    func testTypeMapBindingPolicyIsHonouredOnTheFullCopyPathToo() throws {
+        guard let root = CorpusConformanceTests.repoRoot() else { throw XCTSkip("no repo root") }
+        let mapFile = root.appendingPathComponent("corpus/type-maps/org.roax.corpus.synthetic.json")
+        let map = try DisplayPatternTypeMap(json: try JSONScanner.parse([UInt8](try Data(contentsOf: mapFile))))
+        let committer = Committer<SHA256Hash>(
+            resolver: map, emptyContainerPolicy: .assignedWithoutMapAuthorization
+        )
+        let record = try JSONScanner.parse("{\"marker\":\"m\",\"flag\":true}")
+
+        func fullCopy(namingTypeMap typeMapId: String?) throws -> Envelope {
+            let identity = RecordIdentity(
+                recordType: syntheticIdentity.recordType,
+                schemaVersion: syntheticIdentity.schemaVersion,
+                recordId: syntheticIdentity.recordId,
+                issuerId: syntheticIdentity.issuerId,
+                typeMapId: typeMapId
+            )
+            let commitment = try committer.commit(
+                record: record, context: CommitmentContext(identity: identity)
+            )
+            return Envelope(
+                recordType: identity.recordType, schemaVersion: identity.schemaVersion,
+                recordId: identity.recordId, issuerId: identity.issuerId,
+                typeMapId: typeMapId,
+                root: commitment.root, leafCount: commitment.leafCount,
+                record: record,
+                salts: commitment.leaves.map { SaltEntry(segments: $0.segments, salt: $0.salt) }
+            )
+        }
+
+        func verifier(_ policy: TypeMapBindingPolicy) -> EnvelopeVerifier<SHA256Hash> {
+            EnvelopeVerifier<SHA256Hash>(
+                resolver: map,
+                emptyContainerPolicy: .assignedWithoutMapAuthorization,
+                typeMapBinding: policy
+            )
+        }
+
+        let mapId = "urn:roax:type-map:org.roax.corpus.synthetic:1.0.0"
+        let naming = try fullCopy(namingTypeMap: mapId)
+        let silent = try fullCopy(namingTypeMap: nil)
+        XCTAssertEqual(naming.leafCount, 7, "5 reserved leaves plus 2 record leaves")
+        XCTAssertEqual(silent.leafCount, 6, "4 reserved leaves plus 2 record leaves")
+
+        // The default accepts both, which is what keeps the 1.0 corpus green.
+        XCTAssertNoThrow(try verifier(.boundWhenPresent).verify(naming))
+        XCTAssertNoThrow(try verifier(.boundWhenPresent).verify(silent))
+
+        // `.required` refuses the copy that names none, on this path too.
+        XCTAssertNoThrow(try verifier(.required).verify(naming))
+        XCTAssertThrowsError(try verifier(.required).verify(silent)) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "type-map-not-named")
+        }
+
+        // And the rejection the policy check precedes: stripping the outer
+        // member from a copy whose root committed the leaf changes the derived
+        // leaf count, so even the DEFAULT verifier refuses that.
+        let stripped = Envelope(
+            recordType: naming.recordType, schemaVersion: naming.schemaVersion,
+            recordId: naming.recordId, issuerId: naming.issuerId,
+            typeMapId: nil,
+            root: naming.root, leafCount: naming.leafCount,
+            record: record, salts: naming.salts
+        )
+        XCTAssertThrowsError(try verifier(.boundWhenPresent).verify(stripped)) {
+            XCTAssertEqual(($0 as? ROAXError)?.reason, "salts-length-not-leaf-count")
+        }
     }
 
     // MARK: a known member with the wrong JSON shape

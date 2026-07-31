@@ -290,6 +290,8 @@ The binding now fires whenever **either** side names a type map, absence and dis
 A copy that drops both the outer member and the leaf is byte-indistinguishable from a legitimate 1.0 copy.
 The only signal that a fifth reserved leaf was ever committed is `leafCount`, and specification section 11.1 measured that `leafCount` is **not** authenticated in a disclosed copy, so a check leaning on it would reintroduce the forged-size attack that section corrects.
 That case is therefore the verifier's own decision rather than something read out of the envelope: `TypeMapBindingPolicy.required` demands that a copy name a type map at all, in the same shape as `HashAlgorithmAllowList`, and it defaults to `.boundWhenPresent` because the committed corpus is 1.0 throughout.
+It is enforced on **both** copy kinds, since a knob whose documented meaning holds on one path only is a false promise in the API surface, and its refusal is its own reason code `type-map-not-named`: with neither side naming a type map the two agree, so calling that an `outer-identity-mismatch` would point a reader at a disagreement that did not occur.
+On the full-copy path it buys a clearer diagnostic rather than the rejection itself, because a stripped outer `typeMap` also drops the fifth reserved leaf and changes both `leafCount` and the root.
 A verifier that accepts only 2.0 records must select it.
 
 **What this library does NOT check about a type map**, named one by one rather than summarized, because a reader has to be able to tell without reading the source:
@@ -304,7 +306,7 @@ A verifier that accepts only 2.0 records must select it.
 So what this library verifies about a type map is exactly one thing: that the identifier a copy presents is the identifier its root commits.
 That is worth having and it is not 2.0 support.
 
-`CorpusGapTests.testTypeMapIdBindingIsDrivenByTheCommittedLeafNotTheOuterMember` pins every case above, including the one the default policy accepts, because the corpus cannot reach any of them.
+`CorpusGapTests.testTypeMapIdBindingIsDrivenByTheCommittedLeafNotTheOuterMember` pins every disclosed-copy case above, including the one the default policy accepts, and `testTypeMapBindingPolicyIsHonouredOnTheFullCopyPathToo` pins the full-copy half, because the corpus cannot reach any of them.
 
 ## What this build did not find
 
