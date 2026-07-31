@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ROAX-CANON/1 needs no Android permissions and declares no components.
+
+  It is a pure computation library: SHA-256 from java.security.MessageDigest, the CSPRNG from
+  java.security.SecureRandom, NFC from java.text.Normalizer. Nothing here touches the network, the
+  filesystem or any content provider, which is deliberate - specification section 2.2 leaves the
+  anchoring registry and artifact retrieval to the caller.
+-->
+<manifest />
