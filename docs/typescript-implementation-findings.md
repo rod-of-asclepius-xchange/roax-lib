@@ -47,9 +47,10 @@ Specification section 3.3 says, in the sentence added to guard decision D7:
 So under the specification's rule both records **fail closed and have no root at all**, while `record-structure-empty-array` and `record-structure-empty-object` assert one.
 
 **Measured, by running this implementation both ways on a bare checkout**, where class 10 reports 4 skipped because its records live outside this repository.
-The `mechanical` row is the `npm test` default that section 11 below reports; neither row was run against a reference checkout, so no `map-authorized` count with those records is claimed here.
+**Both rows were measured on corpus 1.0.0's 488 vectors and have NOT been re-measured since the corpus grew to 501**, so section 11 below rather than this table carries the current totals; what this finding turns on - which two vectors flip, and why - is unchanged by the vectors added since.
+Neither row was run against a reference checkout, so no `map-authorized` count with those records is claimed here.
 
-| Empty-container policy | Corpus result |
+| Empty-container policy | Corpus result, on corpus 1.0.0 |
 |---|---|
 | `mechanical` - tag 6 or 7 from the observed kind, without consulting the map | 697 pass, 0 fail, 4 skipped |
 | `map-authorized` - specification section 3.3 | 693 pass, **2 fail**, both class 5, 4 skipped |
@@ -329,7 +330,7 @@ Nothing here is carried forward from an earlier run.
 The runner's total line spells the third column `skipped` while the per-vector note for each of those 4 entries reads `NOT RUN` and names its reason; they are the same 4 class-10 vectors, and neither spelling adds them to the passed count.
 
 **The corpus runs were made under `emptyContainerPolicy: 'mechanical'`, which is the corpus's rule and NOT specification section 3.3's.**
-Finding 2 above gives that measurement in full, and the second row is it: the two failures are `record-structure-empty-array` and `record-structure-empty-object`, both on `type-map-fail-closed: no binding in org.roax.corpus.synthetic for kind array|object at a.b`.
+Finding 2 above gives that reading in full, and the third row of the table above is a run under the other one: the two failures are `record-structure-empty-array` and `record-structure-empty-object`, both on `type-map-fail-closed: no binding in org.roax.corpus.synthetic for kind array|object at a.b`.
 A green corpus is therefore evidence of agreement with the committed vectors and is not, on its own, evidence of conformance to section 3.3 - the two are mutually exclusive as things stand.
 The runner DECLARES the active policy on every run, beside the Unicode declaration and for the same reason: a total line read on its own must not stand for a conformance claim the run did not make.
 

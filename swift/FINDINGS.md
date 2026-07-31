@@ -228,7 +228,7 @@ Measured by running this library both ways:
 | Reading | Result |
 |---|---|
 | Corpus reading, tags 6 and 7 assigned without map authorization | 501 pass, 0 fail |
-| Specification reading, section 3.3 as written | 486 pass, **2 fail** - `record-structure-empty-array` and `record-structure-empty-object` |
+| Specification reading, section 3.3 as written | 499 pass, **2 fail** - `record-structure-empty-array` and `record-structure-empty-object` |
 
 Under specification section 1.1 that is a release-blocking corpus defect and the specification governs.
 The narrow fix is a corpus edit - two authorizing rows in the synthetic map - rather than an implementation default.

@@ -284,7 +284,7 @@ Specification section 11.3 states normatively that a field outside the root is a
 pdt's floor is a strict **subset** of recovery's, which adds `validUntil`, so a holder of a recovery copy who relabels the envelope as pdt discloses pdt's floor, withholds the expiry, and every inclusion proof still verifies against the genuine recovery root.
 `identity-outer-record-type-downgrade` carries exactly that copy and the other three carry a mismatch in each remaining reserved field; all four reject with `outer-identity-mismatch`.
 Measured: with the binding removed, all four are **accepted**.
-Those four are the whole of class 18 as built, and they carry no `verifierConfig` because the envelope alone determines each of them.
+Those four plus the two `identity-outer-type-map-*` binding rows are the whole of class 18 as built, and all six carry no `verifierConfig` because the envelope alone determines each of them.
 
 #### The identity binding runs BEFORE the floor, and that order is required
 
@@ -301,7 +301,7 @@ So a disclosed copy is verified in this order:
 Step 3's source-of-floor is not, and cannot be.**
 Both halves of that are measured, and the difference matters to anyone porting this:
 
-| Deviation | Envelope vectors failed, of 54 |
+| Deviation | Envelope vectors failed, of the 54 committed when this was measured |
 |---|---:|
 | enforce the floor before the binding | **16** |
 | keep the ordering, read the floor from the envelope's `recordType` | **0** |
@@ -333,10 +333,10 @@ It is enforced in `tools/build_type_maps.py`, which resolves `$ref` by file path
 
 ### Class 18 is partly built, and the unbuilt half is a named gap rather than an omission
 
-The four identity rows are built and are described above.
+The four identity rows and the two type-map binding rows are built and are described above.
 The registry-dependent rows of `docs/conformance-corpus.md` class 18 are not, and they cannot be: each of them turns on what the verifier's own anchoring registry answers, and specification section 2.2 deliberately leaves that registry undesigned.
 Building them here would make the corpus invent that interface, which section 1.2 of the corpus document forbids for the same reason it forbids binding an unresolved path.
-That is why `schemas/conformance-corpus-1.0.json` PERMITS `envelopeVector.verifierConfig` at class 18 rather than requiring it: an earlier revision required it, and the four built vectors carry none because the envelope alone determines them, so the requirement rejected the committed corpus.
+That is why `schemas/conformance-corpus-1.0.json` PERMITS `envelopeVector.verifierConfig` at class 18 rather than requiring it: an earlier revision required it, and the six built vectors carry none because the envelope alone determines them, so the requirement rejected the committed corpus.
 The completeness rule the block exists for - a vector whose outcome turns on the verifier's configuration must state that configuration - is stated in the schema and is **not mechanically enforced today**, because the vectors that would need the check are exactly the ones that cannot be built yet.
 
 ### Class 19 now carries both sites, and decision D14a is why the key site is buildable

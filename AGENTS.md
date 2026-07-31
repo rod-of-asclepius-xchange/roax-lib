@@ -477,7 +477,7 @@ Things to know:
 - **Four classes are deliberately short, and each is short for a reason recorded in `corpus/README.md`: 10, 11, 13 and 18.**
   Class 10 is 2 of 3 records - PDT stays uncommittable on its 20 endorsed-sample pairs, which need a versioned composition profile nobody has ruled - and class 13 is half.
   Class 11 lacks the two FHIR fail-closed rows its stated minimum names, and they are inexpressible for the same reason section 10 step 1 is undischargeable above: `corpus/type-maps/` carries no `hl7.fhir.bundle` map for such a vector to fail closed against.
-  Class 18 carries the four identity rows and not the registry rows, which need an anchoring registry that specification section 2.2 leaves undesigned.
+  Class 18 carries the four identity rows and the two type-map binding rows, and not the registry rows, which need an anchoring registry that specification section 2.2 leaves undesigned.
   Do not fill any of them in without reading why it is short - building the unbuilt half of 18 decides an open question from inside a data file, which `docs/conformance-corpus.md` section 1.2 forbids, and authoring the class-11 rows would need an invented FHIR map that does the same thing.
   **Class 19 is complete now.**
   It carried the value site alone while D14 was open, and its key site was built under ruled D14a on 2026-07-30; `build_corpus.py` fails if either site is missing.
@@ -577,7 +577,7 @@ Five things to know if you touch them:
   It is shorter than `"not": {"required": ["x"], "properties": {"x": true}}` and needs no `strictRequired` annotation, because it carries no `required`.
 - **A conditional keyed on a vector's `class` needs an instance test on BOTH sides.**
   `envelopeVector` PERMITS `verifierConfig` at class 18 and forbids it everywhere else.
-  It is not required there, and a revision that required it was reverted for rejecting the committed corpus: the four class-18 vectors are the identity rows, which the envelope alone determines, so a config on them would be inert.
+  It is not required there, and a revision that required it was reverted for rejecting the committed corpus: the six class-18 vectors are the identity and type-map binding rows, which the envelope alone determines, so a config on them would be inert.
   The else-branch is the half a compile check cannot see.
   `corpus/tools/validate_schemas.mjs` carries those probes rather than leaving them to a reader: a class-18 instance without the block (MUST pass), one carrying a complete block (MUST pass), one carrying an empty or a partial block (MUST fail, since the block's own `required` names four members), and a class-14 instance carrying one (MUST fail).
   It probes `recordVector`'s two-branch `oneOf` and the deleted D4a carriers the same way, and every probe mutates a clone of the whole committed corpus rather than a `$defs` subschema: compiling proves the `$ref` resolves, and only a root-level instance proves the branch is reached by the path a runner takes.

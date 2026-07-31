@@ -70,7 +70,7 @@ An unsupported reject-vector shape, an unsupported record-vector envelope carrie
 
 A record vector carrying `typeMapId` is the other NOT RUN case, and it is deliberately not a failure.
 That field selects envelope 2.0, which this package does not implement, so such a vector is one the runner cannot run rather than one it ran and disagreed with; it reports NOT RUN with the reason and contributes to exit 2.
-No committed corpus 1.0 record vector carries the field, so nothing reaches this path today and none of the figures above move; it becomes reachable on the corpus rebuild [`AGENTS.md`](../AGENTS.md) records as pending.
+No committed corpus 1.0 record vector carries the field, so nothing reaches this path today and none of the figures above move; it becomes reachable on the migration to [`../schemas/conformance-corpus-2.0.json`](../schemas/conformance-corpus-2.0.json), which requires `typeMapId` on every record vector and which the committed corpus does not yet carry ([`AGENTS.md`](../AGENTS.md), "Validating the schemas").
 
 ## Running the unit tests
 
@@ -78,7 +78,7 @@ No committed corpus 1.0 record vector carries the field, so nothing reaches this
 PYTHONPATH=python/src python3 -m unittest discover -s python/tests -t python
 ```
 
-147 tests, standard library `unittest`.
+152 tests, standard library `unittest`.
 They cover what the corpus reaches plus the Python-specific traps it cannot see, because a trap closed by accident reopens on the next edit.
 `tests/test_ts_sample.py` covers `tools/ts_sample.py` for the same reason: its only consumer is the class-10 record path, so a run without the reference checkout exercises none of it.
 

@@ -1,11 +1,10 @@
 use roax_canon::{
-    audit_path, commit_full_copy_with_salts, fold_inclusion_proof_untrusted, generate_salts,
-    disclose, issue_full_copy_with_salts, leaf_hash, merkle_tree_hash, parse_envelope_value,
-    reserved_leaf_set_for,
-    verify_disclosed, verify_full, CommitmentContext,
-    Error, HashAlgorithm, Issuer, JsonKind, JsonValue, LeafValue, ParsedEnvelope, Path, Profile,
-    ReservedLeafSet, Salt, SaltMap, SchemaValidator, Segment, TypeResolver, TypeTag,
-    VerificationPolicy, CANON_VERSION, UNICODE_VERSION,
+    audit_path, commit_full_copy_with_salts, disclose, fold_inclusion_proof_untrusted,
+    generate_salts, issue_full_copy_with_salts, leaf_hash, merkle_tree_hash, parse_envelope_value,
+    reserved_leaf_set_for, verify_disclosed, verify_full, CommitmentContext, Error, HashAlgorithm,
+    Issuer, JsonKind, JsonValue, LeafValue, ParsedEnvelope, Path, Profile, ReservedLeafSet, Salt,
+    SaltMap, SchemaValidator, Segment, TypeResolver, TypeTag, VerificationPolicy, CANON_VERSION,
+    UNICODE_VERSION,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -1171,9 +1170,7 @@ fn comparable_json(value: &JsonValue) -> Value {
             Value::Object(map)
         }
         JsonValue::Array(items) => Value::Array(items.iter().map(comparable_json).collect()),
-        JsonValue::Number(literal) => {
-            Value::String(format!("$numberLiteral:{literal}"))
-        }
+        JsonValue::Number(literal) => Value::String(format!("$numberLiteral:{literal}")),
         JsonValue::String(text) => Value::String(text.clone()),
         JsonValue::Bool(flag) => Value::Bool(*flag),
         JsonValue::Null => Value::Null,
@@ -1705,11 +1702,17 @@ fn committed_conformance_corpus() {
         let (class, name) = vector_identity(vector);
         let context = round_trip_context(vector);
         let Some(floor) = profile_floor(&context.record_type) else {
-            report.fail(class, format!("{name}: no floor for {}", context.record_type));
+            report.fail(
+                class,
+                format!("{name}: no floor for {}", context.record_type),
+            );
             continue;
         };
         let Some(map) = maps.get(&context.record_type) else {
-            report.fail(class, format!("{name}: no type map for {}", context.record_type));
+            report.fail(
+                class,
+                format!("{name}: no type map for {}", context.record_type),
+            );
             continue;
         };
         let profile = LegacyProfile {
@@ -1827,7 +1830,9 @@ fn committed_conformance_corpus() {
                 Ok(()) => report.pass(class),
                 Err(error) => report.fail(
                     class,
-                    format!("{name}: this crate issued an envelope its own verifier refused: {error}"),
+                    format!(
+                        "{name}: this crate issued an envelope its own verifier refused: {error}"
+                    ),
                 ),
             }
         }
