@@ -158,7 +158,7 @@ The record-shaped reject vectors above are the first vectors whose `reason` is e
 A corpus `reason` is the reference implementations' spelling and is not a normative code, so each library's runner carries a **declared** equivalence table beside this measurement rather than a loosened comparison: it maps one reference code to the one local code naming the same condition, and a rejection for a different reason still fails.
 Rust's went into the `canonical_rejection_reason` mapper that already existed for exactly this.
 
-Harmonizing the codes themselves is a library API change in three packages and was not made here.
+Harmonizing the codes themselves is a library API change in four packages and was not made here: the Swift library, added after this was measured, names the two conditions `type-map-fail-closed` and `base64-not-canonical`, so it carries an equivalence table of its own rather than a fifth spelling.
 
 ### How the tree class generates its leaves
 

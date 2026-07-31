@@ -2,8 +2,10 @@
 
 **Status:** draft for review.
 Not frozen.
-Three ruled independent implementations exist, in Rust under `rust/`, in TypeScript under `src/` and in Python under `python/`; the other two have not been added.
-The TypeScript implementation was written from this document alone, and its disagreements with the conformance corpus are recorded in `docs/typescript-implementation-findings.md`.
+Four ruled independent implementations exist, in Rust under `rust/`, in TypeScript under `src/`, in Python under `python/` and in Swift under `swift/`; Go and Kotlin have not been added.
+Each was written from this document alone.
+The TypeScript build's disagreements with the conformance corpus are recorded in `docs/typescript-implementation-findings.md`, Python's in `python/FINDINGS.md` and Swift's in `swift/FINDINGS.md`.
+Swift's is the first to reach section 6.4's "Yes, negative result" row in code, and it confirms that row plus a second Foundation defect that row does not name.
 **Version string:** `ROAX-CANON/1`
 **Date:** 2026-07-28
 
@@ -1618,5 +1620,6 @@ File and line references are given inline throughout section 14 and elsewhere.
   Where this document now states one of them normatively, the authority is that ruling.
 - **Inference made in this document rather than carried from a ruling:** pinning the `BLOB_REF` blob digest to SHA-256 independently of `hashAlg`, labelled as such at section 6.5 with its reasoning and the consequence it accepts.
 - **Confirmed by reading dogtag source at the cited file and line:** every claim in section 14, including the test-vector counts in 14.3, which were read out of the file rather than quoted.
-- **Carried from the research reports and not independently re-run here:** the performance measurements in the Poseidon row of 14.2, the byte sizes in section 10.3, the five-language agreement result, and the Swift `JSONSerialization` behaviour in section 6.4.
+- **Carried from the research reports and not independently re-run here:** the performance measurements in the Poseidon row of 14.2, the byte sizes in section 10.3, and the five-language agreement result.
+- **Carried from a research report and since re-measured by an implementation:** the Swift `JSONSerialization` behaviour in section 6.4, re-run by the Swift build on Apple Swift 6.2.4 and recorded in `swift/FINDINGS.md` finding 1, which reproduces the magnitude-dependent inconsistency this section names and adds a duplicate-key defect it does not.
 - **Inference, labelled as such where it appears:** the prefix-guard argument in section 11.2.

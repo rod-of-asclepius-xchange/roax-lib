@@ -10,3 +10,7 @@ build/
 
 __pycache__/
 *.pyc
+
+# SwiftPM build products
+swift/.build/
+swift/.swiftpm/
