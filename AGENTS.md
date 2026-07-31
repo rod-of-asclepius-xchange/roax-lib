@@ -431,7 +431,7 @@ Things to know:
   **One line is exempt from the join half of the rule: a metadata field, whose content opens with a bold label ending in a colon, as `**Status:**` does.**
   A field carries no sentence punctuation, so sentence splitting alone merges a whole field list into one 300-character line, which defeats the readable-diff purpose the convention exists for; the document headers of `docs/spec/roax-canon-1.md` and the four `docs/profiles/` profiles are the sites this governs.
   The colon has to sit immediately inside the closing delimiter, which is what keeps the `**A bold thesis sentence.** Then the rest` paragraph opening these documents use 257 times out of the exemption.
-  `docs/type-maps.md` is the single exclusion and is a named constant in the tool: separate in-flight work owns that file and reflows its own prose to this same convention, so remove the entry once that lands.
+  The tool's exclusion set is empty and every Markdown file in the tree is checked, including `docs/type-maps.md`, which was excluded only while a parallel change owned that file and has conformed since that change landed.
   Hold new and substantially rewritten prose to the convention, and reach for the tool rather than rewrapping by hand.
   Do not reflow a file wholesale as a side effect of an unrelated change, because the cosmetic diff buries the real one.
   That should not arise now that the tree conforms, since a change that edits one sentence rewrites one line.
