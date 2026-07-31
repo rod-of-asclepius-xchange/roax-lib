@@ -4,19 +4,21 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 
 ## What this repository is right now
 
-Specification, schemas, the conformance corpus, and four independent libraries: Rust under `rust/`, TypeScript under `src/`, Python under `python/` and Swift under `swift/`.
+Specification, schemas, the conformance corpus, and five independent libraries: Rust under `rust/`, TypeScript under `src/`, Python under `python/`, Swift under `swift/` and Kotlin under `kotlin/`.
 Decision D was ruled to five independent, corpus-enforced libraries on 2026-07-29 (`docs/decisions.md`, decision D).
 The specifications came first so the design could be reviewed before the language implementations existed to be re-litigated, and that ordering held.
 `rust/README.md` owns that crate's protocol boundaries, its build, test and lint commands, and what ruled decisions D13a and D14a mean for its surface.
 `python/README.md` owns that package's surface, its standalone corpus runner, its test commands and its per-class figures, and `python/FINDINGS.md` records what that build found.
 `swift/README.md` owns that package's targets, its corpus runner and its reference-record naming contract, and `swift/FINDINGS.md` records what that build found.
+`kotlin/README.md` owns that module's surface, its Gradle commands, its Android packaging and the reference-record contract its corpus runner uses, and `kotlin/FINDINGS.md` records what that build found.
 
-Do not add the Go or Kotlin library without an explicit instruction to do so.
+Do not add the Go library without an explicit instruction to do so.
 
-**"Four exist and two are outstanding" does not add up to Da's five, and that is a real open question rather than a counting slip in this file.**
-The five the specification names are the five rows of its section 6.4 parser table - Rust, Go, TypeScript, Swift and Kotlin - and Python is a fully independent, corpus-passing library that is not one of them, so the tree holds six target languages.
-An earlier version of this file and of `README.md` each papered over the same mismatch a different way.
-It belongs to the project owner alongside decisions A and C; do not resolve it in prose, and note that no library's status depends on the answer.
+**The ruling's figure and the language set do not agree, and that is a real open point rather than a typo.**
+Decision D was ruled to "five independent, corpus-enforced libraries", and its rejected option Db names those five as Rust, TypeScript, Swift, Kotlin and Go.
+Python was built afterwards, so the language set is six while the ruled figure stays five.
+Five libraries exist today and they are not Db's five, because Python is among them and Go is not, so the matching count is a coincidence rather than the question closing.
+`README.md` therefore states the counts by enumeration and restates no total; do not "fix" either number without a ruling, because whichever one you change decides the question.
 
 **That ruling carries an obligation on HOW each one is written, and it is the reason the option was worth choosing.**
 An implementation is written from `docs/spec/roax-canon-1.md`, and its author does not read another implementation while writing it.
@@ -37,7 +39,7 @@ See [`src/README.md`](src/README.md).
 
 **`package.json` and `tsconfig.json` now exist, and an earlier version of this file gave their absence as a rule.**
 That rule was "a TypeScript package here would read as the beginning of a library", and it is superseded because the library is now deliberate rather than accidental.
-It is superseded **only for the four libraries that exist**, whose manifests are `rust/Cargo.toml`, the root `package.json`, `python/pyproject.toml` and `swift/Package.swift`: adding a `go.mod` or a Gradle build is still the thing not to do without an instruction.
+It is superseded **only for the five libraries that exist**, whose manifests are `rust/Cargo.toml`, the root `package.json`, `python/pyproject.toml`, `swift/Package.swift` and `kotlin/settings.gradle.kts`: adding a `go.mod` is still the thing not to do without an instruction.
 The package is zero-dependency at runtime - `node:crypto` supplies SHA-256 and the CSPRNG - and TypeScript plus `@types/node` are the only devDependencies.
 Ajv is still installed OUTSIDE the tree and named by `ROAX_AJV`, as the schema-validation section below describes; do not add it here.
 
@@ -66,7 +68,8 @@ Without it every class-10 assertion reports NOT RUN with its reason, and is neve
 **The filename inside that directory must be `<authority>.<profile>.json`**, for example `sg.gov.moh.recovery-healthcert.json`: the vector names only the path inside the reference checkout and the extraction utility writes wherever `--out` says, so the name is the runner's contract and a mismatch is reported as NOT RUN naming the exact path probed.
 **Class 10 now needs TWO records**, recovery and `sg.gov.moh.vaccination-healthcert.json`, since the vaccination bindings were ruled.
 Rust's corpus test reads the same directory but names each file by its EXPORT instead - `sampleDocument.json` and `sampleVaccineHealthCert.json` - through `ROAX_EXTRACTED_RECORDS`; the two conventions are separate and a directory can satisfy both.
-Swift follows the `<recordType>.json` convention, through `ROAX_REFERENCE_RECORDS` for `swift test` and `--references` for `swift run roax-conformance`, so one directory now satisfies three runners.
+Swift follows the `<recordType>.json` convention, through `ROAX_REFERENCE_RECORDS` for `swift test` and `--references` for `swift run roax-conformance`.
+Kotlin's runner probes BOTH names under `ROAX_REFERENCE_RECORDS`, so one directory now satisfies all four runners.
 
 ### The Swift library
 
@@ -91,6 +94,28 @@ The residual case - a copy dropping BOTH, which is byte-indistinguishable from a
 `.required` is enforced on BOTH copy kinds, because a knob whose documented meaning holds on one path only is a false promise in the API surface, and its refusal carries its own reason code `type-map-not-named` rather than `outer-identity-mismatch`: with neither side naming a type map the two agree, so nothing is mismatched.
 Keep those two codes apart when you touch either.
 `swift/README.md` enumerates which envelope-2.0 checks that package does and does not implement, and `swift/FINDINGS.md` finding 11 owns the measurement; this is NOT envelope-2.0 support and must not be described as such.
+
+### The Kotlin library
+
+`kotlin/` is a two-module Gradle build: `roax-canon` is the library and its tests, and `roax-canon-android` packages the same `src/main` as an AAR without a second copy of the code.
+See [`kotlin/README.md`](kotlin/README.md), and [`kotlin/FINDINGS.md`](kotlin/FINDINGS.md) for what the build found.
+Run it with `gradle -p kotlin :roax-canon:test`, which runs the corpus and every other test; it passes 488 of 488 vectors with zero NOT RUN once `ROAX_REFERENCE_RECORDS` is set.
+
+**Three things about this module are easy to get wrong.**
+
+- **`java.math.BigDecimal` must not be used for canonical numbers, and it is the trap because it looks correct.**
+  It is arbitrary-precision, so it reads as the right tool, but its `toString` emits scientific notation the section 6.2 output grammar does not admit (`1e2` renders `1E+2`), its parser accepts `+1`, `007`, `.5` and `5.` which the ROAX grammars reject, its `equals` compares scale, and `1.4e+9999` has to be materialized before it can be measured against the 1024-digit bound.
+  `toPlainString()` reproduces all seven worked examples in section 6.2, which is exactly what makes it dangerous.
+  `JvmPlatformTrapTest` pins every one of those as an assertion about the JDK.
+- **The Unicode version is a property of the runtime and cannot be pinned from inside the library.**
+  Section 6.1 pins 15.1; JDK 17 ships Unicode 13.0 and JDK 25 ships 16.0, and no installed JDK has 15.1.
+  `Nfc` is therefore injectable and declares its version, and the corpus runner prints the comparison every run.
+  Measured: all 488 vectors pass under both JDKs, and the digest over the NFC forms of every string in the corpus is byte-identical on both, pinned as a live guard by `PlatformNfcTablesTest`; `kotlin/FINDINGS.md` section 2 owns the counts.
+  Re-run the other one with `-Proax.testJdk=25`.
+- **The Android module is optional by design and is gated on an SDK actually being present.**
+  This repository has no CI, so a contributor touching only canonicalization must not need an Android SDK; `-Proax.skipAndroid=true` forces the JVM-only configuration.
+  The Android claim is checked WITHOUT an SDK by `AndroidApiSurfaceTest`, which reads the compiled constant pools and asserts every referenced JDK type exists on Android API 21+.
+  That is what keeps `java.util.Base64` (API 26+) and `java.util.HexFormat` (absent on Android) out, which is why the library hand-rolls both.
 
 ## This repository is PUBLIC
 
@@ -257,7 +282,7 @@ These are the things a future agent is most likely to get wrong.
   The `dose` ruling narrows the field to a positive integer, which no tag can express.
   Specification section 4.2 orders profile validation BEFORE map resolution, and decision D13a keeps value-domain validation in "a separate, independently versioned conformance layer".
   So the rule is declared by `docs/profiles/vaccination-healthcert.md` section 6, executable in `corpus/tools/profile_rules.py` and `profile_rules.mjs`, self-tested by `run.sh` step 5, and demonstrated through Rust's `SchemaValidator` seam.
-  Do not move it into a type map, into `roax_ref.*`, or into any of the four libraries: that merges two layers a ruling separated.
+  Do not move it into a type map, into `roax_ref.*`, or into any of the five libraries: that merges two layers a ruling separated.
   The discriminating values are `0` and the negatives, because a fractional value is already refused by the section 6.2 INTEGER grammar.
 
 - **The corpus may not require what the design has not decided.**
@@ -406,7 +431,7 @@ Things to know:
   **One line is exempt from the join half of the rule: a metadata field, whose content opens with a bold label ending in a colon, as `**Status:**` does.**
   A field carries no sentence punctuation, so sentence splitting alone merges a whole field list into one 300-character line, which defeats the readable-diff purpose the convention exists for; the document headers of `docs/spec/roax-canon-1.md` and the four `docs/profiles/` profiles are the sites this governs.
   The colon has to sit immediately inside the closing delimiter, which is what keeps the `**A bold thesis sentence.** Then the rest` paragraph opening these documents use 257 times out of the exemption.
-  `docs/type-maps.md` is the single exclusion and is a named constant in the tool: separate in-flight work owns that file and reflows its own prose to this same convention, so remove the entry once that lands.
+  The tool's exclusion set is empty and every Markdown file in the tree is checked, including `docs/type-maps.md`, which was excluded only while a parallel change owned that file and has conformed since that change landed.
   Hold new and substantially rewritten prose to the convention, and reach for the tool rather than rewrapping by hand.
   Do not reflow a file wholesale as a side effect of an unrelated change, because the cosmetic diff buries the real one.
   That should not arise now that the tree conforms, since a change that edits one sentence rewrites one line.
@@ -428,7 +453,7 @@ Two changed it: D4 to independent per-leaf salts, and D9 gaining the `BLOB_REF` 
 **D14 asked whether the type-map LOOKUP matches over an NFC-normalized key or over the bytes as received, and it was RULED D14a, NORMALIZE, on 2026-07-30** (`docs/decisions.md` part 2a, specification section 4.2, `docs/type-maps.md` section 3.1).
 An earlier version of this file told you not to add an `nfc()` call to a matcher.
 **That instruction is superseded and the opposite is now true:** every matcher in this tree normalizes both the pattern token and the segment key, and removing one of those calls unrules a decision.
-The sites are `corpus/tools/roax_ref.py`, `corpus/tools/roax_ref.mjs`, `src/typemap.ts`, `python/src/roax_canon/typemap.py`, `rust/src/type_map.rs`, `swift/Sources/ROAXCanon/TypeMap.swift` and the legacy adapter in `rust/tests/conformance_corpus.rs`.
+The sites are `corpus/tools/roax_ref.py`, `corpus/tools/roax_ref.mjs`, `src/typemap.ts`, `python/src/roax_canon/typemap.py`, `rust/src/type_map.rs`, `swift/Sources/ROAXCanon/TypeMap.swift`, both resolvers in `kotlin/roax-canon/src/main/kotlin/io/roax/canon/TypeMap.kt` and the legacy adapter in `rust/tests/conformance_corpus.rs`.
 The Kelvin workaround in the synthetic map is gone, and two committed vectors now fail closed under raw matching, so the corpus catches a regression rather than tolerating it.
 Rust's `LookupKeyMode`, `TypeResolver::ensure_lookup_decision_independent` and `Error::LookupNormalizationUndecided` were deleted with the ruling; do not reintroduce a mode enum.
 

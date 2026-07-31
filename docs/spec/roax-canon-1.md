@@ -2,10 +2,11 @@
 
 **Status:** draft for review.
 Not frozen.
-Four ruled independent implementations exist, in Rust under `rust/`, in TypeScript under `src/`, in Python under `python/` and in Swift under `swift/`; Go and Kotlin have not been added.
+Five independent implementations exist, in Rust under `rust/`, in TypeScript under `src/`, in Python under `python/`, in Swift under `swift/` and in Kotlin under `kotlin/`; Go has not been added.
 Each was written from this document alone.
-The TypeScript build's disagreements with the conformance corpus are recorded in `docs/typescript-implementation-findings.md`, Python's in `python/FINDINGS.md` and Swift's in `swift/FINDINGS.md`.
+The TypeScript build's disagreements with the conformance corpus are recorded in `docs/typescript-implementation-findings.md`, Python's in `python/FINDINGS.md`, Swift's in `swift/FINDINGS.md` and Kotlin's in `kotlin/FINDINGS.md`.
 Swift's is the first to reach section 6.4's "Yes, negative result" row in code, and it confirms that row plus a second Foundation defect that row does not name.
+Kotlin's is the negative result that closes the one row of that table which had no answer at all.
 **Version string:** `ROAX-CANON/1`
 **Date:** 2026-07-28
 
@@ -127,10 +128,12 @@ Turning a record into a root; disclosing individual leaves against that root; an
 - **No clinical validation, and this one is normative rather than merely absent.**
   A valid root proves that a typed payload was committed by an identified issuer and proves **nothing clinical**.
   Section 2.3 states that in full, with the prohibition it places on every surface built on this protocol.
-- **Kotlin/JVM is unverified.**
-  Every other target language has a confirmed mechanism for preserving JSON numeric literals (section 6.4).
-  Kotlin does not, in the sense that nobody has yet checked.
-  Treat the Kotlin row of that table as an open engineering question, not as a solved one.
+- **Kotlin/JVM was unverified and now is not, with a negative result.**
+  Every other target language had a confirmed mechanism for preserving JSON numeric literals (section 6.4); Kotlin's row said "Not established" because nobody had checked.
+  It was checked while building the Kotlin library under `kotlin/`, and the answer is that **no JDK JSON facility carries this design**: a number must survive as verbatim source text and duplicate member names must stay visible, and nothing on the platform offers both.
+  A literal-preserving scanner must be hand-written, which is the same answer this document already records for Swift.
+  `java.math.BigDecimal` is the specific hazard, because it is arbitrary-precision and therefore looks like the right tool: its `toString` emits scientific notation the section 6.2 output grammar does not admit, its parser accepts input both grammars reject, its `equals` compares scale, and its expansion has to be materialized before it can be measured against the 1024-digit bound.
+  `kotlin/FINDINGS.md` section 1 records the measurement.
 
 ### 2.3 What a valid root proves, and what it does not
 
@@ -557,7 +560,7 @@ This bites *before* any canonicalization runs, and it is the practical form of s
 | Go | `encoding/json` with `Decoder.UseNumber()`; `json.Number` is the literal string | Yes |
 | TypeScript / JS | ES2025 `JSON.parse` source-text access: the reviver's third `context` argument carries `context.source` (V8 >= 12 / Node >= 21) | Yes |
 | Swift | **Nothing in Foundation.** A literal-preserving scanner must be hand-written | Yes, negative result |
-| Kotlin / JVM | Not established | **No - see section 2.2** |
+| Kotlin / JVM | **Nothing in the JDK.** A literal-preserving scanner must be hand-written, as for Swift | Yes, negative result |
 
 Swift is the sharp edge and it is worse than merely lossy.
 `JSONSerialization` switches between `__NSCFNumber` and `NSDecimalNumber` depending on the magnitude of the value, so `{"a":0.010}` reserializes as `{"a":0.01}` while `{"a":1234567890123456789.1}` survives.

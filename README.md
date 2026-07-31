@@ -7,14 +7,15 @@ The goal is a language-neutral way to canonically serialize, merklize, anchor an
 Status: **implementation phase.**
 The specifications and schemas were drafted and reviewed before any library existed, deliberately, so that the design could be settled before the implementations existed to re-litigate it.
 
-**Four independent libraries exist today**: Rust under [`rust/`](rust/), TypeScript under [`src/`](src/), Python under [`python/`](python/) and Swift under [`swift/`](swift/).
-**Two named target languages have not been added**, Go and Kotlin, and neither should be without an explicit instruction.
+**The independent libraries that exist today**, each written from [`docs/spec/roax-canon-1.md`](docs/spec/roax-canon-1.md) without reading another, are Rust under [`rust/`](rust/), TypeScript under [`src/`](src/), Python under [`python/`](python/), Swift under [`swift/`](swift/) and Kotlin under [`kotlin/`](kotlin/).
+**One named language has not been added, Go**, and it should not be without an explicit instruction.
 
-**The arithmetic in that pair of sentences does not reach the ruled number, and saying so is the accurate statement rather than a rounding of it.**
-Decision D was ruled Da on 2026-07-29 to *five* independent, corpus-enforced libraries, and the five the specification names are the five rows of its section 6.4 parser table: Rust, Go, TypeScript, Swift and Kotlin.
-Python is a fully independent, corpus-passing library that is not one of those five, so four exist and two are outstanding, which totals six languages rather than five.
-An earlier version of this section resolved the same mismatch by writing "three of those five" beside a list of three missing libraries, which added to six a different way.
-Whether Da's "five" is a count or that exact list belongs to the project owner alongside decisions A and C; nothing in this repository decides it, and no library's status depends on the answer.
+**The headline figure and the named set have never agreed, and an earlier version of this section asserted both at once.**
+It said five implementations, then that three of the five existed, then that Go, Swift and Kotlin had not been added, which is six.
+Decision D was ruled Da on 2026-07-29 to "five independent, corpus-enforced libraries", and its rejected option Db names those five as Rust, TypeScript, Swift, Kotlin and Go.
+Python was built afterwards as a further independent library, which makes the language set six while the ruling's figure stays five.
+The list above happens to hold as many entries as that figure and is not the same set, since Python is in it and Go is not, so the agreement of the two numbers is a coincidence rather than the question closing.
+The counts above are therefore stated by enumeration and no total is restated here: [`docs/decisions.md`](docs/decisions.md) decision D owns that figure, and reconciling it with the language set is a ruling rather than a documentation edit.
 
 ## Start here
 
@@ -31,6 +32,7 @@ Whether Da's "five" is a count or that exact list belongs to the project owner a
 | [`rust/`](rust/) | The independent Rust implementation, its protocol boundaries and validation commands. |
 | [`python/`](python/) | The independent Python implementation, standard library only. [`python/FINDINGS.md`](python/FINDINGS.md) records what that build found. |
 | [`swift/`](swift/) | The independent Swift implementation, a SwiftPM package for macOS and iOS. [`swift/FINDINGS.md`](swift/FINDINGS.md) records what that build found, including a `String` comparison rule that silently answers an open specification ambiguity. |
+| [`kotlin/`](kotlin/) | The independent Kotlin implementation, zero runtime dependencies, packaged for the JVM and for Android. [`kotlin/FINDINGS.md`](kotlin/FINDINGS.md) records what that build found, including the JVM number and Unicode traps it had to be written around. |
 
 ## Why not OpenAttestation
 
@@ -89,6 +91,7 @@ rust/               independent Rust implementation of ROAX-CANON/1
 src/                independent TypeScript implementation of ROAX-CANON/1
 python/             independent Python implementation of ROAX-CANON/1
 swift/              independent Swift implementation of ROAX-CANON/1
+kotlin/             independent Kotlin implementation of ROAX-CANON/1, JVM and Android
 ```
 
 Reference material used during design - including third-party schemata - is kept **outside** this repository by design and is never committed here.
