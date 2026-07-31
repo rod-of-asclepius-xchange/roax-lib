@@ -59,7 +59,16 @@ Section 6.1 anticipates this and makes a mismatch detectable **by declaration** 
 **What the gap actually costs was measured rather than assumed, twice.**
 
 The whole test suite runs on either JDK - `gradle -p kotlin -Proax.testJdk=25 :roax-canon:test` - and **all 488 vectors pass under both**, at Unicode 13.0 and at 16.0.
-Separately, NFC was applied to every one of the 14,826 strings appearing anywhere in `corpus/conformance-corpus-1.0.json` and its fixtures, of which 54 are non-ASCII and 23 are changed by NFC, and the digest over the normalized set is **byte-identical** on both JDKs.
+Separately, NFC was applied to every string appearing anywhere in the committed corpus, and the digest over the normalized set is **byte-identical** on both JDKs.
+
+**That second measurement is a live guard rather than a one-time run, and it is [`PlatformNfcTablesTest`](roax-canon/src/test/kotlin/io/roax/canon/PlatformNfcTablesTest.kt).**
+Leaving it as prose would have left the property unguarded, and it is the one claim here that least deserves that: it rots silently the first time a JDK or an Android ICU changes how NFC normalizes, which is precisely the divergence this protocol exists to prevent.
+The test pins the digest `4d02818303f50a85f439b01b7c9b6ba71fe0a533be171715217c39224a9549bf` together with the counts that corroborate it, and **running it under both JDKs IS the cross-version comparison**, because a single JVM cannot compare two table versions.
+The constant is deliberately not keyed on the probed `unicodeVersion`, since a per-version table would degrade the guard into "each runtime agrees with itself".
+
+Its input set is `corpus/conformance-corpus-1.0.json` plus `corpus/fixtures/records`, `corpus/fixtures/envelopes` and `corpus/type-maps`, taking object member keys as well as string values because the key site is half of what specification section 5.1 hashes and half of what class 19 tests.
+That yields **14,836 strings, of which 54 are non-ASCII and 23 are changed by NFC**, with none skipped for carrying a lone surrogate, and every one of those four figures is identical on JDK 17.0.19 and JDK 25.0.2.
+The hand-run figure of 14,826 recorded before the guard existed came from a slightly different enumeration, and the two agree on the 54 and the 23, which are the only strings the measurement can turn on.
 
 That brackets the 15.1 pin from both sides, which is a slightly stronger demonstration than the one `corpus/README.md` already records for Node 16.0 against Python 15.1.
 **It is not a demonstration that a version mismatch is detectable**, which class 16 already says it is not: no character whose NFC form changed between these releases has been identified for this corpus.

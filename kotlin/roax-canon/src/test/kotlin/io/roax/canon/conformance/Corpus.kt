@@ -205,8 +205,9 @@ object Corpus {
      * Specification section 6.1 makes a Unicode version mismatch detectable **by declaration**
      * rather than by demonstration, and this is that declaration. It is reported rather than
      * enforced, because no JDK ships the pinned 15.1: JDK 17 has Unicode 13.0 and JDK 25 has 16.0.
-     * `RoaxLibraryTest.nfc tables agree across the two available JDK Unicode versions` measures
-     * what that costs on this input set.
+     * [io.roax.canon.PlatformNfcTablesTest] measures what that costs on this input set: it pins a
+     * digest over the NFC forms of every string in the corpus, and **running it under both JDKs is
+     * the cross-version comparison**, since one JVM cannot compare two table versions.
      */
     fun unicodeGate(nfc: Nfc = PlatformNfc): String =
         if (nfc.unicodeVersion == unicodeVersion) {
