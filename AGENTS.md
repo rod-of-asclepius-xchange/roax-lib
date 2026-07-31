@@ -39,7 +39,7 @@ See [`src/README.md`](src/README.md).
 
 **`package.json` and `tsconfig.json` now exist, and an earlier version of this file gave their absence as a rule.**
 That rule was "a TypeScript package here would read as the beginning of a library", and it is superseded because the library is now deliberate rather than accidental.
-It is superseded **only for the four libraries that exist**, whose manifests are `rust/Cargo.toml`, the root `package.json`, `python/pyproject.toml` and `swift/Package.swift`: adding a `go.mod` or a Gradle build is still the thing not to do without an instruction.
+It is superseded **only for the five libraries that exist**, whose manifests are `rust/Cargo.toml`, the root `package.json`, `python/pyproject.toml`, `swift/Package.swift` and `kotlin/settings.gradle.kts`: adding a `go.mod` is still the thing not to do without an instruction.
 The package is zero-dependency at runtime - `node:crypto` supplies SHA-256 and the CSPRNG - and TypeScript plus `@types/node` are the only devDependencies.
 Ajv is still installed OUTSIDE the tree and named by `ROAX_AJV`, as the schema-validation section below describes; do not add it here.
 
@@ -110,7 +110,7 @@ Run it with `gradle -p kotlin :roax-canon:test`, which runs the corpus and every
 - **The Unicode version is a property of the runtime and cannot be pinned from inside the library.**
   Section 6.1 pins 15.1; JDK 17 ships Unicode 13.0 and JDK 25 ships 16.0, and no installed JDK has 15.1.
   `Nfc` is therefore injectable and declares its version, and the corpus runner prints the comparison every run.
-  Measured: all 488 vectors pass under both JDKs, and NFC over all 14,826 corpus strings is byte-identical on both.
+  Measured: all 488 vectors pass under both JDKs, and the digest over the NFC forms of every string in the corpus is byte-identical on both, pinned as a live guard by `PlatformNfcTablesTest`; `kotlin/FINDINGS.md` section 2 owns the counts.
   Re-run the other one with `-Proax.testJdk=25`.
 - **The Android module is optional by design and is gated on an SDK actually being present.**
   This repository has no CI, so a contributor touching only canonicalization must not need an Android SDK; `-Proax.skipAndroid=true` forces the JVM-only configuration.
@@ -282,7 +282,7 @@ These are the things a future agent is most likely to get wrong.
   The `dose` ruling narrows the field to a positive integer, which no tag can express.
   Specification section 4.2 orders profile validation BEFORE map resolution, and decision D13a keeps value-domain validation in "a separate, independently versioned conformance layer".
   So the rule is declared by `docs/profiles/vaccination-healthcert.md` section 6, executable in `corpus/tools/profile_rules.py` and `profile_rules.mjs`, self-tested by `run.sh` step 5, and demonstrated through Rust's `SchemaValidator` seam.
-  Do not move it into a type map, into `roax_ref.*`, or into any of the four libraries: that merges two layers a ruling separated.
+  Do not move it into a type map, into `roax_ref.*`, or into any of the five libraries: that merges two layers a ruling separated.
   The discriminating values are `0` and the negatives, because a fractional value is already refused by the section 6.2 INTEGER grammar.
 
 - **The corpus may not require what the design has not decided.**
@@ -453,7 +453,7 @@ Two changed it: D4 to independent per-leaf salts, and D9 gaining the `BLOB_REF` 
 **D14 asked whether the type-map LOOKUP matches over an NFC-normalized key or over the bytes as received, and it was RULED D14a, NORMALIZE, on 2026-07-30** (`docs/decisions.md` part 2a, specification section 4.2, `docs/type-maps.md` section 3.1).
 An earlier version of this file told you not to add an `nfc()` call to a matcher.
 **That instruction is superseded and the opposite is now true:** every matcher in this tree normalizes both the pattern token and the segment key, and removing one of those calls unrules a decision.
-The sites are `corpus/tools/roax_ref.py`, `corpus/tools/roax_ref.mjs`, `src/typemap.ts`, `python/src/roax_canon/typemap.py`, `rust/src/type_map.rs`, `swift/Sources/ROAXCanon/TypeMap.swift` and the legacy adapter in `rust/tests/conformance_corpus.rs`.
+The sites are `corpus/tools/roax_ref.py`, `corpus/tools/roax_ref.mjs`, `src/typemap.ts`, `python/src/roax_canon/typemap.py`, `rust/src/type_map.rs`, `swift/Sources/ROAXCanon/TypeMap.swift`, both resolvers in `kotlin/roax-canon/src/main/kotlin/io/roax/canon/TypeMap.kt` and the legacy adapter in `rust/tests/conformance_corpus.rs`.
 The Kelvin workaround in the synthetic map is gone, and two committed vectors now fail closed under raw matching, so the corpus catches a regression rather than tolerating it.
 Rust's `LookupKeyMode`, `TypeResolver::ensure_lookup_decision_independent` and `Error::LookupNormalizationUndecided` were deleted with the ruling; do not reintroduce a mode enum.
 

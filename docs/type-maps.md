@@ -239,7 +239,7 @@ The corpus-side map and the published artifact are separate bytes with separate 
 
 The reason the published side lags is section 6: those four artifacts can currently be neither regenerated nor `--check`ed, because the generator fails closed on 34 merged object states.
 `tools/build-type-maps.mjs` also has no ruling mechanism at all - nothing corresponding to the corpus-side `RULED_BINDINGS` - so even an unblocked regeneration would reproduce every one of those `unresolved` rows today.
-Hand-editing a generated artifact would replace a regeneration blocked by a recorded ruling with one that is unreproducible in principle, and it would move four content IDs, the registry, the section 2.1 identity table and the IDs pinned in `rust/tests/published_type_maps.rs` on bytes no generator can reproduce.
+Hand-editing a generated artifact would replace a regeneration blocked by a recorded ruling with one that is unreproducible in principle, and it would move four content IDs, the registry, the section 2.1 identity table and the IDs pinned in `rust/tests/published_type_maps.rs` and `kotlin/roax-canon/src/test/kotlin/io/roax/canon/PublishedTypeMapTest.kt` on bytes no generator can reproduce.
 `tools/check-type-maps.mjs` passing on the untouched artifacts is the signal that this is still the safe regime.
 
 **What is pinned today, and what it does and does not prove.**
@@ -253,7 +253,7 @@ They are **not** the FHIR profile binding, and `corpus/README.md` says the same 
 2. Give `tools/build-type-maps.mjs` a ruling table held apart from the schema walk, under the same guards as the corpus-side one: a ruling may only resolve a path the walk independently reported unbound, and may never overwrite a tag the schema determines.
 3. Regenerate all four artifacts with the four ruled bindings applied, which converts the affected `unresolved` rows into bindings; the null-placeholder ruling needs no row and must stay an absence.
 4. Bump `typeMapVersion` by MINOR under section 5.2 on each artifact that gained a binding, since the change is additive and makes previously rejected records issuable.
-5. Update the section 2.1 identity table, `type-maps/registry-1.0.0.json`, the section 2 coverage figures and the pinned IDs in `rust/tests/published_type_maps.rs`.
+5. Update the section 2.1 identity table, `type-maps/registry-1.0.0.json`, the section 2 coverage figures and the pinned IDs in `rust/tests/published_type_maps.rs` and `kotlin/roax-canon/src/test/kotlin/io/roax/canon/PublishedTypeMapTest.kt`, the second of which also asserts that the vaccination artifact still fails closed for `dose` and `expiryDateTime`, so step 3 moves it too.
 6. Delete this section.
 
 ## 2. Published artifacts and finite coverage
