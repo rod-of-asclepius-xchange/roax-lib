@@ -29,13 +29,11 @@ Specification section 3.3 says, of the flattener's empty-container outputs:
 So under the section 3.3 rule those two records have no type tag at `a.b` and MUST fail closed, which means they have no root at all - and the class-5 vectors `record-structure-empty-array` and `record-structure-empty-object` assert one for each.
 
 **Measured, from this implementation.**
-These are the two reference-available rows of [`README.md`](README.md)'s table, which owns those figures; both moved when the corpus grew on 2026-07-30 and the delta between them did not.
+The two reference-available rows of [`README.md`](README.md)'s table own those figures; both moved when the corpus grew on 2026-07-30 and the delta between them did not.
 Both need the third-party checkout `.gitignore` excludes, and that table's two reference-unavailable rows show the same delta of 4 without it, so the divergence below is reproducible from a bare clone.
 
-| Empty-container rule | Corpus result |
-|---|---|
-| structural: tag 6 or 7 assigned without a map lookup | 759 passing assertions, 0 failures |
-| section 3.3: the map must authorize the path and kind | 755 passing assertions, **2 failures**, both class 5 |
+Against that table's reference-available pair, the structural rule passes every assertion with 0 failures, and the section 3.3 rule costs exactly 4 of them and produces **2 failures**, both class 5.
+The absolute totals are deliberately not restated here, because a second copy of a run figure goes stale the moment the corpus grows while the delta of 4 does not.
 
 The two failures are exactly `record-structure-empty-array` and `record-structure-empty-object`, each rejected with `type-unresolved`.
 Nothing else moves.
@@ -83,7 +81,7 @@ Section 4.2 selects the exact map by content ID, committed at `roax.typeMap.id`.
 
 This is observable in the corpus rather than merely theoretical.
 `corpus/fixtures/envelopes/floor-hl7-fhir-bundle-complete.json` is a disclosed copy at `recordType: "hl7.fhir.bundle"`, and `corpus/type-maps/` contains **no** `hl7.fhir.bundle` map at all - only the synthetic, PDT, recovery and vaccination ones.
-An implementer who followed step 1 literally and picked a map by `recordType` would fail that vector closed, and every other `floor-hl7-fhir-bundle-*` accept vector with it.
+An implementer who followed step 1 literally and picked a map by `recordType` would fail that vector closed, and every other class-14 `hl7.fhir.bundle` accept vector with it.
 
 **Reading taken:** the reserved half of step 1 is performable and is performed - a disclosed leaf at a single `roax.`-prefixed segment must carry tag 2 STRING, from the fixed table in section 11.2.
 The record-leaf half is skipped for a 1.0 envelope, and `roax_canon.verify` says so in a comment at the site rather than omitting it silently.

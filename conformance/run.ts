@@ -768,7 +768,7 @@ function corpusVerifierConfig(): VerifierConfig {
           }
         : undefined,
     // `corpus/type-maps/` carries no `hl7.fhir.bundle` map, so section 10 step 1 cannot be
-    // discharged for the 6 `floor-hl7-fhir-bundle-*` fixtures that disclose a record leaf.
+    // discharged for the 8 of the 9 class-14 `hl7.fhir.bundle` fixtures that disclose a record leaf.
     // Reported, not hidden.
     requireTypeMapForDisclosedLeaves: false,
     emptyContainerPolicy: EMPTY_CONTAINER_POLICY,

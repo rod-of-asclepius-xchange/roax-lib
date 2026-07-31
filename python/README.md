@@ -41,19 +41,20 @@ This is a third runner and it is standalone.
 It does not extend `corpus/tools/run.sh`, which is the existing two-implementation gate; it consumes the vector file, the fixtures and the corpus-side type maps, which is the interface `corpus/README.md` documents for an implementation that is not one of those two.
 The runner does not deliberately write files or modify `corpus/`; the interpreter's normal `__pycache__` writes may still occur.
 
-Measured on CPython 3.13.5: Pass and fail are assertion counts; not-run entries are vectors or required classes.
+Measured against corpus `1.1.0`, at `bba14101`: Pass and fail are assertion counts; not-run entries are vectors or required classes.
+Every figure below moves with the corpus version, which is why the version is stated with them.
 
 | Mode | Pass | Fail | Not run | Classes passed | Result | Exit | Needs the checkout |
 |---|---:|---:|---:|---:|---|---:|---|
-| structural, references available | 759 | 0 | 0 | 19/19 | `PASS` | 0 | yes |
-| structural, references unavailable | 751 | 0 | 4 | 18/19 | `INCOMPLETE / NOT RUN` | 2 | no |
-| authorized, references available | 755 | 2 | 0 | 18/19 | `FAIL` | 1 | yes |
-| authorized, references unavailable | 747 | 2 | 4 | 17/19 | `FAIL` | 1 | no |
+| structural, references available | 793 | 0 | 0 | 20/20 | `PASS` | 0 | yes |
+| structural, references unavailable | 785 | 0 | 4 | 19/20 | `INCOMPLETE / NOT RUN` | 2 | no |
+| authorized, references available | 789 | 2 | 0 | 19/20 | `FAIL` | 1 | yes |
+| authorized, references unavailable | 781 | 2 | 4 | 18/20 | `FAIL` | 1 | no |
 
 **The last column is the provenance of each row, and the four did not come from one run.**
 The two `no` rows are reproducible from a bare clone of this repository and were measured that way.
 The two `yes` rows need the third-party schemata checkout that `.gitignore` excludes, so reproducing either one means supplying `--references` from outside the tree.
-Each `yes` row is its `no` twin plus class 10's four vectors and the eight assertions they carry: 751 + 8 = 759, and 747 + 8 = 755 with the same two class-5 failures on both sides.
+Each `yes` row is its `no` twin plus class 10's four vectors and the eight assertions they carry: 785 + 8 = 793, and 781 + 8 = 789 with the same two class-5 failures on both sides.
 
 The first row is the only conforming PASS.
 Class 10 reproduces both roots of the MOH recovery sample at `references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/sample-data.ts`, at 69 and 70 leaves, and both roots of the vaccination sample at `references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/sample-data.ts`, at 91 and 92 leaves.
@@ -63,7 +64,7 @@ That vaccination pair commits at all only because its two blocking paths were ru
 `--references` defaults first to `ROAX_REFERENCES`, then to `references/` at the repository root.
 The checkout is third-party, `.gitignore` excludes it, and it is never committed.
 Without it, class 10 reports its four vectors as NOT RUN with the attempted path and `--references /path/to/schemata` remedy; in structural mode the terminal result is `INCOMPLETE / NOT RUN` and the process exits 2, and in authorized mode the two class-5 failures still decide the exit, which is the table's fourth row.
-It never reports PASS for those 751 assertions.
+It never reports PASS for those 785 assertions.
 Those four vectors resolve their records out of the checkout through the `recordFile` strings committed at `corpus/conformance-corpus-1.0.json:6048`, `:6062`, `:6075` and `:6089`.
 The two authorized-mode rows are a different measurement, in which the two class-5 empty-container records fail closed and the process exits 1 ([`FINDINGS.md`](FINDINGS.md), item 1).
 An unsupported reject-vector shape, an unsupported record-vector envelope carrier, a missing committed type map, or a present reference module that cannot be extracted is a failure and also exits 1.

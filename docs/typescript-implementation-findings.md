@@ -47,13 +47,13 @@ Specification section 3.3 says, in the sentence added to guard decision D7:
 So under the specification's rule both records **fail closed and have no root at all**, while `record-structure-empty-array` and `record-structure-empty-object` assert one.
 
 **Measured, by running this implementation both ways on a bare checkout**, where class 10 reports 4 skipped because its records live outside this repository.
-**Both rows were measured on corpus 1.0.0's 488 vectors and have NOT been re-measured since the corpus grew to 501**, so section 11 below rather than this table carries the current totals; what this finding turns on - which two vectors flip, and why - is unchanged by the vectors added since.
-Neither row was run against a reference checkout, so no `map-authorized` count with those records is claimed here.
+**Both rows were re-measured on corpus 1.1.0's 501 vectors**, at `bba14101` under Node v22.21.0.
+Neither row was run against a reference checkout, so no `map-authorized` count with those records is claimed here, and both rows are therefore the WITHOUT-references variants of the runs section 11 tabulates rather than a separate measurement.
 
-| Empty-container policy | Corpus result, on corpus 1.0.0 |
+| Empty-container policy, both WITHOUT a reference checkout | Corpus result, on corpus 1.1.0 |
 |---|---|
-| `mechanical` - tag 6 or 7 from the observed kind, without consulting the map | 697 pass, 0 fail, 4 skipped |
-| `map-authorized` - specification section 3.3 | 693 pass, **2 fail**, both class 5, 4 skipped |
+| `mechanical` - tag 6 or 7 from the observed kind, without consulting the map | 720 pass, 0 fail, 4 skipped |
+| `map-authorized` - specification section 3.3 | 716 pass, **2 fail**, both class 5, 4 skipped |
 
 The two rows differ by four assertions where only two vectors flip, which is not a third failure hiding somewhere: a record vector asserts `leafCount` and `root` separately, and a throw out of `commitRecord` emits one failure in place of both passes (`conformance/run.ts:525-528`).
 
@@ -73,18 +73,19 @@ The code does not silently pick one.
 ## 3. Specification section 10 step 1 cannot be discharged for `hl7.fhir.bundle` against this corpus
 
 **Class:** specification-versus-corpus divergence, section 1.1.
-Measured: 7 vectors of class 14, of which 6 disclose the record leaf whose tag cannot be checked.
+Measured: 9 `hl7.fhir.bundle` vectors of class 14, of which 8 disclose the record leaf whose tag cannot be checked.
 
 Specification section 10 requires that for each disclosed leaf a verifier "checks a record leaf's tag against the exact selected map under section 4.2".
 
 `corpus/type-maps/` carries four maps: the synthetic one and the three MOH profiles.
-There is **no `hl7.fhir.bundle` map**, and 6 of the 7 committed `floor-hl7-fhir-bundle-*` envelope fixtures disclose a `resourceType` record leaf.
-A verifier that hard-requires the tag check therefore rejects those 6 with `type-map-fail-closed`, including the two the corpus expects to accept.
-The seventh, `floor-hl7-fhir-bundle-omits-resourceType`, discloses no record leaf at all, so the check never fires and it is rejected on `minimum-disclosure-floor` whether the requirement is on or off.
+There is **no `hl7.fhir.bundle` map**, and 8 of the 9 committed class-14 `hl7.fhir.bundle` envelope fixtures disclose a `resourceType` record leaf: 6 of the 7 `floor-hl7-fhir-bundle-*` fixtures and both `typemap-floor-hl7-fhir-bundle-*` ones.
+A verifier that hard-requires the tag check therefore rejects those 8 with `type-map-fail-closed`, including the three the corpus expects to accept.
+The one fixture that discloses no record leaf at all, `floor-hl7-fhir-bundle-omits-resourceType`, never fires the check and is rejected on `minimum-disclosure-floor` whether the requirement is on or off.
 
-**7 is the count against the committed corpus and 8 is the count against the class definition**, so a reader comparing the two is not looking at a miscount.
-Class 14 defines the floor as five reserved paths plus the profile's, the committed fixtures carry four, and the missing `roax.typeMap.id` omission fixture is the eighth.
-Section 9 below records the same difference from the other side, and closing it is corpus-rebuild work.
+**The `floor-hl7-fhir-bundle-*` family alone asserts four reserved paths where class 14 defines five**, so a reader counting omission fixtures inside that one family is not looking at a miscount.
+Those seven fixtures were issued before `roax.typeMap.id` existed, and the fifth reserved path is asserted by the parallel `typemap-floor-hl7-fhir-bundle-*` pair instead, one accept and one omission, which is why the class-14 set for this profile is nine rather than eight.
+That close is ADDITIVE rather than a corpus rebuild, so no root of the earlier seven moved.
+Section 9 below records the same family from the other side.
 
 **How this implementation handles it.**
 `verifyEnvelope` takes an optional resolver per `recordType`.
@@ -325,12 +326,13 @@ Nothing here is carried forward from an earlier run.
 | `npm test`, the default | **720 assertions, 0 failures, 4 NOT RUN** - class 10, whose records live outside this repository |
 | the same with `ROAX_REFERENCE_RECORDS` set | **728 assertions, 0 failures, 0 NOT RUN** |
 | `ROAX_EMPTY_CONTAINERS=map-authorized`, the section 3.3 reading | **724 passed, 2 failed**, exit 1 |
-| `test/unit.ts` | **36 tests, 0 failures** |
+| `test/unit.ts` | **37 tests, 0 failures** |
 
 The runner's total line spells the third column `skipped` while the per-vector note for each of those 4 entries reads `NOT RUN` and names its reason; they are the same 4 class-10 vectors, and neither spelling adds them to the passed count.
 
 **The corpus runs were made under `emptyContainerPolicy: 'mechanical'`, which is the corpus's rule and NOT specification section 3.3's.**
 Finding 2 above gives that reading in full, and the third row of the table above is a run under the other one: the two failures are `record-structure-empty-array` and `record-structure-empty-object`, both on `type-map-fail-closed: no binding in org.roax.corpus.synthetic for kind array|object at a.b`.
+That row and finding 2's `map-authorized` row are the same run family rather than two measurements, and they differ by exactly the 8 class-10 assertions a reference checkout adds: 724 = 728 - 4 here, against 716 = 720 - 4 there, with the same 2 failures on both sides.
 A green corpus is therefore evidence of agreement with the committed vectors and is not, on its own, evidence of conformance to section 3.3 - the two are mutually exclusive as things stand.
 The runner DECLARES the active policy on every run, beside the Unicode declaration and for the same reason: a total line read on its own must not stand for a conformance claim the run did not make.
 

@@ -60,7 +60,9 @@ The bar is byte-identical results on every vector, and a difference is a finding
 - **Specification section 3.3's empty-container rule is unsatisfiable against the committed corpus,** measured at exactly 2 vectors of class 5.
   `a.b` carries an empty array and an empty object in those fixtures, and the synthetic map declares `a.b` for `jsonKind: "null"` alone, so under the specification's rule both records fail closed and have no root.
   Expose both readings rather than picking one silently.
-- **Section 10 step 1 cannot be discharged for `hl7.fhir.bundle`**, because `corpus/type-maps/` carries no map for it while six of the seven class-14 `floor-hl7-fhir-bundle-*` fixtures disclose a `resourceType` record leaf.
+- **Section 10 step 1 cannot be discharged for `hl7.fhir.bundle`**, because `corpus/type-maps/` carries no map for it while eight of the nine class-14 `hl7.fhir.bundle` fixtures disclose a `resourceType` record leaf, across both the `floor-` and the `typemap-floor-` families.
+  **That count is hand-maintained in four places** - here, `docs/typescript-implementation-findings.md` finding 3, `src/envelope.ts` and `conformance/run.ts` - and all four went stale together the moment the `typemap-floor-*` family was added, which is the defect underneath the figure rather than the figure itself.
+  The follow-up is to give it ONE source, derived from the fixtures at runtime or stated once and cited from the other three; do not close the gap by adding a fifth copy.
 
 Run it with `npm run conformance`.
 `ROAX_REFERENCE_RECORDS=<dir>` runs class 10 against records extracted from a reference checkout with `corpus/tools/extract_reference_record.py`, which is a data-extraction utility rather than a reference implementation and is therefore safe to read while building one.
