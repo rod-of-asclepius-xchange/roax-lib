@@ -118,12 +118,23 @@ function verifyInner(envelope, typeMaps) {
 
   const root = Buffer.from(get(envelope, "root"), "hex");
   const issuer = get(envelope, "issuer");
+  const outerTypeMap = get(envelope, "typeMap");
+  // A KNOWN member present with the wrong JSON shape is a malformed envelope and never a silent
+  // absence. Reading it as absent would hand the trigger of the type-map binding below to the
+  // party that binding constrains, one layer lower than the defect it exists to close:
+  // `"typeMap": []` would read as "no type map named" and the check would not run. A guard that
+  // switches itself off on malformed input is worse than no guard, because it reports safety it
+  // is not providing.
+  if (has(envelope, "typeMap") && !(outerTypeMap instanceof ref.RecordMap)) {
+    return [false, "envelope-member-malformed"];
+  }
   const identity = {
     recordType,
     schemaVersion: get(envelope, "schemaVersion"),
     recordId: get(envelope, "recordId"),
     issuerId: get(issuer, "id"),
     issuerKeyId: get(issuer, "keyId"),
+    typeMapId: outerTypeMap === undefined ? undefined : get(outerTypeMap, "id"),
   };
 
   if (hasRecord) return verifyFull(envelope, hashAlg, root, identity, typeMaps);
@@ -247,6 +258,37 @@ function verifyDisclosed(envelope, hashAlg, root, identity) {
     if (ref.nfc(committed) !== ref.nfc(outer)) return [false, "outer-identity-mismatch"];
   }
 
+  // The same binding for roax.typeMap.id. It is CONDITIONAL, and what makes it conditional
+  // rather than a fifth row above is worth stating rather than inferring from the code shape.
+  //
+  // THE TRIGGER IS THE WHOLE POINT. Gating this on the outer `typeMap` member being present -
+  // the obvious reading, since schemas/envelope-1.0.json leaves that member optional - puts the
+  // trigger in the hands of the party the check constrains: the holder deletes the member,
+  // withholds the leaf, and the binding never runs while every remaining inclusion proof stays
+  // genuine. Section 11.2 makes roax.typeMap.id mandatory to disclose BY ARITHMETIC, because it
+  // selects and authenticates the exact map, so skipping it yields no proof of which map applies
+  // rather than a weaker one. A check whose execution is controlled by the party it constrains
+  // is not a check.
+  //
+  // The binding therefore fires whenever EITHER side names a type map, and absence on one side
+  // is the same rejection as disagreement. The single case it cannot reach is neither side
+  // naming one, which is byte-indistinguishable from a legitimate envelope-1.0 copy issued
+  // before the section 4.2 binding: the only signal that a fifth reserved leaf was committed is
+  // `leafCount`, which section 11.1 measured is NOT authenticated in a disclosed copy. The 34
+  // committed floor fixtures are that shape, so the corpus pins accepting it. What closes it is
+  // schemas/envelope-2.0.json REQUIRING the member, not a check inside this function.
+  const committedTypeMapId = revealed.get(pathKey([{ key: ref.RESERVED.typeMapId }]));
+  const outerTypeMapId = identity.typeMapId;
+  const typeMapBound = committedTypeMapId !== undefined || outerTypeMapId !== undefined;
+  if (typeMapBound) {
+    if (typeof committedTypeMapId !== "string" || typeof outerTypeMapId !== "string") {
+      return [false, "outer-identity-mismatch"];
+    }
+    if (ref.nfc(committedTypeMapId) !== ref.nfc(outerTypeMapId)) {
+      return [false, "outer-identity-mismatch"];
+    }
+  }
+
   // Section 10.2, the minimum-disclosure floor, taken from the record type the ROOT commits
   // rather than from the envelope field. The binding just proved them equal, so the floor is
   // the same either way; reading it off the leaf is what makes that structural instead of a
@@ -258,7 +300,13 @@ function verifyDisclosed(envelope, hashAlg, root, identity) {
   // permits the lookup above to read the LEAF at all - drop it and the obvious next edit is to
   // pass the outer field here, putting trust-then-verify back.
   if (floor === null) return [false, "profile-unknown"];
-  for (const required of floor) {
+  // The floor entry comes from the COMMITTED leaf and never from the outer optional. Unreachable
+  // today for the same reason the reserved half of the floor is - the binding above already
+  // rejected a copy naming a type map on one side and withholding the leaf on the other, so by
+  // here the path is in seenPaths. It stays because deleting it leaves the floor's membership
+  // implicit in the binding's ordering, which is the coupling that let the check be skipped.
+  const effectiveFloor = typeMapBound ? [...floor, [{ key: ref.RESERVED.typeMapId }]] : floor;
+  for (const required of effectiveFloor) {
     if (!seenPaths.has(pathKey(required))) return [false, "minimum-disclosure-floor"];
   }
   return [true, "ok"];

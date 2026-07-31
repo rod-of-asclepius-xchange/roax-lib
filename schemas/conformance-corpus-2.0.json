@@ -38,7 +38,8 @@
         "record": { "type": "array", "items": { "$ref": "#/$defs/recordVector" } },
         "unlinkability": { "type": "array", "items": { "$ref": "#/$defs/unlinkabilityVector" } },
         "normalization": { "type": "array", "items": { "$ref": "#/$defs/normalizationVector" } },
-        "envelope": { "type": "array", "items": { "$ref": "#/$defs/envelopeVector" } }
+        "envelope": { "type": "array", "items": { "$ref": "#/$defs/envelopeVector" } },
+        "roundTrip": { "type": "array", "items": { "$ref": "#/$defs/roundTripVector" } }
       }
     }
   },
@@ -47,10 +48,10 @@
     "hex32": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "name": { "type": "string", "minLength": 1 },
     "classRef": {
-      "description": "Which numbered class in docs/conformance-corpus.md this vector discharges. Every class must be reachable from at least one vector; a class with no vectors is a coverage gap and the corpus build MUST report it. The maximum tracks the class count stated in section 3 of that document and MUST move with it. Raised from 17 to 19 on 2026-07-28 when the ten engineering decisions were ruled: class 18 fails an implementation that treats an outside-the-root field as authority (decision D8) and class 19 asserts NFC end to end with a root (decision D12). Class numbers are stable - class 12 kept its number and its subject when decision D4 was ruled D4b and lost only its mechanism, so nothing renumbered.",
+      "description": "Which numbered class in docs/conformance-corpus.md this vector discharges. Every class must be reachable from at least one vector; a class with no vectors is a coverage gap and the corpus build MUST report it. The maximum tracks the class count stated in section 3 of that document and MUST move with it. Raised from 17 to 19 on 2026-07-28 when the ten engineering decisions were ruled: class 18 fails an implementation that treats an outside-the-root field as authority (decision D8) and class 19 asserts NFC end to end with a root (decision D12). Class numbers are stable - class 12 kept its number and its subject when decision D4 was ruled D4b and lost only its mechanism, so nothing renumbered. RAISED FROM 19 TO 20 when the issue-then-verify round trip was added: class 20 is the only class that runs an implementation against its own PRODUCED envelope rather than against bytes another program wrote, and roundTripVector below is a further definition pinning its class with a const.",
       "type": "integer",
       "minimum": 1,
-      "maximum": 19
+      "maximum": 20
     },
 
     "tagRef": {
@@ -409,6 +410,128 @@
           }
         },
         "reason": { "type": "string" }
+      }
+    },
+
+    "roundTripVector": {
+      "description": "Class 20: the issue-then-verify round trip, which is the one class that runs an implementation against its OWN output. EVERY OTHER CLASS RUNS A VERIFIER AGAINST BYTES ANOTHER PROGRAM WROTE. Every committed envelope fixture is produced by corpus/tools/build_corpus.py, so until this class existed nothing asked an implementation to PRODUCE an envelope, and an implementation could therefore issue a disclosed copy its own verifier refused while passing every vector in the file. That is not hypothetical: it happened, in a library that passed all 488 vectors including salt-leak-named-leaf-without-value, the vector naming the very condition its own output violated, and it was found by a human reading the library rather than by this corpus. What makes the producing side worth a class rather than obvious is that THE DISCLOSURE CARRIERS ARE PER TAG AND ARE NOT THE RECORD'S OWN SPELLINGS: NULL, EMPTY_ARRAY and EMPTY_OBJECT carry no value member at all, BOOL carries a JSON boolean, INTEGER and DECIMAL carry STRINGS already in section 6.2 canonical output form, and BYTES carries lowercase HEX where the record spelled base64 (spec sections 6.1 and 10). PINNED RATHER THAN BEHAVIOURAL, unlike unlinkabilityVector: class 12 must draw its own randomness because it is ABOUT randomness, nothing here is, so the salt set is a committed input and both produced envelopes are compared field by field against committed fixtures. A vector asserting only 'my verifier accepts my output' would be self-consistency, and a lax verifier would pass it while producing the same malformed copy; the static class 17 row fails the lax VERIFIER and this class fails the lax PRODUCER, and neither closes the gap alone.",
+      "type": "object",
+      "required": [
+        "name",
+        "class",
+        "recordType",
+        "schemaVersion",
+        "recordId",
+        "issuerId",
+        "recordFile",
+        "saltsFile",
+        "saltPairing",
+        "leafCount",
+        "root",
+        "disclosePaths",
+        "expectedFullCopyFile",
+        "expectedDisclosedCopyFile",
+        "expectSelfVerifies",
+        "typeMap"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "class": {
+          "description": "Always 20. Pinned rather than left to classRef's range, for the reason unlinkabilityVector.class gives: a vector mislabelled as another class marks THAT class covered by a vector testing nothing about it and leaves this one reading as a gap.",
+          "$ref": "#/$defs/classRef",
+          "const": 20
+        },
+        "recordType": {
+          "description": "The profile the record is issued under. Selects the type map the runner resolves record leaves through, and is committed at roax.recordType.",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "description": "OPAQUE, exactly as recordVector.schemaVersion is: matched for equality and never parsed or ordered (spec section 12.1).",
+          "type": "string",
+          "minLength": 1
+        },
+        "recordId": {
+          "description": "Committed at roax.recordId.",
+          "type": "string"
+        },
+        "issuerId": {
+          "description": "Committed at roax.issuer.id.",
+          "type": "string"
+        },
+        "issuerKeyId": {
+          "description": "OPTIONAL. Present so the round trip covers the one reserved leaf whose PRESENCE varies, and so the disclosed copy can WITHHOLD it: it is committed inside the root but OPTIONAL to disclose (spec sections 10.2 and 11.2), which makes it a leaf the producer has to be able to leave out.",
+          "type": "string"
+        },
+        "typeMap": {
+          "description": "REQUIRED IN THIS SCHEMA VERSION, where schemas/conformance-corpus-1.0.json leaves it optional. The record commits roax.typeMap.id as a further reserved leaf and both produced copies carry the outer member, so the round trip also has to produce a copy satisfying the section 4.2 binding and the floor entry that binding adds. It is required rather than optional because spec section 11.2 marks that leaf emitted ALWAYS, so an issuance without one is not something the current specification permits, and a class-20 vector without it would ask an implementation to PRODUCE an envelope the specification forbids. Nothing was ever issued under a looser reading of this definition: roundTripVector is new in corpus 1.1.0 and every committed vector carries the member, so requiring it preserves nothing weaker. Same shape as the envelope member it mirrors (schemas/envelope-2.0.json, where it is likewise required).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "version"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "version": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+            }
+          }
+        },
+        "recordFile": {
+          "description": "Repository-relative path to the record to issue. A corpus fixture and never an external sample: this class is about the producing side and needs no reference material, so it runs with no input from outside this tree.",
+          "type": "string"
+        },
+        "saltsFile": {
+          "description": "The committed salt set to issue under. An INPUT: under decision D4b a salt is an independent random draw nothing re-derives (spec section 7), so pinning the produced envelopes means pinning the salts they came from.",
+          "type": "string"
+        },
+        "saltPairing": {
+          "description": "How the set pairs salts to leaves, declared rather than sniffed - guessing wrong pairs a real salt with the wrong leaf and yields a plausible wrong root instead of an error.",
+          "enum": [
+            "path",
+            "positional"
+          ]
+        },
+        "leafCount": {
+          "description": "The UNION of the record's leaves and the reserved roax.* leaves (spec section 3.3), for the same reason recordVector.leafCount is.",
+          "type": "integer",
+          "minimum": 5
+        },
+        "root": {
+          "$ref": "#/$defs/hex32"
+        },
+        "disclosePaths": {
+          "description": "The paths the produced disclosed copy reveals, as SEGMENTS and never in display notation (spec section 5.2). A subset of the union that MUST cover the minimum-disclosure floor, since a copy omitting a floor path would be REJECTED by a conforming verifier and expectSelfVerifies could not hold. Every vector in this class deliberately leaves at least one leaf of the union out, so the copy is a genuine selective disclosure rather than a full copy wearing one.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/segments"
+          }
+        },
+        "expectedFullCopyFile": {
+          "description": "The full copy the runner must reproduce. Compared SEMANTICALLY and not byte for byte: JSON member order and whether displayPath is emitted are not fixed by the specification, so a byte comparison would assert something it does not say. What must survive intact is every number's SOURCE TEXT - the record body here carries its literals, and a runner rebuilding this envelope through a float-based serializer destroys them (spec sections 6.4 and 7.3).",
+          "type": "string"
+        },
+        "expectedDisclosedCopyFile": {
+          "description": "The disclosed copy the runner must reproduce from the SAME commitment, revealing exactly disclosePaths. This is where the per-tag carrier forms are pinned. It carries no salts array at all: with that array absent the per-leaf salt is the only place a salt can appear, and every one belongs to a leaf being revealed (spec section 10.1).",
+          "type": "string"
+        },
+        "expectSelfVerifies": {
+          "description": "Both produced envelopes MUST be accepted by the producing implementation's OWN verifier. Always true - a vector asserting that a conforming producer emits something its own verifier rejects would assert a contradiction. It is carried explicitly rather than implied because it is the assertion this class exists for, and a runner that compared the fixtures and stopped would have skipped it silently.",
+          "const": true
+        },
+        "intent": {
+          "description": "What this vector is for, in prose. Consumed by no runner; present because a class-20 vector's point is not readable off its fields.",
+          "type": "string"
+        }
       }
     }
   }

@@ -85,6 +85,28 @@ const committedCorpus = CORPUS_FILE === DEFAULT_CORPUS_FILE
 const HASH_ALG = corpus.hashAlg;
 const V = corpus.vectors;
 
+// Every vector group this runner consumes. A group present in the corpus file and absent from
+// this list is a HARD FAILURE rather than a quiet skip, because the quiet skip is the exact
+// shape of defect this corpus exists to prevent: a runner that does not know a group reads it
+// as zero vectors and reports the same green it reported before the group was added. The
+// coverage loop below cannot see it either - a new group's vectors carry a class number the loop
+// counts, so an unconsumed group leaves that class reading as a coverage gap only if no other
+// vector shares it. Stated as an explicit list rather than derived from the code, so that adding
+// a group to the file without teaching this file to read it fails loudly at the next run.
+const CONSUMED_GROUPS = [
+  "encodePath", "encodeValue", "reject", "leaf", "tree", "inclusion", "negativeProof",
+  "typeMap", "record", "unlinkability", "normalization", "envelope", "roundTrip",
+];
+{
+  const unconsumed = Object.keys(V).filter((name) => !CONSUMED_GROUPS.includes(name));
+  if (unconsumed.length) {
+    console.error(`FAILED: corpus carries vector group(s) this runner does not consume: `
+      + `${unconsumed.join(", ")}`);
+    console.error("  A group read as absent would report the same green as before it existed.");
+    process.exit(1);
+  }
+}
+
 const typeMaps = env.loadTypeMaps(path.join(CORPUS_DIR, "type-maps"));
 
 const results = [];
@@ -207,8 +229,13 @@ function expectedSaltSetNames(plan) {
   }
 
   const envelopeVectors = plan.vectors.envelope ?? [];
+  // `typemap-floor-` as well as `floor-`: the type-map binding family is built on its own trees,
+  // because committing roax.typeMap.id adds a leaf and therefore a distinct salt set. Leaving it
+  // out here reports those four carriers as orphans, which is the check working - it noticed the
+  // family the moment it was added.
   const floorSources = envelopeVectors.filter((vector) =>
-    (vector.class === 14 && vector.name.startsWith("floor-")
+    (vector.class === 14
+      && (vector.name.startsWith("floor-") || vector.name.startsWith("typemap-floor-"))
       && vector.name.endsWith("-complete"))
     || vector.name === "algorithm-sha-256-accepted");
   for (const vector of floorSources) {
@@ -595,11 +622,217 @@ for (const v of V.envelope ?? []) {
   check(v, "reason", reason, v.reason);
 }
 
+// Class 20: issue, disclose, then verify the copy THIS implementation produced.
+//
+// Every class above runs this verifier against bytes another program wrote. That is the whole
+// coverage gap this class closes: an implementation can emit a disclosed copy its own verifier
+// refuses and still pass every other vector, because no vector ever asks it to produce one.
+//
+// The procedure is: build the full copy from the record and the committed salt set, compare it
+// field by field with the expected fixture, verify it; then derive the disclosed copy for
+// `disclosePaths` from the SAME commitment, compare it with the expected fixture, and verify
+// that. Comparison is semantic rather than byte-for-byte - JSON member order, whether
+// `displayPath` is emitted, the order of `disclosure.leaves` and the order of a full copy's
+// `salts` are not fixed by the specification, so asserting any of them would fail a conforming
+// implementation.
+// A comparison form for the literal-preserving model. Members are sorted, because JSON member
+// order carries no meaning here, and a NUMBER keeps its source text rather than becoming a
+// JavaScript number - which is the whole point of parsing this way (section 6.4).
+function comparable(node) {
+  if (node instanceof ref.RecordMap) {
+    const out = {};
+    for (const [k, val] of [...node.entries].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))) {
+      out[k] = comparable(val);
+    }
+    return out;
+  }
+  if (node instanceof ref.NumberLiteral) return { $numberLiteral: node.text };
+  if (Array.isArray(node)) return node.map(comparable);
+  return node;
+}
+
+// An envelope's comparison form with the aspects the specification does not fix removed. Applied
+// to BOTH sides, so what survives the comparison is what the specification actually says.
+//
+// Three things are relaxed and nothing else. `disclosure.leaves` is ordered by leaf index and a
+// full copy's `salts` by its entry's structured path, because every leaf carries its own index
+// and every salt entry its own path, so neither array order carries anything. `displayPath` is
+// DROPPED: it is display only and never hashed (section 5.2), and `schemas/envelope-1.0.json`
+// leaves it out of `disclosedLeaf.required`, so a conforming producer may omit it and a
+// comparison that noticed would fail conforming work.
+//
+// Everything else stays exact - both array LENGTHS, every leaf's segments, index, tag, value
+// carrier, salt and audit path, and every scalar identity field - so a producer that omitted a
+// per-leaf value carrier still fails, which is the defect this class exists for.
+function normalizedForComparison(envelope) {
+  const isObject = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
+  if (!isObject(envelope)) return envelope;
+  const out = { ...envelope };
+  const byKey = (key) => (a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0);
+  if (Array.isArray(out.salts)) {
+    out.salts = [...out.salts]
+      .sort(byKey((entry) => JSON.stringify(isObject(entry) ? entry.segments ?? null : null)));
+  }
+  if (isObject(out.disclosure) && Array.isArray(out.disclosure.leaves)) {
+    const leaves = out.disclosure.leaves.map((leaf) => {
+      if (!isObject(leaf)) return leaf;
+      const copy = { ...leaf };
+      delete copy.displayPath;
+      return copy;
+    });
+    // Left-padded so a string sort orders the digits the number literal kept.
+    leaves.sort(byKey((leaf) =>
+      String(isObject(leaf) && isObject(leaf.index) ? leaf.index.$numberLiteral : "").padStart(20, "0")));
+    out.disclosure = { ...out.disclosure, leaves };
+  }
+  return out;
+}
+
+// The first place two comparable forms differ, as `{ at, got, want }`, or null when they agree.
+// A whole envelope printed twice is not a readable failure, and the failure this class exists to
+// catch is one missing member on one leaf.
+function firstDifference(got, want, at = "") {
+  if (got === want) return null;
+  const object = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
+  if (Array.isArray(got) && Array.isArray(want)) {
+    if (got.length !== want.length) {
+      return { at: at || "/", got: `${got.length} entries`, want: `${want.length} entries` };
+    }
+    for (let i = 0; i < got.length; i++) {
+      const d = firstDifference(got[i], want[i], `${at}/${i}`);
+      if (d) return d;
+    }
+    return null;
+  }
+  if (object(got) && object(want)) {
+    for (const key of new Set([...Object.keys(got), ...Object.keys(want)])) {
+      if (!(key in got)) return { at: `${at}/${key}`, got: "ABSENT", want: want[key] };
+      if (!(key in want)) return { at: `${at}/${key}`, got: got[key], want: "ABSENT" };
+      const d = firstDifference(got[key], want[key], `${at}/${key}`);
+      if (d) return d;
+    }
+    return null;
+  }
+  return { at: at || "/", got, want };
+}
+
+function disclosedLeafOf(hashAlg, ordered, salts, hashes, index) {
+  const leaf = ordered[index];
+  const entry = {
+    segments: leaf.segments,
+    displayPath: ref.displayPath(leaf.segments),
+    index,
+    tag: leaf.tag,
+  };
+  const emptyTag = leaf.tag === ref.TAG.NULL || leaf.tag === ref.TAG.EMPTY_ARRAY
+    || leaf.tag === ref.TAG.EMPTY_OBJECT;
+  if (!emptyTag) entry.value = leaf.value;
+  entry.salt = salts[index].toString("hex");
+  entry.auditPath = ref.inclusionPath(hashAlg, index, hashes).map((h) => h.toString("hex"));
+  return entry;
+}
+
+for (const v of V.roundTrip ?? []) {
+  const map = typeMaps[v.recordType];
+  if (map === undefined) {
+    throw new Error(`corpus defect: roundTrip ${v.name} names missing type map ${v.recordType}`);
+  }
+  const identity = {
+    recordType: v.recordType,
+    schemaVersion: v.schemaVersion,
+    recordId: v.recordId,
+    issuerId: v.issuerId,
+    issuerKeyId: v.issuerKeyId,
+    typeMapId: v.typeMap?.id,
+  };
+  const recordText = fs.readFileSync(path.join(REPO_ROOT, v.recordFile), "utf8");
+  const record = parseRecord(recordText);
+  const saltDoc = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, v.saltsFile), "utf8"));
+  if (saltDoc.pairing !== v.saltPairing) {
+    throw new Error(`corpus defect: roundTrip ${v.name} declares saltPairing ${v.saltPairing}, `
+      + `but ${v.saltsFile} declares ${saltDoc.pairing}`);
+  }
+  const ordered0 = ref.orderedLeaves(record, map, identity);
+  const saltSet = ref.saltSetFromDocument(saltDoc, ordered0);
+  const { root, leaves, salts, hashes } = ref.buildTree(HASH_ALG, record, map, saltSet, identity);
+  check(v, "leafCount", leaves.length, v.leafCount);
+  check(v, "root", root.toString("hex"), v.root);
+
+  const base = {
+    canon: ref.CANON,
+    hashAlg: HASH_ALG,
+    recordType: v.recordType,
+    schemaVersion: v.schemaVersion,
+    recordId: v.recordId,
+  };
+  if (v.typeMap !== undefined) base.typeMap = { id: v.typeMap.id, version: v.typeMap.version };
+  base.root = root.toString("hex");
+  base.leafCount = leaves.length;
+  base.issuer = v.issuerKeyId === undefined
+    ? { id: v.issuerId }
+    : { id: v.issuerId, keyId: v.issuerKeyId };
+
+  // The full copy this implementation issues. The record body is spliced in as the fixture's
+  // ORIGINAL bytes, and that is not a tidiness point: writing `record: JSON.parse(recordText)`
+  // here put `0.010` through a float and produced `0.01`, so this runner's own full copy failed
+  // its own verifier with `root-mismatch`. Section 7.3 says the section 6.4 parser requirement
+  // applies to the ENVELOPE and not only to a bare record, and that is exactly this.
+  const producedFullText = JSON.stringify({
+    ...base,
+    record: "@@RECORD@@",
+    salts: leaves.map((leaf, i) => ({ segments: leaf.segments, salt: salts[i].toString("hex") })),
+  }).replace('"@@RECORD@@"', recordText.trim());
+
+  const byPath = new Map(leaves.map((leaf, i) => [ref.encodePath(leaf.segments).toString("hex"), i]));
+  const producedDisclosed = {
+    ...base,
+    disclosure: {
+      mode: "selective",
+      // Sorted by LEAF INDEX on both sides of the comparison. The specification fixes no order
+      // for this array - every leaf carries its own index - so comparing in request order would
+      // fail a conforming producer that emitted the same leaves in another order.
+      leaves: v.disclosePaths.map((p) => {
+        const index = byPath.get(ref.encodePath(p).toString("hex"));
+        if (index === undefined) {
+          throw new Error(`corpus defect: roundTrip ${v.name} discloses a path with no leaf`);
+        }
+        return disclosedLeafOf(HASH_ALG, leaves, salts, hashes, index);
+      }).sort((a, b) => a.index - b.index),
+    },
+  };
+
+  for (const [kind, field, producedText] of [
+    ["full", "expectedFullCopyFile", producedFullText],
+    ["disclosed", "expectedDisclosedCopyFile", JSON.stringify(producedDisclosed)],
+  ]) {
+    const produced = parseRecord(producedText);
+    const expected = parseRecord(fs.readFileSync(path.join(REPO_ROOT, v[field]), "utf8"));
+    // Semantic and not byte-for-byte: `normalizedForComparison` removes the four aspects the
+    // specification does not fix, on both sides. `comparable` keeps a number as its SOURCE TEXT,
+    // which is the one thing that must survive the comparison intact. The assertion is on the
+    // FIRST DIFFERENCE rather than on the two documents, because a whole envelope printed twice
+    // is not a readable failure.
+    check(v, field, firstDifference(
+      normalizedForComparison(comparable(produced)),
+      normalizedForComparison(comparable(expected)),
+    ), null);
+
+    // And the half no static fixture can assert: this implementation's own verifier over this
+    // implementation's own output, on BOTH copy kinds. A producer that omitted a per-leaf value
+    // carrier - the defect this class exists for - fails here even though every leaf hash it
+    // computed was right, because `disclosed-leaf-named-without-value` is what its own verifier
+    // says about its own bytes.
+    const [accepted, reason] = env.verify(produced, typeMaps);
+    check(v, `expectSelfVerifies ${kind}`,
+      { accepted, reason }, { accepted: v.expectSelfVerifies, reason: "ok" });
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Reporting
 // ---------------------------------------------------------------------------------------------
 
-const CLASS_COUNT = 19;
+const CLASS_COUNT = 20;
 const byClass = new Map();
 for (const r of results) {
   const bucket = byClass.get(r.cls) ?? { pass: 0, fail: 0, failures: [] };

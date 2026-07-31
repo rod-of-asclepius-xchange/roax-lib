@@ -1,0 +1,129 @@
+{
+  "canon": "ROAX-CANON/1",
+  "hashAlg": "SHA-256",
+  "recordType": "hl7.fhir.bundle",
+  "schemaVersion": "4.0.1",
+  "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
+  "typeMap": {
+    "id": "sha256:35bc27621917d80e0a2736f4492eba3816ddc3de230279d635ca5e8973a594da",
+    "version": "1.0.0"
+  },
+  "root": "b76eda4282601440e3de0fcd6db92714ec250f3b608cc8c5e34c0091d839eb82",
+  "leafCount": 11,
+  "issuer": {
+    "id": "did:web:corpus.roax.invalid",
+    "keyId": "did:web:corpus.roax.invalid#key-1"
+  },
+  "disclosure": {
+    "mode": "selective",
+    "leaves": [
+      {
+        "segments": [
+          {
+            "key": "roax.recordType"
+          }
+        ],
+        "displayPath": "roax.recordType",
+        "index": 5,
+        "tag": 2,
+        "value": "hl7.fhir.bundle",
+        "salt": "7978300f3467514b800ebe35ae1ec14c",
+        "auditPath": [
+          "1966fa3bda43ecbc21289cc2be8789135c0dac14b981f19f77bc44a319aaed39",
+          "55f309df43b6db550a00f78d7d43a4d6ead9a21b39874ee70fe49d1061e449b5",
+          "c349ebdaa4f03b6c957a2175d1cc0d3d52f4323b34188488a9f1f7db46f9cc63",
+          "8be719bad3d330a5506d47780f1be3bc26a1a3fe69250e054987cd8d54bb5b96"
+        ]
+      },
+      {
+        "segments": [
+          {
+            "key": "roax.schemaVersion"
+          }
+        ],
+        "displayPath": "roax.schemaVersion",
+        "index": 8,
+        "tag": 2,
+        "value": "4.0.1",
+        "salt": "7d051de673ae56a1d6e94a3c88648447",
+        "auditPath": [
+          "97b74245773d9999e5cc26800b7d9a10d49a3cfe83ee2aab0cfa546c31c448d3",
+          "e32e4975447cc1fbd830439a217f823a20801bad4c2ebf60bccf37576db3c0aa",
+          "920fc0b012ec348cada634ccafbed227852f157251d990ff32520f2adc947095"
+        ]
+      },
+      {
+        "segments": [
+          {
+            "key": "roax.recordId"
+          }
+        ],
+        "displayPath": "roax.recordId",
+        "index": 3,
+        "tag": 2,
+        "value": "urn:uuid:11111111-1111-4111-8111-111111111111",
+        "salt": "db4c4c930a82cbf2db8ea9d66bcab8a0",
+        "auditPath": [
+          "d5141848547c301b4cc7cfe62ac7367358b8ae376cc265f25ab0c6ba6f9c2961",
+          "f3f0eac02f3a4e16ff8bc401d654744c519febcc80d6d856ed090eb90e49c87a",
+          "055f94581907bd1b4396db1a64f010cfd05a64400b6ac5cf92cd2b987b38cd6a",
+          "8be719bad3d330a5506d47780f1be3bc26a1a3fe69250e054987cd8d54bb5b96"
+        ]
+      },
+      {
+        "segments": [
+          {
+            "key": "roax.issuer.id"
+          }
+        ],
+        "displayPath": "roax.issuer.id",
+        "index": 4,
+        "tag": 2,
+        "value": "did:web:corpus.roax.invalid",
+        "salt": "a2797e84e0f1e1a9d41d1c0cee579f9b",
+        "auditPath": [
+          "d20c375b3371315a6fdab64d5f205b280510d3f45cddc3e5d730025b2a9a1730",
+          "55f309df43b6db550a00f78d7d43a4d6ead9a21b39874ee70fe49d1061e449b5",
+          "c349ebdaa4f03b6c957a2175d1cc0d3d52f4323b34188488a9f1f7db46f9cc63",
+          "8be719bad3d330a5506d47780f1be3bc26a1a3fe69250e054987cd8d54bb5b96"
+        ]
+      },
+      {
+        "segments": [
+          {
+            "key": "resourceType"
+          }
+        ],
+        "displayPath": "resourceType",
+        "index": 2,
+        "tag": 2,
+        "value": "Bundle",
+        "salt": "19e6ef6e32eadf033de26437ada17cf5",
+        "auditPath": [
+          "b62dcad8052ef65e484c0065d154a0bacb7b18c6113a2b101d15618689908059",
+          "f3f0eac02f3a4e16ff8bc401d654744c519febcc80d6d856ed090eb90e49c87a",
+          "055f94581907bd1b4396db1a64f010cfd05a64400b6ac5cf92cd2b987b38cd6a",
+          "8be719bad3d330a5506d47780f1be3bc26a1a3fe69250e054987cd8d54bb5b96"
+        ]
+      },
+      {
+        "segments": [
+          {
+            "key": "roax.issuer.keyId"
+          }
+        ],
+        "displayPath": "roax.issuer.keyId",
+        "index": 7,
+        "tag": 2,
+        "value": "did:web:corpus.roax.invalid#key-1",
+        "salt": "4fa20ceb457f0d80caf20e9f48a4b3c7",
+        "auditPath": [
+          "a0d63c995f0b81625fb07ef35c0571fb1b2b94df87e565ec262a2df42e8219a6",
+          "e91df2450516dd955429c3aefefe4ea00f582cf463c213a67ec93e51d3cbb0e7",
+          "c349ebdaa4f03b6c957a2175d1cc0d3d52f4323b34188488a9f1f7db46f9cc63",
+          "8be719bad3d330a5506d47780f1be3bc26a1a3fe69250e054987cd8d54bb5b96"
+        ]
+      }
+    ]
+  }
+}

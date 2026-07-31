@@ -24,9 +24,9 @@ pub use commitment::{
     ReservedLeafSet, Salt, SaltMap, SchemaValidator,
 };
 pub use envelope::{
-    commit_full_copy_with_salts, disclose, issue_full_copy, parse_envelope, parse_envelope_value,
-    verify_disclosed, verify_full, DisclosedLeaf, Disclosure, FullCopy, ParsedEnvelope, Profile,
-    VerificationPolicy,
+    commit_full_copy_with_salts, disclose, issue_full_copy, issue_full_copy_with_salts,
+    parse_envelope, parse_envelope_value, reserved_leaf_set_for, verify_disclosed, verify_full,
+    DisclosedLeaf, Disclosure, FullCopy, ParsedEnvelope, Profile, VerificationPolicy,
 };
 pub use error::{Error, Result};
 pub use json::JsonValue;

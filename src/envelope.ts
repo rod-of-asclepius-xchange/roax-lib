@@ -31,7 +31,7 @@ import { commitRecord, PathKeyedSalts, type SaltSource } from './commit.js';
 import type { EmptyContainerPolicy } from './flatten.js';
 import type { TypeTagResolver } from './typemap.js';
 import type { JsonKind, JsonValue } from './json.js';
-import { floorFor, REGISTERED_PROFILES } from './profiles.js';
+import { floorFor, REGISTERED_PROFILES, type ProfileFloor } from './profiles.js';
 
 export interface LeafSaltEntry {
   readonly segments: Path;
@@ -108,6 +108,23 @@ export interface VerifierConfig {
   readonly hashAlgAllowList?: readonly HashAlgName[] | undefined;
   /** The profiles this verifier is configured with. An unknown one fails closed (section 12.2). */
   readonly knownProfiles?: ReadonlySet<string> | undefined;
+  /**
+   * The minimum-disclosure floor for a `recordType`, when this verifier carries one the built-in
+   * registry does not.
+   *
+   * It exists because `knownProfiles` alone is not enough, and the asymmetry was a real defect
+   * rather than a missing convenience: a config could declare a profile KNOWN, clear the
+   * section-12.2 allow-list at step 2, and then fail closed at the floor with the SAME
+   * `profile-unknown` code for an entirely different reason - one no caller could act on, because
+   * nothing in the surface let it supply the floor. This mirrors `resolverFor` exactly, which is
+   * there for the same reason: `corpus/type-maps/` and the corpus-only
+   * `org.roax.corpus.synthetic` profile live outside this library's registry by design, and a
+   * verifier configured for the corpus has to be able to say so once rather than twice.
+   *
+   * Returning `undefined` keeps the built-in lookup, so a config that sets this cannot
+   * accidentally hide a registered profile's floor.
+   */
+  readonly floorFor?: ((recordType: string) => ProfileFloor | undefined) | undefined;
   /** H2: the `(root, hashAlg)` pair the verifier's OWN anchoring registry records. */
   readonly anchoredRoot?: string | undefined;
   readonly anchoredHashAlg?: HashAlgName | undefined;
@@ -126,8 +143,8 @@ export interface VerifierConfig {
    * (specification section 10 step 1).
    *
    * Defaults to `true`. The conformance runner sets it to `false` and reports the fact, because
-   * `corpus/type-maps/` carries no `hl7.fhir.bundle` map and 6 of the 7 `floor-hl7-fhir-bundle-*`
-   * fixtures disclose a record leaf. See the findings document.
+   * `corpus/type-maps/` carries no `hl7.fhir.bundle` map and 8 of the 9 class-14
+   * `hl7.fhir.bundle` fixtures disclose a record leaf. See the findings document.
    */
   readonly requireTypeMapForDisclosedLeaves?: boolean | undefined;
   /**
@@ -951,7 +968,7 @@ function verifyDisclosedCopy(
   const committedRecordType = committedByPath.get(
     toHex(encodePath([{ key: RESERVED_PATHS.recordType }])),
   )?.value as string;
-  const floor = floorFor(committedRecordType);
+  const floor = config.floorFor?.(committedRecordType) ?? floorFor(committedRecordType);
   if (floor === undefined) {
     // Unreachable in practice: step 2 already rejected an unknown profile on the outer field, and
     // step 5 has just proved that field equal to this leaf. Kept so that a later edit cannot

@@ -17,7 +17,7 @@ import { fail } from './errors.js';
 import { toHex } from './bytes.js';
 import { encodePath, displayPath, type Path } from './path.js';
 import { resolveHashFunction, CANON_VERSION, type HashAlgName } from './hash.js';
-import { commitRecord, FreshSalts, type Commitment } from './commit.js';
+import { commitRecord, FreshSalts, type Commitment, type SaltSource } from './commit.js';
 import type { RecordIdentity } from './reserved.js';
 import { TypeTag, type CarrierValue } from './value.js';
 import type { EmptyContainerPolicy } from './flatten.js';
@@ -31,12 +31,35 @@ export interface IssueOptions {
   readonly identity: RecordIdentity;
   readonly resolver: TypeTagResolver;
   readonly hashAlg?: HashAlgName | undefined;
-  /** The type-map artifact version, carried beside its ID in the envelope's discovery hint. */
+  /**
+   * The type-map artifact version, carried beside its ID in the envelope's discovery hint.
+   *
+   * REQUIRED AT ISSUANCE and optional only in the type: `schemas/envelope-1.0.json` requires the
+   * `typeMap` member to carry `id` and `version` together, and `issueFullCopy` always emits that
+   * member, so an issuance without this refuses rather than substituting a version the caller
+   * never named. It stays optional here so the refusal is expressible and testable, exactly as
+   * `RecordIdentity.typeMapId` is.
+   */
   readonly typeMapVersion?: string | undefined;
   readonly anchor?:
     | { readonly chainId: number; readonly registry: string; readonly txHash?: string | undefined }
     | undefined;
   readonly emptyContainerPolicy?: EmptyContainerPolicy | undefined;
+  /**
+   * Where the salts come from. Defaults to `FreshSalts`, which is the only correct source for a
+   * real issuance.
+   *
+   * It is settable so that an issuance can be REPRODUCED from a committed salt set, which is what
+   * conformance corpus class 20 requires: under decision D4b a salt is an independent random draw
+   * nothing re-derives (specification section 7), so a round trip whose expected output is pinned
+   * has to be issued under pinned salts. `commitRecord` already takes a `SaltSource`, so this
+   * exposes no capability the library did not have; it removes the need for a caller to assemble
+   * the envelope itself and thereby miss the code path under test.
+   *
+   * A caller supplying salts owns the section 7 entropy floor and the rule that no salt is ever
+   * reused across leaves or across issuances.
+   */
+  readonly salts?: SaltSource | undefined;
 }
 
 export interface FullCopy {
@@ -68,12 +91,24 @@ export function issueFullCopy(options: IssueOptions): FullCopy {
         'roax.typeMap.id and carried in the envelope (specification sections 4.2 and 11.2)',
     );
   }
+  // Both members or neither, and a version is never guessed. `schemas/envelope-1.0.json` requires
+  // the `typeMap` member to carry `id` and `version` together, and the version is metadata the
+  // issuer knows rather than anything derivable here, so substituting one writes an artifact
+  // version the caller never named into an envelope that is unrecoverable once anchored.
+  if (options.typeMapVersion === undefined) {
+    fail(
+      'envelope-malformed',
+      'issuance requires the type-map artifact version: the envelope carries the type-map id ' +
+        'and version together, and neither is derivable from the other (specification ' +
+        'section 12.1)',
+    );
+  }
 
   const commitment = commitRecord(options.record, {
     hash,
     resolver: options.resolver,
     identity: options.identity,
-    salts: new FreshSalts(),
+    salts: options.salts ?? new FreshSalts(),
     emptyContainerPolicy: options.emptyContainerPolicy,
   });
 
@@ -101,7 +136,7 @@ export function issueFullCopy(options: IssueOptions): FullCopy {
         kind: 'object',
         members: [
           ['id', { kind: 'string', value: options.identity.typeMapId }],
-          ['version', { kind: 'string', value: options.typeMapVersion ?? '1.0.0' }],
+          ['version', { kind: 'string', value: options.typeMapVersion }],
         ],
       },
     ],

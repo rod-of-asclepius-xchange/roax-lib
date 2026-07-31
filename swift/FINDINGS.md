@@ -1,6 +1,7 @@
 # What the Swift build found
 
-**Status:** the Swift library passes all 488 committed corpus vectors, with class 10 run against the pinned reference checkout.
+**Status:** the Swift library passes all 501 committed corpus vectors, with class 10 run against the pinned reference checkout.
+It was 488 when this document was written; corpus classes 14, 17, 18 and 20 grew afterwards, and findings 10 and 11 below are why.
 This document records what building it independently from `docs/spec/roax-canon-1.md` surfaced.
 
 Each finding says what was measured, on what, and whether it is a finding about **this language**, about the **specification**, or about the **corpus**.
@@ -21,8 +22,8 @@ Everything below was measured on Apple Swift 6.2.4 (swiftlang-6.2.4.1.4), macOS 
 | 7 | **Swift `String` equality is canonical equivalence, so the obvious duplicate-key check silently answers `corpus/README.md` ambiguity 6** | language **and** specification | **No, in either direction** |
 | 8 | Specification section 3.3's empty-container rule is unsatisfiable against the committed corpus | specification vs corpus | Inverted: the corpus fails an implementation that follows the specification |
 | 9 | Section 3.3's zero-leaf MUST can never fire from a JSON record | specification | No, and it cannot |
-| 10 | The corpus covers the verifying side of an envelope and not the producing side | corpus | **No - it caught a real bug in this library that all 488 vectors missed** |
-| 11 | `schemas/envelope-2.0.json` is only partly verifiable here, and its last check has no evidence to run on | specification **and** library | **No - the committed corpus is envelope-1.0 throughout** |
+| 10 | The corpus covers the verifying side of an envelope and not the producing side | corpus | **It did not - it caught a real bug in this library that all 488 vectors missed. CLASS 20 NOW DOES**, and finding 10 records what it found in the other four libraries |
+| 11 | `schemas/envelope-2.0.json` is only partly verifiable here, and its last check has no evidence to run on | specification **and** library | **It did not, in either direction. CLASSES 14 AND 18 NOW REACH THE BINDING**; the residual both-absent case is still unreachable, and finding 11 says why |
 
 Findings 8 and 9 were reported by the TypeScript and Python builds before this one and are restated here only because a fourth independent implementation reaching the same place is the evidence those reports were about.
 Findings 1 to 5 are Swift-specific.
@@ -226,8 +227,8 @@ Measured by running this library both ways:
 
 | Reading | Result |
 |---|---|
-| Corpus reading, tags 6 and 7 assigned without map authorization | 488 pass, 0 fail |
-| Specification reading, section 3.3 as written | 486 pass, **2 fail** - `record-structure-empty-array` and `record-structure-empty-object` |
+| Corpus reading, tags 6 and 7 assigned without map authorization | 501 pass, 0 fail |
+| Specification reading, section 3.3 as written | 499 pass, **2 fail** - `record-structure-empty-array` and `record-structure-empty-object` |
 
 Under specification section 1.1 that is a release-blocking corpus defect and the specification governs.
 The narrow fix is a corpus edit - two authorizing rows in the synthetic map - rather than an implementation default.
@@ -269,15 +270,21 @@ Reverting the fix fails that test on five leaves, which is how the coverage was 
 
 **The general shape is worth a corpus vector rather than four library-local tests.**
 A class asking an implementation to *produce* a disclosed copy from a record, a salt set and a path list, and to verify the result, would catch this in every language at once.
-It is a genuine gap in what `docs/conformance-corpus.md` defines rather than a gap in what the corpus happens to contain, so closing it is a corpus change and is not made here.
+It is a genuine gap in what `docs/conformance-corpus.md` defines rather than a gap in what the corpus happens to contain, so closing it is a corpus change.
+
+**THAT CHANGE IS NOW MADE: it is class 20**, and this paragraph is left standing as the record of what the class was written from.
+Running it across the five libraries found more than the defect above.
+Kotlin emitted and read the tag-5 BYTES disclosure carrier as base64 rather than lowercase hex - the fourth of the four carrier mistakes this finding names, in the one language that made it.
+And the TypeScript library refused to ISSUE an envelope without `roax.typeMap.id` while the Python library refused to issue one WITH it: two shipped libraries holding mutually exclusive issuance rules, both passing every vector, because no vector had ever asked either to produce anything.
 
 ## 11. `schemas/envelope-2.0.json` is only partly verifiable here, and its last check has no evidence to run on
 
 **Kind: specification and library.
 The library half is fixed; the specification half is stated rather than worked around.**
 
-All 54 committed envelope fixtures are `schemas/envelope-1.0.json` and not one carries a `typeMap` member, so nothing in the corpus reaches the 2.0 binding in either direction.
-This library nevertheless parses a `typeMap` member and commits `roax.typeMap.id` as a fifth reserved leaf, which makes it partly a 2.0 implementation and therefore worth saying exactly how far it goes.
+When this finding was written, all 54 committed envelope fixtures were `schemas/envelope-1.0.json` and not one carried a `typeMap` member, so nothing in the corpus reached the 2.0 binding in either direction.
+**Classes 14 and 18 now carry a family that does**, and the closing note of this finding records what running it across the five libraries found; the residual case remains unreachable for the reason given there.
+This library parses a `typeMap` member and commits `roax.typeMap.id` as a fifth reserved leaf, which makes it partly a 2.0 implementation and therefore worth saying exactly how far it goes.
 
 **The library half, which was a defect.**
 The outer-identity binding for `typeMap.id` was gated on the outer `typeMap` member being present, and so was the leaf's place in the minimum-disclosure floor.
@@ -306,14 +313,19 @@ A verifier that accepts only 2.0 records must select it.
 So what this library verifies about a type map is exactly one thing: that the identifier a copy presents is the identifier its root commits.
 That is worth having and it is not 2.0 support.
 
-`CorpusGapTests.testTypeMapIdBindingIsDrivenByTheCommittedLeafNotTheOuterMember` pins every disclosed-copy case above, including the one the default policy accepts, and `testTypeMapBindingPolicyIsHonouredOnTheFullCopyPathToo` pins the full-copy half, because the corpus cannot reach any of them.
+`CorpusGapTests.testTypeMapIdBindingIsDrivenByTheCommittedLeafNotTheOuterMember` pins every disclosed-copy case above, including the one the default policy accepts, and `testTypeMapBindingPolicyIsHonouredOnTheFullCopyPathToo` pins the full-copy half.
+
+**THE CORPUS REACHES THEM NOW.**
+The sentence above said it could not, and that was true: not one of the 488 fixtures carried a `typeMap` member.
+Classes 14 and 18 grew a family that does - `typemap-floor-<profile>-*`, `identity-outer-type-map-id-mismatch` and `identity-outer-type-map-member-stripped` - and running it found that the Python library had no binding at all and the Kotlin library only bound when its verifier was configured to.
+The residual both-absent case is still unreachable for the reason this finding gives, and `corpus/README.md` states it in the same terms.
 
 ## What this build did not find
 
 Stated because a findings document that lists only hits is not checkable.
 
 - **No disagreement with any committed vector**, under the corpus reading of finding 8.
-  All 488 pass, including the four class-10 vectors against the reference checkout at the pinned commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`.
+  All 501 pass, including the four class-10 vectors against the reference checkout at the pinned commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`.
   The shipped vaccination sample commits at 91 leaves without an issuer key identifier and 92 with one; recovery commits at 69 and 70.
 - **No disagreement about the two vectors that discriminate ruled decision D14a.**
   `normalization-nfc-key-end-to-end` and `record-guard-kelvin-key` both resolve through NFC, and both would fail closed under raw matching.

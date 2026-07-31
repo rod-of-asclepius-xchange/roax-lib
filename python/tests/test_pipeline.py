@@ -626,61 +626,76 @@ class TestRecordAndEnvelope(unittest.TestCase):
         )
         self.assertTrue(verify_envelope(full_copy(built), config).accepted)
 
-    def test_v2_pipeline_fails_closed_without_an_artifact_aware_resolver(self):
-        # RESERVED_V2 can model the structural reserved leaf, but issuance, emission and
-        # verification need to load the exact published DFA selected by this content ID.
-        # This package deliberately implements neither that loader nor content-ID
-        # reproduction, so a syntactically plausible fake ID must never become authority
-        # merely because the display-pattern corpus resolver can tag this record
-        # (specification section 4.2).
+    def test_v2_round_trip_is_issuable_and_binds_the_identifier_it_commits(self):
+        # THIS TEST REPLACES ONE THAT ASSERTED THE OPPOSITE, and the reversal is the point.
+        #
+        # It used to require issuance, emission and verification to REFUSE `RESERVED_V2`
+        # outright, on the ground that they "need to load the exact published DFA selected by
+        # this content ID". That is false for the producing side: an issuer knows which
+        # artifact it used and supplies its identifier, and nothing has to be fetched or
+        # reproduced. The refusal made this package unable to issue any record the current
+        # specification admits, because section 11.2 marks `roax.typeMap.id` emitted ALWAYS -
+        # and conformance corpus class 20 is what surfaced that, by asking an implementation
+        # to PRODUCE an envelope rather than only to verify one.
+        #
+        # What the package still does not do is unchanged and is asserted below: it never
+        # fetches the artifact, never reproduces its content ID, and never compares the
+        # artifact's own metadata. So a syntactically plausible identifier is committed and
+        # bound - never resolved - and this test pins the binding rather than a refusal.
         identity = RecordIdentity(
             IDENTITY.record_type,
             IDENTITY.schema_version,
             IDENTITY.record_id,
             IDENTITY.issuer_id,
             type_map_id="sha256:" + "0" * 64,
+            type_map_version=SYNTHETIC_MAP["typeMapVersion"],
         )
-
         profile = self.registry.get("org.roax.corpus.synthetic")
-        forged_v2 = replace(
-            self.built,
-            identity=identity,
-            reserved_set=RESERVED_V2,
-        )
-        operations = {
-            "issue": lambda: issue(
-                self.record,
-                identity,
-                resolver(),
-                reserved_set=RESERVED_V2,
-            ),
-            "full copy": lambda: full_copy(forged_v2),
-            "disclosed copy": lambda: disclosed_copy(
-                profile.floor(reserved_set=RESERVED_V2),
-                forged_v2,
-                profile=profile,
-            ),
-        }
-        for name, operation in operations.items():
-            with self.subTest(operation=name):
-                with self.assertRaises(RoaxError) as ctx:
-                    operation()
-                self.assertEqual(ctx.exception.code, ErrorCode.TYPE_MAP_REJECTED)
-                self.assertIn("content-ID reproduction", ctx.exception.detail)
-
-        envelope = full_copy(self.built)
-        envelope["typeMap"] = {
-            "id": identity.type_map_id,
-            "version": SYNTHETIC_MAP["typeMapVersion"],
-        }
+        built = issue(self.record, identity, resolver(), reserved_set=RESERVED_V2)
         config = VerifierConfig(
             profiles=self.registry,
             resolvers={"org.roax.corpus.synthetic": resolver()},
-            reserved_set=RESERVED_V2,
         )
-        result = verify_envelope(envelope, config)
-        self.assertEqual(result.reason, ErrorCode.TYPE_MAP_REJECTED)
-        self.assertIn("content-ID reproduction", result.detail)
+
+        # The producing side round-trips through this package's OWN verifier, on both copy
+        # kinds. This is the assertion class 20 exists for.
+        full = full_copy(built)
+        self.assertEqual(full["typeMap"]["id"], identity.type_map_id)
+        self.assertTrue(verify_envelope(full, config).accepted)
+
+        revealed = list(profile.floor(reserved_set=RESERVED_V2))
+        disclosed = disclosed_copy(revealed, built, profile=profile)
+        self.assertTrue(verify_envelope(disclosed, config).accepted)
+
+        # And the binding itself, in both directions. Each of these is a copy whose outer
+        # member and committed leaf disagree, and absence on either side is a disagreement:
+        # a check whose execution the presenter controls is not a check.
+        disagreeing = disclosed_copy(revealed, built, profile=profile)
+        disagreeing["typeMap"] = {"id": "sha256:" + "1" * 64, "version": "1.0.0"}
+        self.assertEqual(
+            verify_envelope(disagreeing, config).reason,
+            ErrorCode.OUTER_IDENTITY_MISMATCH,
+        )
+
+        stripped = disclosed_copy(revealed, built, profile=profile)
+        del stripped["typeMap"]
+        self.assertEqual(
+            verify_envelope(stripped, config).reason,
+            ErrorCode.OUTER_IDENTITY_MISMATCH,
+        )
+
+        withheld = disclosed_copy(
+            [
+                path
+                for path in revealed
+                if not (len(path) == 1 and getattr(path[0], "value", None) == "roax.typeMap.id")
+            ],
+            built,
+        )
+        self.assertEqual(
+            verify_envelope(withheld, config).reason,
+            ErrorCode.OUTER_IDENTITY_MISMATCH,
+        )
 
     def test_full_copy_detects_a_tampered_value(self):
         envelope = full_copy(self.built)
@@ -999,17 +1014,29 @@ class TestHostileEnvelopeMembers(unittest.TestCase):
         )
 
     def test_optional_type_map_hint_has_the_envelope_1_carrier_shape(self):
-        # Envelope 1 leaves this descriptor unauthenticated and optional, but when present
-        # its carrier is still closed and fully shaped by schemas/envelope-1.0.json.
-        # A syntactically valid value unrelated to this root remains accepted, proving the
-        # hint did not start selecting a map as a side effect of validating its shape.
+        # When present, this descriptor's carrier is closed and fully shaped by
+        # schemas/envelope-1.0.json, and every malformed case below is an ENVELOPE_SHAPE
+        # rejection rather than a silent absence - reading a present-but-wrong-typed member
+        # as missing is what would switch the binding below off from outside.
+        #
+        # THE FIRST ASSERTION USED TO BE THAT A DESCRIPTOR UNRELATED TO THIS ROOT WAS
+        # ACCEPTED, "proving the hint did not start selecting a map". That was the defect
+        # rather than the property: the member is not authority (specification section 11.3),
+        # and a copy presenting an identifier the root does not commit is exactly what the
+        # section 4.2 binding refuses. Nothing here selects a map; what changed is that the
+        # unauthenticated hint is now BOUND to the leaf instead of ignored.
         valid = {
             "id": "sha256:" + "0" * 64,
             "version": "9.9.9",
         }
         envelope = self.full()
         envelope["typeMap"] = valid
-        self.assertTrue(verify_envelope(envelope, self.config).accepted)
+        self.assertEqual(
+            verify_envelope(envelope, self.config).reason,
+            ErrorCode.SALT_MISSING_FOR_LEAF,
+            "a full copy naming a type map commits the leaf, so a member bolted onto a copy "
+            "issued without one asks for a salt the copy never carried",
+        )
 
         cases = {
             "not an object": None,

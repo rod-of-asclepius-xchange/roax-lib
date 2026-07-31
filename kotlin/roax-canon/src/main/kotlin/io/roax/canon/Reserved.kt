@@ -43,6 +43,15 @@ data class RecordIdentity(
     val issuerKeyId: String? = null,
     /** Required under [EnvelopeProfile.V2_TYPE_MAP_BOUND], absent under V1. */
     val typeMapId: String? = null,
+    /**
+     * The artifact's own three-part version, carried beside [typeMapId] in the envelope.
+     *
+     * NOT a leaf and not committed: the content ID transitively binds every artifact byte,
+     * including this version (specification section 12.1). It is here because
+     * `schemas/envelope-1.0.json` requires BOTH members whenever `typeMap` is present, so an
+     * issuance emitting the identifier alone produces a schema-invalid envelope.
+     */
+    val typeMapVersion: String? = null,
 )
 
 /** ROAX-CANON/1 section 11.2. Every reserved leaf is a STRING at a single `KEY` segment. */

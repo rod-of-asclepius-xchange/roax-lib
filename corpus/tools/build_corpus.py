@@ -29,21 +29,42 @@ import moh_records  # noqa: E402
 import roax_ref as ref
 import salt_sets  # noqa: E402
 import synthetic_records  # noqa: E402
-from envelope_fixtures import build_envelope_fixtures  # noqa: E402
+from envelope_fixtures import (  # noqa: E402
+    build_envelope_fixtures,
+    build_round_trip_vectors,
+    verify_round_trip_fixtures,
+)
 from roax_ref import RoaxError  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CORPUS_DIR = os.path.dirname(HERE)
 REPO_ROOT = os.path.dirname(CORPUS_DIR)
 
-CORPUS_VERSION = "1.0.0"
+# The version of the corpus FILE. 1.0.0 until class 20 (the issue-then-verify round trip) and the
+# type-map binding fixtures were added; both are additive, so this is a minor bump rather than a
+# major one and the file stays governed by schemas/conformance-corpus-1.0.json. Bumped rather than
+# left alone because an implementation pinning the old value should fail loudly rather than run an
+# older expectation set against a newer file - rust/tests/conformance_corpus.rs does exactly that.
+CORPUS_VERSION = "1.1.0"
+
+# The domain string class 8's stand-in leaves are generated under, DELIBERATELY DECOUPLED FROM
+# `CORPUS_VERSION` and pinned at the value it had when those vectors were first built.
+#
+# It used to interpolate `CORPUS_VERSION`, which made every future addition to the corpus rewrite
+# all 173 tree vectors, all 165 inclusion vectors and all 11 negative-proof vectors derived from
+# them - 349 vectors churned by a change that had nothing to do with any of them, burying the real
+# diff. Nothing about class 8 is a function of what the rest of the file contains, so this is a
+# constant of the generator rather than a version of the artifact. Do not re-couple them.
+TREE_LEAF_DOMAIN_VERSION = "1.0.0"
 
 # docs/conformance-corpus.md section 3 states the class count, and schemas/conformance-corpus-1.0.json
 # sets classRef's maximum to match. All three MOVE TOGETHER: a stale count here means the
 # highest-numbered class is never checked for coverage, which is the silent skip the coverage
 # report exists to prevent. 17 until the ten engineering decisions were ruled on 2026-07-28, which
 # added class 18 (outside-the-root authority, decision D8) and class 19 (NFC end to end, D12).
-CLASS_COUNT = 19
+# 20 since the issue-then-verify round trip was added: every class before it runs an implementation's
+# VERIFIER against a third party's bytes, and none runs it against that implementation's own output.
+CLASS_COUNT = 20
 # docs/conformance-corpus.md class 8 makes these leaf counts mandatory, and
 # schemas/conformance-corpus-1.0.json names this check as what enforces that, since a requirement
 # on the SET of tree vectors is not expressible per vector. Held separately from
@@ -336,9 +357,13 @@ def synthetic_tree_leaves(n):
     generated rather than built from records. The rule is stated here and in corpus/README.md
     so that both implementations regenerate identical trees; a consumer of the corpus does not
     need it, because every tree vector carries its leaf hashes explicitly.
+
+    The domain uses `TREE_LEAF_DOMAIN_VERSION` and NOT `CORPUS_VERSION`. See that constant: these
+    leaves are not a function of what the rest of the corpus contains, and coupling them to the
+    artifact version churned 349 vectors on every unrelated addition.
     """
     return [
-        ref.H(HASH_ALG, f"ROAX-CORPUS/{CORPUS_VERSION}/tree/{n}/{i}".encode("ascii"))
+        ref.H(HASH_ALG, f"ROAX-CORPUS/{TREE_LEAF_DOMAIN_VERSION}/tree/{n}/{i}".encode("ascii"))
         for i in range(n)
     ]
 
@@ -493,6 +518,11 @@ def build(references=None, notes=None, check=False):
 
     type_map_vectors = synthetic_records.build_type_map_vectors()
     envelopes = build_envelope_fixtures(HASH_ALG)
+    # After build_envelope_fixtures, which declares corpus/fixtures/envelopes/ owned so the
+    # directory can be set-compared; the round-trip fixtures land in the same directory and are
+    # registered by emitting them, so they must be produced before differences() is taken.
+    round_trip = build_round_trip_vectors(HASH_ALG)
+    verify_round_trip_fixtures(round_trip)
 
     unlinkability = build_unlinkability()
     normalization = synthetic_records.build_normalization_vectors()
@@ -515,6 +545,7 @@ def build(references=None, notes=None, check=False):
             "unlinkability": unlinkability,
             "normalization": normalization,
             "envelope": envelopes,
+            "roundTrip": round_trip,
         },
     }
 
@@ -637,6 +668,11 @@ def main():
                          "record fixture is rewritten under the new salts while the corpus file "
                          "itself keeps its old roots, and --check fails until a normal build "
                          "follows.")
+    ap.add_argument("--draw-missing-salts", action="store_true",
+                    help="like --draw-salts, but leaves an already-committed set untouched and "
+                         "draws only the ones a newly added fixture family needs. Use this when "
+                         "ADDING fixtures: a full redraw changes every root in the corpus, which "
+                         "buries an additive change in a corpus-wide diff.")
     ap.add_argument("--check", action="store_true",
                     help="rebuild and compare the corpus AND every fixture against the "
                          "committed files instead of writing them; writes nothing")
@@ -646,22 +682,28 @@ def main():
     if args.salt_sets is not None:
         salt_sets.set_directory(args.salt_sets)
 
-    if args.draw_salts:
+    if args.draw_salts or args.draw_missing_salts:
         # Draw and exit. Deliberately not part of any build: a build that drew its own salts
         # would produce a root no other machine could reproduce, which is the silent divergence
         # this corpus is the enforcement mechanism against.
         if args.check:
             raise SystemExit("--draw-salts and --check are contradictory: one writes, one compares")
-        salt_sets.set_drawing(True)
+        if args.draw_salts and args.draw_missing_salts:
+            raise SystemExit("--draw-salts and --draw-missing-salts are contradictory: one "
+                             "redraws every set, the other leaves committed sets alone")
+        before = set(salt_sets.committed_names())
+        salt_sets.set_drawing(True, only_missing=args.draw_missing_salts)
         notes = []
         build(args.references, notes, check=False)
-        drawn = salt_sets.committed_names()
+        after = salt_sets.committed_names()
+        drawn = [name for name in after if not args.draw_missing_salts or name not in before]
         print(f"drew {len(drawn)} salt set(s) into {salt_sets.REPO_PREFIX}")
         for name in drawn:
             print(f"  {name}")
         print("commit these; a normal build reads them and never draws.")
-        print("then run a normal build: every envelope and record fixture has just been "
-              "rewritten under the new salts and the corpus file still carries the old roots.")
+        print("then run a normal build: every envelope and record fixture built under a NEWLY "
+              "drawn salt has just been rewritten and the corpus file still carries the old "
+              "roots.")
         return
 
     notes = []

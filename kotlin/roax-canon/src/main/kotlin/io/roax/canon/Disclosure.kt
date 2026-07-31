@@ -139,8 +139,30 @@ object EnvelopeWriter {
         sb.append(",\"schemaVersion\":").also { string(sb, ctx.identity.schemaVersion) }
         sb.append(",\"recordId\":").also { string(sb, ctx.identity.recordId) }
         if (ctx.envelopeProfile.bindsTypeMapId) {
+            // BOTH members, and FAIL CLOSED without either. `schemas/envelope-1.0.json` requires
+            // `id` and `version` together whenever `typeMap` is present, so emitting the
+            // identifier alone produced a schema-invalid envelope - which nothing caught until
+            // conformance corpus class 20 asked this library to produce one and compare it
+            // against a committed copy. Coercing an absent version to the empty string is the
+            // same defect one layer down: `""` fails the schema's `^[0-9]+\.[0-9]+\.[0-9]+$` and
+            // no verifier here reads the member, so the library would accept its own invalid
+            // output. [Reserved.leavesFor] already refuses an absent `typeMapId` under this
+            // profile, and the version is refused on the same terms.
+            val id = ctx.identity.typeMapId ?: fail(
+                Reason.ENVELOPE_SHAPE,
+                "envelope profile ${ctx.envelopeProfile} requires typeMap.id, which selects and " +
+                    "authenticates the exact artifact (specification section 4.2)",
+            )
+            val version = ctx.identity.typeMapVersion ?: fail(
+                Reason.ENVELOPE_SHAPE,
+                "envelope profile ${ctx.envelopeProfile} emits the `typeMap` member, which " +
+                    "carries `id` and `version` together, so RecordIdentity.typeMapVersion is " +
+                    "required (schemas/envelope-1.0.json)",
+            )
             sb.append(",\"typeMap\":{\"id\":")
-            string(sb, ctx.identity.typeMapId ?: "")
+            string(sb, id)
+            sb.append(",\"version\":")
+            string(sb, version)
             sb.append('}')
         }
         sb.append(",\"root\":\"").append(Bytes.toHex(root)).append('"')
@@ -193,9 +215,18 @@ object EnvelopeWriter {
                 string(sb, Numbers.canonicalDecimal((v as RoaxValue.Decimal).literal))
             }
 
+            // LOWERCASE HEX, not base64, and this used to be base64.
+            //
+            // The disclosure carrier is per tag and is NOT the record's own spelling: a record
+            // spells `base64Binary` in RFC 4648 form, the leaf commits the DECODED OCTETS, and
+            // `schemas/envelope-1.0.json` pins the carrier to "lowercase hex of even length".
+            // Emitting base64 here produced a copy this library's own verifier rejected, and no
+            // vector could see it because until conformance corpus class 20 nothing asked this
+            // library to PRODUCE a disclosed copy. The pinned base64 form is an
+            // input-admissibility condition on the record, not the committed value (section 6.3).
             TypeTag.BYTES -> {
                 sb.append(",\"value\":")
-                string(sb, Base64Strict.encode((v as RoaxValue.Bytes).value))
+                string(sb, Bytes.toHex((v as RoaxValue.Bytes).value))
             }
 
             TypeTag.BLOB_REF -> fail(

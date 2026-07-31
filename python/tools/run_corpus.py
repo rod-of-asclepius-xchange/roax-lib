@@ -12,7 +12,7 @@ fixtures and the corpus-side type maps, which is exactly what
 `corpus/README.md` documents as the interface for "an implementation that is not one of
 these two".
 
-Exit status is 0 only when all 19 classes pass with no unavailable vectors.
+Exit status is 0 only when all 20 classes pass with no unavailable vectors.
 An assertion failure exits 1.
 A vector or class that cannot run says NOT RUN with the reason and exits 2; it never
 reports green unrun.
@@ -25,6 +25,7 @@ import json
 import os
 import sys
 from collections import defaultdict
+from collections.abc import Mapping
 from typing import Any
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -59,7 +60,8 @@ from roax_canon import (  # noqa: E402
 )
 from roax_canon.errors import ErrorCode  # noqa: E402
 from roax_canon.flatten import check_reserved_namespace, flatten  # noqa: E402
-from roax_canon.jsonio import as_int, is_json_string  # noqa: E402
+from roax_canon.disclose import disclosed_copy, full_copy  # noqa: E402
+from roax_canon.jsonio import JsonNumber, as_int, is_json_string  # noqa: E402
 from roax_canon.path import segments_from_json  # noqa: E402
 from roax_canon.profiles import CORPUS_SYNTHETIC_PROFILE  # noqa: E402
 from ts_sample import load_export  # noqa: E402
@@ -67,8 +69,28 @@ from ts_sample import load_export  # noqa: E402
 REPO = os.path.dirname(os.path.dirname(_HERE))
 CORPUS = os.path.join(REPO, "corpus", "conformance-corpus-1.0.json")
 TYPE_MAP_DIR = os.path.join(REPO, "corpus", "type-maps")
-EXPECTED_CLASSES = tuple(range(1, 20))
+EXPECTED_CLASSES = tuple(range(1, 21))
 REFERENCES_INSTRUCTION = "rerun with --references /path/to/schemata"
+
+# Every vector group this runner consumes. A group present in the corpus file and absent from
+# this tuple is a HARD FAILURE rather than a quiet skip, because the quiet skip is the exact
+# defect shape the corpus exists to prevent: a runner that does not know a group reads it as zero
+# vectors and reports the same green it reported before the group was added.
+CONSUMED_GROUPS = (
+    "encodePath",
+    "encodeValue",
+    "reject",
+    "leaf",
+    "tree",
+    "inclusion",
+    "negativeProof",
+    "typeMap",
+    "record",
+    "unlinkability",
+    "normalization",
+    "envelope",
+    "roundTrip",
+)
 
 
 # ---------------------------------------------------------------------------------
@@ -445,22 +467,6 @@ def run_record(vectors, maps, r: Results, references, authorize_empty) -> None:
             r.bad(cls, name, "unsupported record-vector envelope carrier")
             continue
         reserved_set = _reserved_set(x)
-        if reserved_set == RESERVED_V2:
-            # NOT RUN rather than FAIL. This package deliberately implements no
-            # published-DFA artifact loader and no content-ID reproduction, so a vector
-            # selecting envelope 2.0 is one this runner CANNOT run, not one it ran and
-            # disagreed with. Reporting it as a failure would collapse the three-way
-            # contract in this module's own docstring, where could-not-check is a third
-            # status that is neither a pass nor a failure (`FINDINGS.md` item 13;
-            # specification section 4.2).
-            r.unavailable(
-                cls,
-                name,
-                "vector selects envelope 2.0 through `typeMapId`, which this package does "
-                "not implement: specification section 4.2 requires selecting the exact "
-                "map by a reproduced content ID from a published DFA artifact",
-            )
-            continue
         record, why_not_run, failure = _record_for(x, references)
         if failure is not None:
             r.bad(cls, name, failure)
@@ -516,6 +522,180 @@ def run_record(vectors, maps, r: Results, references, authorize_empty) -> None:
             continue
         r.check(cls, name, built.leaf_count, x["leafCount"], "leafCount: ")
         r.check(cls, name, built.root.hex(), x["root"], "root: ")
+
+
+def run_round_trip(vectors, maps, r: Results, config, authorize_empty) -> None:
+    """Class 20: issue, disclose, then verify the copy THIS package produced.
+
+    Every other class runs :func:`verify_envelope` against bytes the corpus generator wrote.
+    That is the gap this class closes: a package can emit a disclosed copy its own verifier
+    refuses and still pass every other vector, because no other vector asks it to PRODUCE one.
+
+    So this drives the real entry points - :func:`full_copy` and :func:`disclosed_copy` - and
+    then puts their output through :func:`verify_envelope`. Assembling an envelope here instead
+    would test this file rather than the package.
+    """
+    for x in vectors:
+        cls, name = x["class"], x["name"]
+        descriptor = x.get("typeMap") or {}
+        identity = RecordIdentity(
+            record_type=x["recordType"],
+            schema_version=x["schemaVersion"],
+            record_id=x["recordId"],
+            issuer_id=x["issuerId"],
+            issuer_key_id=x.get("issuerKeyId"),
+            type_map_id=descriptor.get("id"),
+            type_map_version=descriptor.get("version"),
+        )
+        reserved_set = RESERVED_V2 if descriptor else RESERVED_V1
+        record = load_file(os.path.join(REPO, x["recordFile"]))
+        by_path = salts_by_path(os.path.join(REPO, x["saltsFile"]))
+        try:
+            built = build_tree(
+                record,
+                identity,
+                maps(x["recordType"]),
+                MappingSalts(by_path),
+                reserved_set=reserved_set,
+                authorize_empty_containers=authorize_empty,
+            )
+        except RoaxError as exc:
+            r.bad(cls, name, f"issuance rejected with {exc.code}: {exc.detail}")
+            continue
+        r.check(cls, name, built.leaf_count, x["leafCount"], "leafCount: ")
+        r.check(cls, name, built.root.hex(), x["root"], "root: ")
+
+        reveal = [segments_from_json(p) for p in x["disclosePaths"]]
+        try:
+            produced = {
+                "expectedFullCopyFile": full_copy(built),
+                "expectedDisclosedCopyFile": disclosed_copy(reveal, built),
+            }
+        except RoaxError as exc:
+            r.bad(cls, name, f"disclosure rejected with {exc.code}: {exc.detail}")
+            continue
+
+        for field_name, envelope in produced.items():
+            expected = load_file(os.path.join(REPO, x[field_name]))
+            # Compared SEMANTICALLY. JSON member order, whether `displayPath` is emitted, the
+            # order of `disclosure.leaves` and the order of a full copy's `salts` are not fixed
+            # by the specification, so asserting any of them would fail a conforming
+            # implementation. A number's SOURCE TEXT must survive: `JsonNumber` subclasses `str`
+            # and carries it, which is exactly what the full copy's record literals need
+            # (section 6.4).
+            difference = _first_difference(
+                _normalized_for_comparison(_comparable(envelope)),
+                _normalized_for_comparison(_comparable(expected)),
+            )
+            if difference is None:
+                r.ok(cls)
+            else:
+                r.bad(cls, name, f"{field_name}: {difference}")
+            # And the half no static fixture can assert: this package's verifier over this
+            # package's own output. A producer that omitted a per-leaf value carrier fails HERE
+            # even though every leaf hash it computed was right.
+            result = verify_envelope(envelope, config)
+            if result.accepted == x["expectSelfVerifies"]:
+                r.ok(cls)
+            else:
+                r.bad(
+                    cls,
+                    name,
+                    f"{field_name}: this package issued an envelope its own verifier "
+                    f"refused: {result.reason} ({result.detail[:120]})",
+                )
+
+
+def _normalized_for_comparison(envelope):
+    """An envelope's comparison form with the aspects the specification does not fix removed.
+
+    Applied to BOTH sides, so what survives the comparison is what the specification says.
+    Three things are relaxed and nothing else: ``disclosure.leaves`` is ordered by leaf index
+    and a full copy's ``salts`` by its entry's structured path, because every leaf carries its
+    own index and every salt entry its own path, so neither array order carries anything; and
+    ``displayPath`` is DROPPED, because it is display only and never hashed (section 5.2) and
+    `schemas/envelope-1.0.json` leaves it out of ``disclosedLeaf.required``, so a conforming
+    producer may omit it and a comparison that noticed would fail conforming work.
+
+    Everything else stays exact - both array lengths, every leaf's segments, index, tag, value
+    carrier, salt and audit path, and every scalar identity field - so a producer that omitted
+    a per-leaf value carrier still fails, which is the defect this class exists for.
+    """
+    if not isinstance(envelope, Mapping):
+        return envelope
+    out = dict(envelope)
+    salts = out.get("salts")
+    if isinstance(salts, list):
+        out["salts"] = sorted(
+            salts,
+            key=lambda entry: json.dumps(
+                entry.get("segments") if isinstance(entry, Mapping) else None, sort_keys=True
+            ),
+        )
+    disclosure = out.get("disclosure")
+    if isinstance(disclosure, Mapping) and isinstance(disclosure.get("leaves"), list):
+        leaves = [
+            {k: value for k, value in leaf.items() if k != "displayPath"}
+            if isinstance(leaf, Mapping)
+            else leaf
+            for leaf in disclosure["leaves"]
+        ]
+        out["disclosure"] = {**disclosure, "leaves": sorted(leaves, key=_leaf_index)}
+    return out
+
+
+def _leaf_index(leaf) -> int:
+    """The leaf index a `_comparable` leaf carries, as the number literal it kept."""
+    if not isinstance(leaf, Mapping):
+        return -1
+    carrier = leaf.get("index")
+    if isinstance(carrier, Mapping):
+        return int(carrier.get("$numberLiteral", -1))
+    return int(carrier) if carrier is not None else -1
+
+
+def _comparable(node):
+    """Members sorted, numbers kept as source text."""
+    if isinstance(node, Mapping):
+        out = {}
+        for key in sorted(node):
+            out[key] = _comparable(node[key])
+        return out
+    if isinstance(node, list):
+        return [_comparable(item) for item in node]
+    if isinstance(node, JsonNumber):
+        return {"$numberLiteral": str(node)}
+    if isinstance(node, bool) or node is None or isinstance(node, str):
+        return node
+    if isinstance(node, int):
+        return {"$numberLiteral": str(node)}
+    return node
+
+
+def _first_difference(got, want, at=""):
+    """The first place two comparable forms differ, or None. A whole envelope printed twice is
+    not a readable failure, and this class catches one missing member on one leaf."""
+    if got == want:
+        return None
+    if isinstance(got, list) and isinstance(want, list):
+        if len(got) != len(want):
+            return f"{at or '/'}: {len(got)} entries, expected {len(want)}"
+        for index, (a, b) in enumerate(zip(got, want)):
+            found = _first_difference(a, b, f"{at}/{index}")
+            if found is not None:
+                return found
+        return None
+    if isinstance(got, dict) and isinstance(want, dict):
+        for key in sorted(set(got) | set(want)):
+            if key not in got:
+                return f"{at}/{key}: ABSENT, expected {want[key]!r}"
+            if key not in want:
+                return f"{at}/{key}: {got[key]!r}, expected ABSENT"
+            found = _first_difference(got[key], want[key], f"{at}/{key}")
+            if found is not None:
+                return found
+        return None
+    return f"{at or '/'}: {got!r}, expected {want!r}"
 
 
 def _reserved_set(vector) -> str:
@@ -666,6 +846,15 @@ def main() -> int:
     corpus = json.load(open(CORPUS, encoding="utf-8"))
     vectors = corpus["vectors"]
 
+    unconsumed = [name for name in vectors if name not in CONSUMED_GROUPS]
+    if unconsumed:
+        print(
+            "FAILED: the corpus carries vector group(s) this runner does not consume: "
+            + ", ".join(sorted(unconsumed))
+        )
+        print("  A group read as absent would report the same green as before it existed.")
+        return 1
+
     print("ROAX-CANON/1 conformance corpus, Python implementation")
     print(
         f"  corpus            {corpus['corpusVersion']}  canon {corpus['canon']}"
@@ -741,6 +930,7 @@ def main() -> int:
     run_unlinkability(vectors.get("unlinkability", []), r)
     run_normalization(vectors.get("normalization", []), maps, r, authorize_empty)
     run_envelope(vectors.get("envelope", []), config, r)
+    run_round_trip(vectors.get("roundTrip", []), maps, r, config, authorize_empty)
 
     observed_classes = set(r.passed) | set(r.failed) | set(r.not_run)
     missing_classes = [cls for cls in EXPECTED_CLASSES if cls not in observed_classes]
@@ -788,20 +978,20 @@ def main() -> int:
                 print(f"  class {cls}: ... and {len(r.failed[cls]) - 12} more (--verbose)")
         print(
             f"\nRESULT: FAIL ({sum(r.passed.values())} passed; {total_fail} failed; "
-            f"{total_not_run} not run; {classes_passed}/19 classes passed)"
+            f"{total_not_run} not run; {classes_passed}/{len(EXPECTED_CLASSES)} classes passed)"
         )
         return 1
 
     if total_not_run:
         print(
             f"\nRESULT: INCOMPLETE / NOT RUN ({sum(r.passed.values())} assertions passed; "
-            f"{total_not_run} not run; {classes_passed}/19 classes passed)"
+            f"{total_not_run} not run; {classes_passed}/{len(EXPECTED_CLASSES)} classes passed)"
         )
         return 2
 
     print(
         f"\nRESULT: PASS ({sum(r.passed.values())} assertions; "
-        f"{classes_passed}/19 classes passed; 0 not run)"
+        f"{classes_passed}/{len(EXPECTED_CLASSES)} classes passed; 0 not run)"
     )
     return 0
 

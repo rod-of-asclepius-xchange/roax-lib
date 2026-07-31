@@ -127,6 +127,24 @@ const REFERENCE_REASON_ALIASES: ReadonlyMap<string, string> = new Map([
   ['type-map-uncovered-path', 'type-map-fail-closed'],
 ]);
 
+/**
+ * The same claim, but for one VECTOR rather than for a code everywhere it appears.
+ *
+ * Keyed `<vector name>::<reference reason>`, because a code-keyed entry would be too wide here.
+ * `salt-leak-disclosed-copy-with-wrong-typed-salts` carries `"salts": {}` beside a `disclosure`:
+ * the reference implementations check whether the member is PRESENT, so they answer
+ * `disclosed-copy-carries-salts`, while this library types every known member as it parses and
+ * refuses a present-but-wrong-typed one as `envelope-malformed` before the copy kind is settled.
+ * Both refuse the same document for the same reason - a `salts` member sits beside a disclosure -
+ * at different layers. Aliasing the CODE globally would also excuse
+ * `salt-leak-disclosed-copy-with-salts-array`, where this library agrees exactly and where a
+ * parse-level refusal would mean it never reached the salt-leak guard at all.
+ */
+const VECTOR_REASON_ALIASES: ReadonlyMap<string, string> = new Map([
+  ['salt-leak-disclosed-copy-with-wrong-typed-salts::disclosed-copy-carries-salts',
+    'envelope-malformed'],
+]);
+
 /** Asserts that `body` throws a `RoaxError` whose code equals `reason` or its declared alias. */
 export function expectReject(
   report: Report,
@@ -149,7 +167,10 @@ export function expectReject(
     report.fail(cls, `${name}: threw a non-RoaxError: ${String(threw)}`);
     return;
   }
-  const expected = REFERENCE_REASON_ALIASES.get(reason) ?? reason;
+  const expected =
+    VECTOR_REASON_ALIASES.get(`${name}::${reason}`) ??
+    REFERENCE_REASON_ALIASES.get(reason) ??
+    reason;
   if (threw.code !== expected) {
     const alias = expected === reason ? '' : ` (this library's spelling of ${reason})`;
     report.fail(cls, `${name}: expected reason ${expected}${alias}, got ${threw.code}`);

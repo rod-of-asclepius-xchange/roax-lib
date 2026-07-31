@@ -1,7 +1,7 @@
 # The ROAX conformance corpus
 
 **Status:** first cut.
-488 vectors, all 19 classes reachable, 14 complete, 4 partial and 1 stale.
+501 vectors, all 20 classes reachable, 15 complete, 4 partial and 1 stale.
 **Normative definition:** [`docs/conformance-corpus.md`](../docs/conformance-corpus.md).
 **Schema:** [`schemas/conformance-corpus-1.0.json`](../schemas/conformance-corpus-1.0.json).
 **Specification:** [`docs/spec/roax-canon-1.md`](../docs/spec/roax-canon-1.md), which governs where the two disagree (specification section 1.1).
@@ -15,8 +15,8 @@ If ROAX ships five independent libraries it is the whole enforcement mechanism f
 |---|---|
 | `conformance-corpus-1.0.json` | The vector file. The deliverable. |
 | `type-maps/*.json` | The type maps class 10 and class 11 are asserted against. Three are derived from the reference schemas with a citation on every entry; one is authored for the synthetic fixtures and says so. |
-| `fixtures/records/*.json` | Synthetic records for classes 5, 7, 13, 15 and 19. Authored here; no reference sample is reproduced. |
-| `fixtures/envelopes/*.json` | Envelopes for classes 11, 14, 15, 17 and 18. Generated. |
+| `fixtures/records/*.json` | Synthetic records for classes 5, 7, 13, 15, 19 and 20. Authored here; no reference sample is reproduced. |
+| `fixtures/envelopes/*.json` | Envelopes for classes 11, 14, 15, 17, 18 and 20. Generated. Class 20's four are the copies a conforming implementation must REPRODUCE rather than merely verify. |
 | `fixtures/salts/*.json` | The committed per-leaf salt sets. **Inputs, not generated fixtures**: under decision D4b a salt is an independent CSPRNG draw that nothing can re-derive (specification section 7), so a fresh build cannot recompute one and comparing it against a fresh draw would fail forever. Drawn once by `build_corpus.py --draw-salts` and committed; a build that finds one missing FAILS rather than drawing, because a drawn-on-demand salt would give one machine a root no other machine could reproduce. Class 10's sets pair positionally, everything else by path - `docs/conformance-corpus.md` class 10 says why, and why harmonizing them toward positional envelopes would be the unsafe direction. |
 | `tools/` | Two independent implementations, the generator, the runner and the schema validator. |
 
@@ -44,10 +44,10 @@ The exit status distinguishes the three gate outcomes:
 | 1 | At least one check ran and failed. |
 | 2 | Nothing failed, but at least one check or vector was `NOT RUN`. |
 
-On the committed tree, the fully configured command above measures 488 vectors, 1,122 implementation-B assertions, and 76 JSON Schema verdicts.
+On the committed tree, the fully configured command above measures 501 vectors, 1,156 implementation-B assertions, and 97 JSON Schema verdicts.
 **Each of the last two needs an input that lives outside this tree, and the two are missing in different ways**, neither of which is drift.
-Without the pinned third-party reference checkout, `check_corpus.mjs` still runs and passes 1,114 assertions while reporting class 10's four vectors NOT RUN; supplying the checkout adds the 8 assertions those vectors carry.
-Without an Ajv 8 and `ajv-formats` installed outside this tree and named by `--modules` or `ROAX_NODE_MODULES`, `validate_schemas.mjs` emits no verdict at all and exits 2, which `run.sh` reports as step 4 NOT RUN rather than as a lower count; with one it emits 76 verdict lines - the corpus file, the four corpus type maps, the 54 envelope fixtures and its 17 conditional probes - and exits 0.
+Without the pinned third-party reference checkout, `check_corpus.mjs` still runs and passes 1,148 assertions while reporting class 10's four vectors NOT RUN; supplying the checkout adds the 8 assertions those vectors carry.
+Without an Ajv 8 and `ajv-formats` installed outside this tree and named by `--modules` or `ROAX_NODE_MODULES`, `validate_schemas.mjs` emits no verdict at all and exits 2, which `run.sh` reports as step 4 NOT RUN rather than as a lower count; with one it emits 97 verdict lines - the corpus file, the four corpus type maps, the 69 envelope fixtures and its 23 conditional probes - and exits 0.
 
 `build_corpus.py --check` and `check_corpus.mjs` use the same three-way status.
 In particular, each exits 2 when the committed external record vectors were not checked.
@@ -100,6 +100,15 @@ Those are produced by `tools/build_type_maps.py`, a separate tool with no check 
 Regenerate them by hand against a reference checkout after touching that tool.
 The fourth map, `org.roax.corpus.synthetic.json`, is authored by the corpus generator and *is* compared by step 1.
 
+### Every vector group must be CONSUMED, and an unknown one is a failure
+
+A runner that does not know a group reads it as zero vectors and reports the same green it reported before the group existed.
+That is worse than a coverage gap, because the per-class report cannot see it either: the class the group serves simply does not appear.
+
+So every runner here enumerates the groups the corpus file carries and FAILS on one it does not consume.
+`corpus/tools/check_corpus.mjs`, the TypeScript, Python, Swift and Kotlin runners each hold an explicit list, and `rust/tests/conformance_corpus.rs` uses serde's `deny_unknown_fields`, whose default of IGNORING an unknown member is exactly the quiet skip.
+The guard was added BEFORE class 20 rather than with it, so that each runner went red for a reason its author controlled instead of quietly staying green.
+
 ### Checking an implementation that is not one of these two
 
 The runner to port is [`tools/check_corpus.mjs`](tools/check_corpus.mjs).
@@ -114,6 +123,7 @@ The procedure per class:
 | `leaf` | `leafHash(segments, tag, value, saltHex)` equals `leafHash`. The salt is an INPUT: decision D4 is ruled D4b, so nothing derives one (specification section 7). |
 | `record` | Flatten the record, union the reserved leaves, order by encoded path, take each leaf's salt from the set `saltsFile` names in the shape `saltPairing` declares; the leaf count then equals `leafCount` and the root equals `root`. A vector may instead carry the whole thing as one full envelope copy, naming `envelopeFile` and no salt set; a runner that does not implement that schema-valid carrier fails with exit 1 rather than reporting it `NOT RUN`. |
 | `unlinkability` | Perform `trials` independent issuances at the paths given, with YOUR OWN generator, and assert the three relations. Nothing is compared against a pinned value, because under D4b there is none to pin. |
+| `roundTrip` | ISSUE a full copy from `recordFile` under the salts `saltsFile` names, compare it with `expectedFullCopyFile`, derive a disclosed copy revealing exactly `disclosePaths` from the SAME commitment, compare it with `expectedDisclosedCopyFile`, and then verify BOTH through YOUR OWN verifier. This is the one group that runs an implementation against its own OUTPUT; every other group runs its verifier against bytes this generator wrote. Compare SEMANTICALLY - member order, `displayPath`, the order of `disclosure.leaves` and the order of a full copy's `salts` are not specified, so key those two arrays by leaf index and by structured path and drop `displayPath` on both sides - while keeping every number's source text and every other member exact. |
 | `tree` | `MTH(leafHashes)` equals `root`. |
 | `inclusion` | Verifying `(leafHash, index, treeSize, auditPath, root)` returns `expect`. Generating the audit path for `index` reproduces `auditPath`. |
 | `negativeProof` | Verification MUST fail. |
@@ -185,12 +195,42 @@ Counts are vectors in the file, measured by `build_corpus.py --report`.
 | 11 the schema binding | 24 | **partial - the two FHIR fail-closed rows are inexpressible.** Includes the three unknown-algorithm and unknown-profile fail-closed vectors: specification section 12.2 calls that "the same rule section 4.2 applies to an unknown path, applied one level up", and section 4.2 is what this class tests - see below |
 | 12 cross-record unlinkability | 3 | complete. Behavioural rather than pinned: the runner draws and asserts. Detects a deterministic or reused salt; it CANNOT detect a weak CSPRNG, and no fixed vector file can. |
 | 13 reference-schema hazards | 2 | **partial - the `$id` half is inexpressible** |
-| 14 minimum-disclosure floor | 34 | complete. The four outer-identity vectors this row used to count are class 18 now - see below. |
+| 14 minimum-disclosure floor | 42 | complete. The four outer-identity vectors this row used to count are class 18 now - see below. Grew by the 8 `typemap-floor-*` vectors, one accept and one omit per profile, which are the first fixtures here to carry a `typeMap` member at all. |
 | 15 reserved-namespace guard | 20 | complete |
 | 16 Unicode version sensitivity | 20 | complete, at the strength class 16 itself states |
-| 17 withheld-leaf salt | 8 | complete |
-| 18 outside-the-root authority | 4 | **partial - the identity rows only; the registry rows are a named gap** |
+| 17 withheld-leaf salt | 9 | complete. The ninth is `salt-leak-disclosed-copy-with-wrong-typed-salts`, which fails a verifier that reads a present-but-wrong-typed member as absent and thereby switches its own guard off |
+| 18 outside-the-root authority | 6 | **partial - the identity rows and the two type-map binding rows; the registry rows are a named gap** |
 | 19 NFC end to end, with a root | 2 | complete - both the value site and the key site, the latter buildable since decision D14 was ruled D14a |
+| 20 issue-then-verify round trip | 2 | complete. The only class that runs an implementation against its own PRODUCED envelope - see below |
+
+### Classes 14, 18 and 20 grew because two blind spots were proven rather than argued
+
+Both were found by a person reading an implementation, not by this corpus, and both are recorded here because the shape recurs.
+
+**Blind spot 1: nothing ran an implementation against its own OUTPUT.**
+Every envelope fixture in this directory is produced by `corpus/tools/build_corpus.py`, so classes 14, 15, 17 and 18 all run a library's VERIFIER against a third party's bytes.
+A library could therefore issue a disclosed copy its own verifier refused and pass all 488 vectors - and one did, omitting every revealed leaf's per-tag value carrier and failing on `disclosed-leaf-named-without-value`, a condition class 17 names in a committed vector.
+Class 20 closes it: issue, disclose, compare against the committed copies, and verify your own output.
+
+**Blind spot 2: no committed fixture carried a `typeMap` member**, so nothing reached the specification section 4.2 binding in either direction.
+A verifier could gate the whole check on that member - which the HOLDER supplies - and no vector would notice.
+`typemap-floor-*` and the two `identity-outer-type-map-*` rows close it.
+The governing rule is worth stating once: **a check whose execution is controlled by the party it constrains is not a check.**
+
+**What extending the corpus then measured across the five libraries**, listed because a corpus change that turns a merged library red is the finding rather than an obstacle:
+
+| Library | Outcome |
+|---|---|
+| Rust | Not exploitable, but its runner chose the envelope generation from the presenter-supplied `typeMap` member, and the copy with that member stripped was refused by the reserved-namespace guard rather than by the binding. `reserved_leaf_set_for` now selects from what the envelope COMMITS. |
+| TypeScript | Passed both binding families. Its `VerifierConfig` could declare a profile known and then fail closed on the same profile at the floor, with the same `profile-unknown` code for a different reason; `floorFor` closes that. |
+| Python | **Accepted all four type-map binding attacks.** It had no binding at all outside a verifier configuration nothing set. Fixed. |
+| Swift | Passed. This is where both blind spots were found. |
+| Kotlin | Accepted a copy withholding `roax.typeMap.id` while the outer member named one, and emitted AND read the tag-5 BYTES disclosure carrier as base64 rather than lowercase hex. Both fixed; the second was caught by class 20 and by nothing else, because no committed disclosed fixture carries a BYTES leaf. |
+
+**The single most useful thing class 20 found is none of the above.**
+The TypeScript library refused to ISSUE an envelope without `roax.typeMap.id` and the Python library refused to issue one WITH it.
+Two shipped libraries held mutually exclusive issuance rules, both passed all 488 vectors, and no verifying-side vector could ever have found it.
+Specification section 11.2 settles the question - that leaf is emitted ALWAYS - so Python's refusal was narrowed to the thing it actually needs, which is artifact resolution rather than issuance.
 
 ### Class 10 is partial, and the reason is a finding rather than an omission
 
@@ -244,7 +284,7 @@ Specification section 11.3 states normatively that a field outside the root is a
 pdt's floor is a strict **subset** of recovery's, which adds `validUntil`, so a holder of a recovery copy who relabels the envelope as pdt discloses pdt's floor, withholds the expiry, and every inclusion proof still verifies against the genuine recovery root.
 `identity-outer-record-type-downgrade` carries exactly that copy and the other three carry a mismatch in each remaining reserved field; all four reject with `outer-identity-mismatch`.
 Measured: with the binding removed, all four are **accepted**.
-Those four are the whole of class 18 as built, and they carry no `verifierConfig` because the envelope alone determines each of them.
+Those four plus the two `identity-outer-type-map-*` binding rows are the whole of class 18 as built, and all six carry no `verifierConfig` because the envelope alone determines each of them.
 
 #### The identity binding runs BEFORE the floor, and that order is required
 
@@ -261,7 +301,7 @@ So a disclosed copy is verified in this order:
 Step 3's source-of-floor is not, and cannot be.**
 Both halves of that are measured, and the difference matters to anyone porting this:
 
-| Deviation | Envelope vectors failed, of 54 |
+| Deviation | Envelope vectors failed, of the 54 committed when this was measured |
 |---|---:|
 | enforce the floor before the binding | **16** |
 | keep the ordering, read the floor from the envelope's `recordType` | **0** |
@@ -293,10 +333,10 @@ It is enforced in `tools/build_type_maps.py`, which resolves `$ref` by file path
 
 ### Class 18 is partly built, and the unbuilt half is a named gap rather than an omission
 
-The four identity rows are built and are described above.
+The four identity rows and the two type-map binding rows are built and are described above.
 The registry-dependent rows of `docs/conformance-corpus.md` class 18 are not, and they cannot be: each of them turns on what the verifier's own anchoring registry answers, and specification section 2.2 deliberately leaves that registry undesigned.
 Building them here would make the corpus invent that interface, which section 1.2 of the corpus document forbids for the same reason it forbids binding an unresolved path.
-That is why `schemas/conformance-corpus-1.0.json` PERMITS `envelopeVector.verifierConfig` at class 18 rather than requiring it: an earlier revision required it, and the four built vectors carry none because the envelope alone determines them, so the requirement rejected the committed corpus.
+That is why `schemas/conformance-corpus-1.0.json` PERMITS `envelopeVector.verifierConfig` at class 18 rather than requiring it: an earlier revision required it, and the six built vectors carry none because the envelope alone determines them, so the requirement rejected the committed corpus.
 The completeness rule the block exists for - a vector whose outcome turns on the verifier's configuration must state that configuration - is stated in the schema and is **not mechanically enforced today**, because the vectors that would need the check are exactly the ones that cannot be built yet.
 
 ### Class 19 now carries both sites, and decision D14a is why the key site is buildable

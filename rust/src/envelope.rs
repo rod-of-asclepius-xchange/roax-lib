@@ -87,6 +87,30 @@ pub fn issue_full_copy(
     Ok((copy, commitment))
 }
 
+/// Issue a full copy from caller-supplied, path-addressed salts, and retain its commitment.
+///
+/// The deterministic twin of [`issue_full_copy`], and the ENVELOPE-level counterpart of
+/// [`commit_full_copy_with_salts`], which stops at the commitment. It exists because conformance
+/// corpus class 20 pins an issuance: under decision D4b a salt is an independent random draw that
+/// nothing re-derives (specification section 7), so a round trip whose expected envelope bytes
+/// are committed has to be issued under committed salts. Without it a runner has to assemble the
+/// envelope itself, which tests the runner instead of this crate - the precise way an earlier
+/// round-trip test elsewhere missed a real defect.
+///
+/// A caller supplying salts owns the section 7 entropy floor and the rule that no salt is reused
+/// across leaves or across issuances. [`issue_full_copy`] remains the entry point for a real
+/// issuance.
+pub fn issue_full_copy_with_salts(
+    record: &JsonValue,
+    context: &CommitmentContext,
+    profile: &dyn Profile,
+    salts: &SaltMap,
+) -> Result<(FullCopy, Commitment)> {
+    let commitment = commit_full_copy_with_salts(record, context, profile, salts)?;
+    let copy = FullCopy::from_commitment(record.clone(), &commitment)?;
+    Ok((copy, commitment))
+}
+
 /// Rebuild a full-copy commitment from caller-supplied, path-addressed salts.
 ///
 /// This is the deterministic construction entry point for imports and
@@ -270,6 +294,84 @@ pub fn parse_envelope(input: &[u8], reserved_leaf_set: ReservedLeafSet) -> Resul
     parse_envelope_value(&root, reserved_leaf_set)
 }
 
+/// Select the reserved-leaf generation an envelope belongs to, from what it COMMITS.
+///
+/// [`parse_envelope`] takes the generation as an INPUT, which is right: it is the verifier's own
+/// decision and never the document's. But a verifier that accepts BOTH generations still has to
+/// choose one per envelope, and the obvious choice - "2.0 when the outer `typeMap` member is
+/// there" - hands that choice to the party the binding constrains. A holder deletes the member,
+/// withholds the leaf, and a verifier reading only the member drops to the 1.0 generation where
+/// `roax.typeMap.id` is not in the floor and nothing asks for it, while every remaining inclusion
+/// proof stays genuine. **A check whose execution is controlled by the party it constrains is not
+/// a check** (specification section 11.3; `roax.typeMap.id` is mandatory to disclose by
+/// arithmetic under section 11.2, because it selects and authenticates the exact map).
+///
+/// So this reads the COMMITTED evidence as well: any disclosed leaf, or any `salts` entry,
+/// addressing the single segment `roax.typeMap.id` selects the 2.0 generation regardless of what
+/// the outer member says. A copy that then presents no member fails with
+/// [`Error::TypeMapNotNamed`], and a copy presenting a different one fails the binding with
+/// [`Error::OuterIdentityMismatch`].
+///
+/// The one case no envelope can evidence is a copy that drops BOTH. It is byte-indistinguishable
+/// from a legitimate 1.0 copy issued before the binding existed, because the only signal that a
+/// further reserved leaf was committed is `leafCount`, which specification section 11.1 measured
+/// is NOT authenticated in a disclosed copy. A verifier that requires the binding regardless
+/// passes [`ReservedLeafSet::EnvelopeV2`] here instead of calling this.
+#[must_use]
+pub fn reserved_leaf_set_for(value: &JsonValue) -> ReservedLeafSet {
+    let JsonValue::Object(members) = value else {
+        return ReservedLeafSet::EnvelopeV1;
+    };
+    let member = |name: &str| {
+        members
+            .iter()
+            .find(|(key, _)| key == name)
+            .map(|(_, entry)| entry)
+    };
+    if member("typeMap").is_some() {
+        return ReservedLeafSet::EnvelopeV2;
+    }
+    let commits_type_map_id = |entries: Option<&JsonValue>| {
+        let Some(JsonValue::Array(rows)) = entries else {
+            return false;
+        };
+        rows.iter().any(|row| {
+            let JsonValue::Object(fields) = row else {
+                return false;
+            };
+            fields
+                .iter()
+                .find(|(key, _)| key == "segments")
+                .is_some_and(|(_, segments)| is_type_map_id_path(segments))
+        })
+    };
+    let disclosure_leaves = member("disclosure").and_then(|disclosure| {
+        let JsonValue::Object(fields) = disclosure else {
+            return None;
+        };
+        fields
+            .iter()
+            .find(|(key, _)| key == "leaves")
+            .map(|(_, leaves)| leaves)
+    });
+    if commits_type_map_id(disclosure_leaves) || commits_type_map_id(member("salts")) {
+        return ReservedLeafSet::EnvelopeV2;
+    }
+    ReservedLeafSet::EnvelopeV1
+}
+
+fn is_type_map_id_path(segments: &JsonValue) -> bool {
+    let JsonValue::Array(items) = segments else {
+        return false;
+    };
+    let [JsonValue::Object(fields)] = items.as_slice() else {
+        return false;
+    };
+    fields.iter().any(|(key, entry)| {
+        key == "key" && matches!(entry, JsonValue::String(name) if name == "roax.typeMap.id")
+    })
+}
+
 /// Decode an already strict-parsed envelope value.
 pub fn parse_envelope_value(
     value: &JsonValue,
@@ -319,10 +421,12 @@ pub fn parse_envelope_value(
         .transpose()?;
     let type_map = match reserved_leaf_set {
         ReservedLeafSet::EnvelopeV1 => None,
-        ReservedLeafSet::EnvelopeV2 => Some(
-            type_map_hint
-                .ok_or_else(|| Error::InvalidEnvelope("envelope 2.0 requires typeMap".into()))?,
-        ),
+        // `TypeMapNotNamed` rather than a bare `InvalidEnvelope`, so a caller can tell "this
+        // verifier requires the binding and the copy has none" apart from "the two sides name
+        // different artifacts". `reserved_leaf_set_for` reaches this generation only for a copy
+        // that COMMITS `roax.typeMap.id`, so under that selector this code means the presenter
+        // dropped the outer member while the root still commits the identifier.
+        ReservedLeafSet::EnvelopeV2 => Some(type_map_hint.ok_or(Error::TypeMapNotNamed)?),
     };
     let context = CommitmentContext {
         hash_algorithm,

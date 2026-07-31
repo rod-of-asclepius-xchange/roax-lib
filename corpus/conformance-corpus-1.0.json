@@ -1,5 +1,5 @@
 {
-  "corpusVersion": "1.0.0",
+  "corpusVersion": "1.1.0",
   "canon": "ROAX-CANON/1",
   "hashAlg": "SHA-256",
   "unicodeVersion": "15.1",
@@ -6491,6 +6491,76 @@
         "reason": "outer-identity-mismatch"
       },
       {
+        "name": "typemap-floor-hl7-fhir-bundle-complete",
+        "class": 14,
+        "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-hl7-fhir-bundle-complete.json",
+        "expectAccept": true,
+        "reason": "ok"
+      },
+      {
+        "name": "typemap-floor-hl7-fhir-bundle-omits-roax-typeMap-id",
+        "class": 14,
+        "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-hl7-fhir-bundle-omits-roax-typeMap-id.json",
+        "expectAccept": false,
+        "reason": "outer-identity-mismatch"
+      },
+      {
+        "name": "typemap-floor-sg-gov-moh-pdt-healthcert-complete",
+        "class": 14,
+        "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-sg-gov-moh-pdt-healthcert-complete.json",
+        "expectAccept": true,
+        "reason": "ok"
+      },
+      {
+        "name": "typemap-floor-sg-gov-moh-pdt-healthcert-omits-roax-typeMap-id",
+        "class": 14,
+        "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-sg-gov-moh-pdt-healthcert-omits-roax-typeMap-id.json",
+        "expectAccept": false,
+        "reason": "outer-identity-mismatch"
+      },
+      {
+        "name": "typemap-floor-sg-gov-moh-recovery-healthcert-complete",
+        "class": 14,
+        "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-sg-gov-moh-recovery-healthcert-complete.json",
+        "expectAccept": true,
+        "reason": "ok"
+      },
+      {
+        "name": "typemap-floor-sg-gov-moh-recovery-healthcert-omits-roax-typeMap-id",
+        "class": 14,
+        "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-sg-gov-moh-recovery-healthcert-omits-roax-typeMap-id.json",
+        "expectAccept": false,
+        "reason": "outer-identity-mismatch"
+      },
+      {
+        "name": "identity-outer-type-map-id-mismatch",
+        "class": 18,
+        "envelopeFile": "corpus/fixtures/envelopes/identity-outer-type-map-id-mismatch.json",
+        "expectAccept": false,
+        "reason": "outer-identity-mismatch"
+      },
+      {
+        "name": "identity-outer-type-map-member-stripped",
+        "class": 18,
+        "envelopeFile": "corpus/fixtures/envelopes/identity-outer-type-map-member-stripped.json",
+        "expectAccept": false,
+        "reason": "outer-identity-mismatch"
+      },
+      {
+        "name": "typemap-floor-sg-gov-moh-vaccination-healthcert-complete",
+        "class": 14,
+        "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-sg-gov-moh-vaccination-healthcert-complete.json",
+        "expectAccept": true,
+        "reason": "ok"
+      },
+      {
+        "name": "typemap-floor-sg-gov-moh-vaccination-healthcert-omits-roax-typeMap-id",
+        "class": 14,
+        "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-sg-gov-moh-vaccination-healthcert-omits-roax-typeMap-id.json",
+        "expectAccept": false,
+        "reason": "outer-identity-mismatch"
+      },
+      {
         "name": "guard-accept-bare-roax",
         "class": 15,
         "envelopeFile": "corpus/fixtures/envelopes/guard-accept-bare-roax.json",
@@ -6543,6 +6613,13 @@
         "name": "salt-leak-disclosed-copy-with-salts-array",
         "class": 17,
         "envelopeFile": "corpus/fixtures/envelopes/salt-leak-disclosed-copy-with-salts-array.json",
+        "expectAccept": false,
+        "reason": "disclosed-copy-carries-salts"
+      },
+      {
+        "name": "salt-leak-disclosed-copy-with-wrong-typed-salts",
+        "class": 17,
+        "envelopeFile": "corpus/fixtures/envelopes/salt-leak-disclosed-copy-with-wrong-typed-salts.json",
         "expectAccept": false,
         "reason": "disclosed-copy-carries-salts"
       },
@@ -6601,6 +6678,205 @@
         "envelopeFile": "corpus/fixtures/envelopes/profile-unknown-fails-closed.json",
         "expectAccept": false,
         "reason": "profile-unknown"
+      }
+    ],
+    "roundTrip": [
+      {
+        "name": "roundtrip-every-carrier-form",
+        "class": 20,
+        "recordType": "org.roax.corpus.synthetic",
+        "schemaVersion": "1.0",
+        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
+        "issuerId": "did:web:corpus.roax.invalid",
+        "recordFile": "corpus/fixtures/records/roundtrip-carriers.json",
+        "saltsFile": "corpus/fixtures/salts/roundtrip-every-carrier-form.json",
+        "saltPairing": "path",
+        "leafCount": 14,
+        "root": "dd736ade030dcefb864f067534f72e6a143d6a52b7be87f22c7ce52c95c2e0e9",
+        "disclosePaths": [
+          [
+            {
+              "key": "roax.recordType"
+            }
+          ],
+          [
+            {
+              "key": "roax.schemaVersion"
+            }
+          ],
+          [
+            {
+              "key": "roax.recordId"
+            }
+          ],
+          [
+            {
+              "key": "roax.issuer.id"
+            }
+          ],
+          [
+            {
+              "key": "marker"
+            }
+          ],
+          [
+            {
+              "key": "a"
+            },
+            {
+              "key": "b"
+            }
+          ],
+          [
+            {
+              "key": "flag"
+            }
+          ],
+          [
+            {
+              "key": "counts"
+            },
+            {
+              "key": "text"
+            }
+          ],
+          [
+            {
+              "key": "counts"
+            },
+            {
+              "key": "integer"
+            }
+          ],
+          [
+            {
+              "key": "counts"
+            },
+            {
+              "key": "decimal"
+            }
+          ],
+          [
+            {
+              "key": "blob"
+            },
+            {
+              "key": "bytes"
+            }
+          ],
+          [
+            {
+              "key": "roax.typeMap.id"
+            }
+          ]
+        ],
+        "expectedFullCopyFile": "corpus/fixtures/envelopes/roundtrip-every-carrier-form-full.json",
+        "expectedDisclosedCopyFile": "corpus/fixtures/envelopes/roundtrip-every-carrier-form-disclosed.json",
+        "expectSelfVerifies": true,
+        "typeMap": {
+          "id": "sha256:35bc27621917d80e0a2736f4492eba3816ddc3de230279d635ca5e8973a594da",
+          "version": "1.0.0"
+        },
+        "intent": "one leaf per disclosure carrier form, issued and then verified through this implementation's own verifier",
+        "issuerKeyId": "did:web:corpus.roax.invalid#key-1"
+      },
+      {
+        "name": "roundtrip-without-issuer-key-id",
+        "class": 20,
+        "recordType": "org.roax.corpus.synthetic",
+        "schemaVersion": "1.0",
+        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
+        "issuerId": "did:web:corpus.roax.invalid",
+        "recordFile": "corpus/fixtures/records/roundtrip-carriers.json",
+        "saltsFile": "corpus/fixtures/salts/roundtrip-without-issuer-key-id.json",
+        "saltPairing": "path",
+        "leafCount": 13,
+        "root": "93ff13278716d137c20015e81ea106d14b3d240977bdf77942f767448a4b7d19",
+        "disclosePaths": [
+          [
+            {
+              "key": "roax.recordType"
+            }
+          ],
+          [
+            {
+              "key": "roax.schemaVersion"
+            }
+          ],
+          [
+            {
+              "key": "roax.recordId"
+            }
+          ],
+          [
+            {
+              "key": "roax.issuer.id"
+            }
+          ],
+          [
+            {
+              "key": "marker"
+            }
+          ],
+          [
+            {
+              "key": "a"
+            },
+            {
+              "key": "b"
+            }
+          ],
+          [
+            {
+              "key": "flag"
+            }
+          ],
+          [
+            {
+              "key": "counts"
+            },
+            {
+              "key": "text"
+            }
+          ],
+          [
+            {
+              "key": "counts"
+            },
+            {
+              "key": "integer"
+            }
+          ],
+          [
+            {
+              "key": "counts"
+            },
+            {
+              "key": "decimal"
+            }
+          ],
+          [
+            {
+              "key": "blob"
+            },
+            {
+              "key": "bytes"
+            }
+          ],
+          [
+            {
+              "key": "roax.typeMap.id"
+            }
+          ]
+        ],
+        "expectedFullCopyFile": "corpus/fixtures/envelopes/roundtrip-without-issuer-key-id-full.json",
+        "expectedDisclosedCopyFile": "corpus/fixtures/envelopes/roundtrip-without-issuer-key-id-disclosed.json",
+        "expectSelfVerifies": true,
+        "typeMap": {
+          "id": "sha256:35bc27621917d80e0a2736f4492eba3816ddc3de230279d635ca5e8973a594da",
+          "version": "1.0.0"
+        },
+        "intent": "the same round trip with issuer.keyId ABSENT, so the producer must emit NO leaf for it rather than a NULL leaf or an empty string - three different roots of which only one is right (specification section 11.2)"
       }
     ]
   }

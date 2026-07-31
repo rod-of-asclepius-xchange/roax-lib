@@ -52,12 +52,20 @@ MAX_INDEX = 2**32 - 1
 RESERVED_PREFIX = "roax."
 RESERVED_RECORD_TYPE = "roax.recordType"
 RESERVED_SCHEMA_VERSION = "roax.schemaVersion"
+RESERVED_TYPE_MAP_ID = "roax.typeMap.id"
 RESERVED_RECORD_ID = "roax.recordId"
 RESERVED_ISSUER_ID = "roax.issuer.id"
 RESERVED_ISSUER_KEY_ID = "roax.issuer.keyId"
 
 # Section 10.2. The four reserved paths every profile's disclosure floor must contain.
 # roax.issuer.keyId is deliberately NOT here: it is committed but OPTIONAL to disclose.
+#
+# roax.typeMap.id IS mandatory to disclose (section 11.2) and is also deliberately not here. This
+# tuple is the floor every profile carries UNCONDITIONALLY, and the 54 committed envelope-1.0
+# fixtures predate the type-map binding: listing it would demand a leaf they never committed and
+# fail 34 vectors that are correct. The binding in envelope.py is conditional instead - it fires
+# when EITHER side names a type map - and adds this path to the floor as a CONSEQUENCE of that
+# binding rather than as a standing member of it.
 RESERVED_DISCLOSURE_FLOOR = (
     RESERVED_RECORD_TYPE,
     RESERVED_SCHEMA_VERSION,
@@ -668,11 +676,17 @@ def carrier(tag: int, node):
 
 
 def reserved_leaves(record_type: str, schema_version: str, record_id: str, issuer_id: str,
-                    issuer_key_id=None):
+                    issuer_key_id=None, type_map_id=None):
     """Section 11.2. Four always, plus roax.issuer.keyId only when issuer.keyId is present.
 
     An absent issuer.keyId emits NO leaf. It MUST NOT become a NULL leaf or an empty string:
     those are three different roots and only one of them can be right.
+
+    roax.typeMap.id is emitted when, and only when, the issuance names a type map. Section 11.2
+    marks it ALWAYS emitted, which is the envelope-2.0 reading; this corpus is envelope-1.0
+    throughout and most of its envelope fixtures were issued without a type map, so the leaf is
+    conditional here for the same reason schemas/envelope-1.0.json leaves the `typeMap` member
+    optional - requiring it would invalidate every envelope already issued under that schema.
     """
     out = [
         Leaf([{"key": RESERVED_RECORD_TYPE}], TAG_STRING, record_type),
@@ -680,13 +694,15 @@ def reserved_leaves(record_type: str, schema_version: str, record_id: str, issue
         Leaf([{"key": RESERVED_RECORD_ID}], TAG_STRING, record_id),
         Leaf([{"key": RESERVED_ISSUER_ID}], TAG_STRING, issuer_id),
     ]
+    if type_map_id is not None:
+        out.append(Leaf([{"key": RESERVED_TYPE_MAP_ID}], TAG_STRING, type_map_id))
     if issuer_key_id is not None:
         out.append(Leaf([{"key": RESERVED_ISSUER_KEY_ID}], TAG_STRING, issuer_key_id))
     return out
 
 
 def ordered_leaves(record, type_map, record_type: str, schema_version: str, record_id: str,
-                   issuer_id: str, issuer_key_id=None):
+                   issuer_id: str, issuer_key_id=None, type_map_id=None):
     """Sections 3.3 and 9. The leaf set, in encodePath order, WITHOUT any salt.
 
     Split out from build_tree when decision D4 was ruled D4b. Leaf order is a function of the
@@ -705,7 +721,7 @@ def ordered_leaves(record, type_map, record_type: str, schema_version: str, reco
         raise RoaxError("record-contributes-no-leaves", "")
 
     leaves = reserved_leaves(
-        record_type, schema_version, record_id, issuer_id, issuer_key_id
+        record_type, schema_version, record_id, issuer_id, issuer_key_id, type_map_id
     ) + record_leaves
 
     encoded = [(encode_path(leaf.segments), leaf) for leaf in leaves]
@@ -717,14 +733,16 @@ def ordered_leaves(record, type_map, record_type: str, schema_version: str, reco
 
 
 def build_tree(hash_alg: str, record, type_map, salts: "SaltSet", record_type: str,
-               schema_version: str, record_id: str, issuer_id: str, issuer_key_id=None):
+               schema_version: str, record_id: str, issuer_id: str, issuer_key_id=None,
+               type_map_id=None):
     """Sections 3.3, 7, 8 and 9. Returns (root, ordered leaves, salts, leaf hashes).
 
     `salts` is a SaltSet and is an INPUT: under decision D4b nothing here derives a salt
     (spec section 7). A leaf with no committed salt is an error rather than a fresh draw.
     """
     ordered = ordered_leaves(
-        record, type_map, record_type, schema_version, record_id, issuer_id, issuer_key_id
+        record, type_map, record_type, schema_version, record_id, issuer_id, issuer_key_id,
+        type_map_id
     )
     leaf_salts = [salts.for_leaf(leaf.segments) for leaf in ordered]
     hashes = [

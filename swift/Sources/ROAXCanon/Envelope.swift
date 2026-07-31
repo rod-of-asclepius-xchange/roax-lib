@@ -4,6 +4,16 @@ import Foundation
 public struct SaltEntry {
     public let segments: Path
     public let salt: [UInt8]
+
+    /// Public so a caller can BUILD a full copy, not only parse one.
+    ///
+    /// Conformance corpus class 20 requires an implementation to produce an envelope and put
+    /// it through its own verifier, and rule 1 of specification section 7.3 makes the salt of
+    /// every leaf part of what a full copy carries.
+    public init(segments: Path, salt: [UInt8]) {
+        self.segments = segments
+        self.salt = salt
+    }
 }
 
 /// One revealed leaf of a disclosed copy.
@@ -15,6 +25,18 @@ public struct DisclosedLeaf {
     public let value: JSONValue?
     public let salt: [UInt8]
     public let auditPath: [[UInt8]]
+
+    public init(
+        segments: Path, index: Int, tag: TypeTag, value: JSONValue?,
+        salt: [UInt8], auditPath: [[UInt8]]
+    ) {
+        self.segments = segments
+        self.index = index
+        self.tag = tag
+        self.value = value
+        self.salt = salt
+        self.auditPath = auditPath
+    }
 }
 
 /// A parsed envelope, in either copy kind.

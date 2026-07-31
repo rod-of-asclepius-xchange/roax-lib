@@ -45,14 +45,16 @@ __all__ = ["full_copy", "disclosed_copy"]
 
 
 def _require_emittable_reserved_set(reserved_set: str) -> None:
-    if reserved_set == RESERVED_V2:
-        raise RoaxError(
-            ErrorCode.TYPE_MAP_REJECTED,
-            "envelope 2.0 emission requires exact structured-path DFA artifact loading "
-            "and content-ID reproduction, which this package does not implement "
-            "(specification section 4.2)",
-        )
-    if reserved_set != RESERVED_V1:
+    """Both reserved leaf sets are emittable; anything else is a caller error.
+
+    This used to refuse ``RESERVED_V2`` outright, on the ground that emission "requires exact
+    structured-path DFA artifact loading and content-ID reproduction". That is false for
+    EMISSION: an issuer knows which artifact it used and supplies its content ID, and nothing
+    here has to fetch or reproduce anything. See :func:`roax_canon.record.build_tree` for the
+    same correction at issuance, and the module docstring for what this package genuinely does
+    not do about a type map.
+    """
+    if reserved_set not in (RESERVED_V1, RESERVED_V2):
         raise RoaxError(ErrorCode.ENVELOPE_SHAPE, f"unknown reserved leaf set {reserved_set!r}")
 
 
@@ -70,6 +72,27 @@ def _envelope_head(built: BuiltRecord) -> dict[str, Any]:
     }
     if identity.issuer_key_id is not None:
         head["issuer"]["keyId"] = identity.issuer_key_id
+    if built.reserved_set == RESERVED_V2:
+        # PRESENTED because it is COMMITTED, and keyed on the reserved leaf set of THIS
+        # commitment rather than on the identity. A copy committing `roax.typeMap.id` and
+        # carrying no outer `typeMap` member is exactly what a verifier binding on either side
+        # rejects for `outer-identity-mismatch`; a copy carrying the member while its root
+        # commits no such leaf is the same defect mirrored, because
+        # :func:`~roax_canon.verify.verify_envelope` takes the reserved set of a full copy from
+        # that member and would rebuild one leaf more than the commitment has.
+        #
+        # Both members or neither: `schemas/envelope-1.0.json` requires `id` and `version`
+        # together whenever `typeMap` is present, and this package's own verifier rejects the
+        # identifier alone with ENVELOPE_SHAPE, so an issuance missing the artifact's version
+        # fails CLOSED here rather than emitting an envelope nothing can accept.
+        if identity.type_map_id is None or identity.type_map_version is None:
+            raise RoaxError(
+                ErrorCode.ENVELOPE_SHAPE,
+                "an issuance committing roax.typeMap.id must supply both "
+                "RecordIdentity.type_map_id and RecordIdentity.type_map_version, because the "
+                "envelope's `typeMap` member carries them together",
+            )
+        head["typeMap"] = {"id": identity.type_map_id, "version": identity.type_map_version}
     # `recordType` is placed before `root` above only for readability; the envelope is
     # JSON and member order carries no meaning, because nothing here is hashed over the
     # serialized envelope (specification section 13.2).

@@ -22,8 +22,17 @@ import io.roax.canon.commit
 import io.roax.canon.displayPath
 import io.roax.canon.encodePath
 import io.roax.canon.encodeValue
+import io.roax.canon.commitWithSaltsByPath
+import io.roax.canon.disclose
+import io.roax.canon.EnvelopeWriter
+import io.roax.canon.json.JsonArray
+import io.roax.canon.json.JsonBoolean
+import io.roax.canon.json.JsonNull
+import io.roax.canon.json.JsonNumber
 import io.roax.canon.json.JsonObject
 import io.roax.canon.json.JsonReader
+import io.roax.canon.json.JsonString
+import io.roax.canon.json.JsonValue
 import io.roax.canon.leafHash
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -52,6 +61,28 @@ import java.io.File
 class ConformanceCorpusTest {
 
     private val nfc = PlatformNfc
+
+    // ------------------------------------------------------------------ the group guard itself ---
+
+    /**
+     * Every vector group the corpus carries must be consumed by some test in this suite.
+     *
+     * [Corpus.vectors] answers an unknown group with the empty list, so a corpus that grew a group
+     * no test reads would contribute zero assertions and report the same green it reported before
+     * the group existed. That is the exact defect shape the corpus exists to prevent, and it is
+     * invisible to the per-class report as well: a class whose only vectors live in an unconsumed
+     * group reads as absent rather than as failed.
+     */
+    @Test
+    fun `every vector group is consumed`() {
+        val unconsumed = Corpus.unconsumedGroups()
+        assertTrue(
+            unconsumed.isEmpty(),
+            "the corpus carries vector group(s) this suite does not consume: " +
+                "${unconsumed.joinToString(", ")}; a group read as absent reports the same green " +
+                "as before it existed",
+        )
+    }
 
     // ---------------------------------------------------------------- class 6: path encoding ----
 
@@ -562,6 +593,155 @@ class ConformanceCorpusTest {
             n++
         }
         Report.pass("envelope", n)
+    }
+
+    // ------------------------------ class 20: issue, disclose, verify our OWN output --
+
+    /**
+     * Every other test here runs [EnvelopeVerifier] against bytes the corpus generator wrote.
+     *
+     * That is the gap this class closes: a library can emit a disclosed copy its own verifier
+     * refuses and still pass every other vector, because no other vector asks it to PRODUCE one.
+     * So this drives the real entry points - [commitWithSaltsByPath], [disclose] and
+     * [EnvelopeWriter] - and then puts their output back through [EnvelopeVerifier].
+     *
+     * The produced envelope is compared with the committed one SEMANTICALLY. JSON member order,
+     * `displayPath`, the order of `disclosure.leaves` and the order of a full copy's `salts` are
+     * not fixed by the specification, so asserting any of them would fail a conforming
+     * implementation; a number's SOURCE TEXT is what must survive, and [JsonNumber] carries it.
+     */
+    @Test
+    fun `round trip vectors`() {
+        var n = 0
+        for (v in Corpus.vectors("roundTrip")) {
+            val name = Corpus.str(v, "name")
+            val recordType = Corpus.str(v, "recordType")
+            val descriptor = v["typeMap"] as? JsonObject
+            val typeMapId = descriptor?.let { Corpus.str(it, "id") }
+            val identity = RecordIdentity(
+                recordType = recordType,
+                schemaVersion = Corpus.str(v, "schemaVersion"),
+                recordId = Corpus.str(v, "recordId"),
+                issuerId = Corpus.str(v, "issuerId"),
+                issuerKeyId = Corpus.strOrNull(v, "issuerKeyId"),
+                typeMapId = typeMapId,
+                typeMapVersion = descriptor?.let { Corpus.str(it, "version") },
+            )
+            val envelopeProfile =
+                if (typeMapId != null) EnvelopeProfile.V2_TYPE_MAP_BOUND
+                else EnvelopeProfile.V1_NO_TYPE_MAP_BINDING
+            val recordBytes = Corpus.bytes(Corpus.str(v, "recordFile"))
+            val commitment = commitWithSaltsByPath(
+                JsonReader.parse(recordBytes),
+                IssuanceContext(identity, envelopeProfile, CANON, Sha256.id),
+                Corpus.typeMap(recordType, nfc),
+                (Corpus.saltSet(Corpus.str(v, "saltsFile"), nfc) as Corpus.SaltSet.ByPath)
+                    .byEncodedPath,
+                nfc,
+                emptyContainers = EmptyContainerAuthorization.CORPUS_1_0_COMPATIBILITY,
+            )
+            assertEquals(Corpus.int(v, "leafCount"), commitment.leafCount, "$name leafCount")
+            assertEquals(Corpus.str(v, "root"), Bytes.toHex(commitment.root), "$name root")
+
+            val reveal = (v["disclosePaths"] as JsonArray).elements.map { Corpus.readSegments(it) }
+            val produced = mapOf(
+                "expectedFullCopyFile" to EnvelopeWriter.fullCopy(commitment, recordBytes, nfc),
+                "expectedDisclosedCopyFile" to
+                    EnvelopeWriter.disclosedCopy(commitment.disclose(reveal, nfc), nfc),
+            )
+            val config = io.roax.canon.VerifierConfig(
+                profiles = Corpus.profiles,
+                envelopeProfile = envelopeProfile,
+                nfc = nfc,
+                resolverFor = { type -> runCatching { Corpus.typeMap(type, nfc) }.getOrNull() },
+            )
+            for ((field, text) in produced) {
+                val expected = JsonReader.parse(Corpus.bytes(Corpus.str(v, field)))
+                assertEquals(
+                    normalizedForComparison(comparable(expected)),
+                    normalizedForComparison(comparable(JsonReader.parse(text))),
+                    "$name $field",
+                )
+                // And the half no static fixture can assert: this library's verifier over this
+                // library's own output. A producer that omitted a per-leaf value carrier fails
+                // HERE even though every leaf hash it computed was right.
+                val result = EnvelopeVerifier.verify(text.toByteArray(Charsets.UTF_8), config)
+                assertTrue(
+                    result is VerificationResult.Accepted,
+                    "$name $field: this library issued an envelope its own verifier refused: " +
+                        "${(result as? VerificationResult.Rejected)?.reason} " +
+                        "${(result as? VerificationResult.Rejected)?.detail}",
+                )
+                n++
+            }
+        }
+        Report.pass("roundTrip", n)
+    }
+
+    /**
+     * A comparable rendering: object members sorted, and a number kept as its SOURCE TEXT rather
+     * than parsed. [normalizedForComparison] removes what the specification does not fix.
+     */
+    private fun comparable(value: JsonValue): Any? = when (value) {
+        is JsonObject -> value.members.sortedBy { it.key }.associate { it.key to comparable(it.value) }
+        is JsonArray -> value.elements.map { comparable(it) }
+        is JsonNumber -> "\$numberLiteral:" + value.literal
+        is JsonString -> value.value
+        is JsonBoolean -> value.value
+        JsonNull -> null
+    }
+
+    /**
+     * A rendering that depends on a value's CONTENT and never on the order it was built in.
+     *
+     * A [Map]'s own `toString` renders insertion order, so keying a sort on it would order two
+     * equal salt entries differently on the two sides the moment a producer emitted an entry's
+     * members in another order - which is exactly the unspecified aspect being normalized away.
+     */
+    private fun canonicalKey(value: Any?): String = when (value) {
+        is Map<*, *> -> value.entries
+            .map { "${it.key}=${canonicalKey(it.value)}" }
+            .sorted()
+            .joinToString(",", "{", "}")
+
+        is List<*> -> value.joinToString(",", "[", "]") { canonicalKey(it) }
+        else -> value.toString()
+    }
+
+    /**
+     * An envelope's comparison form with the aspects the specification does not fix removed.
+     * Applied to BOTH sides, so what survives the comparison is what the specification says.
+     *
+     * Three things are relaxed and nothing else. `disclosure.leaves` is ordered by leaf index and
+     * a full copy's `salts` by its entry's structured path, because every leaf carries its own
+     * index and every salt entry its own path, so neither array order carries anything.
+     * `displayPath` is DROPPED: it is display only and never hashed (specification section 5.2),
+     * and `schemas/envelope-1.0.json` leaves it out of `disclosedLeaf.required`, so a conforming
+     * producer may omit it and a comparison that noticed would fail conforming work.
+     *
+     * Everything else stays exact - both array LENGTHS, every leaf's segments, index, tag, value
+     * carrier, salt and audit path, and every scalar identity field - so a producer that omitted a
+     * per-leaf value carrier still fails, which is the defect this class exists for.
+     */
+    private fun normalizedForComparison(envelope: Any?): Any? {
+        if (envelope !is Map<*, *>) return envelope
+        val out = LinkedHashMap<Any?, Any?>(envelope)
+        (out["salts"] as? List<*>)?.let { salts ->
+            out["salts"] = salts.sortedBy { entry -> canonicalKey((entry as? Map<*, *>)?.get("segments")) }
+        }
+        (out["disclosure"] as? Map<*, *>)?.let { disclosure ->
+            val leaves = disclosure["leaves"] as? List<*> ?: return@let
+            val stripped = leaves.map { leaf ->
+                if (leaf is Map<*, *>) leaf.filterKeys { it != "displayPath" } else leaf
+            }
+            out["disclosure"] = LinkedHashMap<Any?, Any?>(disclosure).apply {
+                this["leaves"] = stripped.sortedBy { leaf ->
+                    ((leaf as? Map<*, *>)?.get("index") as? String)
+                        ?.removePrefix("\$numberLiteral:")?.toLongOrNull() ?: Long.MAX_VALUE
+                }
+            }
+        }
+        return out
     }
 
     companion object {

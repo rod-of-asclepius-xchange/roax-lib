@@ -127,11 +127,16 @@ Until then the gate stays open, and no document may describe the corpus as valid
 
 ## 3. Mandatory vector classes
 
-**Nineteen classes.**
+**Twenty classes.**
 A class with no vectors is a coverage gap and the corpus build MUST report it rather than passing silently.
 
 The count is stated because a gap check built off it is the intended use, and a stale count means the highest-numbered class is skipped silently.
-Both `schemas/conformance-corpus-1.0.json` and `schemas/conformance-corpus-2.0.json` set the `classRef` maximum to 19 to match.
+Both `schemas/conformance-corpus-1.0.json` and `schemas/conformance-corpus-2.0.json` set the `classRef` maximum to 20 to match.
+
+**A class with no vectors is not the only way this corpus can fail to gate.**
+A vector GROUP a runner does not read is worse, because it is invisible: the runner contributes zero assertions for it and reports the same green it reported before the group existed, and the coverage check above cannot see it either.
+Every runner MUST therefore enumerate the groups the corpus file carries and FAIL on one it does not consume, rather than defaulting an unknown group to the empty list.
+That is enforced in `corpus/tools/check_corpus.mjs` and in all five library runners, and it was added BEFORE class 20 so that each runner went red for a reason its author controlled.
 
 **Both new classes are expressible under both schema versions.**
 Class 19's vector shape is the `normalization` group, which `schemas/conformance-corpus-1.0.json` carries alongside `schemas/conformance-corpus-2.0.json`, because the committed artifact was rebuilt in the same change that added the class rather than left to a later migration.
@@ -374,6 +379,10 @@ This class follows the same convention as classes 15 and 16, which say outright 
 For each profile, a disclosed copy omitting each declared non-redactable path in turn, each of which MUST be rejected - plus one that includes them all and is accepted.
 
 **The floor is the five reserved paths specification section 11.2 marks mandatory to disclose**, including `roax.typeMap.id`, plus whatever the profile adds on top.
+
+**`roax.typeMap.id` joins a copy's floor as a CONSEQUENCE of the section 4.2 binding rather than unconditionally**, and the difference is what lets this class carry both generations at once.
+The 54 fixtures that predate the binding commit four or five reserved leaves and name no type map on either side, so demanding the path of every copy would fail 34 vectors that are correct.
+A separate `typemap-floor-<profile>-*` family carries the outer member AND commits the leaf, one pair per profile, and its omit row asserts `outer-identity-mismatch` for the same reason the other reserved omissions do: the binding fires before any floor is selected.
 This class MUST carry a vector proving where its upper edge is: a disclosed copy that **omits `roax.issuer.keyId` MUST be ACCEPTED** when the record committed one.
 That path is committed inside the root but OPTIONAL to disclose, because requiring it would permanently bind an anchored record to the key it was issued under and leave no rotation path, which specification section 12.2 rules out.
 Without that vector, an implementation that over-tightens the floor to every reserved path passes this class while breaking key rotation, and nothing else in the corpus would catch it.
@@ -444,9 +453,16 @@ A disclosed copy carries the salt of every leaf it reveals and the salt of **no 
 | A disclosed copy carrying exactly the salts of its revealed leaves | **Accept** |
 | The same copy with one withheld leaf's salt added | **Reject** |
 | A disclosed copy carrying a `salts` array, the full-copy field | **Reject** |
+| A disclosed copy whose `salts` member is present but is **not an array** | **Reject** |
 | A disclosed copy carrying any seed field, `masterSalt` or otherwise | **Reject** |
 | A full copy whose `salts` array omits one leaf of the union | **Reject** |
 | A full copy whose `salts` array length does not equal `leafCount` | **Reject** |
+
+**The wrong-typed row is about the TRIGGER rather than about the value.**
+The guard above asks whether `salts` is present, so an implementation that reads a present-but-wrong-typed member as ABSENT has switched its own salt-leak guard off from outside: `"salts": {}` never trips the check and the copy verifies while carrying it.
+**A guard that turns itself off on malformed input is worse than no guard, because it reports safety it is not providing.**
+The shape is general and this row is the cheap instance of it - the same reading applied to `typeMap` switches off the section 4.2 binding, and applied to `record` or `disclosure` it changes which copy kind a verifier thinks it has.
+`schemas/envelope-1.0.json` types every one of those members, so the schema rejects this document too, and both halves are worth having: a schema validator is not what runs inside a verifier.
 
 **The seed row survives decision D4's ruling on purpose.**
 There is no `masterSalt` in this design any more (specification section 7), and `additionalProperties: false` already rejects an unknown field, so the row is cheap.
@@ -473,6 +489,7 @@ Every vector here **fails an implementation that trusts an outside-the-root fiel
 | A disclosed copy whose top-level `recordType` disagrees with the disclosed `roax.recordType` leaf | **Reject** | A verifier that reads the envelope field instead of the committed leaf. The leaf is inside the root; the field is not. |
 | The same, for `schemaVersion`, `recordId` and `issuer.id` in turn | **Reject** | The same mistake at the other profile and identity floor paths (specification section 11.2). |
 | A top-level `typeMap.id` that disagrees with the disclosed `roax.typeMap.id` leaf | **Reject before resolving a record leaf** | A verifier selecting a convenient map from the discovery hint instead of the ID committed inside the root (specification sections 4.2, 10 and 11.2). |
+| The outer `typeMap` member **deleted** while the root still commits `roax.typeMap.id` | **Reject** | A verifier that gates the binding on that member never runs it. The member is supplied by the HOLDER, so gating there hands the trigger to the party the check constrains. |
 | Candidate type-map bytes whose content ID does not reproduce the committed `roax.typeMap.id`, including a second artifact with the same semver | **Reject** | A verifier selecting by version or locator rather than the exact immutable artifact ID (specification section 4.2 and [`type-maps.md`](type-maps.md) section 4). |
 | An envelope whose `hashAlg` disagrees with the `(root, hashAlg)` pair the verifier's anchoring registry records | **Reject** | A verifier taking the algorithm from the document rather than from the registry. This is exactly what specification section 7.4's H2 requires and what H1 does **not** provide. |
 | A `SHA-256` envelope whose `(root, hashAlg)` pair the registry records correctly, verified against a configured allow-list of `["Poseidon-BN254"]` | **Reject** | The retired-algorithm case, which H2 alone does not close. Specification section 7.4, H3. |
@@ -496,9 +513,24 @@ It is required for a vector whose outcome turns on verifier configuration and in
 The corpus build owns that check.
 An earlier revision required the block on *every* class-18 vector, written when this class was expected to be the registry rows alone; it rejected the committed corpus the moment the identity rows arrived, which is how the over-tightening was found.
 
+**The rule the last two rows share, stated because it is the general one and it recurs:**
+
+> **A check whose execution is controlled by the party it constrains is not a check.**
+> The trigger must come from what is COMMITTED, never from what was PRESENTED.
+
+`roax.typeMap.id` is the case that made it concrete.
+It is mandatory to disclose **by arithmetic** (specification section 11.2), because it selects and authenticates the exact map, so withholding it yields no proof of which map applies rather than a weaker one.
+The outer `typeMap` member is optional under `schemas/envelope-1.0.json`, which makes "bind when the member is present" the obvious reading and the wrong one: a holder deletes the member, withholds the leaf, and the binding never runs while every remaining inclusion proof stays genuine.
+The binding therefore fires whenever **either** side names a type map, and absence on one side is the same rejection as disagreement.
+
+**The one case no envelope can evidence, named rather than left as a silent limit.**
+A copy that drops BOTH the member and the leaf is byte-indistinguishable from a legitimate envelope-1.0 copy issued before the section 4.2 binding existed: the only signal that a further reserved leaf was ever committed is `leafCount`, which specification section 11.1 measured is NOT authenticated in a disclosed copy, so a check leaning on it would reintroduce the forged-size attack that section corrects.
+It needs no vector of its own, because **the 34 committed floor fixtures already are that shape**: an implementation that hard-rejects a copy lacking a type map fails class 14 today.
+What closes the case is `schemas/envelope-2.0.json` REQUIRING the member, and a verifier that accepts only 2.0 records selecting that policy for itself.
+
 #### What is built, and the named gap
 
-**Built: the four identity rows.**
+**Built: the four identity rows, plus the two type-map binding rows.**
 A disclosed copy whose top-level `recordType`, `schemaVersion`, `recordId` or `issuer.id` disagrees with the reserved leaf committed inside the root is rejected, with every inclusion proof still verifying against the genuine root.
 Their **reject** verdict is determined by the envelope alone, since the field and the committed leaf disagree with each other, so they carry no `verifierConfig`.
 These four carried class 14 until the D8 ruling created this class; they were always this assertion, and the floor class is about a disclosed copy *omitting* a non-redactable path, which is a different property.
@@ -548,6 +580,57 @@ Class 19 asserts the property of the whole pipeline, over the union of section 3
 **The assertion is equality, so the class is complete without a pinned hexadecimal root.**
 The value of `R` is whatever the corpus build computes; what the vector fixes is that both forms produce one value and that it is the same one.
 A pinned `R` is worth adding once the corpus file exists, as a regression against the normalization silently changing, and the vector shape has room for it.
+
+### Class 20 - the issue-then-verify round trip
+
+**Every class above runs an implementation's VERIFIER against bytes another program wrote.**
+Every committed envelope fixture is produced by `corpus/tools/build_corpus.py`, so until this class existed nothing asked an implementation to PRODUCE an envelope.
+An implementation could therefore issue a disclosed copy that its own verifier refused and pass every vector in the file.
+
+**That is not hypothetical, and the corpus did not find it.**
+One library emitted every revealed leaf with no `value` member, so it issued disclosures its own verifier rejected for `disclosed-leaf-named-without-value` - a condition class 17 names in a committed vector - while passing all 488 vectors.
+A human reading the library found it.
+`swift/FINDINGS.md` finding 10 records the measurement and says outright that closing it is a corpus change rather than a library one.
+
+**What makes the producing side worth a class rather than obvious** is that the disclosure carriers are PER TAG and are not the record's own spellings.
+NULL, EMPTY_ARRAY and EMPTY_OBJECT carry no `value` member at all; BOOL carries a JSON boolean; INTEGER and DECIMAL carry STRINGS already in the section 6.2 canonical output form; and BYTES carries lowercase HEX where the record spelled base64.
+Four ways to get one wrong, and none of them reachable from a vector that only verifies.
+
+A vector names a record, a committed salt set, a set of paths to disclose, and the two envelopes a conforming implementation produces from them.
+A runner MUST:
+
+1. issue a full copy from the record and that salt set, and check its `leafCount` and `root`;
+2. compare the full copy it produced against `expectedFullCopyFile`;
+3. derive a disclosed copy revealing exactly `disclosePaths` from the SAME commitment, and compare it against `expectedDisclosedCopyFile`;
+4. verify BOTH copies it produced through its OWN verifier, and require acceptance.
+
+**Step 4 is the assertion the class exists for and steps 2 and 3 are what stop it being reflexive.**
+A vector asserting only "my verifier accepts my output" is self-consistency, and a lax verifier passes it while producing the same malformed copy.
+The static class 17 row fails the lax VERIFIER; this class fails the lax PRODUCER.
+Neither closes the gap alone.
+
+**The comparison is SEMANTIC and not byte-for-byte**, because JSON member order, whether `displayPath` is emitted, the order of the `disclosure.leaves` array and the order of a full copy's `salts` array are not fixed by the specification, and asserting any of them would fail a conforming implementation for something this document does not require.
+`disclosure.leaves` and `salts` are both compared as SETS keyed by what their entries carry - the leaf index and the structured path - rather than in the order a producer emitted them, and `displayPath` is dropped from the comparison on both sides, because `schemas/envelope-1.0.json` leaves it out of `disclosedLeaf.required` and it is display only in any case (specification section 5.2).
+Nothing else is relaxed, and the half that stays exact is the half that matters: both array LENGTHS, every leaf's segments, index, tag, value carrier, salt and audit path, and every scalar identity field, so a producer that omitted a per-leaf value carrier still fails.
+What must survive intact is every number's SOURCE TEXT: the full copy carries the record's literals, and a runner that rebuilds that envelope through a float-based serializer destroys exactly what the root was computed from (specification sections 6.4 and 7.3).
+
+**Pinned rather than behavioural, unlike class 12.**
+Class 12 must draw its own randomness because it is ABOUT randomness.
+Nothing here is, so the salt set is a committed input and both produced envelopes are fixed - which is what lets this class fail an implementation on its own rather than only in company with class 17.
+
+**Every vector in this class commits `roax.typeMap.id`, and that is a constraint rather than a choice.**
+Specification section 11.2 marks that leaf emitted ALWAYS, so an ISSUANCE without one is not something the current specification permits; `schemas/envelope-1.0.json` keeps the member optional for envelopes ALREADY issued under it, which is what the other fixtures are.
+A vector without one would ask an implementation to produce an envelope the specification forbids it to produce.
+
+**EMPTY_ARRAY and EMPTY_OBJECT are deliberately absent from the round-trip record.**
+NULL already covers the no-value carrier, so their tags add no form the record does not reach, while the committed corpus emits them without consulting the type map - the reading specification section 3.3 does not take.
+`python/FINDINGS.md` item 1, `swift/FINDINGS.md` finding 8 and `docs/typescript-implementation-findings.md` all measure that cost at exactly two class-5 vectors, and putting an empty container here would raise a number three findings documents state.
+
+**What this class found the day it was built, and it is worth more than either defect it was written for.**
+Two shipped libraries held mutually exclusive issuance rules: the TypeScript library refused to issue an envelope WITHOUT `roax.typeMap.id`, and the Python library refused to issue one WITH it.
+Both passed all 488 vectors.
+No verifying-side vector could have found that, because neither library was ever asked to produce anything.
+Section 11.2 settles it - the leaf is emitted always - and the Python refusal was narrowed to what it actually needed, which is artifact resolution and not issuance.
 
 ## 4. Seed material that already exists
 

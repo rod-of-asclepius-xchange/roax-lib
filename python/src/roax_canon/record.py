@@ -76,8 +76,15 @@ class RecordIdentity:
 
     ``type_map_id`` is required when :func:`reserved_leaves` models
     :data:`RESERVED_V2` and is absent from :data:`RESERVED_V1`.
-    The issue and envelope pipelines reject V2 until exact artifact selection is
-    implemented, as the constant's note records.
+    ``type_map_version`` travels beside it because the envelope's ``typeMap`` member carries
+    both, and an issuance that committed the identifier without presenting the member would
+    emit a copy its own verifier rejects for ``outer-identity-mismatch``.
+    Both are therefore REQUIRED TOGETHER at emission and
+    :func:`roax_canon.disclose.full_copy` fails closed without either, because
+    `schemas/envelope-1.0.json` requires ``id`` and ``version`` together whenever ``typeMap``
+    is present; they stay optional here so :data:`RESERVED_V1` needs neither.
+    It is NOT a leaf and is not committed: the content ID transitively binds every artifact
+    byte, including that version (specification section 12.1).
     """
 
     record_type: str
@@ -86,6 +93,7 @@ class RecordIdentity:
     issuer_id: str
     issuer_key_id: str | None = None
     type_map_id: str | None = None
+    type_map_version: str | None = None
 
     def __post_init__(self) -> None:
         """Reject a JSON-number carrier anywhere an identity requires a string.
@@ -105,6 +113,7 @@ class RecordIdentity:
         optional = (
             ("issuer_key_id", self.issuer_key_id),
             ("type_map_id", self.type_map_id),
+            ("type_map_version", self.type_map_version),
         )
         for field_name, value in required:
             if not is_json_string(value):
@@ -360,13 +369,21 @@ def build_tree(
 
     This is the whole of steps (A) through (D) of specification section 3.1.
     """
-    if reserved_set == RESERVED_V2:
-        raise RoaxError(
-            ErrorCode.TYPE_MAP_REJECTED,
-            "envelope 2.0 issuance requires exact structured-path DFA artifact loading "
-            "and content-ID reproduction, which this package does not implement "
-            "(specification section 4.2)",
-        )
+    # RESERVED_V2 IS PERMITTED HERE, and the refusal that used to sit at this line was a
+    # defect rather than a conservative choice.
+    #
+    # It read "envelope 2.0 issuance requires exact structured-path DFA artifact loading and
+    # content-ID reproduction", and that is false FOR ISSUANCE. An issuer knows which
+    # artifact it used; the content ID is a caller input, not something to be reproduced from
+    # fetched bytes. Content-ID reproduction is a VERIFIER's obligation when it selects a map
+    # from candidate bytes (specification section 10), and it is still unimplemented here.
+    #
+    # The refusal made this package unable to issue any record the CURRENT specification
+    # admits: section 11.2 marks `roax.typeMap.id` emitted ALWAYS, so every conforming
+    # issuance commits it. The cost was invisible until conformance corpus class 20 asked an
+    # implementation to produce an envelope rather than only to verify one - at which point
+    # this package refused to issue with the leaf while another refused to issue without it,
+    # and both had passed every vector in the file.
     if not isinstance(record, dict):
         raise RoaxError(
             ErrorCode.ENVELOPE_SHAPE,

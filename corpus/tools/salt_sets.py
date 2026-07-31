@@ -51,6 +51,7 @@ REPO_PREFIX = "corpus/fixtures/salts/"
 
 
 _drawing = False
+_only_missing = False
 _used = set()
 
 
@@ -68,10 +69,17 @@ class _OtherNumber:
         self.literal = literal
 
 
-def set_drawing(flag: bool) -> None:
-    """Enable draw mode. Set once, by build_corpus.py --draw-salts, and never during a build."""
-    global _drawing
+def set_drawing(flag: bool, only_missing: bool = False) -> None:
+    """Enable draw mode. Set once, by build_corpus.py --draw-salts, and never during a build.
+
+    `only_missing` draws a set only where none is committed and returns the committed one
+    otherwise. It exists because ADDING a fixture family must not rewrite the salts of every
+    fixture that already had one: a full redraw changes every root in the corpus, which buries an
+    additive change in a corpus-wide diff and destroys the ability to see what actually moved.
+    """
+    global _drawing, _only_missing
     _drawing = bool(flag)
+    _only_missing = bool(only_missing)
 
 
 def drawing() -> bool:
@@ -231,7 +239,13 @@ def draw(name: str, ordered, pairing: str) -> dict:
     `secrets.token_bytes` and not `random`: the entropy floor is normative (spec section 7), and
     a corpus whose salts came from a seeded PRNG would model the very defect class 12 exists to
     catch.
+
+    Under `--draw-missing-salts` an already-committed set is returned untouched, so adding a
+    fixture family draws only the sets that family needs. See `set_drawing`.
     """
+    if _only_missing and os.path.exists(path_for(name)):
+        return load(name)
+
     if pairing == "path":
         doc = {
             "pairing": "path",

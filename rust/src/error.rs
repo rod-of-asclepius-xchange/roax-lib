@@ -92,6 +92,17 @@ pub enum Error {
     #[error("unsupported envelope generation")]
     UnsupportedEnvelopeGeneration,
 
+    /// The verifier selected the 2.0 reserved-leaf generation and the envelope names no type map
+    /// on EITHER side - no outer `typeMap` member and no committed `roax.typeMap.id` leaf.
+    ///
+    /// Kept apart from [`Error::OuterIdentityMismatch`] deliberately. With neither side naming a
+    /// type map the two AGREE, so nothing is mismatched; what failed is the verifier's own
+    /// requirement that a copy bind the exact artifact at all, which is the same shape as
+    /// `hashAlg` being absent from the allow-list. Collapsing the two would point a reader at a
+    /// disagreement that did not occur.
+    #[error("the envelope names no type map on either side")]
+    TypeMapNotNamed,
+
     #[error("invalid commitment context: {0}")]
     InvalidContext(String),
 
@@ -181,6 +192,7 @@ impl Error {
             Self::TypeMapIssuerScope => "type-map-issuer-scope",
             Self::IssuerScopeNormalizationUndecided => "issuer-scope-normalization-undecided",
             Self::UnsupportedEnvelopeGeneration => "envelope-version-unsupported",
+            Self::TypeMapNotNamed => "type-map-not-named",
             Self::InvalidContext(_) => "invalid-context",
             Self::EnvelopeModeConflict | Self::EnvelopeModeMissing => "envelope-mode",
             Self::InvalidEnvelope(_) => "invalid-envelope",

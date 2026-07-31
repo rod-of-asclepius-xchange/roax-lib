@@ -10,18 +10,18 @@ A library produced by reading an existing one passes the corpus while destroying
 
 ## Status
 
-**488 of 488 committed corpus vectors pass**, with class 10 run against the pinned reference checkout.
+**501 of 501 committed corpus vectors pass**, with class 10 run against the pinned reference checkout.
 
 | Measure | Result |
 |---|---|
-| Corpus vectors | 488 pass, 0 fail, 0 NOT RUN with a reference checkout |
+| Corpus vectors | 501 pass, 0 fail, 0 NOT RUN with a reference checkout. The runner prints 503 outcomes, because each class-20 vector asserts on both copy kinds |
 | Unit and gap tests | 38 pass |
 | Vaccination sample | commits at 91 leaves without an issuer key identifier, 92 with one |
 | Recovery sample | commits at 69 leaves without an issuer key identifier, 70 with one |
 | Runtime dependencies | none; CryptoKit where it exists, and an in-tree SHA-256 otherwise |
 
 What that pass does and does not mean is in [`FINDINGS.md`](FINDINGS.md), which is worth more than the code.
-Four findings are new with this build: a Swift `String` comparison rule that silently answers an open specification ambiguity in the opposite direction from the rest of the family; two corpus gaps - the forged-tree-size attack, and the fact that no vector covers the ENVELOPE-PRODUCING side, which hid a real bug in this library that all 488 vectors missed; and the envelope-2.0 type-map binding, which the corpus cannot reach in either direction.
+Four findings are new with this build: a Swift `String` comparison rule that silently answers an open specification ambiguity in the opposite direction from the rest of the family; two corpus gaps - the forged-tree-size attack, and the fact that no vector covers the ENVELOPE-PRODUCING side, which hid a real bug in this library that all 488 vectors then committed missed, and which corpus class 20 now covers; and the envelope-2.0 type-map binding, which the corpus could not reach in either direction when this was written and which corpus classes 14 and 18 now assert.
 
 ## Running it
 

@@ -47,12 +47,13 @@ Specification section 3.3 says, in the sentence added to guard decision D7:
 So under the specification's rule both records **fail closed and have no root at all**, while `record-structure-empty-array` and `record-structure-empty-object` assert one.
 
 **Measured, by running this implementation both ways on a bare checkout**, where class 10 reports 4 skipped because its records live outside this repository.
-The `mechanical` row is the `npm test` default that section 10 below reports; neither row was run against a reference checkout, so no `map-authorized` count with those records is claimed here.
+**Both rows were re-measured on corpus 1.1.0's 501 vectors**, at `bba14101` under Node v22.21.0.
+Neither row was run against a reference checkout, so no `map-authorized` count with those records is claimed here, and both rows are therefore the WITHOUT-references variants of the runs section 11 tabulates rather than a separate measurement.
 
-| Empty-container policy | Corpus result |
+| Empty-container policy, both WITHOUT a reference checkout | Corpus result, on corpus 1.1.0 |
 |---|---|
-| `mechanical` - tag 6 or 7 from the observed kind, without consulting the map | 697 pass, 0 fail, 4 skipped |
-| `map-authorized` - specification section 3.3 | 693 pass, **2 fail**, both class 5, 4 skipped |
+| `mechanical` - tag 6 or 7 from the observed kind, without consulting the map | 720 pass, 0 fail, 4 skipped |
+| `map-authorized` - specification section 3.3 | 716 pass, **2 fail**, both class 5, 4 skipped |
 
 The two rows differ by four assertions where only two vectors flip, which is not a third failure hiding somewhere: a record vector asserts `leafCount` and `root` separately, and a throw out of `commitRecord` emits one failure in place of both passes (`conformance/run.ts:525-528`).
 
@@ -72,18 +73,19 @@ The code does not silently pick one.
 ## 3. Specification section 10 step 1 cannot be discharged for `hl7.fhir.bundle` against this corpus
 
 **Class:** specification-versus-corpus divergence, section 1.1.
-Measured: 7 vectors of class 14, of which 6 disclose the record leaf whose tag cannot be checked.
+Measured: 9 `hl7.fhir.bundle` vectors of class 14, of which 8 disclose the record leaf whose tag cannot be checked.
 
 Specification section 10 requires that for each disclosed leaf a verifier "checks a record leaf's tag against the exact selected map under section 4.2".
 
 `corpus/type-maps/` carries four maps: the synthetic one and the three MOH profiles.
-There is **no `hl7.fhir.bundle` map**, and 6 of the 7 committed `floor-hl7-fhir-bundle-*` envelope fixtures disclose a `resourceType` record leaf.
-A verifier that hard-requires the tag check therefore rejects those 6 with `type-map-fail-closed`, including the two the corpus expects to accept.
-The seventh, `floor-hl7-fhir-bundle-omits-resourceType`, discloses no record leaf at all, so the check never fires and it is rejected on `minimum-disclosure-floor` whether the requirement is on or off.
+There is **no `hl7.fhir.bundle` map**, and 8 of the 9 committed class-14 `hl7.fhir.bundle` envelope fixtures disclose a `resourceType` record leaf: 6 of the 7 `floor-hl7-fhir-bundle-*` fixtures and both `typemap-floor-hl7-fhir-bundle-*` ones.
+A verifier that hard-requires the tag check therefore rejects those 8 with `type-map-fail-closed`, including the three the corpus expects to accept.
+The one fixture that discloses no record leaf at all, `floor-hl7-fhir-bundle-omits-resourceType`, never fires the check and is rejected on `minimum-disclosure-floor` whether the requirement is on or off.
 
-**7 is the count against the committed corpus and 8 is the count against the class definition**, so a reader comparing the two is not looking at a miscount.
-Class 14 defines the floor as five reserved paths plus the profile's, the committed fixtures carry four, and the missing `roax.typeMap.id` omission fixture is the eighth.
-Section 9 below records the same difference from the other side, and closing it is corpus-rebuild work.
+**The `floor-hl7-fhir-bundle-*` family alone asserts four reserved paths where class 14 defines five**, so a reader counting omission fixtures inside that one family is not looking at a miscount.
+Those seven fixtures were issued before `roax.typeMap.id` existed, and the fifth reserved path is asserted by the parallel `typemap-floor-hl7-fhir-bundle-*` pair instead, one accept and one omission, which is why the class-14 set for this profile is nine rather than eight.
+That close is ADDITIVE rather than a corpus rebuild, so no root of the earlier seven moved.
+Section 9 below records the same family from the other side.
 
 **How this implementation handles it.**
 `verifyEnvelope` takes an optional resolver per `recordType`.
@@ -102,7 +104,8 @@ Both are recorded because they are the same shape as the gap above, and because 
   Given a kind the map yields exactly one tag, so the leaf's own tag names the kind to look its path up under and the single tag that comes back either equals it or contradicts it.
   The cost of the earlier reading was one-sided: a leaf mis-issued as BYTES at a path bound to STRING for kind `string` was accepted, while the same mistake the other way round was caught.
   `observedKindForTag` in `src/envelope.ts` is now total over every tag a record leaf can carry and returns `undefined` for tag 8 BLOB_REF alone, which implies no observed JSON kind; the caller fails closed on that rather than skipping, and tag 8 is already rejected as the first check in the same loop.
-  Invisible in the corpus either way: all 318 disclosed leaves across its 54 envelope fixtures are tag 2 STRING, so `test/unit.ts` is the only coverage and carries one retag in each direction.
+  Invisible in the corpus when this was written: all 318 disclosed leaves across the 54 envelope fixtures then committed were tag 2 STRING, so `test/unit.ts` was the only coverage and carries one retag in each direction.
+  Class 20's disclosed copy carries one leaf per carrier form, tags 0 through 5, so the corpus now reaches every one of them on the PRODUCING side.
 - **The reserved-leaf branch of step 1 is not implemented.**
   Section 10 step 1 reads "checks a record leaf's tag against the exact selected map under section 4.2, **or checks a reserved leaf against the fixed table in section 11.2**".
   This implementation short-circuits both branches for a reserved path: `isReservedPath` returns true and no comparison against the six-row table happens.
@@ -224,7 +227,11 @@ Recorded so a passing run does not read as coverage it does not have.
   That covers the two class-10 vectors this run could not execute as well, and by argument rather than by measurement: no map in `corpus/type-maps/` binds any path to tag 5, so the recovery record cannot reach the changed code at all.
   **The independent Rust library already reads it this way**, which is the strongest evidence available that the specification says one thing here and that the TypeScript side was the outlier: `rust/src/value.rs:54` decodes canonical base64 at record projection, `:157-158` requires an envelope carrier to be hex that survives a re-encode round trip, so uppercase is refused there too, and `:180` emits `hex::encode` into a disclosed leaf.
   **Because no published map selects `BYTES`, synthetic coverage was the only coverage possible** and is therefore required rather than optional - nothing in `type-maps/`, `corpus/type-maps/` or the corpus reached the path when this was written.
-  The corpus reaches the RECORD-PROJECTION half now, through the corpus-only tag-5 binding the section 6.3 bullet above records, but none of the 54 envelope fixtures carries a disclosed tag-5 value and no published map selects `BYTES` still, so the CARRIER half this paragraph is about remains synthetic coverage alone.
+  **THE CORPUS REACHES THE CARRIER HALF NOW TOO, and this paragraph's claim that it did not is superseded rather than deleted, because what closed it is worth recording.**
+  It reached the RECORD-PROJECTION half first, through the corpus-only tag-5 binding the section 6.3 bullet above records, while none of the then-committed 54 envelope fixtures carried a disclosed tag-5 value - so the carrier half was synthetic coverage alone.
+  Class 20's disclosed copy carries a tag-5 leaf, which makes the hex carrier a committed expectation that every implementation must both EMIT and READ.
+  It found the identical defect in one other language on the day it was added: the Kotlin library wrote `Base64Strict.encode` and read `Base64Strict.decode`, so its two halves agreed with each other and disagreed with everyone else - symmetric and silent, exactly as described above.
+  No published map selects `BYTES` still, so the published-artifact half remains uncovered.
   `test/unit.ts` carries the base64-to-hex projection with its non-canonical rejections, strict hex decoding including the uppercase, odd-length and non-hex cases, an issue-disclose-parse-verify round trip under a synthetic tag-5 map that emits `00010203`, empty bytes carried the whole way as `""`, and a check of the emitted carrier against the tag-5 pattern read out of both live envelope schema files rather than restated in the test.
   **One value in that round trip is letter-bearing on purpose**, `q83v` emitting `abcdef`, because `00010203` and `""` are unchanged by `toUpperCase` and so satisfy every other assertion here even if `toHex` emits uppercase nibbles - which the case-sensitive schema pattern would then reject.
   Measured rather than reasoned about: uppercasing the carrier in `carrierFromJson` fails exactly those two tests, 34 passed and 2 failed, both on `envelope-malformed: a BYTES value is not lowercase hex of even length`.
@@ -274,37 +281,69 @@ Which of the three fires depends on what else the edit changed, and all three ar
 Nothing there is waivable by deletion, and the entry says so: what is undischarged is that the document binds no type-map artifact at all, not that one may have been removed.
 The stripped-versus-envelope-1.0 ambiguity is specific to a disclosed copy, which is never re-flattened.
 
-All 54 committed envelope fixtures carry no `typeMap` member and no `roax.typeMap.id` leaf, so what the corpus exercises today is the residue rather than either closed direction, and **neither closed direction is asserted by a vector.**
-The round trip through `issueFullCopy` and `discloseFrom` in `test/unit.ts` does commit and disclose the leaf, so the both-present direction is exercised there incidentally; the leaf-without- member direction is not exercised anywhere and is recorded here for that reason.
-Closing the corpus difference is corpus-rebuild work: class 14 now defines five reserved paths where the committed fixtures carry four.
+**THE CORPUS ASSERTS BOTH DIRECTIONS NOW, and the paragraph this replaces said it asserted neither.**
+That was true and is worth keeping as the record: all 54 envelope fixtures committed at the time carried no `typeMap` member and no `roax.typeMap.id` leaf, so the corpus exercised only the residue.
+Classes 14 and 18 grew a family that carries the member and commits the leaf - `typemap-floor-<profile>-*` per profile, plus `identity-outer-type-map-id-mismatch` and `identity-outer-type-map-member-stripped` - and the last of those is the leaf-without-member direction this finding recorded as unexercised.
+The residue is unchanged and is still reported rather than waived; `corpus/README.md` states in the same terms why no vector can reach it.
+
+**What running that family across the other libraries found, since this finding is the one that names the defect.**
+The Python library had no binding at all and accepted all four attacks; the Kotlin library bound only when its verifier was configured to; and the Rust runner chose the envelope generation from the presenter-supplied member, so the stripped-member copy was refused by the reserved-namespace guard rather than by the binding.
+This library was already correct on every row, which is what this finding having been written and acted on bought.
 
 ---
 
-## 10. What was measured
+## 10. DEFECT IN THIS LIBRARY: issuance invented a type-map version rather than refusing to guess one
 
-Node v22.21.0, TypeScript 5.9.3, `SHA-256`, corpus `1.0.0`.
+**Kind: library.
+Fixed.
+PRE-EXISTING and unchanged since base commit `411de0c`, and fixed here because this is the change that made the opposite rule explicit in the sibling emitters.**
+
+`issueFullCopy` wrote `['version', { kind: 'string', value: options.typeMapVersion ?? '1.0.0' }]`, so a caller naming `identity.typeMapId` without a `typeMapVersion` received an envelope declaring an artifact version it never named.
+
+**Inventing a value rather than failing closed IS the defect class this whole change is about**, which is why the pre-existing status does not carry the day.
+`schemas/envelope-1.0.json` requires the `typeMap` member to carry `id` and `version` together, and the version is metadata the issuer holds rather than anything a library can derive: the content ID names the artifact's bytes, and nothing in this library reads them.
+An issued envelope is unrecoverable once anchored, so a substituted version is not a default a caller can correct later.
+
+**The impact was bounded and this was NOT a fourth instance of the class-20 defect.**
+`1.0.0` satisfies the schema's `^[0-9]+\.[0-9]+\.[0-9]+$`, the version is not a committed leaf, and the content ID transitively binds every artifact byte including that version (specification section 12.1), so the result was misleading metadata on an otherwise valid, self-verifying envelope rather than one its own verifier refuses.
+It is recorded as a finding anyway because the cost was **cross-library divergence on a rule this very change introduced**: `python/FINDINGS.md` and `kotlin/FINDINGS.md` both record their emitters being made to fail closed here, which would have left this library the only one of the three that substitutes.
+That is exactly the shape the corpus exists to prevent, and no vector can see it - every class-20 vector supplies a version, so all three emitters agree on every committed row while disagreeing about the case none of them covers.
+
+The refusal now reads like the one immediately above it, which refuses an issuance with no `typeMapId` at all: the same `envelope-malformed` code, at the same point, before anything is committed.
+`test/unit.ts` pins both directions - an issuance naming both members round-trips through this library's own verifier carrying exactly the version supplied, and an issuance naming the artifact without its version is refused rather than emitting an invented one.
+
+---
+
+## 11. What was measured
+
+Node v22.21.0, TypeScript 5.9.3, `SHA-256`, corpus `1.1.0`.
 
 **Every number in this table was re-measured on the commit that carries it.**
 Nothing here is carried forward from an earlier run.
 
 | Run | Result |
 |---|---|
-| `npm test`, the default | **697 assertions, 0 failures, 4 NOT RUN** - class 10, whose records live outside this repository |
-| `ROAX_EMPTY_CONTAINERS=map-authorized`, the section 3.3 reading | **693 passed, 2 failed, 4 NOT RUN**, exit 1 |
-| `test/unit.ts` | **36 tests, 0 failures** |
+| `npm test`, the default | **720 assertions, 0 failures, 4 NOT RUN** - class 10, whose records live outside this repository |
+| the same with `ROAX_REFERENCE_RECORDS` set | **728 assertions, 0 failures, 0 NOT RUN** |
+| `ROAX_EMPTY_CONTAINERS=map-authorized`, the section 3.3 reading | **724 passed, 2 failed**, exit 1 |
+| `test/unit.ts` | **37 tests, 0 failures** |
 
 The runner's total line spells the third column `skipped` while the per-vector note for each of those 4 entries reads `NOT RUN` and names its reason; they are the same 4 class-10 vectors, and neither spelling adds them to the passed count.
 
 **The corpus runs were made under `emptyContainerPolicy: 'mechanical'`, which is the corpus's rule and NOT specification section 3.3's.**
-Finding 2 above gives that measurement in full, and the second row is it: the two failures are `record-structure-empty-array` and `record-structure-empty-object`, both on `type-map-fail-closed: no binding in org.roax.corpus.synthetic for kind array|object at a.b`.
+Finding 2 above gives that reading in full, and the third row of the table above is a run under the other one: the two failures are `record-structure-empty-array` and `record-structure-empty-object`, both on `type-map-fail-closed: no binding in org.roax.corpus.synthetic for kind array|object at a.b`.
+That row and finding 2's `map-authorized` row are the same run family rather than two measurements, and they differ by exactly the 8 class-10 assertions a reference checkout adds: 724 = 728 - 4 here, against 716 = 720 - 4 there, with the same 2 failures on both sides.
 A green corpus is therefore evidence of agreement with the committed vectors and is not, on its own, evidence of conformance to section 3.3 - the two are mutually exclusive as things stand.
 The runner DECLARES the active policy on every run, beside the Unicode declaration and for the same reason: a total line read on its own must not stand for a conformance claim the run did not make.
 
-### Class 10 is NOT RUN here, and no complete 19-class total is claimed
+### Class 10 needs records this repository does not vendor, and the default run reports it NOT RUN
 
-**Class 10 did not execute in any run recorded above, and its 8 assertions, across four vectors, are counted as NOT RUN rather than as passed.**
-An earlier revision of this section carried a second corpus row - `ROAX_REFERENCE_RECORDS=<dir> npm run conformance` giving 684 assertions, 0 failures, 0 skipped across all 19 classes, measured when the class carried two vectors - and that row has been removed rather than restated, because it was not reproducible on this machine and a measurement that cannot be reproduced must not sit in a table of measurements as though it were current.
-That is why no with-records total is restated for the four vectors either.
+**Without `ROAX_REFERENCE_RECORDS` class 10 does not execute, and its 8 assertions across four vectors are counted as NOT RUN rather than as passed.**
+That is the first row of the table above, and it is the row a reader with no reference checkout will reproduce.
+
+**The second row is a with-records run, and it is stated only because it was re-measured rather than carried forward.**
+An earlier revision of this section carried such a row - 684 assertions across all 19 classes, measured when the class carried two vectors - and removed it, because it was not reproducible on the machine that wrote it and a measurement that cannot be reproduced must not sit in a table of measurements as though it were current.
+The rule that removal established still holds and is why the row is back rather than why it was absent: it is here because this run reproduced it against the pinned reference checkout, not because the earlier one was restored.
 
 The class needs records this repository deliberately does not vendor.
 Its four vectors are two real Singapore MOH samples with and without an issuer key identifier: the recovery-healthcert records at 69 and 70 leaves, resolving against `references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/sample-data.ts#sampleDocument`, and the vaccination-healthcert records at 91 and 92 leaves, resolving against `references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/sample-data.ts#sampleVaccineHealthCert`, which the 2026-07-30 `dose` and `expiryDateTime` rulings made committable.

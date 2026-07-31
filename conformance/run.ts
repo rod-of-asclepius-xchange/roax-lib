@@ -43,6 +43,7 @@ import {
   type VerificationResult,
 } from '../src/envelope.js';
 import { REGISTERED_PROFILES } from '../src/profiles.js';
+import { issueFullCopy, discloseFrom } from '../src/issue.js';
 
 /**
  * The repository root.
@@ -103,10 +104,51 @@ function carrierOf(raw: unknown): CarrierValue | undefined {
   return raw as CarrierValue;
 }
 
+/**
+ * Every vector group this runner consumes.
+ *
+ * A group present in the corpus file and absent from this list is a HARD FAILURE rather than a
+ * quiet skip. The quiet skip is the exact defect shape the corpus exists to prevent: a runner
+ * that does not know a group reads it as zero vectors and reports the same green it reported
+ * before the group was added, so extending the corpus would silently fail to extend the gate.
+ */
+const CONSUMED_GROUPS: readonly string[] = [
+  'encodePath',
+  'encodeValue',
+  'reject',
+  'leaf',
+  'tree',
+  'inclusion',
+  'negativeProof',
+  'typeMap',
+  'record',
+  'unlinkability',
+  'normalization',
+  'envelope',
+  'roundTrip',
+];
+
+function checkEveryGroupIsConsumed(corpus: Corpus): string[] {
+  return Object.keys(corpus.vectors).filter((name) => !CONSUMED_GROUPS.includes(name));
+}
+
 function main(): number {
   const corpus = readJsonFileLoose(
     resolve(ROOT, 'corpus/conformance-corpus-1.0.json'),
   ) as Corpus;
+
+  const unconsumed = checkEveryGroupIsConsumed(corpus);
+  if (unconsumed.length > 0) {
+    console.error(
+      'FAILED: the corpus carries vector group(s) this runner does not consume: ' +
+        unconsumed.join(', '),
+    );
+    console.error(
+      '  A group read as absent would report the same green as before it existed.',
+    );
+    return 1;
+  }
+
   const report = new Report();
   const hash = resolveHashFunction(corpus.hashAlg);
 
@@ -127,6 +169,7 @@ function main(): number {
   runRecord(corpus, report, hash);
   runNormalization(corpus, report, hash);
   runEnvelope(corpus, report);
+  runRoundTrip(corpus, report);
   runUnlinkability(corpus, report, hash);
 
   printReport(report, unicode);
@@ -711,8 +754,21 @@ function corpusVerifierConfig(): VerifierConfig {
       }
       return resolverFor(recordType);
     },
+    // The corpus-only profile's floor. `org.roax.corpus.synthetic` is not in `docs/profiles/`
+    // and MUST NEVER be issued against, so the library's registry rightly does not carry it -
+    // but class 20 verifies a DISCLOSED copy under it, and a floor has to come from somewhere.
+    // `marker` is the corpus's own declaration, matching `PROFILE_FLOORS` in
+    // `corpus/tools/envelope.py` and `envelope.mjs`.
+    floorFor: (recordType: string) =>
+      recordType === 'org.roax.corpus.synthetic'
+        ? {
+            recordType,
+            profilePaths: [[{ key: 'marker' }]],
+            citation: 'corpus/README.md, the synthetic profile',
+          }
+        : undefined,
     // `corpus/type-maps/` carries no `hl7.fhir.bundle` map, so section 10 step 1 cannot be
-    // discharged for the 6 `floor-hl7-fhir-bundle-*` fixtures that disclose a record leaf.
+    // discharged for the 8 of the 9 class-14 `hl7.fhir.bundle` fixtures that disclose a record leaf.
     // Reported, not hidden.
     requireTypeMapForDisclosedLeaves: false,
     emptyContainerPolicy: EMPTY_CONTAINER_POLICY,
@@ -771,6 +827,227 @@ function runEnvelope(corpus: Corpus, report: Report): void {
     // the vector is about (`corpus/README.md`).
     expectReject(report, v.class, v.name, v.reason ?? '', run);
   }
+}
+
+/**
+ * Class 20: issue, disclose, then verify the copy THIS library produced.
+ *
+ * Every other class runs `verifyEnvelope` against bytes the corpus generator wrote. That is the
+ * gap this class closes: a library can emit a disclosed copy its own verifier refuses and still
+ * pass every other vector, because no other vector asks it to PRODUCE one.
+ *
+ * So this drives the real issuance and disclosure entry points - `issueFullCopy` and
+ * `discloseFrom` - rather than assembling an envelope here. Assembling it here would test this
+ * file instead of the library, which is exactly how an earlier round-trip test elsewhere missed
+ * the defect: it checked inclusion proofs directly instead of driving the verifier.
+ */
+function runRoundTrip(corpus: Corpus, report: Report): void {
+  const config = corpusVerifierConfig();
+  for (const raw of corpus.vectors['roundTrip'] ?? []) {
+    const v = raw as {
+      name: string;
+      class: number;
+      recordType: string;
+      schemaVersion: string;
+      recordId: string;
+      issuerId: string;
+      issuerKeyId?: string;
+      typeMap?: { id: string; version: string };
+      recordFile: string;
+      saltsFile: string;
+      saltPairing: string;
+      leafCount: number;
+      root: string;
+      disclosePaths: unknown[];
+      expectedFullCopyFile: string;
+      expectedDisclosedCopyFile: string;
+      expectSelfVerifies: boolean;
+    };
+    try {
+      const identity: RecordIdentity = {
+        recordType: v.recordType,
+        schemaVersion: v.schemaVersion,
+        recordId: v.recordId,
+        issuerId: v.issuerId,
+        typeMapId: v.typeMap?.id,
+        issuerKeyId: v.issuerKeyId,
+      };
+      const full = issueFullCopy({
+        record: readFixture(v.recordFile),
+        identity,
+        resolver: resolverFor(v.recordType),
+        typeMapVersion: v.typeMap?.version,
+        salts: saltSourceFrom(v.saltsFile, v.saltPairing),
+        emptyContainerPolicy: EMPTY_CONTAINER_POLICY,
+      });
+      expectEqual(report, v.class, `${v.name} (leafCount)`, full.commitment.leafCount, v.leafCount);
+      expectEqual(report, v.class, `${v.name} (root)`, full.root, v.root);
+
+      const disclosed = discloseFrom(full, {
+        reveal: v.disclosePaths.map(segmentsOf),
+        includeDisplayPath: true,
+      });
+
+      // Compared SEMANTICALLY: JSON member order, whether `displayPath` is emitted, the order of
+      // `disclosure.leaves` and the order of a full copy's `salts` are not fixed by the
+      // specification, so asserting any of them would fail a conforming implementation.
+      // A number keeps its SOURCE TEXT through `comparableJson`, which is the one thing that must
+      // survive - the full copy carries the record's literals (specification sections 6.4, 7.3).
+      for (const [produced, expectedFile] of [
+        [full.document, v.expectedFullCopyFile],
+        [disclosed, v.expectedDisclosedCopyFile],
+      ] as const) {
+        const difference = firstDifference(
+          normalizedForComparison(comparableJson(produced)),
+          normalizedForComparison(comparableJson(readFixture(expectedFile))),
+        );
+        if (difference === undefined) {
+          report.pass(v.class);
+        } else {
+          report.fail(
+            v.class,
+            `${v.name} (${expectedFile.split('/').pop() ?? expectedFile}): ${difference}`,
+          );
+        }
+        // And the half no static fixture can assert: this library's verifier over this library's
+        // own output. A producer that omitted a per-leaf value carrier fails HERE, on
+        // `disclosed-leaf-named-without-value`, even though every leaf hash it computed was right.
+        try {
+          verifyEnvelope(parseEnvelope(produced), config);
+          report.pass(v.class);
+        } catch (e) {
+          report.fail(
+            v.class,
+            `${v.name}: this library issued an envelope its own verifier refused: ${String(e)}`,
+          );
+        }
+      }
+    } catch (e) {
+      report.fail(v.class, `${v.name}: ${String(e)}`);
+    }
+  }
+}
+
+/**
+ * The first place two comparable forms differ, or `undefined` when they agree.
+ *
+ * A whole envelope printed twice is not a readable failure, and what this class catches is one
+ * missing member on one leaf.
+ */
+function firstDifference(got: unknown, want: unknown, at = ''): string | undefined {
+  if (got === want) {
+    return undefined;
+  }
+  if (Array.isArray(got) && Array.isArray(want)) {
+    if (got.length !== want.length) {
+      return `${at || '/'}: ${got.length} entries, expected ${want.length}`;
+    }
+    for (let i = 0; i < got.length; i += 1) {
+      const d = firstDifference(got[i], want[i], `${at}/${i}`);
+      if (d !== undefined) {
+        return d;
+      }
+    }
+    return undefined;
+  }
+  if (isPlainObject(got) && isPlainObject(want)) {
+    for (const key of new Set([...Object.keys(got), ...Object.keys(want)])) {
+      if (!(key in got)) {
+        return `${at}/${key}: ABSENT, expected ${JSON.stringify(want[key])}`;
+      }
+      if (!(key in want)) {
+        return `${at}/${key}: ${JSON.stringify(got[key])}, expected ABSENT`;
+      }
+      const d = firstDifference(got[key], want[key], `${at}/${key}`);
+      if (d !== undefined) {
+        return d;
+      }
+    }
+    return undefined;
+  }
+  return `${at || '/'}: ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`;
+}
+
+/**
+ * An envelope's comparison form with the aspects the specification does not fix removed. Applied
+ * to BOTH sides, so what survives is what the specification actually says.
+ *
+ * Three things are relaxed, and nothing else. `disclosure.leaves` is ordered by leaf index and a
+ * full copy's `salts` by its entry's structured path, because every leaf carries its own index and
+ * every salt entry its own path, so neither array order carries anything. `displayPath` is
+ * DROPPED: it is display only and never hashed (specification section 5.2), and
+ * `schemas/envelope-1.0.json` leaves it out of `disclosedLeaf.required`, so a conforming producer
+ * may omit it and a comparison that noticed would fail conforming work.
+ *
+ * Everything else stays exact, which is the half that matters: both array LENGTHS, every leaf's
+ * segments, index, tag, value carrier, salt and audit path, and every scalar identity field. A
+ * producer that omitted a per-leaf value carrier - the defect this class exists for - still fails.
+ */
+function normalizedForComparison(envelope: unknown): unknown {
+  if (!isPlainObject(envelope)) {
+    return envelope;
+  }
+  const out: Record<string, unknown> = { ...envelope };
+  const salts = out['salts'];
+  if (Array.isArray(salts)) {
+    out['salts'] = [...salts].sort(bySortKey((entry) =>
+      JSON.stringify(isPlainObject(entry) ? (entry['segments'] ?? null) : null),
+    ));
+  }
+  const disclosure = out['disclosure'];
+  if (isPlainObject(disclosure) && Array.isArray(disclosure['leaves'])) {
+    const leaves = disclosure['leaves'].map((leaf) => {
+      if (!isPlainObject(leaf)) {
+        return leaf;
+      }
+      const copy: Record<string, unknown> = { ...leaf };
+      delete copy['displayPath'];
+      return copy;
+    });
+    leaves.sort(bySortKey((leaf) => (isPlainObject(leaf) ? numberLiteralOf(leaf['index']) : '')));
+    out['disclosure'] = { ...disclosure, leaves };
+  }
+  return out;
+}
+
+function isPlainObject(x: unknown): x is Record<string, unknown> {
+  return x !== null && typeof x === 'object' && !Array.isArray(x);
+}
+
+/** The digits `comparableJson` kept for a number, left-padded so a string sort orders them. */
+function numberLiteralOf(node: unknown): string {
+  const literal = isPlainObject(node) ? node['$numberLiteral'] : undefined;
+  return typeof literal === 'string' ? literal.padStart(20, '0') : '';
+}
+
+function bySortKey(key: (x: unknown) => string): (a: unknown, b: unknown) => number {
+  return (a, b) => {
+    const ka = key(a);
+    const kb = key(b);
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  };
+}
+
+/** A comparison form for a parsed JSON tree: members sorted, numbers kept as source text. */
+function comparableJson(node: unknown): unknown {
+  const n = node as { kind?: string; members?: [string, unknown][]; items?: unknown[]; value?: unknown; literal?: string };
+  if (n?.kind === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, val] of [...(n.members ?? [])].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))) {
+      out[k] = comparableJson(val);
+    }
+    return out;
+  }
+  if (n?.kind === 'array') {
+    return (n.items ?? []).map(comparableJson);
+  }
+  if (n?.kind === 'number') {
+    return { $numberLiteral: n.literal };
+  }
+  if (n?.kind === 'null') {
+    return null;
+  }
+  return n?.value;
 }
 
 function printReport(report: Report, unicode: ReturnType<typeof describeUnicodeEnvironment>): void {

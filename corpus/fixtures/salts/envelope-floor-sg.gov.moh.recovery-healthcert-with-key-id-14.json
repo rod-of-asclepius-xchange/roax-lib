@@ -1,0 +1,123 @@
+{
+  "pairing": "path",
+  "salts": [
+    {
+      "segments": [
+        {
+          "key": "id"
+        }
+      ],
+      "salt": "191870f42da8024abbc75f32f6da2e0b"
+    },
+    {
+      "segments": [
+        {
+          "key": "type"
+        }
+      ],
+      "salt": "e72f5d12f5430ab9e6e95db262a63f60"
+    },
+    {
+      "segments": [
+        {
+          "key": "version"
+        }
+      ],
+      "salt": "fd99d98bec1ebce7fd61fa26b9f77ffa"
+    },
+    {
+      "segments": [
+        {
+          "key": "validFrom"
+        }
+      ],
+      "salt": "855423b98954e16a8d8470274b8de29d"
+    },
+    {
+      "segments": [
+        {
+          "key": "validUntil"
+        }
+      ],
+      "salt": "ab2baa6b8ec37c132c5a5d26c208eab9"
+    },
+    {
+      "segments": [
+        {
+          "key": "fhirVersion"
+        }
+      ],
+      "salt": "c7bb1509143f1a54c6be77f3fd2bf274"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.recordId"
+        }
+      ],
+      "salt": "0b360f019d791b8f190334bb84fba74d"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.issuer.id"
+        }
+      ],
+      "salt": "87ac197d28588b1dc5fb17f465a3f189"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.recordType"
+        }
+      ],
+      "salt": "aed933624f406355eb19e24281d1ab67"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.typeMap.id"
+        }
+      ],
+      "salt": "590b1ea21a3723854df8e83b849ecd0f"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.issuer.keyId"
+        }
+      ],
+      "salt": "ae0ee1f578fd5201fdd51d0eb583a7dc"
+    },
+    {
+      "segments": [
+        {
+          "key": "roax.schemaVersion"
+        }
+      ],
+      "salt": "e9d200e2611889e687b64a4dafc57ce9"
+    },
+    {
+      "segments": [
+        {
+          "key": "patient"
+        },
+        {
+          "key": "gender"
+        }
+      ],
+      "salt": "925ae2367ed9fea5ca677eacec9a49d5"
+    },
+    {
+      "segments": [
+        {
+          "key": "patient"
+        },
+        {
+          "key": "birthDate"
+        }
+      ],
+      "salt": "5518c73a93f5d22cdd1a20b199fcc916"
+    }
+  ]
+}

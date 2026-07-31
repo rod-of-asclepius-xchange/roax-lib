@@ -219,8 +219,15 @@ const RECORD = readJson(
   '{"version":"pdt-healthcert-v2.0","type":"PCR","validFrom":"2026-07-28T00:00:00Z","dose":0.010}',
 );
 
+const TYPE_MAP_VERSION = '1.0.0';
+
 function issued(): ReturnType<typeof issueFullCopy> {
-  return issueFullCopy({ record: RECORD, identity: IDENTITY, resolver: SYNTHETIC_MAP });
+  return issueFullCopy({
+    record: RECORD,
+    identity: IDENTITY,
+    resolver: SYNTHETIC_MAP,
+    typeMapVersion: TYPE_MAP_VERSION,
+  });
 }
 
 const VERIFIER = {
@@ -255,6 +262,27 @@ test('a full copy issued by this library verifies against itself', () => {
   // 4 record leaves plus 6 reserved: recordType, schemaVersion, typeMap.id, recordId, issuer.id,
   // issuer.keyId (specification section 11.2).
   assert.equal(result.leafCount, 10);
+});
+
+test('the typeMap member carries id and version together, and a version is never guessed', () => {
+  // The accepting direction: both members named, and the envelope round-trips through this
+  // library's own verifier carrying exactly the version the caller supplied.
+  const full = issued();
+  const descriptor = memberValue(full.document, 'typeMap');
+  assert.deepEqual(memberValue(descriptor, 'id'), { kind: 'string', value: IDENTITY.typeMapId });
+  assert.deepEqual(memberValue(descriptor, 'version'), {
+    kind: 'string',
+    value: TYPE_MAP_VERSION,
+  });
+  assert.equal(verifyEnvelope(parseEnvelope(full.document), VERIFIER).kind, 'full');
+
+  // And the refusing direction. `schemas/envelope-1.0.json` requires both members whenever
+  // `typeMap` is present, so an issuance naming the artifact without its version has nothing
+  // valid to write; substituting one emits a version the caller never named into an envelope
+  // that is unrecoverable once anchored. The sibling emitters refuse this too.
+  expectCode('envelope-malformed', () =>
+    issueFullCopy({ record: RECORD, identity: IDENTITY, resolver: SYNTHETIC_MAP }),
+  );
 });
 
 test('a disclosed copy verifies, and carries the salt of no withheld leaf (sections 7.3, 10.1)', () => {
@@ -634,6 +662,7 @@ test('an anchor on another chain is refused even when the registry address match
     record: RECORD,
     identity: IDENTITY,
     resolver: SYNTHETIC_MAP,
+    typeMapVersion: TYPE_MAP_VERSION,
     anchor: { chainId: 137, registry: '0xregistry' },
   });
   // One contract address on two chains is two registries with two sets of contents, so comparing
@@ -698,6 +727,7 @@ test('a present-but-non-string optional member reads as absent, at every site', 
     record: RECORD,
     identity: IDENTITY,
     resolver: SYNTHETIC_MAP,
+    typeMapVersion: TYPE_MAP_VERSION,
     anchor: { chainId: 1, registry: '0xregistry', txHash: '0xdead' },
   });
   const anchor = withMember(memberValue(anchored.document, 'anchor'), 'txHash', {
@@ -826,6 +856,7 @@ test('a BYTES leaf issues, discloses as hex, parses and verifies (sections 6.3, 
     record: BYTES_RECORD,
     identity: IDENTITY,
     resolver: BYTES_MAP,
+    typeMapVersion: TYPE_MAP_VERSION,
   });
   // The full copy verifies, which is what proves the two halves agree: verification re-flattens
   // the record, so the base64 goes through `carrierFromJson` a second time and the hex it yields
@@ -852,7 +883,12 @@ test('the disclosed BYTES carrier matches the tag-5 pattern of both live envelop
   // agreeing with itself after the schema moved, which is the whole failure mode: this test exists
   // because the code and the schema had drifted apart with nothing comparing them.
   const disclosed = discloseFrom(
-    issueFullCopy({ record: BYTES_RECORD, identity: IDENTITY, resolver: BYTES_MAP }),
+    issueFullCopy({
+      record: BYTES_RECORD,
+      identity: IDENTITY,
+      resolver: BYTES_MAP,
+      typeMapVersion: TYPE_MAP_VERSION,
+    }),
     { reveal: REVEAL_WITH_BYTES },
   );
   // `lettersAttachment` is in this list for the reason given at the fixture: the schema pattern is

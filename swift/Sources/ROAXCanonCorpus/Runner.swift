@@ -48,7 +48,34 @@ public struct CorpusRunner {
     private func cls(_ v: JSONValue) -> Int { intValue(v["class"]) ?? 0 }
     private func name(_ v: JSONValue) -> String { stringValue(v["name"]) ?? "<unnamed>" }
 
+    /// Every vector group this runner consumes.
+    ///
+    /// `vectors(_:)` above answers an unknown group with the empty array, so a
+    /// corpus that grew a group this file does not read would contribute zero
+    /// assertions and report the same green it reported before the group
+    /// existed. That is the exact defect shape the corpus exists to prevent, so
+    /// an unconsumed group is a hard failure rather than a quiet skip.
+    static let consumedGroups: Set<String> = [
+        "encodePath", "encodeValue", "reject", "leaf", "tree", "inclusion", "negativeProof",
+        "typeMap", "record", "unlinkability", "normalization", "envelope", "roundTrip",
+    ]
+
+    /// The groups the corpus carries that this runner does not consume.
+    public var unconsumedGroups: [String] {
+        guard case .object(let members)? = corpus["vectors"] else { return [] }
+        return members.map(\.key).filter { !Self.consumedGroups.contains($0) }.sorted()
+    }
+
     public func run() {
+        let unconsumed = unconsumedGroups
+        if !unconsumed.isEmpty {
+            report.record(
+                .fail("the corpus carries vector group(s) this runner does not consume: "
+                      + unconsumed.joined(separator: ", ")
+                      + "; a group read as absent reports the same green as before it existed"),
+                class: 0, name: "vector-group-coverage")
+            return
+        }
         runEncodePath()
         runEncodeValue()
         runReject()
@@ -61,6 +88,7 @@ public struct CorpusRunner {
         runUnlinkability()
         runNormalization()
         runEnvelope()
+        runRoundTrip()
     }
 
     // MARK: encodePath
@@ -641,7 +669,9 @@ public struct CorpusRunner {
             } catch let e as ROAXError {
                 if expectAccept {
                     outcome = .fail("rejected for \(e.reason): \(e)")
-                } else if ReasonEquivalence.matches(corpusReason: expectedReason, thrown: e) {
+                } else if ReasonEquivalence.matches(
+                    vector: name(v), corpusReason: expectedReason, thrown: e
+                ) {
                     // The reason is not decoration: several fixtures are
                     // rejectable for more than one cause, so a boolean alone
                     // would pass an implementation that never ran the check the
@@ -654,6 +684,123 @@ public struct CorpusRunner {
                 outcome = .fail("threw a non-ROAX error: \(error)")
             }
             report.record(outcome, class: cls(v), name: name(v))
+        }
+    }
+    // MARK: class 20 - issue, disclose, then verify this library's OWN output
+
+    /// Every other class runs `EnvelopeVerifier` against bytes the corpus generator wrote.
+    ///
+    /// That is the gap this class closes, and it is not hypothetical here: this library
+    /// once emitted every revealed leaf with `value: nil`, so it issued disclosures its own
+    /// verifier refused for `disclosed-leaf-named-without-value` while passing all 488
+    /// vectors - including the one naming that very condition. Only a human reading the
+    /// source found it. So this drives `Committer.commit` and `Commitment.disclose`, then
+    /// puts their output through the real verifier.
+    ///
+    /// The produced envelope is compared against the committed fixture field by field rather
+    /// than by bytes: this package emits no JSON, and JSON member order, `displayPath` and
+    /// the order of `disclosure.leaves` are not fixed by the specification anyway.
+    private func runRoundTrip() {
+        for v in vectors("roundTrip") {
+            let vectorName = name(v)
+            let vectorClass = cls(v)
+            guard let recordType = stringValue(v["recordType"]),
+                  let schemaVersion = stringValue(v["schemaVersion"]),
+                  let recordId = stringValue(v["recordId"]),
+                  let issuerId = stringValue(v["issuerId"]),
+                  let recordFile = stringValue(v["recordFile"]),
+                  let saltsFile = stringValue(v["saltsFile"]),
+                  let expectedLeafCount = intValue(v["leafCount"]),
+                  let expectedRoot = stringValue(v["root"]),
+                  let disclosePaths = arrayValue(v["disclosePaths"]),
+                  let fullCopyFile = stringValue(v["expectedFullCopyFile"]),
+                  let disclosedCopyFile = stringValue(v["expectedDisclosedCopyFile"])
+            else {
+                report.record(.fail("malformed vector"), class: vectorClass, name: vectorName)
+                continue
+            }
+
+            do {
+                let descriptor = v["typeMap"]
+                let identity = RecordIdentity(
+                    recordType: recordType,
+                    schemaVersion: schemaVersion,
+                    recordId: recordId,
+                    issuerId: issuerId,
+                    issuerKeyId: stringValue(v["issuerKeyId"]),
+                    typeMapId: stringValue(descriptor?["id"])
+                )
+                let committer = Committer<SHA256Hash>(
+                    resolver: try typeMap(for: recordType),
+                    emptyContainerPolicy: emptyContainerPolicy
+                )
+                let commitment = try committer.commit(
+                    record: try loadJSON(path(recordFile)),
+                    salts: try loadSaltSet(path(saltsFile)),
+                    context: CommitmentContext(identity: identity)
+                )
+                guard commitment.leafCount == expectedLeafCount else {
+                    report.record(.fail("leafCount \(commitment.leafCount) != \(expectedLeafCount)"),
+                                  class: vectorClass, name: vectorName)
+                    continue
+                }
+                guard commitment.root.roaxHex == expectedRoot else {
+                    report.record(.fail("root \(commitment.root.roaxHex) != \(expectedRoot)"),
+                                  class: vectorClass, name: vectorName)
+                    continue
+                }
+
+                let head = { (record: JSONValue?, salts: [SaltEntry]?, leaves: [DisclosedLeaf]?) in
+                    Envelope(
+                        recordType: recordType, schemaVersion: schemaVersion, recordId: recordId,
+                        issuerId: issuerId, issuerKeyId: stringValue(v["issuerKeyId"]),
+                        typeMapId: stringValue(descriptor?["id"]),
+                        typeMapVersion: stringValue(descriptor?["version"]),
+                        root: commitment.root, leafCount: commitment.leafCount,
+                        record: record, salts: salts, disclosedLeaves: leaves
+                    )
+                }
+                let producedFull = head(
+                    try loadJSON(path(recordFile)),
+                    commitment.leaves.map { SaltEntry(segments: $0.segments, salt: $0.salt) },
+                    nil
+                )
+                let producedDisclosed = head(
+                    nil, nil,
+                    try commitment.disclose(
+                        paths: try disclosePaths.map {
+                            try parseCorpusSegments(arrayValue($0) ?? [])
+                        },
+                        hash: SHA256Hash.self
+                    )
+                )
+
+                let verifier = EnvelopeVerifier<SHA256Hash>(
+                    resolver: try typeMap(for: recordType),
+                    emptyContainerPolicy: emptyContainerPolicy
+                )
+                for (produced, expectedFile) in [(producedFull, fullCopyFile),
+                                                 (producedDisclosed, disclosedCopyFile)] {
+                    let expected = try Envelope.parse(json: try loadJSON(path(expectedFile)))
+                    if let difference = firstEnvelopeDifference(produced: produced, expected: expected) {
+                        report.record(.fail("\(expectedFile): \(difference)"),
+                                      class: vectorClass, name: vectorName)
+                        continue
+                    }
+                    // The half no static fixture can assert: this library's verifier over
+                    // this library's own output.
+                    do {
+                        try verifier.verify(produced)
+                        report.record(.pass, class: vectorClass, name: vectorName)
+                    } catch {
+                        report.record(
+                            .fail("this library issued an envelope its own verifier refused: \(error)"),
+                            class: vectorClass, name: vectorName)
+                    }
+                }
+            } catch {
+                report.record(.fail("threw \(error)"), class: vectorClass, name: vectorName)
+            }
         }
     }
 }
