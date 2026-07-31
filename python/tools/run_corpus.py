@@ -577,12 +577,16 @@ def run_round_trip(vectors, maps, r: Results, config, authorize_empty) -> None:
 
         for field_name, envelope in produced.items():
             expected = load_file(os.path.join(REPO, x[field_name]))
-            # Compared SEMANTICALLY. JSON member order and whether `displayPath` is emitted are
-            # not fixed by the specification, and neither is the order of `disclosure.leaves`,
-            # so a byte comparison would assert something the specification does not say. A
-            # number's SOURCE TEXT must survive: `JsonNumber` subclasses `str` and carries it,
-            # which is exactly what the full copy's record literals need (section 6.4).
-            difference = _first_difference(_comparable(envelope), _comparable(expected))
+            # Compared SEMANTICALLY. JSON member order, whether `displayPath` is emitted, the
+            # order of `disclosure.leaves` and the order of a full copy's `salts` are not fixed
+            # by the specification, so asserting any of them would fail a conforming
+            # implementation. A number's SOURCE TEXT must survive: `JsonNumber` subclasses `str`
+            # and carries it, which is exactly what the full copy's record literals need
+            # (section 6.4).
+            difference = _first_difference(
+                _normalized_for_comparison(_comparable(envelope)),
+                _normalized_for_comparison(_comparable(expected)),
+            )
             if difference is None:
                 r.ok(cls)
             else:
@@ -602,15 +606,60 @@ def run_round_trip(vectors, maps, r: Results, config, authorize_empty) -> None:
                 )
 
 
+def _normalized_for_comparison(envelope):
+    """An envelope's comparison form with the aspects the specification does not fix removed.
+
+    Applied to BOTH sides, so what survives the comparison is what the specification says.
+    Three things are relaxed and nothing else: ``disclosure.leaves`` is ordered by leaf index
+    and a full copy's ``salts`` by its entry's structured path, because every leaf carries its
+    own index and every salt entry its own path, so neither array order carries anything; and
+    ``displayPath`` is DROPPED, because it is display only and never hashed (section 5.2) and
+    `schemas/envelope-1.0.json` leaves it out of ``disclosedLeaf.required``, so a conforming
+    producer may omit it and a comparison that noticed would fail conforming work.
+
+    Everything else stays exact - both array lengths, every leaf's segments, index, tag, value
+    carrier, salt and audit path, and every scalar identity field - so a producer that omitted
+    a per-leaf value carrier still fails, which is the defect this class exists for.
+    """
+    if not isinstance(envelope, Mapping):
+        return envelope
+    out = dict(envelope)
+    salts = out.get("salts")
+    if isinstance(salts, list):
+        out["salts"] = sorted(
+            salts,
+            key=lambda entry: json.dumps(
+                entry.get("segments") if isinstance(entry, Mapping) else None, sort_keys=True
+            ),
+        )
+    disclosure = out.get("disclosure")
+    if isinstance(disclosure, Mapping) and isinstance(disclosure.get("leaves"), list):
+        leaves = [
+            {k: value for k, value in leaf.items() if k != "displayPath"}
+            if isinstance(leaf, Mapping)
+            else leaf
+            for leaf in disclosure["leaves"]
+        ]
+        out["disclosure"] = {**disclosure, "leaves": sorted(leaves, key=_leaf_index)}
+    return out
+
+
+def _leaf_index(leaf) -> int:
+    """The leaf index a `_comparable` leaf carries, as the number literal it kept."""
+    if not isinstance(leaf, Mapping):
+        return -1
+    carrier = leaf.get("index")
+    if isinstance(carrier, Mapping):
+        return int(carrier.get("$numberLiteral", -1))
+    return int(carrier) if carrier is not None else -1
+
+
 def _comparable(node):
-    """Members sorted, `disclosure.leaves` sorted by index, numbers kept as source text."""
+    """Members sorted, numbers kept as source text."""
     if isinstance(node, Mapping):
         out = {}
         for key in sorted(node):
-            value = node[key]
-            if key == "leaves" and isinstance(value, list):
-                value = sorted(value, key=lambda leaf: int(leaf.get("index", 0)))
-            out[key] = _comparable(value)
+            out[key] = _comparable(node[key])
         return out
     if isinstance(node, list):
         return [_comparable(item) for item in node]

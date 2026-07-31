@@ -79,6 +79,10 @@ class RecordIdentity:
     ``type_map_version`` travels beside it because the envelope's ``typeMap`` member carries
     both, and an issuance that committed the identifier without presenting the member would
     emit a copy its own verifier rejects for ``outer-identity-mismatch``.
+    Both are therefore REQUIRED TOGETHER at emission and
+    :func:`roax_canon.disclose.full_copy` fails closed without either, because
+    `schemas/envelope-1.0.json` requires ``id`` and ``version`` together whenever ``typeMap``
+    is present; they stay optional here so :data:`RESERVED_V1` needs neither.
     It is NOT a leaf and is not committed: the content ID transitively binds every artifact
     byte, including that version (specification section 12.1).
     """

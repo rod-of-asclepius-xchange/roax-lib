@@ -431,7 +431,8 @@
         "disclosePaths",
         "expectedFullCopyFile",
         "expectedDisclosedCopyFile",
-        "expectSelfVerifies"
+        "expectSelfVerifies",
+        "typeMap"
       ],
       "additionalProperties": false,
       "properties": {
@@ -465,7 +466,7 @@
           "type": "string"
         },
         "typeMap": {
-          "description": "OPTIONAL. When present the record commits roax.typeMap.id as a further reserved leaf and both produced copies carry the outer member, so the round trip also has to produce a copy satisfying the section 4.2 binding and the floor entry that binding adds. Same shape as the envelope member it mirrors (schemas/envelope-1.0.json).",
+          "description": "REQUIRED IN THIS SCHEMA VERSION, where schemas/conformance-corpus-1.0.json leaves it optional. The record commits roax.typeMap.id as a further reserved leaf and both produced copies carry the outer member, so the round trip also has to produce a copy satisfying the section 4.2 binding and the floor entry that binding adds. It is required rather than optional because spec section 11.2 marks that leaf emitted ALWAYS, so an issuance without one is not something the current specification permits, and a class-20 vector without it would ask an implementation to PRODUCE an envelope the specification forbids. Nothing was ever issued under a looser reading of this definition: roundTripVector is new in corpus 1.1.0 and every committed vector carries the member, so requiring it preserves nothing weaker. Same shape as the envelope member it mirrors (schemas/envelope-2.0.json, where it is likewise required).",
           "type": "object",
           "additionalProperties": false,
           "required": [

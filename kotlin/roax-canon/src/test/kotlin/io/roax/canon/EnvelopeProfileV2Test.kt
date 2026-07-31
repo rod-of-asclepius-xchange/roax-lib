@@ -186,6 +186,56 @@ class EnvelopeProfileV2Test {
     }
 
     @Test
+    fun `issuance fails closed when the artifact version is missing, rather than emitting one`() {
+        // `schemas/envelope-1.0.json` requires `id` and `version` together whenever `typeMap` is
+        // present, so the two are refused on the same terms. Coercing an absent version to the
+        // empty string wrote `"version":""`, which fails that schema's
+        // `^[0-9]+\.[0-9]+\.[0-9]+$` - and no verifier here reads the member, so this library
+        // would have accepted its own invalid output. Every class-20 vector supplies a version,
+        // so the corpus cannot reach this.
+        val versionless = identity().copy(typeMapVersion = null)
+        val commitment = commit(
+            record = record(),
+            context = IssuanceContext(versionless, EnvelopeProfile.V2_TYPE_MAP_BOUND),
+            resolver = Corpus.typeMap("org.roax.corpus.synthetic", nfc),
+            saltSource = SaltSource.secureRandom(),
+            nfc = nfc,
+        )
+        val thrown = assertThrows(RoaxException::class.java) {
+            EnvelopeWriter.fullCopy(
+                commitment, Corpus.bytes("corpus/fixtures/records/typed-scalars.json"), nfc,
+            )
+        }
+        assertEquals(Reason.ENVELOPE_SHAPE, thrown.reason)
+    }
+
+    @Test
+    fun `a wrongly typed typeMap member is malformed rather than absent`() {
+        // A KNOWN member present with the WRONG JSON TYPE must never read as ABSENT: absence is
+        // the one shape the binding treats as a pre-binding envelope-1.0 copy, so a reader
+        // answering `null` here would let malformed input switch off the check it gates. Both
+        // reference implementations refuse this shape and no vector carries it, because only the
+        // `salts` instance of the same rule got a fixture.
+        val commitment = commitV2()
+        val json = EnvelopeWriter.fullCopy(commitment, Corpus.bytes("corpus/fixtures/records/typed-scalars.json"), nfc)
+        for (mangled in listOf("[]", "null", "\"sha256:00\"", "{\"id\":7,\"version\":\"1.0.0\"}",
+            "{\"id\":\"$typeMapId\"}")) {
+            val hostile = json.replace(
+                "\"typeMap\":{\"id\":\"$typeMapId\",\"version\":\"$typeMapVersion\"}",
+                "\"typeMap\":$mangled",
+            )
+            assertNotEquals(json, hostile, "the typeMap member was not replaced by $mangled")
+            val result = EnvelopeVerifier.verify(hostile.toByteArray(), configV2())
+            assertTrue(result is VerificationResult.Rejected, "accepted a typeMap of $mangled")
+            assertEquals(
+                Reason.ENVELOPE_SHAPE,
+                (result as VerificationResult.Rejected).reason,
+                "wrong reason for a typeMap of $mangled",
+            )
+        }
+    }
+
+    @Test
     fun `the anchored root is checked when the deployment supplies one`() {
         // Section 11.3: `root` in the envelope is a hint until the anchoring layer confirms it.
         val commitment = commitV2()

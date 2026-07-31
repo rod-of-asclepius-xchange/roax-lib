@@ -609,7 +609,9 @@ A vector asserting only "my verifier accepts my output" is self-consistency, and
 The static class 17 row fails the lax VERIFIER; this class fails the lax PRODUCER.
 Neither closes the gap alone.
 
-**The comparison is SEMANTIC and not byte-for-byte**, because JSON member order, whether `displayPath` is emitted, and the order of the `disclosure.leaves` array are not fixed by the specification, and asserting them would fail a conforming implementation for something this document does not require.
+**The comparison is SEMANTIC and not byte-for-byte**, because JSON member order, whether `displayPath` is emitted, the order of the `disclosure.leaves` array and the order of a full copy's `salts` array are not fixed by the specification, and asserting any of them would fail a conforming implementation for something this document does not require.
+`disclosure.leaves` and `salts` are both compared as SETS keyed by what their entries carry - the leaf index and the structured path - rather than in the order a producer emitted them, and `displayPath` is dropped from the comparison on both sides, because `schemas/envelope-1.0.json` leaves it out of `disclosedLeaf.required` and it is display only in any case (specification section 5.2).
+Nothing else is relaxed, and the half that stays exact is the half that matters: both array LENGTHS, every leaf's segments, index, tag, value carrier, salt and audit path, and every scalar identity field, so a producer that omitted a per-leaf value carrier still fails.
 What must survive intact is every number's SOURCE TEXT: the full copy carries the record's literals, and a runner that rebuilds that envelope through a float-based serializer destroys exactly what the root was computed from (specification sections 6.4 and 7.3).
 
 **Pinned rather than behavioural, unlike class 12.**

@@ -616,7 +616,7 @@
           "type": "string"
         },
         "typeMap": {
-          "description": "OPTIONAL. When present the record commits roax.typeMap.id as a further reserved leaf and both produced copies carry the outer member, so the round trip also has to produce a copy satisfying the section 4.2 binding and the floor entry that binding adds. Same shape as the envelope member it mirrors (schemas/envelope-1.0.json).",
+          "description": "OPTIONAL HERE AND REQUIRED FROM 2.0, exactly as the envelope member it mirrors is optional in schemas/envelope-1.0.json and required in schemas/envelope-2.0.json. When present the record commits roax.typeMap.id as a further reserved leaf and both produced copies carry the outer member, so the round trip also has to produce a copy satisfying the section 4.2 binding and the floor entry that binding adds. This file governs the committed artifact, whose every class-20 vector carries the member, so the optionality here is what a vector may omit and not what one does.",
           "type": "object",
           "additionalProperties": false,
           "required": [

@@ -631,9 +631,10 @@ for (const v of V.envelope ?? []) {
 // The procedure is: build the full copy from the record and the committed salt set, compare it
 // field by field with the expected fixture, verify it; then derive the disclosed copy for
 // `disclosePaths` from the SAME commitment, compare it with the expected fixture, and verify
-// that. Comparison is semantic rather than byte-for-byte - JSON member order and whether
-// `displayPath` is emitted are not fixed by the specification, so a byte comparison would assert
-// something the specification does not say.
+// that. Comparison is semantic rather than byte-for-byte - JSON member order, whether
+// `displayPath` is emitted, the order of `disclosure.leaves` and the order of a full copy's
+// `salts` are not fixed by the specification, so asserting any of them would fail a conforming
+// implementation.
 // A comparison form for the literal-preserving model. Members are sorted, because JSON member
 // order carries no meaning here, and a NUMBER keeps its source text rather than becoming a
 // JavaScript number - which is the whole point of parsing this way (section 6.4).
@@ -648,6 +649,43 @@ function comparable(node) {
   if (node instanceof ref.NumberLiteral) return { $numberLiteral: node.text };
   if (Array.isArray(node)) return node.map(comparable);
   return node;
+}
+
+// An envelope's comparison form with the aspects the specification does not fix removed. Applied
+// to BOTH sides, so what survives the comparison is what the specification actually says.
+//
+// Three things are relaxed and nothing else. `disclosure.leaves` is ordered by leaf index and a
+// full copy's `salts` by its entry's structured path, because every leaf carries its own index
+// and every salt entry its own path, so neither array order carries anything. `displayPath` is
+// DROPPED: it is display only and never hashed (section 5.2), and `schemas/envelope-1.0.json`
+// leaves it out of `disclosedLeaf.required`, so a conforming producer may omit it and a
+// comparison that noticed would fail conforming work.
+//
+// Everything else stays exact - both array LENGTHS, every leaf's segments, index, tag, value
+// carrier, salt and audit path, and every scalar identity field - so a producer that omitted a
+// per-leaf value carrier still fails, which is the defect this class exists for.
+function normalizedForComparison(envelope) {
+  const isObject = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
+  if (!isObject(envelope)) return envelope;
+  const out = { ...envelope };
+  const byKey = (key) => (a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0);
+  if (Array.isArray(out.salts)) {
+    out.salts = [...out.salts]
+      .sort(byKey((entry) => JSON.stringify(isObject(entry) ? entry.segments ?? null : null)));
+  }
+  if (isObject(out.disclosure) && Array.isArray(out.disclosure.leaves)) {
+    const leaves = out.disclosure.leaves.map((leaf) => {
+      if (!isObject(leaf)) return leaf;
+      const copy = { ...leaf };
+      delete copy.displayPath;
+      return copy;
+    });
+    // Left-padded so a string sort orders the digits the number literal kept.
+    leaves.sort(byKey((leaf) =>
+      String(isObject(leaf) && isObject(leaf.index) ? leaf.index.$numberLiteral : "").padStart(20, "0")));
+    out.disclosure = { ...out.disclosure, leaves };
+  }
+  return out;
 }
 
 // The first place two comparable forms differ, as `{ at, got, want }`, or null when they agree.
@@ -769,12 +807,15 @@ for (const v of V.roundTrip ?? []) {
   ]) {
     const produced = parseRecord(producedText);
     const expected = parseRecord(fs.readFileSync(path.join(REPO_ROOT, v[field]), "utf8"));
-    // Semantic and not byte-for-byte: JSON member order and whether `displayPath` is emitted are
-    // not fixed by the specification, so a byte comparison would assert something it does not
-    // say. `comparable` keeps a number as its SOURCE TEXT, which is the one thing that must
-    // survive the comparison intact. The assertion is on the FIRST DIFFERENCE rather than on the
-    // two documents, because a whole envelope printed twice is not a readable failure.
-    check(v, field, firstDifference(comparable(produced), comparable(expected)), null);
+    // Semantic and not byte-for-byte: `normalizedForComparison` removes the four aspects the
+    // specification does not fix, on both sides. `comparable` keeps a number as its SOURCE TEXT,
+    // which is the one thing that must survive the comparison intact. The assertion is on the
+    // FIRST DIFFERENCE rather than on the two documents, because a whole envelope printed twice
+    // is not a readable failure.
+    check(v, field, firstDifference(
+      normalizedForComparison(comparable(produced)),
+      normalizedForComparison(comparable(expected)),
+    ), null);
 
     // And the half no static fixture can assert: this implementation's own verifier over this
     // implementation's own output, on BOTH copy kinds. A producer that omitted a per-leaf value

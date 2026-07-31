@@ -191,7 +191,7 @@ object EnvelopeVerifier {
             recordId = str(env, "recordId"),
             issuerId = str(issuer, "id"),
             issuerKeyId = (issuer["keyId"] as? JsonString)?.value,
-            typeMapId = ((env["typeMap"] as? JsonObject)?.get("id") as? JsonString)?.value,
+            typeMapId = outerTypeMapId(env),
         )
 
         val committed = if (hasRecord) {
@@ -540,6 +540,40 @@ object EnvelopeVerifier {
     }
 
     // --- small readers -------------------------------------------------------------------------
+
+    /**
+     * The `typeMap.id` an envelope PRESENTS, or `null` when the member is genuinely absent.
+     *
+     * **A KNOWN member present with the WRONG JSON TYPE must never read as ABSENT.** Absence is
+     * the one shape the type-map binding treats as an envelope-1.0 copy issued before the section
+     * 4.2 binding existed, so a reader that answered `null` for `"typeMap": []` would let
+     * malformed input switch off the check it gates - and a guard that turns itself off on
+     * malformed input is worse than no guard. Both reference implementations refuse this shape,
+     * and `salt-leak-disclosed-copy-with-wrong-typed-salts` is the committed vector for its
+     * sibling on `salts`.
+     *
+     * `id` and `version` are required together whenever the member is present
+     * (`schemas/envelope-1.0.json`), so either missing or wrongly typed is the same rejection.
+     */
+    private fun outerTypeMapId(env: JsonObject): String? {
+        val member = env["typeMap"] ?: return null
+        val descriptor = member as? JsonObject ?: fail(
+            Reason.ENVELOPE_SHAPE,
+            "'typeMap' is present and is not an object; a known member carrying the wrong JSON " +
+                "type MUST NOT read as absent",
+        )
+        val id = descriptor["id"] as? JsonString ?: fail(
+            Reason.ENVELOPE_SHAPE,
+            "'typeMap.id' is required whenever 'typeMap' is present, and MUST be a string",
+        )
+        if (descriptor["version"] !is JsonString) {
+            fail(
+                Reason.ENVELOPE_SHAPE,
+                "'typeMap.version' is required whenever 'typeMap' is present, and MUST be a string",
+            )
+        }
+        return id.value
+    }
 
     internal fun readSegments(v: JsonValue?): List<Segment> {
         val array = v as? JsonArray ?: fail(Reason.ENVELOPE_SHAPE, "'segments' is not an array")

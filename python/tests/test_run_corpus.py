@@ -335,5 +335,90 @@ class RunnerStatusTests(unittest.TestCase):
         self.assertFalse(results.not_run)
 
 
+class RoundTripComparisonTests(unittest.TestCase):
+    """What class 20's comparison may and may not assert.
+
+    A comparator that failed a conforming implementation would be the corpus being wrong in the
+    most damaging direction, so the three aspects the specification leaves free are pinned as
+    ACCEPTED here, and everything else is pinned as still refused.
+    """
+
+    def compare(self, produced, expected):
+        return run_corpus._first_difference(
+            run_corpus._normalized_for_comparison(run_corpus._comparable(produced)),
+            run_corpus._normalized_for_comparison(run_corpus._comparable(expected)),
+        )
+
+    def leaf(self, index, key, **extra):
+        return {
+            "segments": [{"key": key}],
+            "index": index,
+            "tag": 2,
+            "value": key,
+            "salt": f"{index:032x}",
+            "auditPath": [],
+            **extra,
+        }
+
+    def disclosed(self, leaves):
+        return {"canon": "ROAX-CANON/1", "disclosure": {"mode": "selective", "leaves": leaves}}
+
+    def full(self, salts):
+        return {"canon": "ROAX-CANON/1", "record": {"a": 1}, "salts": salts}
+
+    def test_display_path_present_on_one_side_only_is_not_a_difference(self):
+        # `schemas/envelope-1.0.json` leaves `displayPath` out of `disclosedLeaf.required`, and
+        # section 5.2 makes it display only, so a producer may omit it.
+        produced = self.disclosed([self.leaf(0, "a")])
+        expected = self.disclosed([self.leaf(0, "a", displayPath="a")])
+        self.assertIsNone(self.compare(produced, expected))
+        self.assertIsNone(self.compare(expected, produced))
+
+    def test_leaf_and_salt_array_order_is_not_a_difference(self):
+        produced = self.disclosed([self.leaf(1, "b"), self.leaf(0, "a")])
+        expected = self.disclosed([self.leaf(0, "a"), self.leaf(1, "b")])
+        self.assertIsNone(self.compare(produced, expected))
+        entries = [
+            {"segments": [{"key": "a"}], "salt": "00" * 16},
+            {"segments": [{"key": "b"}, {"index": 3}], "salt": "11" * 16},
+        ]
+        self.assertIsNone(self.compare(self.full(entries[::-1]), self.full(entries)))
+
+    def test_member_order_is_not_a_difference(self):
+        produced = {"disclosure": {"leaves": [], "mode": "selective"}, "canon": "ROAX-CANON/1"}
+        expected = {"canon": "ROAX-CANON/1", "disclosure": {"mode": "selective", "leaves": []}}
+        self.assertIsNone(self.compare(produced, expected))
+
+    def test_everything_the_specification_does_fix_is_still_asserted(self):
+        base = self.leaf(0, "a")
+        for changed in (
+            {**base, "value": None},
+            {k: v for k, v in base.items() if k != "value"},
+            {**base, "salt": "ff" * 16},
+            {**base, "tag": 3},
+            {**base, "index": 1},
+            {**base, "segments": [{"key": "b"}]},
+            {**base, "auditPath": ["ab" * 32]},
+        ):
+            with self.subTest(changed=sorted(changed)):
+                difference = self.compare(self.disclosed([changed]), self.disclosed([base]))
+                self.assertIsNotNone(difference)
+        # A dropped leaf and a dropped salt are both length differences, and both still fail.
+        self.assertIsNotNone(self.compare(self.disclosed([]), self.disclosed([base])))
+        self.assertIsNotNone(
+            self.compare(self.full([]), self.full([{"segments": [], "salt": "00" * 16}]))
+        )
+
+    def test_a_number_keeps_its_source_text(self):
+        # `0.010` is not `0.01`: trailing zeros in a decimal are significant, and the full copy
+        # carries the record's own literals (specification sections 6.2 and 7.3).
+        self.assertIsNotNone(
+            self.compare(
+                {"record": {"a": run_corpus.JsonNumber("0.01")}},
+                {"record": {"a": run_corpus.JsonNumber("0.010")}},
+            )
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

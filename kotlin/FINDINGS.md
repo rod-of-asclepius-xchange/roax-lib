@@ -147,6 +147,17 @@ Nothing ran it against its own output until class 20 asked an implementation to 
 `schemas/envelope-1.0.json` requires `id` and `version` together whenever the member is present, so this module emitted a schema-invalid envelope under `EnvelopeProfile.V2_TYPE_MAP_BOUND`.
 Nothing caught it because nothing compared a produced envelope against a committed one.
 
+**The first fix for that was itself schema-invalid, and by the same mechanism.**
+It emitted both members while coercing an absent `typeMapVersion` to the empty string, and `""` fails the schema's `^[0-9]+\.[0-9]+\.[0-9]+$` exactly as an absent member fails `required`.
+`EnvelopeVerifier` reads only `typeMap.id` and validates no version at all, so this module would again have accepted its own invalid output, and every class-20 vector supplies a version so the corpus still could not see it.
+`Reserved.leavesFor` already refused an absent `typeMapId` under the same profile, so the asymmetry was inside one module: the writer now refuses an absent version on the same terms.
+
+**And the mirror of it on the reading side: a wrongly typed `typeMap` member read as ABSENT.**
+`(env["typeMap"] as? JsonObject)?.get("id") as? JsonString` answers `null` for `"typeMap": []` just as it does for a member that is not there, and absence is the one shape the binding treats as a pre-binding envelope-1.0 copy.
+That is the same defect as `"salts": {}` beside a `disclosure`, which the corpus does carry as a vector: **a guard that turns itself off on malformed input is worse than no guard.**
+It was not exploitable here - with the leaf disclosed the binding still fails on the null outer value - but both reference implementations refuse this shape and this module accepted it, and only the `salts` instance of the rule got a fixture.
+A present `typeMap` is now rejected as `envelope-shape` unless it is an object carrying a string `id` and a string `version`.
+
 **A third defect came from classes 14 and 18 rather than 20**, and is the same shape as the two above.
 The `roax.typeMap.id` binding fired only when the verifier's own `EnvelopeProfile` selected it, so a V1-configured verifier accepted a copy that withheld the leaf while the outer member named one.
 It now fires whenever EITHER side names a type map; `corpus/README.md` states the rule and the residual case.

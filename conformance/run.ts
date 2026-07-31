@@ -888,18 +888,18 @@ function runRoundTrip(corpus: Corpus, report: Report): void {
         includeDisplayPath: true,
       });
 
-      // Compared SEMANTICALLY: JSON member order and whether `displayPath` is emitted are not
-      // fixed by the specification, so a byte comparison would assert something it does not say.
+      // Compared SEMANTICALLY: JSON member order, whether `displayPath` is emitted, the order of
+      // `disclosure.leaves` and the order of a full copy's `salts` are not fixed by the
+      // specification, so asserting any of them would fail a conforming implementation.
       // A number keeps its SOURCE TEXT through `comparableJson`, which is the one thing that must
       // survive - the full copy carries the record's literals (specification sections 6.4, 7.3).
       for (const [produced, expectedFile] of [
         [full.document, v.expectedFullCopyFile],
         [disclosed, v.expectedDisclosedCopyFile],
       ] as const) {
-        const producedForComparison = sortDisclosedLeavesByIndex(produced);
         const difference = firstDifference(
-          comparableJson(producedForComparison),
-          comparableJson(sortDisclosedLeavesByIndex(readFixture(expectedFile))),
+          normalizedForComparison(comparableJson(produced)),
+          normalizedForComparison(comparableJson(readFixture(expectedFile))),
         );
         if (difference === undefined) {
           report.pass(v.class);
@@ -938,8 +938,6 @@ function firstDifference(got: unknown, want: unknown, at = ''): string | undefin
   if (got === want) {
     return undefined;
   }
-  const isObject = (x: unknown): x is Record<string, unknown> =>
-    x !== null && typeof x === 'object' && !Array.isArray(x);
   if (Array.isArray(got) && Array.isArray(want)) {
     if (got.length !== want.length) {
       return `${at || '/'}: ${got.length} entries, expected ${want.length}`;
@@ -952,7 +950,7 @@ function firstDifference(got: unknown, want: unknown, at = ''): string | undefin
     }
     return undefined;
   }
-  if (isObject(got) && isObject(want)) {
+  if (isPlainObject(got) && isPlainObject(want)) {
     for (const key of new Set([...Object.keys(got), ...Object.keys(want)])) {
       if (!(key in got)) {
         return `${at}/${key}: ABSENT, expected ${JSON.stringify(want[key])}`;
@@ -971,49 +969,62 @@ function firstDifference(got: unknown, want: unknown, at = ''): string | undefin
 }
 
 /**
- * A disclosed copy with its `disclosure.leaves` array sorted by leaf index.
+ * An envelope's comparison form with the aspects the specification does not fix removed. Applied
+ * to BOTH sides, so what survives is what the specification actually says.
  *
- * The specification fixes no order for that array - every leaf carries its own index, so the
- * order carries nothing - and class 20 COMPARES a produced copy against a committed one. Without
- * this a conforming producer that emitted the same leaves in another order would fail, which is
- * asserting something the specification does not say. Applied to both sides.
+ * Three things are relaxed, and nothing else. `disclosure.leaves` is ordered by leaf index and a
+ * full copy's `salts` by its entry's structured path, because every leaf carries its own index and
+ * every salt entry its own path, so neither array order carries anything. `displayPath` is
+ * DROPPED: it is display only and never hashed (specification section 5.2), and
+ * `schemas/envelope-1.0.json` leaves it out of `disclosedLeaf.required`, so a conforming producer
+ * may omit it and a comparison that noticed would fail conforming work.
+ *
+ * Everything else stays exact, which is the half that matters: both array LENGTHS, every leaf's
+ * segments, index, tag, value carrier, salt and audit path, and every scalar identity field. A
+ * producer that omitted a per-leaf value carrier - the defect this class exists for - still fails.
  */
-function sortDisclosedLeavesByIndex(document: unknown): unknown {
-  const doc = document as { kind?: string; members?: [string, unknown][] };
-  if (doc?.kind !== 'object') {
-    return document;
+function normalizedForComparison(envelope: unknown): unknown {
+  if (!isPlainObject(envelope)) {
+    return envelope;
   }
-  return {
-    kind: 'object',
-    members: doc.members?.map(([key, value]) => {
-      if (key !== 'disclosure') {
-        return [key, value] as [string, unknown];
+  const out: Record<string, unknown> = { ...envelope };
+  const salts = out['salts'];
+  if (Array.isArray(salts)) {
+    out['salts'] = [...salts].sort(bySortKey((entry) =>
+      JSON.stringify(isPlainObject(entry) ? (entry['segments'] ?? null) : null),
+    ));
+  }
+  const disclosure = out['disclosure'];
+  if (isPlainObject(disclosure) && Array.isArray(disclosure['leaves'])) {
+    const leaves = disclosure['leaves'].map((leaf) => {
+      if (!isPlainObject(leaf)) {
+        return leaf;
       }
-      const disclosure = value as { kind?: string; members?: [string, unknown][] };
-      return [
-        key,
-        {
-          kind: 'object',
-          members: disclosure.members?.map(([innerKey, innerValue]) => {
-            if (innerKey !== 'leaves') {
-              return [innerKey, innerValue] as [string, unknown];
-            }
-            const leaves = innerValue as { kind?: string; items?: unknown[] };
-            const indexOf = (leaf: unknown): number => {
-              const members = (leaf as { members?: [string, unknown][] }).members ?? [];
-              const entry = members.find(([k]) => k === 'index')?.[1] as
-                | { literal?: string }
-                | undefined;
-              return Number(entry?.literal ?? '0');
-            };
-            return [
-              innerKey,
-              { kind: 'array', items: [...(leaves.items ?? [])].sort((a, b) => indexOf(a) - indexOf(b)) },
-            ] as [string, unknown];
-          }),
-        },
-      ] as [string, unknown];
-    }),
+      const copy: Record<string, unknown> = { ...leaf };
+      delete copy['displayPath'];
+      return copy;
+    });
+    leaves.sort(bySortKey((leaf) => (isPlainObject(leaf) ? numberLiteralOf(leaf['index']) : '')));
+    out['disclosure'] = { ...disclosure, leaves };
+  }
+  return out;
+}
+
+function isPlainObject(x: unknown): x is Record<string, unknown> {
+  return x !== null && typeof x === 'object' && !Array.isArray(x);
+}
+
+/** The digits `comparableJson` kept for a number, left-padded so a string sort orders them. */
+function numberLiteralOf(node: unknown): string {
+  const literal = isPlainObject(node) ? node['$numberLiteral'] : undefined;
+  return typeof literal === 'string' ? literal.padStart(20, '0') : '';
+}
+
+function bySortKey(key: (x: unknown) => string): (a: unknown, b: unknown) => number {
+  return (a, b) => {
+    const ka = key(a);
+    const kb = key(b);
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
   };
 }
 

@@ -1114,17 +1114,35 @@ fn round_trip_context(vector: &Value) -> CommitmentContext {
     }
 }
 
-/// A disclosed copy with `disclosure.leaves` sorted by leaf index.
+/// An envelope's comparison form with the aspects the specification does not fix removed. Applied
+/// to BOTH sides, so what survives the comparison is what the specification actually says.
 ///
-/// The specification fixes no order for that array - every leaf carries its own index - and class
-/// 20 COMPARES a produced copy against a committed one, so comparing in whatever order the
-/// producer emitted would fail a conforming implementation. Applied to both sides.
-fn with_disclosure_leaves_sorted(mut value: Value) -> Value {
+/// Three things are relaxed and nothing else. `disclosure.leaves` is ordered by leaf index and a
+/// full copy's `salts` by its entry's structured path, because every leaf carries its own index
+/// and every salt entry its own path, so neither array order carries anything. `displayPath` is
+/// DROPPED: it is display only and never hashed (specification section 5.2), and
+/// `schemas/envelope-1.0.json` leaves it out of `disclosedLeaf.required`, so a conforming producer
+/// may omit it and a comparison that noticed would fail conforming work.
+///
+/// Everything else stays exact - both array LENGTHS, every leaf's segments, index, tag, value
+/// carrier, salt and audit path, and every scalar identity field - so a producer that omitted a
+/// per-leaf value carrier still fails, which is the defect this class exists for.
+fn normalized_for_comparison(mut value: Value) -> Value {
+    if let Some(salts) = value.get_mut("salts").and_then(Value::as_array_mut) {
+        salts.sort_by_key(|entry| {
+            serde_json::to_string(entry.get("segments").unwrap_or(&Value::Null)).unwrap_or_default()
+        });
+    }
     if let Some(leaves) = value
         .get_mut("disclosure")
         .and_then(|disclosure| disclosure.get_mut("leaves"))
         .and_then(Value::as_array_mut)
     {
+        for leaf in leaves.iter_mut() {
+            if let Some(members) = leaf.as_object_mut() {
+                members.remove("displayPath");
+            }
+        }
         leaves.sort_by_key(|leaf| {
             leaf.get("index")
                 .and_then(Value::as_str)
@@ -1138,11 +1156,11 @@ fn with_disclosure_leaves_sorted(mut value: Value) -> Value {
 
 /// A comparison form for a parsed envelope: members sorted, numbers kept as SOURCE TEXT.
 ///
-/// Semantic and not byte-for-byte, because JSON member order and whether `displayPath` is emitted
-/// are not fixed by the specification and a byte comparison would assert something it does not
-/// say. A number's source text is the one thing that must survive: the full copy carries the
-/// record's literals and re-serializing them through a float destroys exactly what the root was
-/// computed from (specification sections 6.4 and 7.3).
+/// Semantic and not byte-for-byte, because JSON member order is not fixed by the specification;
+/// [`normalized_for_comparison`] removes the rest of what it does not fix. A number's source text
+/// is the one thing that must survive: the full copy carries the record's literals and
+/// re-serializing them through a float destroys exactly what the root was computed from
+/// (specification sections 6.4 and 7.3).
 fn comparable_json(value: &JsonValue) -> Value {
     match value {
         JsonValue::Object(members) => {
@@ -1799,8 +1817,8 @@ fn committed_conformance_corpus() {
                 class,
                 name,
                 field_name,
-                with_disclosure_leaves_sorted(comparable_json(&produced)),
-                with_disclosure_leaves_sorted(comparable_json(&expected)),
+                normalized_for_comparison(comparable_json(&produced)),
+                normalized_for_comparison(comparable_json(&expected)),
             );
             // And the half no static fixture can assert: this crate's verifier over this crate's
             // own output. A producer that omitted a per-leaf value carrier fails HERE even though

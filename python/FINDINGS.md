@@ -391,3 +391,10 @@ The limit is now named on the three checks that genuinely need an artifact, and 
 With V2 issuance permitted, this package issued a full copy committing 14 leaves whose own verifier rebuilt 13 and rejected it for `leaf-count-mismatch`, because `_verify_full_copy` took the reserved leaf set from `cfg.reserved_set` rather than from what the envelope carried.
 A full copy cannot hide that difference the way a disclosed copy can - stripping the member drops the committed leaf, which changes both `leafCount` and the root - so the envelope is sufficient evidence on that path and is not on the disclosed one.
 This is exactly the defect class 20 exists for: an implementation issuing an envelope its own verifier refuses.
+
+**And two more of the same shape, found by reading the emitter rather than by any vector.**
+`_envelope_head` keyed the outer `typeMap` member on `identity.type_map_id` and emitted `version` only when the identity happened to carry one.
+Both halves produce an envelope this package's own verifier refuses, and neither needs a caller mistake.
+A `RecordIdentity` naming an artifact without its version emitted `{"id": ...}` alone, which `verify_envelope` rejects with `envelope-shape` because `schemas/envelope-1.0.json` requires the two members together; and issuing that same identity under the DEFAULT `RESERVED_V1` presented a member the root commits no leaf for, which the disclosed copy then failed at `outer-identity-mismatch` while the full copy rebuilt one leaf too many.
+The member is now keyed on `built.reserved_set`, so it is PRESENTED exactly when it is COMMITTED, and an issuance missing the artifact version fails closed rather than emitting a descriptor nothing accepts.
+Neither is reachable from the committed corpus, because both class-20 vectors supply a version and issue under the envelope 2.0 reserved set.

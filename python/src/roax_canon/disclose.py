@@ -72,15 +72,27 @@ def _envelope_head(built: BuiltRecord) -> dict[str, Any]:
     }
     if identity.issuer_key_id is not None:
         head["issuer"]["keyId"] = identity.issuer_key_id
-    if identity.type_map_id is not None:
-        # PRESENTED because it is COMMITTED. A copy committing `roax.typeMap.id` and carrying
-        # no outer `typeMap` member is exactly what a verifier binding on either side rejects
-        # for `outer-identity-mismatch`, so omitting it here would make this package issue
-        # envelopes its own verifier refuses - the shape conformance corpus class 20 exists to
-        # make impossible to ship.
-        head["typeMap"] = {"id": identity.type_map_id}
-        if identity.type_map_version is not None:
-            head["typeMap"]["version"] = identity.type_map_version
+    if built.reserved_set == RESERVED_V2:
+        # PRESENTED because it is COMMITTED, and keyed on the reserved leaf set of THIS
+        # commitment rather than on the identity. A copy committing `roax.typeMap.id` and
+        # carrying no outer `typeMap` member is exactly what a verifier binding on either side
+        # rejects for `outer-identity-mismatch`; a copy carrying the member while its root
+        # commits no such leaf is the same defect mirrored, because
+        # :func:`~roax_canon.verify.verify_envelope` takes the reserved set of a full copy from
+        # that member and would rebuild one leaf more than the commitment has.
+        #
+        # Both members or neither: `schemas/envelope-1.0.json` requires `id` and `version`
+        # together whenever `typeMap` is present, and this package's own verifier rejects the
+        # identifier alone with ENVELOPE_SHAPE, so an issuance missing the artifact's version
+        # fails CLOSED here rather than emitting an envelope nothing can accept.
+        if identity.type_map_id is None or identity.type_map_version is None:
+            raise RoaxError(
+                ErrorCode.ENVELOPE_SHAPE,
+                "an issuance committing roax.typeMap.id must supply both "
+                "RecordIdentity.type_map_id and RecordIdentity.type_map_version, because the "
+                "envelope's `typeMap` member carries them together",
+            )
+        head["typeMap"] = {"id": identity.type_map_id, "version": identity.type_map_version}
     # `recordType` is placed before `root` above only for readability; the envelope is
     # JSON and member order carries no meaning, because nothing here is hashed over the
     # serialized envelope (specification section 13.2).

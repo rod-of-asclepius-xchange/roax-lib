@@ -606,9 +606,9 @@ class ConformanceCorpusTest {
      * [EnvelopeWriter] - and then puts their output back through [EnvelopeVerifier].
      *
      * The produced envelope is compared with the committed one SEMANTICALLY. JSON member order,
-     * `displayPath` and the order of `disclosure.leaves` are not fixed by the specification, so a
-     * byte comparison would assert something it does not say; a number's SOURCE TEXT is what must
-     * survive, and [JsonNumber] carries it.
+     * `displayPath`, the order of `disclosure.leaves` and the order of a full copy's `salts` are
+     * not fixed by the specification, so asserting any of them would fail a conforming
+     * implementation; a number's SOURCE TEXT is what must survive, and [JsonNumber] carries it.
      */
     @Test
     fun `round trip vectors`() {
@@ -658,8 +658,8 @@ class ConformanceCorpusTest {
             for ((field, text) in produced) {
                 val expected = JsonReader.parse(Corpus.bytes(Corpus.str(v, field)))
                 assertEquals(
-                    comparable(expected),
-                    comparable(JsonReader.parse(text)),
+                    normalizedForComparison(comparable(expected)),
+                    normalizedForComparison(comparable(JsonReader.parse(text))),
                     "$name $field",
                 )
                 // And the half no static fixture can assert: this library's verifier over this
@@ -679,30 +679,69 @@ class ConformanceCorpusTest {
     }
 
     /**
-     * A comparable rendering: object members sorted, `disclosure.leaves` sorted by leaf index,
-     * and a number kept as its SOURCE TEXT rather than parsed.
+     * A comparable rendering: object members sorted, and a number kept as its SOURCE TEXT rather
+     * than parsed. [normalizedForComparison] removes what the specification does not fix.
      */
     private fun comparable(value: JsonValue): Any? = when (value) {
-        is JsonObject -> value.members
-            .sortedBy { it.key }
-            .associate { member ->
-                val entry = member.value
-                member.key to
-                    if (member.key == "leaves" && entry is JsonArray) {
-                        // Sorted by leaf index: the array order is not fixed by the specification,
-                        // so comparing it would assert something the specification does not say.
-                        entry.elements
-                            .sortedBy { leaf -> ((leaf as JsonObject)["index"] as JsonNumber).literal.toInt() }
-                            .map { comparable(it) }
-                    } else {
-                        comparable(entry)
-                    }
-            }
+        is JsonObject -> value.members.sortedBy { it.key }.associate { it.key to comparable(it.value) }
         is JsonArray -> value.elements.map { comparable(it) }
         is JsonNumber -> "\$numberLiteral:" + value.literal
         is JsonString -> value.value
         is JsonBoolean -> value.value
         JsonNull -> null
+    }
+
+    /**
+     * An envelope's comparison form with the aspects the specification does not fix removed.
+     * Applied to BOTH sides, so what survives the comparison is what the specification says.
+     *
+     * Three things are relaxed and nothing else. `disclosure.leaves` is ordered by leaf index and
+     * a full copy's `salts` by its entry's structured path, because every leaf carries its own
+     * index and every salt entry its own path, so neither array order carries anything.
+     * `displayPath` is DROPPED: it is display only and never hashed (specification section 5.2),
+     * and `schemas/envelope-1.0.json` leaves it out of `disclosedLeaf.required`, so a conforming
+     * producer may omit it and a comparison that noticed would fail conforming work.
+     *
+     * Everything else stays exact - both array LENGTHS, every leaf's segments, index, tag, value
+     * carrier, salt and audit path, and every scalar identity field - so a producer that omitted a
+     * per-leaf value carrier still fails, which is the defect this class exists for.
+     */
+    /**
+     * A rendering that depends on a value's CONTENT and never on the order it was built in.
+     *
+     * A [Map]'s own `toString` renders insertion order, so keying a sort on it would order two
+     * equal salt entries differently on the two sides the moment a producer emitted an entry's
+     * members in another order - which is exactly the unspecified aspect being normalized away.
+     */
+    private fun canonicalKey(value: Any?): String = when (value) {
+        is Map<*, *> -> value.entries
+            .map { "${it.key}=${canonicalKey(it.value)}" }
+            .sorted()
+            .joinToString(",", "{", "}")
+
+        is List<*> -> value.joinToString(",", "[", "]") { canonicalKey(it) }
+        else -> value.toString()
+    }
+
+    private fun normalizedForComparison(envelope: Any?): Any? {
+        if (envelope !is Map<*, *>) return envelope
+        val out = LinkedHashMap<Any?, Any?>(envelope)
+        (out["salts"] as? List<*>)?.let { salts ->
+            out["salts"] = salts.sortedBy { entry -> canonicalKey((entry as? Map<*, *>)?.get("segments")) }
+        }
+        (out["disclosure"] as? Map<*, *>)?.let { disclosure ->
+            val leaves = disclosure["leaves"] as? List<*> ?: return@let
+            val stripped = leaves.map { leaf ->
+                if (leaf is Map<*, *>) leaf.filterKeys { it != "displayPath" } else leaf
+            }
+            out["disclosure"] = LinkedHashMap<Any?, Any?>(disclosure).apply {
+                this["leaves"] = stripped.sortedBy { leaf ->
+                    ((leaf as? Map<*, *>)?.get("index") as? String)
+                        ?.removePrefix("\$numberLiteral:")?.toLongOrNull() ?: Long.MAX_VALUE
+                }
+            }
+        }
+        return out
     }
 
     companion object {
