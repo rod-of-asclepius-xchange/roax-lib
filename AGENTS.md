@@ -76,7 +76,7 @@ Kotlin's runner probes BOTH names under `ROAX_REFERENCE_RECORDS`, so one directo
 `swift/` is a SwiftPM package: `Sources/ROAXCanon` is the library, `Sources/ROAXCanonCorpus` is the corpus runner, `Sources/roax-conformance` is its command-line front end and `Tests/ROAXCanonTests` is the suite.
 See [`swift/README.md`](swift/README.md) and [`swift/FINDINGS.md`](swift/FINDINGS.md).
 Build and gate it with `swift build --package-path swift`, `swift test --package-path swift` and `swift run --package-path swift roax-conformance`.
-It passes 488 of 488 vectors with a reference checkout and reports exactly the four class-10 vectors NOT RUN without one, exiting 2 rather than 0 so a bare run does not read as a pass.
+It passes 501 of 501 vectors with a reference checkout and reports exactly the four class-10 vectors NOT RUN without one, exiting 2 rather than 0 so a bare run does not read as a pass.
 
 **The runner is a LIBRARY target rather than only an executable, and that is deliberate**: it makes `swift test` a real gate over the committed corpus instead of a second suite that could pass while the corpus failed.
 
@@ -99,7 +99,7 @@ Keep those two codes apart when you touch either.
 
 `kotlin/` is a two-module Gradle build: `roax-canon` is the library and its tests, and `roax-canon-android` packages the same `src/main` as an AAR without a second copy of the code.
 See [`kotlin/README.md`](kotlin/README.md), and [`kotlin/FINDINGS.md`](kotlin/FINDINGS.md) for what the build found.
-Run it with `gradle -p kotlin :roax-canon:test`, which runs the corpus and every other test; it passes 488 of 488 vectors with zero NOT RUN once `ROAX_REFERENCE_RECORDS` is set.
+Run it with `gradle -p kotlin :roax-canon:test`, which runs the corpus and every other test; it passes 501 of 501 vectors with zero NOT RUN once `ROAX_REFERENCE_RECORDS` is set.
 
 **Three things about this module are easy to get wrong.**
 
@@ -110,12 +110,82 @@ Run it with `gradle -p kotlin :roax-canon:test`, which runs the corpus and every
 - **The Unicode version is a property of the runtime and cannot be pinned from inside the library.**
   Section 6.1 pins 15.1; JDK 17 ships Unicode 13.0 and JDK 25 ships 16.0, and no installed JDK has 15.1.
   `Nfc` is therefore injectable and declares its version, and the corpus runner prints the comparison every run.
-  Measured: all 488 vectors pass under both JDKs, and the digest over the NFC forms of every string in the corpus is byte-identical on both, pinned as a live guard by `PlatformNfcTablesTest`; `kotlin/FINDINGS.md` section 2 owns the counts.
+  Measured: all 501 vectors pass under both JDKs, and the digest over the NFC forms of every string in the corpus is byte-identical on both, pinned as a live guard by `PlatformNfcTablesTest`; `kotlin/FINDINGS.md` section 2 owns the counts.
+  **That digest is over the corpus's strings, so it moves whenever the corpus grows.**
+  Re-derive it by running the test on BOTH JDKs and re-pinning only if they agree - re-pinning from one runtime silently retires the cross-version comparison, which is the whole point of the constant.
   Re-run the other one with `-Proax.testJdk=25`.
 - **The Android module is optional by design and is gated on an SDK actually being present.**
   This repository has no CI, so a contributor touching only canonicalization must not need an Android SDK; `-Proax.skipAndroid=true` forces the JVM-only configuration.
   The Android claim is checked WITHOUT an SDK by `AndroidApiSurfaceTest`, which reads the compiled constant pools and asserts every referenced JDK type exists on Android API 21+.
   That is what keeps `java.util.Base64` (API 26+) and `java.util.HexFormat` (absent on Android) out, which is why the library hand-rolls both.
+
+## The corpus gates the PRODUCING side too, since class 20
+
+**Every class except 20 runs an implementation's VERIFIER against bytes `corpus/tools/build_corpus.py` wrote.**
+Nothing asked a library to PRODUCE an envelope, so a library could issue a disclosed copy its own verifier refused and pass every vector - and one did, for `disclosed-leaf-named-without-value`, which is itself a committed vector.
+Class 20 issues from a record and a committed salt set, discloses a named path set from the same commitment, compares BOTH produced envelopes against committed copies, and verifies them through the producing implementation's own verifier.
+`docs/conformance-corpus.md` class 20 owns the definition and `corpus/README.md` owns the measurement.
+
+**Three things about it are easy to get wrong.**
+
+- **The comparison is SEMANTIC, never byte-for-byte.**
+  JSON member order, whether `displayPath` is emitted, and the order of the `disclosure.leaves` array are not fixed by the specification, so asserting them fails a conforming implementation for something nothing requires.
+  What must survive is every number's SOURCE TEXT: implementation B's own class-20 runner failed its own full copy with `root-mismatch` the first time, because it rebuilt the envelope with `JSON.parse` and turned `0.010` into `0.01`.
+  Section 7.3 says the section 6.4 parser requirement applies to the ENVELOPE and not only to a bare record, and that is exactly this.
+- **Every class-20 vector commits `roax.typeMap.id`, and that is forced rather than chosen.**
+  Section 11.2 marks the leaf emitted ALWAYS, so an issuance without one is not something the current specification permits; `schemas/envelope-1.0.json` keeps the member optional for envelopes ALREADY issued under it, which is what the other 65 envelope fixtures are.
+  A vector without one would ask an implementation to produce an envelope the specification forbids.
+- **EMPTY_ARRAY and EMPTY_OBJECT are deliberately absent from the round-trip record.**
+  NULL already covers the no-value carrier, and adding an empty container would raise the "exactly 2 class-5 vectors" figure that `python/FINDINGS.md` item 1, `swift/FINDINGS.md` finding 8 and `docs/typescript-implementation-findings.md` all state.
+
+**A vector GROUP a runner does not read is worse than a class with no vectors, and every runner now fails on one.**
+An unknown group reads as zero vectors and reports the same green as before it existed, and the per-class report cannot see it either.
+`corpus/tools/check_corpus.mjs` and the TypeScript, Python, Swift and Kotlin runners each hold an explicit consumed-group list; `rust/tests/conformance_corpus.rs` uses serde `deny_unknown_fields`, whose default of IGNORING an unknown member is precisely the quiet skip.
+Add a group to the corpus file and every runner goes red until it is consumed - which is the intended order, and is why the guard was added before class 20 rather than with it.
+
+**`build_corpus.py --draw-missing-salts` is the flag to use when ADDING fixtures.**
+`--draw-salts` redraws EVERY committed set, which changes every root in the corpus and buries an additive change in a corpus-wide diff.
+`TREE_LEAF_DOMAIN_VERSION` is pinned at `1.0.0` and deliberately decoupled from `CORPUS_VERSION` for the same reason: it used to interpolate the corpus version, so any addition rewrote all 173 tree, 165 inclusion and 11 negative-proof vectors.
+Do not re-couple them.
+
+## The type-map binding is triggered by what is COMMITTED, in all five libraries
+
+**The governing rule, and it generalizes:**
+
+> **A check whose execution is controlled by the party it constrains is not a check.**
+> The trigger must come from what is COMMITTED, never from what was PRESENTED.
+
+`roax.typeMap.id` is mandatory to disclose BY ARITHMETIC (section 11.2), because it selects and authenticates the exact map.
+The outer `typeMap` member is optional under `schemas/envelope-1.0.json`, which makes "bind when the member is present" the obvious reading and the wrong one: a holder deletes the member, withholds the leaf, and the binding never runs while every inclusion proof stays genuine.
+Every library now binds when EITHER side names a type map, and absence on one side is the same `outer-identity-mismatch` as disagreement.
+
+**The residual case is a copy that drops BOTH, and it is unreachable rather than unhandled.**
+It is byte-indistinguishable from a legitimate envelope-1.0 copy, because the only signal that a further reserved leaf was committed is `leafCount`, which section 11.1 measured is NOT authenticated in a disclosed copy.
+The 34 committed floor fixtures ARE that shape, so a library that hard-rejects it fails class 14; what closes it is `schemas/envelope-2.0.json` requiring the member, and each library exposes a verifier-side opt-in for a deployment that accepts 2.0 only.
+
+**What extending the corpus found in the three libraries that shipped before any of this was known.**
+Report these as findings rather than as history: each is the same defect shape, and each was invisible to 488 vectors.
+
+- **Python had no binding at all** and accepted all four attacks.
+  Its blanket `RESERVED_V2` refusal was also too wide - an issuer supplies the content ID and reproduces nothing - and narrowing it is what let it issue at all.
+- **Kotlin bound only when its verifier was configured to**, and separately emitted AND read the tag-5 BYTES disclosure carrier as base64 rather than lowercase hex.
+  No committed disclosed fixture carries a BYTES leaf, so only class 20 could see the second.
+- **Rust was not exploitable but refused for the wrong reason**: its runner chose the envelope generation from the presenter-supplied member, so the stripped-member copy tripped the reserved-namespace guard instead of the binding.
+  `reserved_leaf_set_for` now selects from committed evidence.
+
+**And the finding that is worth more than any of them.**
+The TypeScript library refused to ISSUE an envelope without `roax.typeMap.id`; the Python library refused to issue one WITH it.
+Two shipped libraries held mutually exclusive issuance rules and both passed all 488 vectors, because no vector had ever asked either to produce anything.
+Section 11.2 settles it - the leaf is emitted ALWAYS - so TypeScript was right.
+
+**`hashAlg` is carried twice wherever a verifier has an anchoring registry, and a disagreement is a REJECTION.**
+Rust, TypeScript and Python already rejected it; Kotlin read `config.anchorHashAlg ?: env["hashAlg"]` and silently preferred the registry, so an envelope declaring `Poseidon-BN254` verified under SHA-256 - an issuance section 7.4 forbids, accepted without a word.
+Swift's is a different pair, because its verifier is generic over the hash type: the declared name and the computing function are independent carriers there and `envelope.hashAlg == H.identifier` is what holds them together.
+The corpus cannot reach any of this - class 18's registry rows are the named gap section 2.2 blocks - so `kotlin/SpecificationGapTest` carries it.
+
+**A KNOWN envelope member present with the WRONG JSON TYPE must never read as ABSENT.**
+`"salts": {}` beside a `disclosure` parses to nothing in a naive reader, so the salt-leak guard never fires and the copy verifies while carrying it: a guard that turns itself off on malformed input is worse than no guard.
+`salt-leak-disclosed-copy-with-wrong-typed-salts` is the vector, and all five libraries reject it - TypeScript as `envelope-malformed` and Swift as `malformed-json`, both one layer earlier than the references, each with a declared PER-VECTOR equivalence rather than a code-wide one, because `disclosed-copy-carries-salts` is correct for the sibling vector.
 
 ## This repository is PUBLIC
 
@@ -350,7 +420,8 @@ These are the things a future agent is most likely to get wrong.
   Derived from section 11.3, not chosen: authority has to be established before an outer field selects anything, and floor-then-bind is trust-then-verify.
   The consequence is load-bearing and is pinned by 16 vectors of the committed corpus - because absence of a reserved leaf now trips the binding, the reserved half of the floor is unreachable and every `floor-<profile>-omits-roax-*` vector asserts `outer-identity-mismatch` rather than `minimum-disclosure-floor`.
   Do not "simplify" by enforcing the floor first; do not trim the reserved paths out of the floor table either, since class 14 defines the floor as the reserved paths plus the profile's.
-  Those 16 are four reserved paths across four profiles because the committed corpus predates `roax.typeMap.id`, while class 14 now defines five reserved paths; closing that difference is corpus-rebuild work and not a reason to trim the table.
+  Those 16 are four reserved paths across four profiles because those fixtures predate `roax.typeMap.id`, while class 14 defines five reserved paths.
+  **That difference is closed ADDITIVELY rather than by a rebuild**: a parallel `typemap-floor-<profile>-*` family carries the outer `typeMap` member and commits the leaf, one accept and one omit per profile, so the fifth path is asserted without touching the roots of the 34 fixtures that were issued without it.
   `profile-unknown` stays ahead of both: it is the verifier's own allow-list, not a policy choice.
   See `corpus/README.md`.
 
@@ -470,7 +541,8 @@ Compiling is not enough on its own for a conditional - validate instances both w
 
 **The envelope and the corpus vector file each have two live schema versions, and the pair is not a leftover.**
 `schemas/envelope-2.0.json` and `schemas/conformance-corpus-2.0.json` carry the type-map binding and the six-leaf floor, and are what the specification and `docs/type-maps.md` describe.
-`schemas/envelope-1.0.json` and `schemas/conformance-corpus-1.0.json` govern the corpus artifact and the 54 envelope fixtures as committed, which `corpus/tools/validate_schemas.mjs` measures.
+`schemas/envelope-1.0.json` and `schemas/conformance-corpus-1.0.json` govern the corpus artifact and the 69 envelope fixtures as committed, which `corpus/tools/validate_schemas.mjs` measures.
+That file also validates the two envelopes each class-20 vector names, which no envelope vector points at: leaving them out would make the one class whose fixtures an implementation must REPRODUCE the only class whose fixtures nothing schema-checked.
 
 **The two files differ in what stayed behind, and the difference is deliberate.**
 `schemas/envelope-1.0.json` is unchanged in meaning BY THE RULING: D4b altered no envelope bytes, so what it took from D4b was description changes alone, and its floor stays at five reserved leaves where the successor's is six.

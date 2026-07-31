@@ -57,6 +57,65 @@ class SpecificationGapTest {
         resolverFor = { runCatching { Corpus.typeMap(it, nfc) }.getOrNull() },
     )
 
+    // -------------------------- GAP: hashAlg is carried twice and the two must agree ------------
+
+    @Test
+    fun `GAP - a hashAlg disagreeing with the anchoring registry is rejected, not silently preferred`() {
+        // `docs/conformance-corpus.md` class 18 states this row and it is UNBUILT, because
+        // specification section 2.2 leaves the anchoring registry undesigned and section 1.2 of the
+        // corpus document forbids the corpus from inventing that interface. So no vector reaches
+        // it, and this test is what stands in for one.
+        //
+        // The defect it pins is a real one this library had: `effectiveHashAlg` read
+        // `config.anchorHashAlg ?: env["hashAlg"]` and never compared the two, so an envelope
+        // declaring `Poseidon-BN254` verified under SHA-256 and its declared value was discarded
+        // without a word - an issuance specification section 7.4 forbids, accepted silently.
+        // H2 says authority comes from the registry; it does not say a disagreement is a shrug.
+        val commitment = typedScalars()
+        val json = EnvelopeWriter.fullCopy(
+            commitment,
+            Corpus.bytes("corpus/fixtures/records/typed-scalars.json"),
+            nfc,
+        )
+
+        // The same envelope verifies when the registry agrees with it.
+        val agreeing = VerifierConfig(
+            profiles = Corpus.profiles,
+            envelopeProfile = EnvelopeProfile.V1_NO_TYPE_MAP_BINDING,
+            nfc = nfc,
+            resolverFor = { runCatching { Corpus.typeMap(it, nfc) }.getOrNull() },
+            anchorHashAlg = "SHA-256",
+        )
+        assertTrue(
+            EnvelopeVerifier.verify(json.toByteArray(), agreeing) is VerificationResult.Accepted,
+            "a registry that agrees with the envelope must not change the outcome",
+        )
+
+        // And is rejected when it does not.
+        //
+        // **THE DIRECTION IS THE DISCRIMINATOR AND THE OBVIOUS ONE PROVES NOTHING.** Setting the
+        // REGISTRY to `Poseidon-BN254` is rejected with or without the comparison, because the
+        // allow-list (H3) refuses to resolve an algorithm ROAX-CANON/1 defines no construction
+        // for - so that shape passes an implementation with no H2 comparison at all. This is the
+        // same trap `docs/conformance-corpus.md` class 18 records about its own allow-list row,
+        // and writing this test the wrong way round first is how it was found here: reverting the
+        // guard left the test green.
+        //
+        // The shape that discriminates is the DANGEROUS one: the ENVELOPE declares
+        // `Poseidon-BN254` while the registry records `SHA-256`. Without the comparison the
+        // registry's value is simply preferred, the envelope verifies under SHA-256, and its
+        // declared algorithm is discarded without a word - a record specification section 7.4
+        // says MUST NOT be issued, accepted silently.
+        val forged = json.replace("\"hashAlg\":\"SHA-256\"", "\"hashAlg\":\"Poseidon-BN254\"")
+        assertNotEquals(json, forged, "the envelope under test must actually have been rewritten")
+        val rejected = EnvelopeVerifier.verify(forged.toByteArray(), agreeing)
+        assertTrue(rejected is VerificationResult.Rejected, "the disagreement MUST be a rejection")
+        assertEquals(
+            Reason.HASH_ALG_NOT_ALLOWED,
+            (rejected as VerificationResult.Rejected).reason,
+        )
+    }
+
     // ------------------------------------------------ GAP 1: class 9's forged-tree-size row ------
 
     @Test

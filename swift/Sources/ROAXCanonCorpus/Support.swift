@@ -85,8 +85,31 @@ public enum ReasonEquivalence {
         "type-map-uncovered-path": "type-map-fail-closed",
     ]
 
+    /// The same claim for ONE VECTOR rather than for a code everywhere it appears.
+    ///
+    /// Keyed `<vector name>::<reference reason>`, because a code-keyed entry would be too wide.
+    /// `salt-leak-disclosed-copy-with-wrong-typed-salts` carries `"salts": {}` beside a
+    /// `disclosure`: the reference implementations ask whether the member is PRESENT, so they
+    /// answer `disclosed-copy-carries-salts`, while this package types every known member as it
+    /// parses and refuses a present-but-wrong-typed one as `malformed-json` before the copy kind
+    /// is settled. That refusal is deliberate and is what the vector is about - reading a
+    /// wrong-typed member as ABSENT would switch the salt-leak guard off from outside.
+    /// Aliasing the CODE globally would also excuse `salt-leak-disclosed-copy-with-salts-array`,
+    /// where this package agrees exactly and where a parse-level refusal would mean it never
+    /// reached the salt-leak guard at all.
+    public static let perVector: [String: String] = [
+        "salt-leak-disclosed-copy-with-wrong-typed-salts::disclosed-copy-carries-salts":
+            "malformed-json",
+    ]
+
     public static func matches(corpusReason: String, thrown: ROAXError) -> Bool {
-        let expected = table[corpusReason] ?? corpusReason
+        matches(vector: nil, corpusReason: corpusReason, thrown: thrown)
+    }
+
+    public static func matches(vector: String?, corpusReason: String, thrown: ROAXError) -> Bool {
+        let expected = vector.flatMap { perVector["\($0)::\(corpusReason)"] }
+            ?? table[corpusReason]
+            ?? corpusReason
         return thrown.reason == expected
     }
 }
@@ -173,4 +196,89 @@ func boolValue(_ value: JSONValue?) -> Bool? {
 func arrayValue(_ value: JSONValue?) -> [JSONValue]? {
     guard case .array(let a)? = value else { return nil }
     return a
+}
+/// The first field on which a produced envelope differs from a committed one, or nil.
+///
+/// Field by field rather than by bytes, because this package emits no JSON and because JSON
+/// member order, `displayPath` and the order of `disclosure.leaves` are not fixed by the
+/// specification anyway. A whole envelope printed twice is not a readable failure, and the
+/// defect class 20 exists for is one missing member on one leaf.
+func firstEnvelopeDifference(produced: Envelope, expected: Envelope) -> String? {
+    func compare<T: Equatable>(_ label: String, _ got: T, _ want: T) -> String? {
+        got == want ? nil : "\(label): \(got) != \(want)"
+    }
+    let scalars: [String?] = [
+        compare("canon", produced.canon, expected.canon),
+        compare("hashAlg", produced.hashAlg, expected.hashAlg),
+        compare("recordType", produced.recordType, expected.recordType),
+        compare("schemaVersion", produced.schemaVersion, expected.schemaVersion),
+        compare("recordId", produced.recordId, expected.recordId),
+        compare("issuerId", produced.issuerId, expected.issuerId),
+        compare("issuer.keyId", produced.issuerKeyId, expected.issuerKeyId),
+        compare("typeMap.id", produced.typeMapId, expected.typeMapId),
+        compare("typeMap.version", produced.typeMapVersion, expected.typeMapVersion),
+        compare("root", produced.root.roaxHex, expected.root.roaxHex),
+        compare("leafCount", produced.leafCount, expected.leafCount),
+    ]
+    if let first = scalars.compactMap({ $0 }).first { return first }
+
+    // A full copy's salts, addressed by path so the array order carries nothing.
+    switch (produced.salts, expected.salts) {
+    case (nil, nil):
+        break
+    case (let got?, let want?):
+        let key = { (entry: SaltEntry) in PathEncoding.encode(entry.segments).roaxHex }
+        let gotTable = Dictionary(uniqueKeysWithValues: got.map { (key($0), $0.salt.roaxHex) })
+        let wantTable = Dictionary(uniqueKeysWithValues: want.map { (key($0), $0.salt.roaxHex) })
+        if gotTable != wantTable {
+            let missing = Set(wantTable.keys).subtracting(gotTable.keys).sorted()
+            let extra = Set(gotTable.keys).subtracting(wantTable.keys).sorted()
+            return "salts differ: \(missing.count) missing, \(extra.count) unexpected"
+        }
+    default:
+        return "salts: one copy carries the array and the other does not"
+    }
+
+    switch (produced.disclosedLeaves, expected.disclosedLeaves) {
+    case (nil, nil):
+        return nil
+    case (let got?, let want?):
+        // Sorted by leaf index on both sides: the array order is not specified.
+        let gotSorted = got.sorted { $0.index < $1.index }
+        let wantSorted = want.sorted { $0.index < $1.index }
+        if let difference = compare("disclosure.leaves.count", gotSorted.count, wantSorted.count) {
+            return difference
+        }
+        for (g, w) in zip(gotSorted, wantSorted) {
+            let at = PathEncoding.display(w.segments)
+            let perLeaf: [String?] = [
+                compare("\(at).segments", PathEncoding.encode(g.segments).roaxHex,
+                        PathEncoding.encode(w.segments).roaxHex),
+                compare("\(at).index", g.index, w.index),
+                compare("\(at).tag", g.tag.rawValue, w.tag.rawValue),
+                compare("\(at).value", describeCarrier(g.value), describeCarrier(w.value)),
+                compare("\(at).salt", g.salt.roaxHex, w.salt.roaxHex),
+                compare("\(at).auditPath", g.auditPath.map(\.roaxHex), w.auditPath.map(\.roaxHex)),
+            ]
+            if let first = perLeaf.compactMap({ $0 }).first { return first }
+        }
+        return nil
+    default:
+        return "disclosure: one copy carries revealed leaves and the other does not"
+    }
+}
+
+/// A comparable rendering of a disclosed leaf's carrier. `nil` is ABSENT and is what tags 0, 6
+/// and 7 carry; anything else renders its kind and content, so a BOOL `true` and the string
+/// `"true"` never compare equal.
+private func describeCarrier(_ value: JSONValue?) -> String {
+    guard let value else { return "ABSENT" }
+    switch value {
+    case .string(let s): return "string:\(s)"
+    case .bool(let b): return "bool:\(b)"
+    case .number(let n): return "number:\(n)"
+    case .null: return "null"
+    case .array: return "array"
+    case .object: return "object"
+    }
 }

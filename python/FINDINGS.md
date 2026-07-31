@@ -192,7 +192,8 @@ Both checks run at **every** object `schemas/envelope-1.0.json` closes and not a
 Each nested object is dereferenced by named key, so an extra member one level down would otherwise be ignored: a `disclosure` carrying its own `salts` array, or an `issuer` carrying a `masterSalt`, hands a reader the salt of an undisclosed leaf inside a copy that verifies `ok`, which is the accept path that makes it a leak rather than a curiosity.
 `anchor` is closed for the adjacent reason rather than the same one: no check in the module dereferences it, and being unread is exactly what makes it a place to park bytes nobody looks at.
 The seed scan skips a name the object legitimately declares, because `salt` is in the list and is the member being asked for on a `salts` entry and on a disclosed leaf.
-No committed vector moves, measured over all 54 envelope fixtures rather than assumed: the observed nested key sets are exactly `issuer{id, keyId}`, `disclosure{mode, leaves}`, `salts` entry `{segments, salt}` and leaf `{segments, displayPath, index, tag, value, salt, auditPath}`, and no fixture carries `anchor` or `typeMap` at all.
+No committed vector moves, measured over the 54 envelope fixtures committed at the time rather than assumed: the observed nested key sets are exactly `issuer{id, keyId}`, `disclosure{mode, leaves}`, `salts` entry `{segments, salt}` and leaf `{segments, displayPath, index, tag, value, salt, auditPath}`, and no fixture carried `anchor` or `typeMap` at all.
+The `typeMap` half of that measurement is superseded: the type-map binding family added to classes 14 and 18 carries the member, and item 15 below records what it found here.
 The only undeclared member anywhere in the 54 is the top-level `masterSalt` of `salt-leak-disclosed-copy-with-master-salt.json`, which is the fixture that asks to be rejected.
 
 ---
@@ -367,3 +368,26 @@ That agreement is what makes this a defect report rather than an opinion.
 One implementation reporting an unreachable MUST is a candidate for a misreading of the specification.
 Three implementations, each written from the specification alone and each forbidden from reading the others, arriving at the same reading is evidence that the reading is the natural one and that the text is what is at fault.
 Producing exactly that kind of evidence is why `docs/decisions.md` decision D ruled for five independent libraries rather than one shared core.
+
+## 15. DEFECT IN THIS PACKAGE, found by the corpus growing: no `roax.typeMap.id` binding, and a V2 refusal that was too wide
+
+**Kind: library.
+Both fixed.
+Neither was reachable from any of the 488 vectors this document was written against.**
+
+**The binding.**
+Specification section 11.3 says an outer field is never authority and section 11.2 commits `roax.typeMap.id` as a reserved leaf, so a disclosed copy's outer `typeMap.id` must be bound to that leaf.
+This package bound it only when `VerifierConfig.reserved_set` was `RESERVED_V2` - a value nothing set, and one the package then refused outright - so **the check never ran at all**.
+Corpus classes 14 and 18 grew ten vectors carrying a `typeMap` member, and this package ACCEPTED every one of the four attacks: a copy withholding the leaf while the outer member named one, a copy whose two sides named different artifacts, and a copy with the member deleted while the root still committed the leaf.
+The binding now fires whenever EITHER side names a type map, because the outer member is supplied by the holder and **a check whose execution is controlled by the party it constrains is not a check**.
+
+**The refusal.**
+`build_tree`, `disclosed_copy` and `verify_envelope` each rejected `RESERVED_V2` outright, on the ground that envelope 2.0 "requires exact structured-path DFA artifact loading and content-ID reproduction".
+That reason is correct for map SELECTION and false for issuance and emission, and the over-broad form made this package unable to issue any record the current specification admits - section 11.2 marks that leaf emitted ALWAYS.
+It also stopped agreeing with the binding above, which fires on what a copy commits rather than on the configured generation.
+The limit is now named on the three checks that genuinely need an artifact, and `README.md` states it.
+
+**And one class 20 found immediately after.**
+With V2 issuance permitted, this package issued a full copy committing 14 leaves whose own verifier rebuilt 13 and rejected it for `leaf-count-mismatch`, because `_verify_full_copy` took the reserved leaf set from `cfg.reserved_set` rather than from what the envelope carried.
+A full copy cannot hide that difference the way a disclosed copy can - stripping the member drops the committed leaf, which changes both `leafCount` and the root - so the envelope is sufficient evidence on that path and is not on the disclosed one.
+This is exactly the defect class 20 exists for: an implementation issuing an envelope its own verifier refuses.

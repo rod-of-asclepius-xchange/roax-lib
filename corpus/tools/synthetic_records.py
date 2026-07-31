@@ -254,6 +254,34 @@ RECORD_FIXTURES = {
         '  "marker": "typed"\n'
         '}\n'
     ),
+
+    # Class 20's record. One leaf per DISCLOSURE CARRIER FORM, which is a different axis from
+    # `typed-scalars.json` above even though the tags overlap: that record exists to separate
+    # TAGS inside a tree, this one exists so that a disclosed copy an implementation PRODUCES has
+    # to spell each carrier correctly. The forms are not the record's own spellings and there are
+    # several ways to get one wrong - NULL carries no value at all, BOOL carries a JSON boolean,
+    # INTEGER and DECIMAL carry STRINGS already in canonical output form, and BYTES carries
+    # lowercase HEX where this record spells base64.
+    #
+    # EMPTY_ARRAY and EMPTY_OBJECT are deliberately ABSENT, and not by oversight. NULL already
+    # covers the no-value carrier, so their tags add no form this record does not reach, while
+    # the committed corpus emits them without consulting the type map - the reading specification
+    # section 3.3 does not take. `python/FINDINGS.md` item 1, `swift/FINDINGS.md` finding 8 and
+    # `docs/typescript-implementation-findings.md` all measure that cost at EXACTLY two class-5
+    # vectors, and putting an empty container here would raise a number three findings documents
+    # state. Do not "complete" this record by adding one.
+    #
+    # `a.hidden` is here to be WITHHELD, so the disclosed copy is a genuine subset rather than a
+    # full copy in a disclosure's clothing. It resolves through the `a.**` entry.
+    "roundtrip-carriers.json": (
+        '{\n'
+        '  "a": { "b": null, "hidden": "withheld from every disclosed copy" },\n'
+        '  "blob": { "bytes": "SGVsbG8sIFJPQVgh" },\n'
+        '  "counts": { "integer": 5, "decimal": 0.010, "text": "5" },\n'
+        '  "flag": true,\n'
+        '  "marker": "roundtrip"\n'
+        '}\n'
+    ),
 }
 
 # (vector name, class, fixture file, issuerKeyId or None)

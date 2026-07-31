@@ -17,7 +17,7 @@ import { fail } from './errors.js';
 import { toHex } from './bytes.js';
 import { encodePath, displayPath, type Path } from './path.js';
 import { resolveHashFunction, CANON_VERSION, type HashAlgName } from './hash.js';
-import { commitRecord, FreshSalts, type Commitment } from './commit.js';
+import { commitRecord, FreshSalts, type Commitment, type SaltSource } from './commit.js';
 import type { RecordIdentity } from './reserved.js';
 import { TypeTag, type CarrierValue } from './value.js';
 import type { EmptyContainerPolicy } from './flatten.js';
@@ -37,6 +37,21 @@ export interface IssueOptions {
     | { readonly chainId: number; readonly registry: string; readonly txHash?: string | undefined }
     | undefined;
   readonly emptyContainerPolicy?: EmptyContainerPolicy | undefined;
+  /**
+   * Where the salts come from. Defaults to `FreshSalts`, which is the only correct source for a
+   * real issuance.
+   *
+   * It is settable so that an issuance can be REPRODUCED from a committed salt set, which is what
+   * conformance corpus class 20 requires: under decision D4b a salt is an independent random draw
+   * nothing re-derives (specification section 7), so a round trip whose expected output is pinned
+   * has to be issued under pinned salts. `commitRecord` already takes a `SaltSource`, so this
+   * exposes no capability the library did not have; it removes the need for a caller to assemble
+   * the envelope itself and thereby miss the code path under test.
+   *
+   * A caller supplying salts owns the section 7 entropy floor and the rule that no salt is ever
+   * reused across leaves or across issuances.
+   */
+  readonly salts?: SaltSource | undefined;
 }
 
 export interface FullCopy {
@@ -73,7 +88,7 @@ export function issueFullCopy(options: IssueOptions): FullCopy {
     hash,
     resolver: options.resolver,
     identity: options.identity,
-    salts: new FreshSalts(),
+    salts: options.salts ?? new FreshSalts(),
     emptyContainerPolicy: options.emptyContainerPolicy,
   });
 

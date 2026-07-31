@@ -511,13 +511,13 @@ def _verify(env: Mapping[str, Any], cfg: VerifierConfig) -> VerificationResult:
                 ErrorCode.ENVELOPE_SHAPE,
                 "typeMap.version must be a three-part numeric version JSON string",
             )
-    if cfg.reserved_set == RESERVED_V2:
-        return _reject(
-            ErrorCode.TYPE_MAP_REJECTED,
-            "envelope 2.0 verification requires exact structured-path DFA artifact loading "
-            "and content-ID reproduction, which this package does not implement "
-            "(specification section 4.2)",
-        )
+    # RESERVED_V2 IS NOT REFUSED HERE ANY MORE, and the refusal that stood at this line had
+    # already stopped agreeing with the rest of this function: the binding below fires on what
+    # a copy COMMITS rather than on `cfg.reserved_set`, so a copy naming a type map is bound
+    # either way and this gate only decided whether the same copy was also rejected outright.
+    # Its stated reason - artifact loading and content-ID reproduction - is what this package
+    # genuinely does not do, and that limit is named where it belongs, on those three checks,
+    # rather than as a blanket refusal of a whole envelope generation.
 
     # `anchor` remains routing only, but a routing hint is still a schema carrier.
     # Validate its closed shape without ever treating one of its values as authority
@@ -589,13 +589,22 @@ def _verify_full_copy(env, cfg, hasher, root, leaf_count, record_type) -> Verifi
         type_map_id=type_map.get("id"),
     )
 
+    # The reserved leaf set the rebuild uses comes from what the ENVELOPE carries, not from
+    # `cfg.reserved_set`. Taking it from the config rebuilt 13 leaves for a copy that committed
+    # 14, so this package rejected its own issuance with `leaf-count-mismatch` - conformance
+    # corpus class 20 is what surfaced that, because no verifying-side vector can.
+    #
+    # A full copy cannot hide the difference the way a disclosed copy can: stripping `typeMap`
+    # drops the committed leaf, which changes both `leafCount` and the root, so there is nothing
+    # here for a presenter to steer. That is why the outer member is sufficient evidence on THIS
+    # path and is not on the disclosed one (specification section 11.1).
     built = build_tree(
         env["record"],
         identity,
         resolver,
         MappingSalts(by_path),
         hash_alg=hasher.name,
-        reserved_set=cfg.reserved_set,
+        reserved_set=RESERVED_V2 if identity.type_map_id is not None else cfg.reserved_set,
         authorize_empty_containers=cfg.authorize_empty_containers,
     )
 
@@ -787,7 +796,28 @@ def _verify_disclosed_copy(env, cfg, hasher, root, leaf_count) -> VerificationRe
         disclosed[encoded] = (segments, tag, value)
 
     # Step 2: bind the outer identity to the reserved leaves the root commits.
-    bindings = _IDENTITY_BINDINGS_V2 if cfg.reserved_set == RESERVED_V2 else _IDENTITY_BINDINGS_V1
+    #
+    # `roax.typeMap.id` is bound whenever EITHER side names a type map, and never on the
+    # verifier's configured generation alone. THE TRIGGER IS THE POINT. Binding it only
+    # under ``RESERVED_V2`` left the check switched off for every default verifier, and
+    # binding it on the outer ``typeMap`` member instead would hand the trigger to the
+    # party the check constrains: a holder deletes the member, withholds the leaf, and the
+    # binding never runs while every remaining inclusion proof stays genuine. Specification
+    # section 11.2 makes that leaf mandatory to disclose BY ARITHMETIC, because it selects
+    # and authenticates the exact map, so skipping it yields no proof of which map applies
+    # rather than a weaker one, and section 11.3 says an outer field is never authority.
+    # **A check whose execution is controlled by the party it constrains is not a check.**
+    #
+    # The one case a single envelope cannot evidence is a copy dropping BOTH. It is
+    # byte-indistinguishable from a legitimate `schemas/envelope-1.0.json` copy issued
+    # before the section 4.2 binding, since the only signal that a further reserved leaf was
+    # committed is ``leafCount``, which specification section 11.1 measured is NOT
+    # authenticated in a disclosed copy. Requiring the binding regardless is what
+    # ``reserved_set=RESERVED_V2`` is for.
+    bindings = _IDENTITY_BINDINGS_V1
+    commits_type_map_id = encode_path((Key("roax.typeMap.id"),)) in disclosed
+    if cfg.reserved_set == RESERVED_V2 or commits_type_map_id or "typeMap" in env:
+        bindings = _IDENTITY_BINDINGS_V2
     committed: dict[str, str] = {}
     for reserved_key, outer_path in bindings:
         encoded = encode_path((Key(reserved_key),))
@@ -825,7 +855,14 @@ def _verify_disclosed_copy(env, cfg, hasher, root, leaf_count) -> VerificationRe
     if committed_profile is None:  # pragma: no cover - unreachable after step 2
         return _reject(ErrorCode.PROFILE_UNKNOWN, f"{committed_type!r} is not a registered profile")
 
-    for floor_path in committed_profile.floor(reserved_set=cfg.reserved_set):
+    # The floor's reserved half follows the binding above rather than the configured
+    # generation, for the same reason: a copy that named a type map on either side has
+    # `roax.typeMap.id` bound, so it is non-redactable for that copy. Step 2 has already
+    # rejected a copy whose sides disagree, so this is unreachable today - it stays because
+    # deleting it leaves the floor's membership implicit in step 2's ordering, which is the
+    # coupling that let the check be skipped in the first place.
+    floor_reserved_set = RESERVED_V2 if bindings is _IDENTITY_BINDINGS_V2 else cfg.reserved_set
+    for floor_path in committed_profile.floor(reserved_set=floor_reserved_set):
         if encode_path(floor_path) not in disclosed:
             return _reject(
                 ErrorCode.MINIMUM_DISCLOSURE_FLOOR,

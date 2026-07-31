@@ -144,8 +144,32 @@ object EnvelopeVerifier {
 
         // --- 1. hashAlg: the anchoring registry if the deployment has one (H2), then the
         //        verifier's own allow-list (H3) ---
-        val effectiveHashAlg = config.anchorHashAlg ?: str(env, "hashAlg")
-        val hash = config.hashAlgorithms.resolve(effectiveHashAlg)
+        //
+        // `hashAlg` IS CARRIED TWICE when a registry is configured - once by the envelope and
+        // once by the registry - and a DISAGREEMENT IS A REJECTION rather than a silent
+        // preference. This used to read `config.anchorHashAlg ?: str(env, "hashAlg")` and never
+        // compare the two, so an envelope declaring `Poseidon-BN254` was verified under SHA-256
+        // and its declared value was simply discarded: that is an issuance specification section
+        // 7.4 forbids, accepted without a word. Preferring the registry silently is not what H2
+        // asks for either - `docs/conformance-corpus.md` class 18 states the row as "an envelope
+        // whose hashAlg disagrees with the (root, hashAlg) pair the verifier's anchoring registry
+        // records MUST be rejected", and the Rust, TypeScript and Python libraries all reject it.
+        //
+        // The registry rows of class 18 are still UNBUILT, because specification section 2.2
+        // leaves the anchoring registry undesigned and the corpus may not invent that interface,
+        // so no vector reaches this today. It is stated here rather than left to one.
+        val declaredHashAlg = str(env, "hashAlg")
+        val anchored = config.anchorHashAlg
+        if (anchored != null && anchored != declaredHashAlg) {
+            fail(
+                Reason.HASH_ALG_NOT_ALLOWED,
+                "the anchoring registry records '$anchored' against this root and the envelope " +
+                    "declares '$declaredHashAlg'; authority for which hash to run comes from the " +
+                    "registry, and a self-describing document cannot authenticate its own " +
+                    "description (section 7.4, H2)",
+            )
+        }
+        val hash = config.hashAlgorithms.resolve(anchored ?: declaredHashAlg)
 
         // --- 2. the verifier's profile allow-list, on the OUTER recordType ---
         val outerRecordType = str(env, "recordType")
@@ -177,7 +201,26 @@ object EnvelopeVerifier {
         }
 
         // --- step 2: bind the outer identity to what the root commits (section 11.3) ---
-        bindOuterIdentity(identity, committed, config)
+        //
+        // `roax.typeMap.id` is bound whenever EITHER side names a type map, and never on the
+        // verifier's configured [EnvelopeProfile] alone. THE TRIGGER IS THE POINT. Gating it on
+        // the configuration left the check switched off for a V1-configured verifier, and gating
+        // it on the outer `typeMap` member instead would hand the trigger to the party the check
+        // constrains: a holder deletes the member, withholds the leaf, and the binding never runs
+        // while every remaining inclusion proof stays genuine. Section 11.2 makes that leaf
+        // mandatory to disclose BY ARITHMETIC, because it selects and authenticates the exact
+        // map, so skipping it yields no proof of which map applies rather than a weaker one.
+        // **A check whose execution is controlled by the party it constrains is not a check.**
+        //
+        // The one case no envelope can evidence is a copy dropping BOTH: it is
+        // byte-indistinguishable from a legitimate 1.0 copy issued before the binding existed,
+        // because the only signal a further reserved leaf was committed is `leafCount`, which
+        // section 11.1 measured is NOT authenticated in a disclosed copy. Requiring the binding
+        // regardless is what [EnvelopeProfile.V2_TYPE_MAP_BOUND] is for.
+        val typeMapBound = config.envelopeProfile.bindsTypeMapId ||
+            identity.typeMapId != null ||
+            committed.singleKeyStrings.containsKey(Reserved.TYPE_MAP_ID)
+        bindOuterIdentity(identity, committed, config, typeMapBound)
 
         // --- step 3: the floor, selected from the COMMITTED recordType leaf (section 10.2) ---
         val committedRecordType = committed.singleKeyStrings[Reserved.RECORD_TYPE] ?: fail(
@@ -189,7 +232,14 @@ object EnvelopeVerifier {
         // table and no vector can tell them apart. It is kept so that a later edit cannot quietly
         // restore the trust-then-verify shape.
         val profile = config.profiles.require(committedRecordType)
-        for (floorPath in profile.floor(config.envelopeProfile)) {
+        // The floor's reserved half follows the binding above rather than the configured profile,
+        // for the same reason. Unreachable today, since step 2 has already rejected a copy naming
+        // a type map on one side and withholding the leaf on the other; it stays because deleting
+        // it leaves the floor's membership implicit in step 2's ordering, which is the coupling
+        // that let the check be skipped in the first place.
+        val floorProfile =
+            if (typeMapBound) EnvelopeProfile.V2_TYPE_MAP_BOUND else config.envelopeProfile
+        for (floorPath in profile.floor(floorProfile)) {
             val target = encodePath(floorPath, config.nfc)
             val present = committed.allPaths.any {
                 Bytes.compareUnsigned(encodePath(it, config.nfc), target) == 0
@@ -400,8 +450,30 @@ object EnvelopeVerifier {
             // accepted too, since a real envelope may legitimately carry one.
             TypeTag.INTEGER -> RoaxValue.Integer(numericLiteral(raw!!, segments))
             TypeTag.DECIMAL -> RoaxValue.Decimal(numericLiteral(raw!!, segments))
-            // The ruled FHIR `base64Binary` binding: BYTES over the DECODED octets.
-            TypeTag.BYTES -> RoaxValue.Bytes(Base64Strict.decode(text()))
+            // LOWERCASE HEX, not base64, and this used to be base64.
+            //
+            // The disclosure carrier is per tag and is NOT the record's own spelling.
+            // `schemas/envelope-1.0.json` pins tag 5 to "lowercase hex of even length"; base64 is
+            // how a RECORD spells `base64Binary`, and the pinned RFC 4648 form is an
+            // input-admissibility condition there rather than the committed value (section 6.3).
+            // Reader and writer were both wrong in the same direction, so they agreed with each
+            // other and disagreed with every other implementation - and no committed disclosed
+            // fixture carries a BYTES leaf, so nothing could see it until conformance corpus
+            // class 20 made this library produce one and verify it.
+            TypeTag.BYTES -> {
+                // Validated before decoding rather than by catching: `AndroidApiSurfaceTest`
+                // holds this library to an Android-safe JDK type set, and `runCatching` pulls in
+                // `java.lang.Throwable`.
+                val hex = text()
+                if (hex.length % 2 != 0 || hex.any { it !in '0'..'9' && it !in 'a'..'f' }) {
+                    fail(
+                        Reason.ENVELOPE_SHAPE,
+                        "leaf ${displayPath(segments)} has tag 5 BYTES but its value is not " +
+                            "lowercase hex of even length",
+                    )
+                }
+                RoaxValue.Bytes(Bytes.fromHex(hex))
+            }
             TypeTag.BLOB_REF -> fail(
                 Reason.BLOB_REF_NOT_DECLARED,
                 "envelope carries a tag-8 leaf, which no version-1 profile declares " +
@@ -438,6 +510,7 @@ object EnvelopeVerifier {
         identity: RecordIdentity,
         committed: CommittedLeaves,
         config: VerifierConfig,
+        typeMapBound: Boolean,
     ) {
         fun bind(reservedKey: String, outer: String?) {
             val leafValue = committed.singleKeyStrings[reservedKey] ?: fail(
@@ -463,7 +536,7 @@ object EnvelopeVerifier {
         bind(Reserved.SCHEMA_VERSION, identity.schemaVersion)
         bind(Reserved.RECORD_ID, identity.recordId)
         bind(Reserved.ISSUER_ID, identity.issuerId)
-        if (config.envelopeProfile.bindsTypeMapId) bind(Reserved.TYPE_MAP_ID, identity.typeMapId)
+        if (typeMapBound) bind(Reserved.TYPE_MAP_ID, identity.typeMapId)
     }
 
     // --- small readers -------------------------------------------------------------------------

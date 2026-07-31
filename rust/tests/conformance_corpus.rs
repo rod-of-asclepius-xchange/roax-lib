@@ -1,6 +1,8 @@
 use roax_canon::{
     audit_path, commit_full_copy_with_salts, fold_inclusion_proof_untrusted, generate_salts,
-    leaf_hash, merkle_tree_hash, parse_envelope, verify_disclosed, verify_full, CommitmentContext,
+    disclose, issue_full_copy_with_salts, leaf_hash, merkle_tree_hash, parse_envelope_value,
+    reserved_leaf_set_for,
+    verify_disclosed, verify_full, CommitmentContext,
     Error, HashAlgorithm, Issuer, JsonKind, JsonValue, LeafValue, ParsedEnvelope, Path, Profile,
     ReservedLeafSet, Salt, SaltMap, SchemaValidator, Segment, TypeResolver, TypeTag,
     VerificationPolicy, CANON_VERSION, UNICODE_VERSION,
@@ -14,7 +16,7 @@ use std::fs;
 use std::path::{Path as FsPath, PathBuf};
 use unicode_normalization::UnicodeNormalization;
 
-const CLASS_COUNT: u8 = 19;
+const CLASS_COUNT: u8 = 20;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,8 +29,15 @@ struct Corpus {
     vectors: Vectors,
 }
 
+/// Every vector group this runner consumes.
+///
+/// `deny_unknown_fields` is the group guard and is load-bearing rather than tidy. Serde's default
+/// is to IGNORE an unknown member, so a corpus that grew a group this file does not read would
+/// deserialize cleanly, contribute zero assertions and report the same green it reported before
+/// the group existed - the exact defect shape the corpus exists to prevent. With it, adding a
+/// group to the corpus file fails this test at parse time until the group is consumed here.
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Vectors {
     encode_path: Vec<Value>,
     encode_value: Vec<Value>,
@@ -42,6 +51,7 @@ struct Vectors {
     unlinkability: Vec<Value>,
     normalization: Vec<Value>,
     envelope: Vec<Value>,
+    round_trip: Vec<Value>,
 }
 
 #[derive(Debug, Default)]
@@ -361,13 +371,24 @@ impl Profile for LegacyProfile<'_> {
     }
 
     fn validate_context(&self, context: &CommitmentContext) -> roax_canon::Result<()> {
-        if context.reserved_leaf_set == ReservedLeafSet::EnvelopeV1
-            && context.type_map.is_none()
-            && context.schema_version == self.schema_version
-        {
-            Ok(())
-        } else {
-            Err(Error::TypeMapIdentityMismatch)
+        if context.schema_version != self.schema_version {
+            return Err(Error::TypeMapIdentityMismatch);
+        }
+        // BOTH reserved-leaf generations are accepted here, because the committed corpus now
+        // carries both: 54 fixtures predate the section 4.2 binding and carry no `typeMap`, and
+        // the type-map binding family carries the member and commits `roax.typeMap.id`.
+        //
+        // WHAT THIS HARNESS PROFILE DOES NOT DO, stated rather than implied: it does not fetch
+        // the artifact `typeMap.id` names, does not reproduce its content ID, and does not compare
+        // the artifact's own recordType or typeMapVersion. It cannot - the corpus identifiers are
+        // corpus-authored placeholders in the right FORM addressing no published artifact, which
+        // `corpus/tools/envelope_fixtures.py` says outright, and no artifact exists for the
+        // display-pattern maps under `corpus/type-maps/` at all. So what these vectors assert is
+        // the one thing a single envelope can evidence: the identifier a copy presents is the
+        // identifier its root commits.
+        match (context.reserved_leaf_set, &context.type_map) {
+            (ReservedLeafSet::EnvelopeV1, None) | (ReservedLeafSet::EnvelopeV2, Some(_)) => Ok(()),
+            _ => Err(Error::TypeMapIdentityMismatch),
         }
     }
 
@@ -734,7 +755,16 @@ fn legacy_envelope_reason(error: &Error) -> &'static str {
         Error::InvalidInclusionProof | Error::InvalidLeafIndex => "inclusion-proof-failed",
         Error::DuplicateDisclosurePath => "disclosed-leaf-duplicate-path",
         Error::MinimumDisclosureFloor => "minimum-disclosure-floor",
-        Error::OuterIdentityMismatch => "outer-identity-mismatch",
+        // DECLARED EQUIVALENCE on the second variant, and it is narrow. `reserved_leaf_set_for`
+        // selects the 2.0 generation only for a copy that COMMITS `roax.typeMap.id`, so reaching
+        // `TypeMapNotNamed` through this runner means exactly one thing: the root commits the
+        // identifier and the presenter supplied no outer member. The reference implementations
+        // call that `outer-identity-mismatch`, because for them absence on one side IS the
+        // disagreement; this crate refuses it one layer earlier, at the generation gate, and keeps
+        // a distinct variant so that a verifier which REQUIRES the binding on a copy naming none
+        // on either side is not told a disagreement occurred. `corpus/README.md` owns the table of
+        // such divergences. The two arms share a body here and nowhere else.
+        Error::OuterIdentityMismatch | Error::TypeMapNotNamed => "outer-identity-mismatch",
         Error::InvalidValueCarrier => "disclosed-leaf-value-carrier",
         Error::BlobRefNotSelectable => "blob-ref-unbound",
         Error::UnknownTypeBinding { .. } => "type-map-fail-closed",
@@ -744,7 +774,21 @@ fn legacy_envelope_reason(error: &Error) -> &'static str {
 }
 
 fn verify_legacy_envelope(bytes: &[u8], maps: &HashMap<String, LegacyTypeMap>) -> (bool, String) {
-    let parsed = match parse_envelope(bytes, ReservedLeafSet::EnvelopeV1) {
+    // The generation is chosen by `reserved_leaf_set_for`, from what the envelope COMMITS, and
+    // never from the outer `typeMap` member alone. Choosing on the member hands the choice to the
+    // party the binding constrains: a holder deletes it, withholds the leaf, and a verifier
+    // reading only the member drops to the 1.0 generation where `roax.typeMap.id` is not in the
+    // floor and nothing asks for it. The corpus fixture
+    // `identity-outer-type-map-member-stripped` is exactly that copy.
+    //
+    // Passing `EnvelopeV1` unconditionally, which this runner used to do, was correct only while
+    // no committed fixture carried a `typeMap` member - which was itself the corpus gap the
+    // type-map binding vectors were added to close.
+    let value = match JsonValue::from_slice(bytes) {
+        Ok(value) => value,
+        Err(error) => return (false, legacy_envelope_reason(&error).to_owned()),
+    };
+    let parsed = match parse_envelope_value(&value, reserved_leaf_set_for(&value)) {
         Ok(parsed) => parsed,
         Err(error) => return (false, legacy_envelope_reason(&error).to_owned()),
     };
@@ -1042,6 +1086,82 @@ fn load_record_for_vector(root: &FsPath, vector: &Value) -> Result<Option<JsonVa
         .map_err(|error| error.to_string())
 }
 
+/// The commitment context a class-20 vector names.
+///
+/// Unlike `context_from_vector` this carries the type-map descriptor, because every class-20
+/// vector commits `roax.typeMap.id`: specification section 11.2 marks that leaf ALWAYS emitted, so
+/// an ISSUANCE without one is not something the current specification permits, and
+/// `schemas/envelope-1.0.json` keeps the member optional only for envelopes already issued under
+/// it.
+fn round_trip_context(vector: &Value) -> CommitmentContext {
+    let descriptor = field(vector, "typeMap");
+    CommitmentContext {
+        hash_algorithm: HashAlgorithm::Sha256,
+        reserved_leaf_set: ReservedLeafSet::EnvelopeV2,
+        record_type: string_field(vector, "recordType").to_owned(),
+        schema_version: string_field(vector, "schemaVersion").to_owned(),
+        type_map: Some(roax_canon::TypeMapDescriptor {
+            id: string_field(descriptor, "id").to_owned(),
+            version: string_field(descriptor, "version").to_owned(),
+        }),
+        record_id: string_field(vector, "recordId").to_owned(),
+        issuer: Issuer {
+            id: string_field(vector, "issuerId").to_owned(),
+            key_id: optional_field(vector, "issuerKeyId")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+        },
+    }
+}
+
+/// A disclosed copy with `disclosure.leaves` sorted by leaf index.
+///
+/// The specification fixes no order for that array - every leaf carries its own index - and class
+/// 20 COMPARES a produced copy against a committed one, so comparing in whatever order the
+/// producer emitted would fail a conforming implementation. Applied to both sides.
+fn with_disclosure_leaves_sorted(mut value: Value) -> Value {
+    if let Some(leaves) = value
+        .get_mut("disclosure")
+        .and_then(|disclosure| disclosure.get_mut("leaves"))
+        .and_then(Value::as_array_mut)
+    {
+        leaves.sort_by_key(|leaf| {
+            leaf.get("index")
+                .and_then(Value::as_str)
+                .and_then(|text| text.strip_prefix("$numberLiteral:"))
+                .and_then(|digits| digits.parse::<u64>().ok())
+                .unwrap_or(u64::MAX)
+        });
+    }
+    value
+}
+
+/// A comparison form for a parsed envelope: members sorted, numbers kept as SOURCE TEXT.
+///
+/// Semantic and not byte-for-byte, because JSON member order and whether `displayPath` is emitted
+/// are not fixed by the specification and a byte comparison would assert something it does not
+/// say. A number's source text is the one thing that must survive: the full copy carries the
+/// record's literals and re-serializing them through a float destroys exactly what the root was
+/// computed from (specification sections 6.4 and 7.3).
+fn comparable_json(value: &JsonValue) -> Value {
+    match value {
+        JsonValue::Object(members) => {
+            let mut map = serde_json::Map::new();
+            for (key, entry) in members {
+                map.insert(key.clone(), comparable_json(entry));
+            }
+            Value::Object(map)
+        }
+        JsonValue::Array(items) => Value::Array(items.iter().map(comparable_json).collect()),
+        JsonValue::Number(literal) => {
+            Value::String(format!("$numberLiteral:{literal}"))
+        }
+        JsonValue::String(text) => Value::String(text.clone()),
+        JsonValue::Bool(flag) => Value::Bool(*flag),
+        JsonValue::Null => Value::Null,
+    }
+}
+
 fn context_from_vector(vector: &Value) -> CommitmentContext {
     v1_context(
         string_field(vector, "recordType"),
@@ -1089,6 +1209,7 @@ fn vector_count(vectors: &Vectors) -> usize {
         + vectors.unlinkability.len()
         + vectors.normalization.len()
         + vectors.envelope.len()
+        + vectors.round_trip.len()
 }
 
 #[test]
@@ -1096,13 +1217,13 @@ fn vector_count(vectors: &Vectors) -> usize {
 fn committed_conformance_corpus() {
     let root = repository_root();
     let corpus = read_corpus(&root);
-    assert_eq!(corpus.version, "1.0.0");
+    assert_eq!(corpus.version, "1.1.0");
     assert_eq!(corpus.canon, CANON_VERSION);
     assert_eq!(corpus.unicode_version, UNICODE_VERSION);
     assert_eq!(corpus.hash_alg, HashAlgorithm::Sha256.name());
     assert_eq!(
         vector_count(&corpus.vectors),
-        488,
+        501,
         "every committed vector array must be consumed"
     );
 
@@ -1553,6 +1674,145 @@ fn committed_conformance_corpus() {
             reason,
             string_field(vector, "reason").to_owned(),
         );
+    }
+
+    // Class 20: issue, disclose, then verify the copy THIS crate produced.
+    //
+    // Every loop above runs this crate's VERIFIER against bytes the corpus generator wrote. That
+    // is the gap this class closes: a library can emit a disclosed copy its own verifier refuses
+    // and still pass every other vector, because no other vector asks it to PRODUCE one. So this
+    // drives the real entry points - `issue_full_copy_with_salts` and `disclose` - rather than
+    // assembling an envelope here, which would test this file instead of the crate.
+    for vector in &corpus.vectors.round_trip {
+        let (class, name) = vector_identity(vector);
+        let context = round_trip_context(vector);
+        let Some(floor) = profile_floor(&context.record_type) else {
+            report.fail(class, format!("{name}: no floor for {}", context.record_type));
+            continue;
+        };
+        let Some(map) = maps.get(&context.record_type) else {
+            report.fail(class, format!("{name}: no type map for {}", context.record_type));
+            continue;
+        };
+        let profile = LegacyProfile {
+            record_type: context.record_type.clone(),
+            schema_version: context.schema_version.clone(),
+            resolver: map,
+            floor,
+        };
+        let record = match JsonValue::from_slice(
+            &fs::read(root.join(string_field(vector, "recordFile"))).expect("round-trip record"),
+        ) {
+            Ok(record) => record,
+            Err(error) => {
+                report.fail(class, format!("{name}: {error}"));
+                continue;
+            }
+        };
+        let ordered_paths = match ordered_v1_paths(&record, &context) {
+            Ok(paths) => paths,
+            Err(error) => {
+                report.fail(class, format!("{name}: {error}"));
+                continue;
+            }
+        };
+        let salt_document: Value = serde_json::from_slice(
+            &fs::read(root.join(string_field(vector, "saltsFile"))).expect("round-trip salts"),
+        )
+        .expect("round-trip salt document");
+        let salts = match salt_map_from_document(
+            &salt_document,
+            string_field(vector, "saltPairing"),
+            &ordered_paths,
+        ) {
+            Ok(salts) => salts,
+            Err(error) => {
+                report.fail(class, format!("{name}: {error}"));
+                continue;
+            }
+        };
+        let (copy, commitment) =
+            match issue_full_copy_with_salts(&record, &context, &profile, &salts) {
+                Ok(issued) => issued,
+                Err(error) => {
+                    report.fail(class, format!("{name}: issuance failed: {error}"));
+                    continue;
+                }
+            };
+        report.check(
+            class,
+            name,
+            "leafCount",
+            u64::try_from(commitment.leaves().len()).unwrap_or(u64::MAX),
+            integer_field(vector, "leafCount"),
+        );
+        report.check(
+            class,
+            name,
+            "root",
+            hex::encode(commitment.root()),
+            string_field(vector, "root").to_owned(),
+        );
+
+        let requested: Result<Vec<Path>, String> = field(vector, "disclosePaths")
+            .as_array()
+            .expect("disclosePaths")
+            .iter()
+            .map(path_from_segments)
+            .collect();
+        let requested = match requested {
+            Ok(paths) => paths,
+            Err(error) => {
+                report.fail(class, format!("{name}: {error}"));
+                continue;
+            }
+        };
+        let disclosure = match disclose(&commitment, &profile, &requested) {
+            Ok(disclosure) => disclosure,
+            Err(error) => {
+                report.fail(class, format!("{name}: disclosure failed: {error}"));
+                continue;
+            }
+        };
+
+        let policy = VerificationPolicy {
+            anchored_root: commitment.root(),
+            anchored_hash_algorithm: HashAlgorithm::Sha256,
+        };
+        for (field_name, produced, verified) in [
+            (
+                "expectedFullCopyFile",
+                copy.to_json_value(),
+                verify_full(&copy, &profile, policy).map(|_| ()),
+            ),
+            (
+                "expectedDisclosedCopyFile",
+                disclosure.to_json_value(),
+                verify_disclosed(&disclosure, &profile, policy),
+            ),
+        ] {
+            let expected_bytes = fs::read(root.join(string_field(vector, field_name)))
+                .expect("round-trip expected envelope");
+            let expected =
+                JsonValue::from_slice(&expected_bytes).expect("round-trip expected envelope JSON");
+            report.check(
+                class,
+                name,
+                field_name,
+                with_disclosure_leaves_sorted(comparable_json(&produced)),
+                with_disclosure_leaves_sorted(comparable_json(&expected)),
+            );
+            // And the half no static fixture can assert: this crate's verifier over this crate's
+            // own output. A producer that omitted a per-leaf value carrier fails HERE even though
+            // every leaf hash it computed was right.
+            match verified {
+                Ok(()) => report.pass(class),
+                Err(error) => report.fail(
+                    class,
+                    format!("{name}: this crate issued an envelope its own verifier refused: {error}"),
+                ),
+            }
+        }
     }
 
     report.finish();

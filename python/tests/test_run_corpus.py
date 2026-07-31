@@ -84,7 +84,7 @@ class RunnerStatusTests(unittest.TestCase):
             )
             self.assertIn(
                 "RESULT: INCOMPLETE / NOT RUN "
-                "(751 assertions passed; 4 not run; 18/19 classes passed)",
+                "(785 assertions passed; 4 not run; 19/20 classes passed)",
                 result.stdout,
             )
             self.assertNotIn("RESULT: PASS", result.stdout)
@@ -126,7 +126,7 @@ class RunnerStatusTests(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "RESULT: FAIL " "(751 passed; 4 failed; 0 not run; 18/19 classes passed)",
+                "RESULT: FAIL " "(785 passed; 4 failed; 0 not run; 19/20 classes passed)",
                 result.stdout,
             )
             self.assertNotIn("Traceback", result.stdout + result.stderr)
@@ -204,19 +204,28 @@ class RunnerStatusTests(unittest.TestCase):
         )
         self.assertFalse(results.not_run)
 
-    def test_envelope_two_record_vector_is_not_run_rather_than_a_failure(self) -> None:
-        """A vector this package CANNOT run must not render as one that ran and failed.
+    def test_envelope_two_record_vector_runs_rather_than_reporting_not_run(self) -> None:
+        """A record vector selecting `RESERVED_V2` is RUN, not skipped.
 
-        `typeMapId` selects `RESERVED_V2`, which `build_tree` rejects because specification
-        section 4.2 requires selecting the exact map by a reproduced content ID from a
-        published DFA artifact and this package implements neither. That is a
-        could-not-check, which this module's docstring makes a third status contributing to
-        exit 2, so reporting it through `bad` would collapse the three-way contract.
+        THIS TEST REPLACES ONE THAT ASSERTED THE OPPOSITE. It required such a vector to be
+        reported NOT RUN, because `build_tree` refused `RESERVED_V2` outright "until an
+        artifact-aware resolver can reproduce and select the exact content ID". That refusal
+        was over-broad: an issuer knows which artifact it used and supplies its identifier,
+        and nothing about committing `roax.typeMap.id` requires fetching or reproducing
+        anything. Specification section 11.2 marks that leaf emitted ALWAYS, so the refusal
+        made this package unable to issue any record the current specification admits.
 
-        No committed corpus 1.0 record vector carries `typeMapId`, so this is unreachable
-        today and becomes reachable on the corpus rebuild `AGENTS.md` records as pending.
+        A vector that CAN run must not be reported NOT RUN either: could-not-check is a third
+        status for work genuinely blocked on a missing input, and using it for work the
+        package can do would hide a failure behind an excuse.
         """
         results = run_corpus.Results()
+        record_file = os.path.join(
+            run_corpus.REPO, "corpus", "fixtures", "records", "roundtrip-carriers.json"
+        )
+        salts_file = os.path.join(
+            run_corpus.REPO, "corpus", "fixtures", "salts", "roundtrip-every-carrier-form.json"
+        )
 
         run_corpus.run_record(
             [
@@ -226,20 +235,30 @@ class RunnerStatusTests(unittest.TestCase):
                     "recordType": "org.roax.corpus.synthetic",
                     "schemaVersion": "1.0",
                     "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
-                    "issuerId": "did:web:example.invalid",
+                    "issuerId": "did:web:corpus.roax.invalid",
+                    "issuerKeyId": "did:web:corpus.roax.invalid#key-1",
                     "typeMapId": "sha256:" + "0" * 64,
+                    "recordFile": os.path.relpath(record_file, run_corpus.REPO),
+                    "saltsFile": os.path.relpath(salts_file, run_corpus.REPO),
+                    "saltPairing": "path",
+                    "leafCount": 0,
+                    "root": "0" * 64,
                 }
             ],
-            lambda _record_type: None,
+            lambda record_type: run_corpus.DisplayPatternTypeMap.from_file(
+                os.path.join(run_corpus.TYPE_MAP_DIR, f"{record_type}.json")
+            ),
             results,
             references=None,
             authorize_empty=False,
         )
 
-        self.assertFalse(results.failed, "a vector that cannot run must never report FAIL")
-        self.assertEqual(len(results.not_run[10]), 1)
-        self.assertIn("envelope-two-selector", results.not_run[10][0])
-        self.assertIn("typeMapId", results.not_run[10][0])
+        self.assertFalse(results.not_run, "a vector this package can run must never be skipped")
+        # The vector's pinned figures above are deliberately wrong, so what is asserted is
+        # that the runner REACHED them: a refusal would have produced neither comparison.
+        self.assertEqual(len(results.failed[10]), 2)
+        self.assertIn("leafCount", results.failed[10][0])
+        self.assertIn("root", results.failed[10][1])
 
     def test_record_salt_pairing_disagreement_is_a_failure(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

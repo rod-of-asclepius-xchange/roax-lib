@@ -7,7 +7,8 @@ The implementation is written for Rust 1.81 or newer and forbids unsafe code.
 
 ## Protocol boundaries
 
-Use `issue_full_copy`, `commit_full_copy_with_salts`, `verify_full`, `disclose` and `verify_disclosed` as the protocol boundaries.
+Use `issue_full_copy`, `issue_full_copy_with_salts`, `commit_full_copy_with_salts`, `verify_full`, `disclose` and `verify_disclosed` as the protocol boundaries.
+`issue_full_copy_with_salts` is the deterministic twin of the first: conformance corpus class 20 pins an issuance, and under decision D4b nothing re-derives a salt, so a round trip whose expected envelope bytes are committed has to be issued under committed salts.
 The `Profile` implementation supplied by an application validates the complete record schema and binds the exact record type, schema version, type-map artifact and issuer scope before construction or verification, as required by ROAX-CANON/1 sections 3.2, 4.2 and 10.
 
 `fold_inclusion_proof_untrusted` is deliberately named as a low-level RFC 9162 fold.
@@ -15,6 +16,11 @@ It is not disclosure verification because both the alleged leaf hash and tree si
 
 Envelope generation 1 and 2 have different reserved leaf sets.
 Callers select `ReservedLeafSet::EnvelopeV1` only for the committed legacy corpus and envelope 1.0 compatibility, while current issuance uses `ReservedLeafSet::EnvelopeV2` and commits the exact `roax.typeMap.id` leaf under ROAX-CANON/1 sections 4.2 and 11.2.
+
+**A verifier that accepts BOTH generations must choose one per envelope with `reserved_leaf_set_for`, never from the outer `typeMap` member.**
+That member is supplied by the holder, so choosing on it hands the choice to the party the binding constrains: delete the member, withhold the leaf, and a verifier reading only the member drops to the 1.0 generation where `roax.typeMap.id` is not in the floor and nothing asks for it.
+`reserved_leaf_set_for` reads the COMMITTED evidence as well - any disclosed leaf or `salts` entry addressing that single segment selects 2.0 - and a copy that then presents no member fails with `Error::TypeMapNotNamed`, which is kept apart from `Error::OuterIdentityMismatch` because with neither side naming a map the two agree and nothing is mismatched.
+A verifier that requires the binding regardless passes `EnvelopeV2` directly instead of calling it.
 
 Decision D14 was ruled D14a on 2026-07-30: the type-map lookup compares the NFC-normalized key (ROAX-CANON/1 section 4.2; `docs/decisions.md`, D14).
 `DfaTypeMap::resolve` normalizes a KEY segment before taking its transition, and a loaded artifact's transition keys are already validated NFC, so both sides of the comparison are normalized.

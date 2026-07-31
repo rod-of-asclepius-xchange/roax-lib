@@ -1,10 +1,14 @@
-"""Envelope fixtures for classes 14, 15 and 17, and the vectors that point at them.
+"""Envelope fixtures for classes 14, 15, 17, 18 and 20, and the vectors that point at them.
 
 Class 14 (the minimum-disclosure floor) and class 17 (a disclosed copy must not leak a withheld
 leaf's salt) are properties of an ENVELOPE, so they need envelopes rather than leaves. Class 14
 needs no type map at all: a disclosed copy carries each revealed leaf's tag explicitly, and a
 verifier recomputes the leaf hash from the fields it was given. Only the two full-copy rows of
 class 17 and the class 15 guard rows need a record, and those use the synthetic profile.
+
+Class 18's type-map binding rows and the `typemap-floor-*` half of class 14 are the first fixtures
+here to carry a `typeMap` member at all, and class 20's four are a different kind of fixture
+again: they are the copies a conforming implementation must REPRODUCE, not ones it merely reads.
 """
 
 from __future__ import annotations
@@ -113,12 +117,37 @@ def _salts_for(name, ordered):
     return ref.salt_set_from_document(doc, ordered)
 
 
-def _floor_tree(hash_alg, record_type, schema_version, floor_entries, key_id):
+# The type-map identifiers the class 14 and class 18 binding fixtures carry.
+#
+# CORPUS-AUTHORED PLACEHOLDERS IN THE RIGHT FORM, and stated as such rather than left to be
+# mistaken for artifact digests. `schemas/envelope-1.0.json` pins the shape to
+# `^sha256:[0-9a-f]{64}$`, and these satisfy it by hashing a corpus-owned label rather than by
+# being typed out, so nothing here is a hand-written expected value. Neither identifier addresses
+# any published artifact, and no vector using them asks a verifier to fetch, resolve or reproduce
+# a content ID: they assert the ONE thing a single envelope can evidence, which is that the
+# identifier a copy presents is the identifier its root commits. The class 18 row that needs real
+# candidate bytes - a content ID that does not reproduce the committed leaf - stays unbuilt for
+# the reason docs/conformance-corpus.md class 18 records about the registry rows.
+def _authored_type_map_id(label):
+    return "sha256:" + ref.H("SHA-256", f"ROAX-CORPUS/type-map/{label}".encode("ascii")).hex()
+
+
+TYPE_MAP_ID = _authored_type_map_id("committed")
+TYPE_MAP_ID_OTHER = _authored_type_map_id("a-different-artifact")
+TYPE_MAP_VERSION = "1.0.0"
+
+
+def _floor_tree(hash_alg, record_type, schema_version, floor_entries, key_id, type_map_id=None):
     """Build a tree from an explicit leaf set.
 
     Returns ordered leaves, salts, hashes, root and an index from path key to leaf position.
+
+    `type_map_id` commits roax.typeMap.id as a further reserved leaf. It is conditional here
+    exactly as it is in `ref.reserved_leaves`: the 54 fixtures that predate the section 4.2
+    binding were issued without one and must keep the roots they were issued with.
     """
-    leaves = ref.reserved_leaves(record_type, schema_version, RECORD_ID_A, ISSUER_ID, key_id)
+    leaves = ref.reserved_leaves(record_type, schema_version, RECORD_ID_A, ISSUER_ID, key_id,
+                                 type_map_id)
     for segments, value in list(floor_entries) + WITHHELD_LEAVES:
         leaves.append(ref.Leaf(list(segments), ref.TAG_STRING, value))
 
@@ -127,7 +156,8 @@ def _floor_tree(hash_alg, record_type, schema_version, floor_entries, key_id):
     ordered = [leaf for _, leaf in encoded]
     # Named from what determines the leaf set, so two fixtures with different shapes never
     # share a set. A collision that slipped through anyway fails loudly at load with
-    # salt-missing rather than pairing the wrong salt to a leaf.
+    # salt-missing rather than pairing the wrong salt to a leaf. The leaf count carries the
+    # type-map leaf's presence, so the type-map family gets its own sets without a further token.
     salt_name = "envelope-floor-%s-%s-%d" % (
         record_type, "with-key-id" if key_id is not None else "no-key-id", len(ordered)
     )
@@ -139,20 +169,24 @@ def _floor_tree(hash_alg, record_type, schema_version, floor_entries, key_id):
     return ordered, salts, hashes, ref.mth(hash_alg, hashes), index
 
 
-def _base_envelope(record_type, schema_version, root, leaf_count, key_id):
+def _base_envelope(record_type, schema_version, root, leaf_count, key_id, type_map_id=None):
     issuer = {"id": ISSUER_ID}
     if key_id is not None:
         issuer["keyId"] = key_id
-    return {
+    envelope = {
         "canon": ref.CANON,
         "hashAlg": "SHA-256",
         "recordType": record_type,
         "schemaVersion": schema_version,
         "recordId": RECORD_ID_A,
-        "root": root.hex(),
-        "leafCount": leaf_count,
-        "issuer": issuer,
     }
+    if type_map_id is not None:
+        # Ordered where schemas/envelope-1.0.json documents it, between schemaVersion and root.
+        envelope["typeMap"] = {"id": type_map_id, "version": TYPE_MAP_VERSION}
+    envelope["root"] = root.hex()
+    envelope["leafCount"] = leaf_count
+    envelope["issuer"] = issuer
+    return envelope
 
 
 def _disclosed_leaf(hash_alg, ordered, salts, hashes, index):
@@ -378,6 +412,27 @@ def build_salt_leak_vectors(hash_alg):
         "a disclosed copy carrying the full-copy `salts` array, which would leak every withheld salt",
     ))
 
+    # A KNOWN member present with the WRONG JSON TYPE. `"salts": {}` is not an array, and an
+    # implementation that reads a wrong-typed member as ABSENT has just switched its own
+    # salt-leak guard off from outside: `verifyDisclosedCopy`'s check is "is `salts` present",
+    # so a member that parses to nothing never trips it and the copy verifies while carrying a
+    # `salts` object. **A guard that turns itself off on malformed input is worse than no guard,
+    # because it reports safety it is not providing.**
+    #
+    # The row is cheap and the shape is general: the same reading applied to `typeMap` would
+    # switch off the section 4.2 binding, and applied to `disclosure` or `record` it would change
+    # which copy kind a verifier thinks it has. `schemas/envelope-1.0.json` types every one of
+    # them, so the schema rejects this too - and that is the point of having both, since the
+    # schema is not what runs inside a verifier.
+    wrong_typed_salts = disclosed()
+    wrong_typed_salts["salts"] = {}
+    out.append(_vector(
+        "salt-leak-disclosed-copy-with-wrong-typed-salts", 17,
+        _write("salt-leak-disclosed-copy-with-wrong-typed-salts", wrong_typed_salts), False,
+        "a disclosed copy whose `salts` member is present but is not an array, which a verifier "
+        "reading it as absent would accept while carrying it",
+    ))
+
     with_master = disclosed()
     with_master["masterSalt"] = "00" * 32  # any value; the field must not exist at all
     out.append(_vector(
@@ -550,6 +605,247 @@ def build_algorithm_vectors(hash_alg):
     ]
 
 
+def build_type_map_binding_vectors(hash_alg):
+    """Classes 14 and 18. The `roax.typeMap.id` binding, and who gets to trigger it.
+
+    **These exist because no committed fixture carried a `typeMap` member**, so nothing in the
+    corpus reached the binding of specification section 4.2 in either direction and an
+    implementation could gate the whole check on that member without a single vector noticing.
+    Gating it there is a real defect and was found by a human reading an implementation rather
+    than by the suite: the member is supplied by the HOLDER, so a holder who deletes it and
+    withholds the leaf produces a copy whose binding never runs and whose floor never asks, while
+    every remaining inclusion proof stays genuine against the real root.
+
+    The governing rule, and the reason this family is worth its fixtures:
+    **a check whose execution is controlled by the party it constrains is not a check.**
+    The trigger has to come from what is COMMITTED and never from what was PRESENTED.
+
+    The verdicts are derived from the specification and not from any implementation's behaviour.
+    Section 11.3 states that a field outside the root is a hint and never authority, section 11.2
+    commits `roax.typeMap.id` as a reserved leaf and marks it mandatory to disclose, and section
+    10.2 puts it in the floor of every profile. A copy whose outer member and committed leaf
+    disagree - in either direction, including one side being absent - has therefore failed the
+    binding before any floor is selected, which is why every reject row here carries
+    `outer-identity-mismatch` and not `minimum-disclosure-floor`, exactly as the reserved half of
+    the existing floor family does.
+
+    **The both-absent case has no row here and needs none.** It is byte-indistinguishable from a
+    legitimate envelope-1.0 copy issued before the binding existed, and the 34 committed floor
+    fixtures ARE that shape, so an implementation that hard-rejects a copy lacking a type map
+    already fails class 14. The upper edge is pinned; a row restating it would be inert.
+    """
+    out = []
+    for record_type, schema_version, floor_entries in FLOOR_PROFILES:
+        ordered, salts, hashes, root, by_path = _floor_tree(
+            hash_alg, record_type, schema_version, floor_entries, ISSUER_KEY_ID, TYPE_MAP_ID
+        )
+
+        floor_paths = _reserved_floor_paths() + [[{"key": ref.RESERVED_TYPE_MAP_ID}]] \
+            + [segs for segs, _ in floor_entries]
+        full_set = floor_paths + [[{"key": ref.RESERVED_ISSUER_KEY_ID}]]
+
+        def make(name, paths, cls, expect, reason, tamper=None, _rt=record_type,
+                 _sv=schema_version, _root=root, _ordered=ordered, _salts=salts, _hashes=hashes,
+                 _by_path=by_path):
+            envelope = _base_envelope(_rt, _sv, _root, len(_ordered), ISSUER_KEY_ID, TYPE_MAP_ID)
+            envelope["disclosure"] = {
+                "mode": "selective",
+                "leaves": [_disclosed_leaf(hash_alg, _ordered, _salts, _hashes,
+                                           _by_path[_path_key(p)])
+                           for p in paths],
+            }
+            if tamper:
+                tamper(envelope)
+            return _vector(name, cls, _write(name, envelope), expect, reason)
+
+        slug = record_type.replace(".", "-")
+        out.append(make(
+            f"typemap-floor-{slug}-complete", full_set, 14, True,
+            "carries the outer typeMap member, the committed roax.typeMap.id leaf and every "
+            "other non-redactable path the profile declares",
+        ))
+        out.append(make(
+            f"typemap-floor-{slug}-omits-roax-typeMap-id",
+            [p for p in full_set if p != [{"key": ref.RESERVED_TYPE_MAP_ID}]], 14, False,
+            "withholds roax.typeMap.id while the outer typeMap member still names one, which "
+            "trips the binding before any floor is selected",
+        ))
+
+        # The two class 18 rows are built once, against the recovery tree, for the same reason
+        # the existing identity family is: they are about the binding itself rather than about a
+        # profile's floor, and a copy per profile would assert the same thing four times.
+        if record_type != "sg.gov.moh.recovery-healthcert":
+            continue
+
+        def strip_type_map(envelope):
+            del envelope["typeMap"]
+
+        out.append(make(
+            "identity-outer-type-map-id-mismatch", full_set, 18, False,
+            "an outer typeMap.id that disagrees with the roax.typeMap.id leaf committed inside "
+            "the root, with every inclusion proof still verifying",
+            tamper=lambda e: e.__setitem__(
+                "typeMap", {"id": TYPE_MAP_ID_OTHER, "version": TYPE_MAP_VERSION}),
+        ))
+        out.append(make(
+            "identity-outer-type-map-member-stripped", full_set, 18, False,
+            "the holder deletes the outer typeMap member while the root still commits "
+            "roax.typeMap.id, so a verifier that gates the binding on that member never runs it",
+            tamper=strip_type_map,
+        ))
+    return out
+
+
+# Class 20's disclosure sets. The four reserved floor paths plus the synthetic profile's `marker`
+# are what any accepted disclosed copy must carry; the rest are one leaf per carrier form.
+# `a.hidden` and `roax.issuer.keyId` are in neither list, so the copy withholds two leaves and is
+# a genuine selective disclosure rather than a full copy wearing one.
+ROUND_TRIP_DISCLOSE = (
+    [[{"key": p}] for p in ref.RESERVED_DISCLOSURE_FLOOR]
+    + [[{"key": "marker"}]]
+    + [[{"key": "a"}, {"key": "b"}]]              # 0 NULL - no value carrier at all
+    + [[{"key": "flag"}]]                          # 1 BOOL - a JSON boolean
+    + [[{"key": "counts"}, {"key": "text"}]]       # 2 STRING
+    + [[{"key": "counts"}, {"key": "integer"}]]    # 3 INTEGER - a canonical STRING
+    + [[{"key": "counts"}, {"key": "decimal"}]]    # 4 DECIMAL - a canonical STRING
+    + [[{"key": "blob"}, {"key": "bytes"}]]        # 5 BYTES - lowercase HEX, not the base64
+)
+
+
+def build_round_trip_vectors(hash_alg):
+    """Class 20. Issue, disclose, and verify the copy this build itself produced.
+
+    **Every other class runs an implementation's VERIFIER against a third party's bytes.** Every
+    committed envelope fixture was built by this generator, so nothing in the corpus ever ran an
+    implementation's verifier against that implementation's own ISSUANCE output. An implementation
+    could therefore emit disclosures its own verifier refused and still pass every vector - which
+    is not hypothetical: it happened, and the corpus did not see it. Only a human reading the
+    library did.
+
+    So these vectors pin the PRODUCING side. A runner reads the record and the committed salt set,
+    issues a full copy, discloses `disclosePaths` from that same commitment, compares BOTH
+    envelopes it produced against the expected fixtures field by field, and then puts its own
+    output through its own verifier and requires acceptance.
+
+    **Pinned rather than behavioural**, unlike class 12. Class 12 must draw its own randomness
+    because it is ABOUT randomness; nothing here is, so the salt set is a committed input and
+    every field of both envelopes is fixed. A vector that only asserted "my verifier accepts my
+    output" would be self-consistency, and a lax verifier would pass it while producing the same
+    malformed copy. The static class 17 row `salt-leak-named-leaf-without-value` fails the lax
+    verifier; these fail the lax producer. Neither closes the gap alone.
+    """
+    import json_literal
+
+    type_map = syn.synthetic_type_map()
+    record_text = syn.RECORD_FIXTURES["roundtrip-carriers.json"]
+    record = json_literal.loads(record_text)
+
+    out = []
+    # BOTH vectors commit roax.typeMap.id, and that is a constraint on the class rather than a
+    # choice. Specification section 11.2 marks that leaf ALWAYS emitted, so an ISSUANCE without
+    # one is not something the current specification permits; `schemas/envelope-1.0.json` retains
+    # the optional member for envelopes ALREADY ISSUED under it, which is what the other 54
+    # fixtures are. A class-20 vector without a type map would therefore ask an implementation to
+    # produce an envelope the specification forbids it to produce, and at least one library
+    # refuses that at its issuance entry point - correctly. The two vectors vary the OTHER
+    # reserved leaf instead.
+    plans = [
+        ("roundtrip-every-carrier-form", ISSUER_KEY_ID,
+         "one leaf per disclosure carrier form, issued and then verified through this "
+         "implementation's own verifier"),
+        ("roundtrip-without-issuer-key-id", None,
+         "the same round trip with issuer.keyId ABSENT, so the producer must emit NO leaf for it "
+         "rather than a NULL leaf or an empty string - three different roots of which only one "
+         "is right (specification section 11.2)"),
+    ]
+    for name, key_id, intent in plans:
+        type_map_id = TYPE_MAP_ID
+        identity = (SYNTHETIC_RECORD_TYPE, SYNTHETIC_SCHEMA_VERSION, RECORD_ID_A, ISSUER_ID,
+                    key_id, type_map_id)
+        ordered = ref.ordered_leaves(record, type_map, *identity)
+        salt_set = _salts_for(name, ordered)
+        root, ordered, salts, hashes = ref.build_tree(
+            hash_alg, record, type_map, salt_set, *identity
+        )
+        by_path = {_path_key(leaf.segments): i for i, leaf in enumerate(ordered)}
+        disclose = ROUND_TRIP_DISCLOSE + [[{"key": ref.RESERVED_TYPE_MAP_ID}]]
+
+        full = _base_envelope(SYNTHETIC_RECORD_TYPE, SYNTHETIC_SCHEMA_VERSION, root,
+                              len(ordered), key_id, type_map_id)
+        full["record"] = "@@RECORD@@"
+        full["salts"] = [{"segments": leaf.segments, "salt": salt.hex()}
+                         for leaf, salt in zip(ordered, salts)]
+        text = json.dumps(full, indent=2, ensure_ascii=False)
+        # Spliced as its ORIGINAL bytes. Re-serializing would put a JSON number through a Python
+        # float on the way, which section 6.4 forbids without exception.
+        indented = "\n".join(("  " + line) if i else line
+                             for i, line in enumerate(record_text.rstrip("\n").splitlines()))
+        full_file = _write_text(name + "-full", text.replace('"@@RECORD@@"', indented) + "\n")
+
+        disclosed = _base_envelope(SYNTHETIC_RECORD_TYPE, SYNTHETIC_SCHEMA_VERSION, root,
+                                   len(ordered), key_id, type_map_id)
+        # Sorted by LEAF INDEX rather than left in `disclosePaths` order. The specification fixes
+        # no order for this array - each leaf carries its own index, so the order carries nothing -
+        # and a class-20 runner has to COMPARE what it produced against this file. Leaving the
+        # order to whatever the request happened to be would fail a conforming producer that
+        # emitted the same leaves in another order, which is asserting something the
+        # specification does not say. A runner sorts by index on both sides for the same reason.
+        disclosed["disclosure"] = {
+            "mode": "selective",
+            "leaves": sorted(
+                (_disclosed_leaf(hash_alg, ordered, salts, hashes, by_path[_path_key(p)])
+                 for p in disclose),
+                key=lambda entry: entry["index"],
+            ),
+        }
+        disclosed_file = _write(name + "-disclosed", disclosed)
+
+        vector = {
+            "name": name,
+            "class": 20,
+            "recordType": SYNTHETIC_RECORD_TYPE,
+            "schemaVersion": SYNTHETIC_SCHEMA_VERSION,
+            "recordId": RECORD_ID_A,
+            "issuerId": ISSUER_ID,
+            "recordFile": "corpus/fixtures/records/roundtrip-carriers.json",
+            "saltsFile": salt_sets.reference_for(name),
+            "saltPairing": "path",
+            "leafCount": len(ordered),
+            "root": root.hex(),
+            "disclosePaths": disclose,
+            "expectedFullCopyFile": full_file,
+            "expectedDisclosedCopyFile": disclosed_file,
+            "expectSelfVerifies": True,
+            "typeMap": {"id": type_map_id, "version": TYPE_MAP_VERSION},
+            "intent": intent,
+        }
+        if key_id is not None:
+            vector["issuerKeyId"] = key_id
+        out.append(vector)
+    return out
+
+
+def verify_round_trip_fixtures(vectors):
+    """Run implementation A's verifier over the two envelopes each class-20 vector produced.
+
+    This is the generator half of the round trip. It is what makes `expectSelfVerifies` a claim
+    the build has DISCHARGED for implementation A rather than an instruction handed to a reader:
+    a fixture this generator emits and its own verifier refuses fails the build here, which is
+    exactly the failure mode class 20 exists to make impossible to ship.
+    """
+    import json_literal
+    type_maps = {SYNTHETIC_RECORD_TYPE: syn.synthetic_type_map()}
+    for vec in vectors:
+        for field in ("expectedFullCopyFile", "expectedDisclosedCopyFile"):
+            name = os.path.basename(vec[field])[: -len(".json")]
+            accepted, reason = env.verify(json_literal.loads(_generated[name]), type_maps)
+            if not accepted:
+                raise SystemExit(
+                    f"corpus defect: {vec['name']} produced {vec[field]}, which this build's own "
+                    f"verifier REFUSED ({reason}). That is the class 20 failure itself."
+                )
+
+
 def build_envelope_fixtures(hash_alg):
     # Every .json under ENVELOPE_DIR is produced here, so the directory can be set-compared and
     # a file left behind by a renamed vector is reported rather than sitting unreferenced.
@@ -557,6 +853,7 @@ def build_envelope_fixtures(hash_alg):
     out = []
     out.extend(build_floor_vectors(hash_alg))
     out.extend(build_identity_binding_vectors(hash_alg))
+    out.extend(build_type_map_binding_vectors(hash_alg))
     out.extend(build_guard_vectors(hash_alg))
     out.extend(build_salt_leak_vectors(hash_alg))
     out.extend(build_algorithm_vectors(hash_alg))

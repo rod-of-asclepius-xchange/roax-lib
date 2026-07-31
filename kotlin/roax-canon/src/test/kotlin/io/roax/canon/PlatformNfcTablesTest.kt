@@ -200,15 +200,21 @@ class PlatformNfcTablesTest {
         /**
          * Measured by running this test; see the class documentation for how to re-derive it.
          *
-         * **Identical on JDK 17.0.19 (Unicode 13.0) and JDK 25.0.2 (Unicode 16.0)**, which is the
-         * measurement, and the corroborating counts below are identical on both too: of 14,836
+         * **Identical on JDK 17 (Unicode 13.0) and JDK 25 (Unicode 16.0)**, which is the
+         * measurement, and the corroborating counts below are identical on both too: of 17,517
          * strings, 54 are non-ASCII and 23 are changed by NFC, and 0 were skipped for carrying a
          * lone surrogate.
+         *
+         * RE-DERIVED when the corpus grew class 20 and the type-map binding fixtures, and re-run
+         * on both JDKs before re-pinning, exactly as [COUNT_DRIFT] requires. The total moved from
+         * 14,836 to 17,517 because the new fixtures added strings; the non-ASCII and
+         * changed-by-NFC counts did NOT move, because every added string is ASCII, which is the
+         * corroboration that the input set grew rather than the tables changing.
          */
         private const val PINNED_DIGEST =
-            "4d02818303f50a85f439b01b7c9b6ba71fe0a533be171715217c39224a9549bf"
+            "0f92652a3fed5ff3d8b39a1cdd55e298f4fc6261c4d5166ebd47659b89012c41"
 
-        private const val PINNED_TOTAL = 14_836
+        private const val PINNED_TOTAL = 17_517
         private const val PINNED_NON_ASCII = 54
         private const val PINNED_CHANGED_BY_NFC = 23
 

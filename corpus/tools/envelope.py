@@ -162,12 +162,22 @@ def _verify(envelope, type_maps):
 
     root = bytes.fromhex(_get(envelope, "root"))
     issuer = _get(envelope, "issuer")
+    outer_type_map = _get(envelope, "typeMap")
+    if _has(envelope, "typeMap") and not isinstance(outer_type_map, ref.RecordMap):
+        # A KNOWN member present with the wrong JSON shape is a malformed envelope, never a
+        # silent absence. Reading it as absent would put the type-map binding below back in the
+        # hands of the party it constrains, one layer lower than the defect that binding exists
+        # to close: `"typeMap": []` would parse as "no type map named" and the check would not
+        # run. A guard that switches itself off on malformed input is worse than no guard,
+        # because it reports safety it is not providing.
+        return False, "envelope-member-malformed"
     identity = {
         "record_type": record_type,
         "schema_version": _get(envelope, "schemaVersion"),
         "record_id": _get(envelope, "recordId"),
         "issuer_id": _get(issuer, "id"),
         "issuer_key_id": _get(issuer, "keyId"),
+        "type_map_id": _get(outer_type_map, "id") if outer_type_map is not None else None,
     }
 
     if has_record:
@@ -307,6 +317,34 @@ def _verify_disclosed(envelope, hash_alg, root, identity):
         if ref.nfc(committed) != ref.nfc(outer):
             return False, "outer-identity-mismatch"
 
+    # The same binding for roax.typeMap.id, and it is conditional for a reason worth stating
+    # rather than inferring from the shape of the code.
+    #
+    # THE TRIGGER IS WHAT MATTERS HERE. Gating this check on the outer `typeMap` member being
+    # present - the obvious reading, because that member is optional under
+    # schemas/envelope-1.0.json - hands the trigger to the party the check constrains: a holder
+    # deletes the member, withholds the leaf, and the binding never runs while every remaining
+    # inclusion proof stays genuine. `roax.typeMap.id` is mandatory to disclose BY ARITHMETIC
+    # (specification section 11.2), because it selects and authenticates the exact map, so
+    # skipping it is not a smaller proof but no proof of which map applies. A check whose
+    # execution is controlled by the party it constrains is not a check.
+    #
+    # So the binding fires whenever EITHER side names a type map, and absence on one side is the
+    # same rejection as disagreement. The one case it cannot reach is neither side naming one:
+    # that copy is byte-indistinguishable from a legitimate envelope-1.0 copy issued before the
+    # section 4.2 binding existed, since the only signal a fifth reserved leaf was ever committed
+    # is `leafCount`, which section 11.1 measured is NOT authenticated in a disclosed copy. The
+    # 34 committed floor fixtures ARE that shape, so accepting it is pinned by the corpus rather
+    # than assumed here. Closing it is what schemas/envelope-2.0.json does by REQUIRING `typeMap`.
+    committed_type_map_id = revealed.get(_segments_key([{"key": ref.RESERVED_TYPE_MAP_ID}]))
+    outer_type_map_id = identity["type_map_id"]
+    type_map_bound = committed_type_map_id is not None or outer_type_map_id is not None
+    if type_map_bound:
+        if not isinstance(committed_type_map_id, str) or not isinstance(outer_type_map_id, str):
+            return False, "outer-identity-mismatch"
+        if ref.nfc(committed_type_map_id) != ref.nfc(outer_type_map_id):
+            return False, "outer-identity-mismatch"
+
     # Section 10.2, the minimum-disclosure floor, selected from the record type the ROOT commits
     # and not from the envelope field. The binding above has just proved the two equal, so this
     # is the same floor either way - taking it from the leaf is what makes that a property of
@@ -319,6 +357,14 @@ def _verify_disclosed(envelope, hash_alg, root, identity):
         # is what lets the lookup above read the LEAF; deleting it invites a future reader to
         # pass the outer field here instead and quietly restore the trust-then-verify shape.
         return False, "profile-unknown"
+    if type_map_bound:
+        # The floor entry is sourced from the COMMITTED leaf, never from the outer optional.
+        # Unreachable today for the same reason the reserved half of the floor is: the binding
+        # above already rejected a copy that named a type map on one side and withheld the leaf
+        # on the other, so by the time control reaches here the path is in `seen_paths`. It stays
+        # because deleting it would leave the floor's membership implicit in the binding's order,
+        # which is exactly the coupling that let this check be skipped in the first place.
+        floor = floor + [[{"key": ref.RESERVED_TYPE_MAP_ID}]]
     for required in floor:
         if _segments_key(required) not in seen_paths:
             return False, "minimum-disclosure-floor"

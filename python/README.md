@@ -204,4 +204,15 @@ roax.verify_envelope(partial, config).reason     # 'ok'
 The structured-path DFA artifacts in `type-maps/`, content-ID reproduction, issuer extensions and any anchoring registry read.
 [`FINDINGS.md`](FINDINGS.md) item 13 states each with its reason.
 The short version: no committed corpus vector exercises them, and adding a large unexercised surface to a library whose acceptance criterion is byte-identical agreement on the corpus would be adding untested code, not coverage.
-Consequently `RESERVED_V2` is structural only: `reserved_leaves` can model the extra committed selector leaf, while issuance, envelope emission and verification reject with `type-map-rejected` until an artifact-aware resolver can reproduce and select the exact content ID (`src/roax_canon/record.py:53-65` and `:363-369`; `src/roax_canon/disclose.py:47-56`; `src/roax_canon/verify.py:514-520`; specification section 4.2).
+**That list used to include the whole of `RESERVED_V2`, and the sentence saying so has been narrowed rather than deleted, because the over-broad version was a defect.**
+It read that issuance, envelope emission and verification all reject with `type-map-rejected` "until an artifact-aware resolver can reproduce and select the exact content ID".
+That is false for the producing side: an issuer knows which artifact it used and supplies its content ID, and nothing about committing `roax.typeMap.id` requires fetching or reproducing anything.
+Content-ID reproduction is a VERIFIER's obligation when it selects a map from candidate bytes (specification section 10), and it is still unimplemented here.
+The refusal made this package unable to issue any record the current specification admits, because section 11.2 marks that leaf emitted ALWAYS - and the cost was invisible until conformance corpus class 20 asked an implementation to PRODUCE an envelope rather than only to verify one.
+
+**What this package does and does not do about a type map, one line each.**
+It commits `roax.typeMap.id` when the caller names one, presents the matching `typeMap` member, and binds the two whenever either side names a type map.
+That is the single thing one envelope can evidence: the identifier a copy presents is the identifier its root commits.
+It does NOT fetch the artifact that identifier names, does NOT reproduce the artifact's content ID from fetched bytes, and does NOT compare the artifact's own `recordType`, `schemaVersion` or `typeMapVersion` against the envelope's.
+Those three are what genuinely need the artifact.
+**This is worth having and it is not envelope-2.0 support, and it must not be described as such** (`src/roax_canon/record.py`, `src/roax_canon/disclose.py`, `src/roax_canon/verify.py`; specification section 4.2).

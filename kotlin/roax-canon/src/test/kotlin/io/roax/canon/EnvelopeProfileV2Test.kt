@@ -22,6 +22,8 @@ class EnvelopeProfileV2Test {
 
     private val nfc = PlatformNfc
 
+    private val typeMapVersion = "1.0.0"
+
     private val typeMapId =
         "sha256:de7bb92226af5fa5dc5064d9cb203329abc69160f4280fdf739e66e5e0151e93"
 
@@ -32,6 +34,9 @@ class EnvelopeProfileV2Test {
         issuerId = "did:web:corpus.roax.invalid",
         issuerKeyId = keyId,
         typeMapId = if (withTypeMap) typeMapId else null,
+        // `schemas/envelope-1.0.json` requires BOTH members whenever `typeMap` is present, so an
+        // issuance naming the identifier alone emits a schema-invalid envelope.
+        typeMapVersion = if (withTypeMap) typeMapVersion else null,
     )
 
     private fun record() = JsonReader.parse(Corpus.bytes("corpus/fixtures/records/typed-scalars.json"))
@@ -115,7 +120,7 @@ class EnvelopeProfileV2Test {
             listOf(Segment.Key(Reserved.ISSUER_ID)),
         )
         val json = EnvelopeWriter.disclosedCopy(commitment.disclose(floor, nfc), nfc)
-        assertTrue(json.contains("\"typeMap\":{\"id\":\"$typeMapId\"}"))
+        assertTrue(json.contains("\"typeMap\":{\"id\":\"$typeMapId\",\"version\":\"$typeMapVersion\"}"))
         val ok = EnvelopeVerifier.verify(json.toByteArray(), configV2())
         assertTrue(
             ok is VerificationResult.Accepted,

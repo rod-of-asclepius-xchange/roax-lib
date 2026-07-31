@@ -66,6 +66,37 @@ object Corpus {
     }
 
     /**
+     * Every vector group this suite consumes.
+     *
+     * [vectors] answers an unknown group with the empty list, so a corpus that grew a group no
+     * test reads would contribute zero assertions and report the same green it reported before
+     * the group existed. That is the exact defect shape the corpus exists to prevent, so
+     * `ConformanceCorpusTest.every vector group is consumed` fails on an unconsumed group rather
+     * than letting it pass quietly.
+     */
+    val consumedGroups: Set<String> = setOf(
+        "encodePath",
+        "encodeValue",
+        "reject",
+        "leaf",
+        "tree",
+        "inclusion",
+        "negativeProof",
+        "typeMap",
+        "record",
+        "unlinkability",
+        "normalization",
+        "envelope",
+        "roundTrip",
+    )
+
+    /** The groups the corpus carries that [consumedGroups] does not name. */
+    fun unconsumedGroups(): List<String> =
+        (document["vectors"] as JsonObject).members.map { it.key }
+            .filterNot { it in consumedGroups }
+            .sorted()
+
+    /**
      * The type maps class 10 and class 11 assert against.
      *
      * These are `schemas/type-map-1.0.json` display-pattern files, which that schema itself calls

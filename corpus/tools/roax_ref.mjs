@@ -37,11 +37,19 @@ export const RESERVED_PREFIX = "roax.";
 export const RESERVED = {
   recordType: "roax.recordType",
   schemaVersion: "roax.schemaVersion",
+  typeMapId: "roax.typeMap.id",
   recordId: "roax.recordId",
   issuerId: "roax.issuer.id",
   issuerKeyId: "roax.issuer.keyId",
 };
 // Section 10.2. roax.issuer.keyId is committed but OPTIONAL to disclose and is not in the floor.
+//
+// roax.typeMap.id IS mandatory to disclose (section 11.2) and is deliberately NOT listed here.
+// This constant is the floor every profile carries UNCONDITIONALLY, and every committed
+// envelope-1.0 fixture predates the type-map binding: adding it here would demand a leaf those
+// 54 fixtures never committed and fail 34 vectors that are correct. The binding is conditional
+// instead - it fires when EITHER side names a type map - and `envelope.mjs` adds the path to the
+// floor as a CONSEQUENCE of that binding rather than as a standing member of it.
 export const RESERVED_DISCLOSURE_FLOOR = [
   RESERVED.recordType,
   RESERVED.schemaVersion,
@@ -566,13 +574,24 @@ export function flatten(node, typeMap, segments = []) {
 
 // Section 11.2. Four reserved leaves always; roax.issuer.keyId only when issuer.keyId is
 // present. An absent issuer.keyId emits NO leaf - not a NULL leaf and not an empty string.
-export function reservedLeaves({ recordType, schemaVersion, recordId, issuerId, issuerKeyId }) {
+//
+// roax.typeMap.id is emitted when, and only when, the issuance names a type map. Section 11.2
+// marks it ALWAYS emitted, which is the envelope-2.0 reading; this corpus is envelope-1.0
+// throughout and 54 of its 64 envelope fixtures were issued without a type map, so the leaf is
+// conditional here for the same reason schemas/envelope-1.0.json leaves the `typeMap` member
+// optional - requiring it would invalidate every envelope already issued under that schema.
+export function reservedLeaves({
+  recordType, schemaVersion, recordId, issuerId, issuerKeyId, typeMapId,
+}) {
   const out = [
     { segments: [{ key: RESERVED.recordType }], tag: TAG.STRING, value: recordType },
     { segments: [{ key: RESERVED.schemaVersion }], tag: TAG.STRING, value: schemaVersion },
     { segments: [{ key: RESERVED.recordId }], tag: TAG.STRING, value: recordId },
     { segments: [{ key: RESERVED.issuerId }], tag: TAG.STRING, value: issuerId },
   ];
+  if (typeMapId !== undefined && typeMapId !== null) {
+    out.push({ segments: [{ key: RESERVED.typeMapId }], tag: TAG.STRING, value: typeMapId });
+  }
   if (issuerKeyId !== undefined && issuerKeyId !== null) {
     out.push({ segments: [{ key: RESERVED.issuerKeyId }], tag: TAG.STRING, value: issuerKeyId });
   }

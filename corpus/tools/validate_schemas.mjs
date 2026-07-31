@@ -91,16 +91,30 @@ const SCHEMA_REJECTED = new Set([
   "salt-leak-disclosed-copy-with-salts-array",
   "salt-leak-disclosed-copy-with-master-salt",
   "salt-leak-named-leaf-without-value",
+  // `"salts": {}` is not an array, so the envelope schema rejects it structurally. Both halves
+  // matter: the schema makes it unrepresentable in a conforming document, and the corpus vector
+  // makes a VERIFIER that reads a wrong-typed member as absent fail - which is the half a schema
+  // check cannot cover, because a schema validator is not what runs inside a verifier.
+  "salt-leak-disclosed-copy-with-wrong-typed-salts",
 ]);
-for (const v of corpus.vectors.envelope ?? []) {
-  const doc = readJson(path.join(REPO_ROOT, v.envelopeFile));
+// Class 20's fixtures are named by roundTripVector rather than by an envelope vector, and they
+// are envelopes: leaving them out would let the one class whose fixtures an implementation must
+// REPRODUCE be the only class whose fixtures nothing schema-checked.
+const envelopeFixtureFiles = [
+  ...(corpus.vectors.envelope ?? []).map((v) => [v.name, v.envelopeFile]),
+  ...(corpus.vectors.roundTrip ?? []).flatMap((v) => [
+    [v.name, v.expectedFullCopyFile], [v.name, v.expectedDisclosedCopyFile],
+  ]),
+];
+for (const [name, file] of envelopeFixtureFiles) {
+  const doc = readJson(path.join(REPO_ROOT, file));
   const valid = validateEnvelope(doc);
-  const expectValid = !SCHEMA_REJECTED.has(v.name);
+  const expectValid = !SCHEMA_REJECTED.has(name);
   if (valid === expectValid) {
-    console.log(`  ok    ${v.envelopeFile}${expectValid ? "" : "  (schema-rejected, as intended)"}`);
+    console.log(`  ok    ${file}${expectValid ? "" : "  (schema-rejected, as intended)"}`);
   } else {
     failures += 1;
-    console.log(`  FAIL  ${v.envelopeFile}: schema said valid=${valid}, expected ${expectValid}`);
+    console.log(`  FAIL  ${file}: schema said valid=${valid}, expected ${expectValid}`);
     for (const e of (validateEnvelope.errors ?? []).slice(0, 4)) {
       console.log(`          ${e.instancePath || "/"} ${e.message}`);
     }
@@ -242,6 +256,26 @@ probe("reject vector with NO recordType keeping segments", true,
 // a vector file would be destroyed by the very parser under test (spec section 6.4).
 probe("encodeValue vector carrying a bare JSON number", false,
   (doc) => { doc.vectors.encodeValue[0].input = 1.5; });
+
+// roundTripVector. It carries no if/then, so what these probe are the pins that keep the class
+// from becoming vacuous: an implementation "passing" it by declaring that its own output need
+// not verify, or by dropping the assertion the class exists for.
+const roundTrip = (doc) => doc.vectors.roundTrip[0];
+probe("round-trip vector as committed", true, () => {});
+probe("round-trip vector declaring its own output need not verify", false,
+  (doc) => { roundTrip(doc).expectSelfVerifies = false; });
+probe("round-trip vector without expectSelfVerifies at all", false,
+  (doc) => { delete roundTrip(doc).expectSelfVerifies; });
+probe("round-trip vector without the disclosed copy it must reproduce", false,
+  (doc) => { delete roundTrip(doc).expectedDisclosedCopyFile; });
+// The class const, which is what stops a mislabelled vector marking another class covered while
+// leaving this one reading as a gap.
+probe("round-trip vector labelled as another class", false,
+  (doc) => { roundTrip(doc).class = 14; });
+// disclosePaths is SEGMENTS. A dotted display string is the section 5.2 trap one level up: it
+// would name a leaf no record has, so the produced copy would silently omit that path.
+probe("round-trip vector naming a disclose path in display notation", false,
+  (doc) => { roundTrip(doc).disclosePaths = ["counts.integer"]; });
 
 console.log(failures
   ? `FAILED: ${failures}`
