@@ -31,6 +31,16 @@ swift test  --package-path swift
 swift run   --package-path swift roax-conformance
 ```
 
+The runner takes three flags, and each has an environment equivalent where one is useful:
+
+| Flag | Environment | What it does |
+|---|---|---|
+| `--root <repo>` | `ROAX_CORPUS_ROOT` | Where to find `corpus/conformance-corpus-1.0.json`. Without either, the runner walks up from the working directory. |
+| `--references <dir>` | `ROAX_REFERENCE_RECORDS` | The extracted reference records class 10 needs, described below. |
+| `--empty-containers spec\|corpus` | none | Which reading of specification section 3.3 to run. `corpus` is the default and `spec` is what costs the 2 class-5 vectors below. |
+
+A flag with a missing or unrecognized value is a usage error rather than a fallback, because falling back would exit 0 while the operator believed they had run the other reading.
+
 The runner's exit status follows `corpus/README.md`, so a bare run does not read as a pass:
 
 | Status | Meaning |
@@ -38,6 +48,7 @@ The runner's exit status follows `corpus/README.md`, so a bare run does not read
 | 0 | Every check and vector ran and passed. |
 | 1 | At least one check ran and failed. |
 | 2 | Nothing failed, but at least one check or vector was NOT RUN. |
+| 64 | A usage error: an unknown flag, a flag with a missing or unrecognized value, or a corpus root that cannot be found from where the runner was started. |
 
 **Class 10 needs the pinned third-party reference checkout**, which `.gitignore` excludes by design and which is never copied into this repository.
 Extract the two records it needs into a scratch directory first, then name that directory:
@@ -159,5 +170,5 @@ A package that only ever saw `swift build` could fail on the platform it was wri
 Nothing in the library needs Darwin: SHA-256 comes from CryptoKit through `#if canImport(CryptoKit)` and from `ReferenceSHA256` otherwise, and a test asserts the two agree across every block boundary.
 That pair is a cross-check rather than a divergence risk precisely because the test exists.
 
-Foundation is used for two things only, and both are noted where they appear: `precomposedStringWithCanonicalMapping` for NFC, and file and `Data` handling in the runner.
+Foundation is used for three things only, and each is noted where it appears: `precomposedStringWithCanonicalMapping` for NFC, the one `Data(bytes)` bridge that hands a message to CryptoKit in `Hashing.swift`, and file and `Data` handling in the runner.
 `JSONSerialization` and `Decimal` are used **nowhere** in the library, and appear only inside tests that assert what they do wrong.

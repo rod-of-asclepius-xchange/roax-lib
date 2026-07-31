@@ -257,7 +257,7 @@ These are the things a future agent is most likely to get wrong.
   The `dose` ruling narrows the field to a positive integer, which no tag can express.
   Specification section 4.2 orders profile validation BEFORE map resolution, and decision D13a keeps value-domain validation in "a separate, independently versioned conformance layer".
   So the rule is declared by `docs/profiles/vaccination-healthcert.md` section 6, executable in `corpus/tools/profile_rules.py` and `profile_rules.mjs`, self-tested by `run.sh` step 5, and demonstrated through Rust's `SchemaValidator` seam.
-  Do not move it into a type map, into `roax_ref.*`, or into any of the three libraries: that merges two layers a ruling separated.
+  Do not move it into a type map, into `roax_ref.*`, or into any of the four libraries: that merges two layers a ruling separated.
   The discriminating values are `0` and the negatives, because a fractional value is already refused by the section 6.2 INTEGER grammar.
 
 - **The corpus may not require what the design has not decided.**
@@ -428,7 +428,7 @@ Two changed it: D4 to independent per-leaf salts, and D9 gaining the `BLOB_REF` 
 **D14 asked whether the type-map LOOKUP matches over an NFC-normalized key or over the bytes as received, and it was RULED D14a, NORMALIZE, on 2026-07-30** (`docs/decisions.md` part 2a, specification section 4.2, `docs/type-maps.md` section 3.1).
 An earlier version of this file told you not to add an `nfc()` call to a matcher.
 **That instruction is superseded and the opposite is now true:** every matcher in this tree normalizes both the pattern token and the segment key, and removing one of those calls unrules a decision.
-The sites are `corpus/tools/roax_ref.py`, `corpus/tools/roax_ref.mjs`, `src/typemap.ts`, `python/src/roax_canon/typemap.py`, `rust/src/type_map.rs` and the legacy adapter in `rust/tests/conformance_corpus.rs`.
+The sites are `corpus/tools/roax_ref.py`, `corpus/tools/roax_ref.mjs`, `src/typemap.ts`, `python/src/roax_canon/typemap.py`, `rust/src/type_map.rs`, `swift/Sources/ROAXCanon/TypeMap.swift` and the legacy adapter in `rust/tests/conformance_corpus.rs`.
 The Kelvin workaround in the synthetic map is gone, and two committed vectors now fail closed under raw matching, so the corpus catches a regression rather than tolerating it.
 Rust's `LookupKeyMode`, `TypeResolver::ensure_lookup_decision_independent` and `Error::LookupNormalizationUndecided` were deleted with the ruling; do not reintroduce a mode enum.
 
