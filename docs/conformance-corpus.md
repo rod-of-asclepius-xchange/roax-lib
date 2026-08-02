@@ -136,7 +136,7 @@ Until then the gate stays open, and no document may describe the corpus as valid
 A class with no vectors is a coverage gap and the corpus build MUST report it rather than passing silently.
 
 The count is stated because a gap check built off it is the intended use, and a stale count means the highest-numbered class is skipped silently.
-Both `schemas/conformance-corpus-1.0.json` and `schemas/conformance-corpus-2.0.json` set the `classRef` maximum to 20 to match.
+Both `schemas/conformance-corpus-1.0.json` and `schemas/conformance-corpus-2.0.json` set the `classRef` maximum to 21 to match.
 
 **A class with no vectors is not the only way this corpus can fail to gate.**
 A vector GROUP a runner does not read is worse, because it is invisible: the runner contributes zero assertions for it and reports the same green it reported before the group existed, and the coverage check above cannot see it either.

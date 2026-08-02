@@ -97,21 +97,26 @@ Turning a record into a root; disclosing individual leaves against that root; an
 - **No anchoring registry design.**
   What the on-chain registry looks like - one root per record versus batched roots, and revocation semantics - is not specified here and is not settled.
   A further smart-contract round is expected, so no contract set is treated as permanent by this document.
-  **This document does place one requirement on that design, and hands it forward rather than pretending it is closed here: the registry MUST record the pair `(root, hashAlg)`, and a verifier MUST take `hashAlg` from the registry rather than from the envelope.**
-  Section 7.4 shows why that is the only one of the three algorithm bindings that actually works.
+  **This document does place one requirement on that design, and hands it forward rather than pretending it is closed here: the registry MUST record the triple `(root, hashAlg, ordering)`, and a verifier MUST take both `hashAlg` and the leaf ordering from the registry rather than from the envelope.**
+  Sections 7.4 and 9.5 show why that is the only one of the three bindings, on either axis, that actually works.
+  The tuple grew from a pair to a triple on 2026-08-02, when leaf ordering became record-selectable under the amended decision D5; the requirement's shape did not change, because the second axis fails in exactly the way the first does.
 - **One reference-schema type gap remains unresolved.**
   Four base type-map artifacts are published in `type-maps/`, and their exact coverage is reported in `docs/type-maps.md` section 2.
   Five undetermined bindings were ruled on 2026-07-30 with their evidence grades recorded in `docs/type-maps.md` section 1: the vaccination sample's `dose` and `expiryDateTime`, FHIR `base64Binary`, FHIR `Narrative.div`, and FHIR primitive-array null placeholders.
   PDT's 20 endorsed-sample path-kind pairs remain unbound, because they are outside the selected base schema rather than ambiguous within it and the clean answer is a versioned composition profile that nobody has ruled.
   Decision D7 requires that path to fail closed rather than receive a syntactic guess, so the PDT endorsed sample remains uncommittable until profile governance or an issuer-scoped extension supplies determining evidence under section 4.2.
   Two of the five rulings are operative in the corpus-side maps today, and none of the four that are bindings is yet in the four published artifacts, while the fifth is an absence those artifacts already satisfy, which `docs/type-maps.md` section 1.6 states along with what the next change must do.
-- **No absence proofs, and the capability is deliberately preserved.**
-  Proving "this record asserts no allergy" is possible under the leaf ordering chosen in section 9: sorting by encoded path makes the tree shape a function of the path set alone, so showing the two adjacent leaves in canonical order proves no leaf exists between them (section 9.3).
+- **No absence proofs, and the capability is preserved for `path`-ordered records only.**
+  Proving "this record asserts no allergy" is possible under `path` ordering: sorting by encoded path makes the tree shape a function of the path set alone, so showing the two adjacent leaves in canonical order proves no leaf exists between them (section 9.4).
 
-  > **Normative:** the construction of this document **admits** absence proofs, `ROAX-CANON/1` **does not define them**, and defining them requires a clinical-liability decision that is not a cryptographic one.
+  > **Normative:** under `path` ordering the construction of this document **admits** absence proofs, `ROAX-CANON/1` **does not define them**, and defining them requires a clinical-liability decision that is not a cryptographic one.
+  >
+  > Under `hash` ordering absence proofs are **impossible rather than undefined**, and no later revision can restore them for a record already issued that way.
+  > Selecting `hash` ordering is therefore a decision against absence proofs and not a deferral of one.
 
-  This is decision D6 and it is **ruled** out of scope for version 1 with that capability kept open.
+  This is decision D6 and it is **ruled** out of scope for version 1 with that capability kept open, amended on 2026-08-02 to say for which records it is kept open.
   The three-part statement is deliberate: an implementer who found only "not supported" would be entitled to read the omission as an oversight and add them unilaterally, and "this record asserts no X" is a clinical claim with liability attached.
+  The fourth part is deliberate for the mirror-image reason: a deployment that reads "not supported in v1" and picks `hash` ordering for its privacy would be foreclosing a capability it believed it was merely postponing.
 - **No confidentiality.**
   The full copy of a record is plaintext.
   This document provides selective disclosure, which is a different property: it lets a holder reveal a subset without invalidating the root.
@@ -120,11 +125,12 @@ Turning a record into a root; disclosing individual leaves against that root; an
   A verifier of a disclosed copy learns how many leaves the record has.
   For a record whose profile is known, the leaf count is weak but nonzero information about record shape.
   This is inherent to the construction and is not mitigated.
-- **No gap privacy between disclosed leaves.**
-  Leaves are ordered by encoded path (section 9), so a disclosure revealing leaves at two paths also reveals **how many withheld leaves sort between them**.
+- **No gap privacy between disclosed leaves, under `path` ordering.**
+  Under `path` ordering leaves are ordered by encoded path (section 9), so a disclosure revealing leaves at two paths also reveals **how many withheld leaves sort between them**.
   This is the residual cost of decision D5a and it is stated rather than left for a reader to infer that sorting by path is free.
   In practice the leak is bounded, because these profiles are published and their path sets are largely known already, but it is real and it is structural.
-  Section 10.1 states what a verifier learns in full and section 9.3 states what D5a bought in exchange.
+  Section 10.1 states what a verifier learns in full and section 9.4 states what D5a bought in exchange.
+  **`hash` ordering removes this leak entirely** and pays for it with absence proofs, which is the trade section 9.4 sets out; a deployment that needs gap privacy has an answer here rather than an unmitigated gap, and that is the one line of this section the 2026-08-02 amendment to decision D5 changed.
 - **No clinical validation, and this one is normative rather than merely absent.**
   A valid root proves that a typed payload was committed by an identified issuer and proves **nothing clinical**.
   Section 2.3 states that in full, with the prohibition it places on every surface built on this protocol.
@@ -631,9 +637,14 @@ Each leaf's salt is an independent random value, generated once at issuance and 
 Section 10.1 gives that attack in full: an attacker holding a withheld leaf's hash, its path and its tag enumerates candidate values until one matches, and gender, a birth date or a positive/negative result have only a few or a few thousand candidates.
 The salt is what makes the enumeration infeasible, so a salt from a non-cryptographic generator, or a short one, silently removes the protection while every verification still passes.
 
-`DOMAIN` is **algorithm-qualified**: it is the ASCII string `ROAX-CANON/1/` followed by the envelope's `hashAlg` value, so for v1's defined algorithm it is `ROAX-CANON/1/SHA-256`.
+`DOMAIN` is **algorithm-qualified and ordering-qualified**: it is the ASCII string `ROAX-CANON/1/`, followed by the envelope's `hashAlg` value, followed by the domain suffix of the record's leaf ordering (section 9).
+For v1's defined algorithm under the default ordering it is `ROAX-CANON/1/SHA-256`, and under `hash` ordering it is `ROAX-CANON/1/SHA-256/hash`.
 It appears in the leaf preimage of section 8.
-Section 7.4 states why the algorithm identifier is bound there and not merely declared, and this ruling on salts does not touch it.
+Sections 7.4 and 9.5 state why each of those two identifiers is bound there and not merely declared, and this ruling on salts does not touch either.
+
+**Salt assignment is unaffected by the ordering, and section 9 makes that normative rather than incidental.**
+Salts are assigned to leaves in ascending `encodePath` order under both orderings, so nothing in this section changes when a record selects `hash` ordering.
+That is not a convenience: a leaf hash is computed over its salt, so a rule assigning salts in tree order would be circular under `hash` ordering and unimplementable.
 
 > **Salts are generated by the protocol, not supplied by the issuing institution.**
 > Every salt is produced at issuance by the issuing library itself, from a CSPRNG.
@@ -790,6 +801,16 @@ Without H3 a verifier that has retired `W` still runs `W` because the envelope a
 The general shape is worth naming, because it recurs: **a self-describing document cannot authenticate its own description.**
 The description has to come from outside, which here means the anchoring layer.
 
+**It recurred, which is why the shape is named here rather than only applied.**
+Leaf ordering became record-selectable on 2026-08-02 under the amended decision D5, and ordering is a property the tree's own construction depends on in exactly the way the hash algorithm is.
+Section 9.5 is this section's H1/H2/H3 applied to that axis without alteration, with the same handoff to the anchoring layer.
+A third axis, should one ever be added, is to be bound the same way.
+
+**It does not follow that this section forbids a reserved leaf on every such axis, and ordering is the case that shows the difference.**
+`ROAX-CANON/1` commits `roax.ordering` as a reserved leaf (section 11.2) even though it commits no `roax.hashAlg`, and the reason is that what made this section's leaf harmful was not the arithmetic but the existence of a weak option to downgrade toward.
+Both orderings are equally strong, so the ordering leaf is redundant rather than dangerous and buys committed issuer intent.
+The rule this section actually establishes is therefore narrower and sharper than "never commit a self-description": **never let a self-description be read as authority**, which section 11.2 restates normatively for the leaf it adds.
+
 **Which algorithms are defined.**
 `ROAX-CANON/1` **defines** the construction for `SHA-256` only.
 `Poseidon-BN254` is **registered** in the envelope schema because ZK-friendly and non-ZK hashes are both first-class and selectable per record (decision B in `docs/decisions.md`), but its parameterization is **not pinned** by this document: the field, the rate and capacity, the round constants and - the part the byte layouts above do not survive without - the encoding from a length-prefixed byte string to field elements.
@@ -805,7 +826,7 @@ The description has to come from outside, which here means the anchoring layer.
 ```
 leafHash(path, tag, value, salt) = H(
       0x00                              // RFC 9162 leaf domain byte
-    ‖ u32be(len(DOMAIN)) ‖ DOMAIN       // DOMAIN = "ROAX-CANON/1/" ‖ hashAlg
+    ‖ u32be(len(DOMAIN)) ‖ DOMAIN       // DOMAIN = "ROAX-CANON/1/" ‖ hashAlg ‖ ORD
     ‖ u32be(len(P))      ‖ P            // P = encodePath(path)
     ‖ tag                               // one byte
     ‖ u32be(len(salt))   ‖ salt         // 16 bytes
@@ -815,6 +836,11 @@ leafHash(path, tag, value, salt) = H(
 
 **`H` is the hash function named by the envelope's `hashAlg`**, taken by a verifier from the anchoring registry rather than from the envelope (section 7.4, H2).
 It is written as `H` rather than as `SHA-256` because this is a hash-agile specification and naming one algorithm in the construction would contradict that; `ROAX-CANON/1` defines `H` for `SHA-256` only, per section 7.4.
+
+**`ORD` is the domain suffix of the record's declared leaf ordering**, taken from the registry in section 9 and, like `hashAlg`, taken by a verifier from the anchoring registry rather than from the envelope (section 9.5, H2).
+It is the empty string for `path` ordering and `"/hash"` for `hash` ordering, so `DOMAIN` is `"ROAX-CANON/1/SHA-256"` for a path-ordered record and `"ROAX-CANON/1/SHA-256/hash"` for a hash-ordered one.
+Section 9.5 states why the two suffixes are asymmetric and what that asymmetry is worth.
+`DOMAIN` remains a single length-prefixed component: `ORD` is part of the domain string rather than a field of its own, so an implementation builds one byte string and prefixes it once.
 
 **Salts carry no algorithm dependence at all** (section 7).
 A salt is random bytes, generated once at issuance and never recomputed by a verifier or inside a proof circuit, so there is no second hash function anywhere in this construction and no question of which algorithm produced a salt.
@@ -830,15 +856,48 @@ Every variable-length component is length-prefixed, so no two distinct `(path, t
 The `0x00` prefix is RFC 9162's leaf domain byte, so a leaf can never be confused with an internal node, which is prefixed `0x01`.
 RFC 9162 section 2.1.1 states the reason: "the hash calculations for leaves and nodes differ; this domain separation is required to give second preimage resistance".
 
-`DOMAIN` is inside every leaf preimage, which is what cryptographically binds the canonicalization version **and**, because it is algorithm-qualified, the hash algorithm.
-See sections 7.4 and 12.
+`DOMAIN` is inside every leaf preimage, which is what cryptographically binds the canonicalization version **and**, because it is algorithm-qualified and ordering-qualified, the hash algorithm and the leaf ordering.
+See sections 7.4, 9.5 and 12.
 
 ---
 
 ## 9. Tree construction
 
-Leaves are the `leafHash` values, **ordered by ascending `encodePath` bytes**, using plain unsigned byte comparison.
-Paths are unique by construction, so the order is total and tie-free.
+**Leaf ordering is selected per record, from a registry of two, and the choice is declared rather than inferred.**
+This mirrors decision B exactly: ZK-friendly and non-ZK hashes are both first-class and selectable per record, and ordering is now the same kind of axis rather than a fixed property of the construction.
+Both orderings are first-class, and `path` is the default (section 9.4).
+
+| `ordering` | Leaves are ordered by | `ORD`, the section 8 domain suffix | `roax.ordering` leaf | Admits absence proofs | Leaks gap counts |
+|---|---|---|---|---|---|
+| `path` | ascending `encodePath` bytes | `""` | not emitted | Yes, and decision D6 preserves the capability | Yes |
+| `hash` | ascending `leafHash` bytes | `"/hash"` | emitted, value `"hash"` | **No, and not by omission** | No |
+
+The `roax.ordering` column is committed issuer intent and is **not authority**; section 11.2 defines the leaf and section 9.5 states what each binding is and is not worth.
+
+Both comparisons are plain unsigned byte comparison over the full byte string, shorter-is-first on a proper prefix, which is the same rule section 5 already relies on for `encodePath`.
+
+> **Normative:** an implementation MUST take the ordering as an explicit input at issuance and at verification.
+> It MUST NOT infer one from the record, the profile or the envelope, and it MUST NOT differ between implementations in what it does when none is supplied.
+> Where an implementation supplies a default, that default MUST be `path`.
+
+**Under `path`, order is total and tie-free by construction**, because section 3.3 rejects duplicate encoded paths, so no two leaves can compare equal.
+
+**Under `hash`, totality is not free, and the specification states what to do rather than leaving it to an implementation.**
+
+> **Normative:** if two leaves of one record have equal `leafHash` values, the record MUST be rejected at issuance and the copy MUST be rejected at verification.
+> An implementation MUST NOT break the tie by path or by any other rule.
+
+Paths are already unique, and every leaf preimage is length-prefixed in each of its variable components (section 8), so two equal leaf hashes over distinct paths are a hash collision rather than an input to be ordered.
+Breaking the tie by path would absorb that collision into a well-defined tree and produce a root, which is the failure shape section 4.1 rejects for type inference and section 7.4 rejects for a binding that does not bind: it converts evidence of a broken hash into a silent success.
+
+**Salt assignment does not depend on the ordering, and this is what keeps `hash` ordering non-circular.**
+
+> **Normative:** salts are assigned to leaves in ascending `encodePath` order under **both** orderings.
+> Leaf ordering governs tree placement only.
+
+A leaf hash is computed over its salt (section 8), so under `hash` ordering the tree order is not knowable until every salt is already paired to its leaf.
+Any rule that assigned salts in tree order would therefore be circular and unimplementable.
+Fixing salt assignment at `encodePath` order removes the circularity outright rather than resolving it, and it costs nothing: the envelope's `salts` array is keyed by path rather than by position precisely so that pairing never depends on reproducing a sort (section 7.2).
 
 Then RFC 9162 section 2.1.1, **with one stated adaptation.**
 
@@ -852,7 +911,7 @@ In this design the `0x00` byte is already applied inside `leafHash` (section 8).
 So the tree function here operates on **already-hashed leaves** and MUST NOT apply `0x00` a second time:
 
 ```
-Let L = [ leafHash(...) for each leaf, in encodePath order ]     // each already 0x00-domained
+Let L = [ leafHash(...) for each leaf, in the declared ordering ]  // each already 0x00-domained
 
 MTH([])      = H("")                                             // total function only; see below
 MTH([x])     = x                                                 // NOT H(0x00 ‖ x)
@@ -896,22 +955,159 @@ A proof is verified against `(leaf hash, leaf index, tree size, audit path, root
   It does not follow that a verifier can recover the size, and section 11.1 states what goes wrong for an implementation that assumes it can.
 - It has no duplicate-promotion second-preimage problem, and its non-power-of-two handling is specified rather than invented.
 
-**Sorting by path rather than by leaf hash** additionally makes the tree shape independent of the salt values, and makes absence proofs possible in principle: showing the two adjacent leaves in canonical order proves no leaf exists between them.
-dogtag sorts by hash (`merkle.rs:24-26`).
-This is decision D5, **ruled D5a**; the absence-proof consequence is decision D6, **ruled** out of scope for version 1 with the capability preserved (section 2.2).
+Neither of the two orderings in section 9 disturbs any of the above: RFC 9162's domain separation, shape-from-size property and duplicate-promotion freedom are properties of the tree function, which takes an already-ordered list and does not care how it was ordered.
 
-Three things bought, and one paid, stated together so the trade is visible in the section that makes it:
+### 9.4 Choosing an ordering, and what each one costs
+
+**This is the section a deployment reads to make the choice, so it states the trade rather than a recommendation.**
+The two orderings are not a performance knob and they do not differ in security.
+They differ in exactly one pair of properties, and the pair is a genuine trade rather than a dominance:
+
+- **`path` admits absence proofs, and leaks gap counts.**
+  Ordering by encoded path makes the tree shape a function of the path set alone, so showing the two adjacent leaves in canonical order proves no leaf exists between them.
+  That is what makes absence proofs possible in principle, and it is the capability decision D6 preserves (section 2.2).
+  The same property is the leak: a disclosure revealing leaves at two paths also reveals **how many withheld leaves sort between them**, because the positions are determined by the path order (section 10.1).
+- **`hash` leaks nothing about position, and forecloses absence proofs.**
+  A leaf hash says nothing about where its field sits in the record, so the tree order carries no positional information and there are no gaps to count.
+  The property holds all the way through verification rather than only at issuance: a disclosed copy carries each revealed leaf's **index**, and under `hash` ordering that index is a position in leaf-hash order, which reveals nothing about the record's shape.
+  Section 9.6 states why no verification step ever recovers the positional information the index withholds.
+  The same property is the foreclosure: **absence proofs are impossible under `hash` ordering**, not merely undefined.
+  Two adjacent leaf hashes bound an interval in hash space, and no argument runs from "no leaf hashes between these two" to "no path exists between these two", because hash order and path order are unrelated.
+
+> **Normative:** a deployment selecting `hash` ordering is selecting **against** absence proofs, permanently for every record issued under it.
+> Decision D6 preserves the absence-proof capability for `path`-ordered records only, and no later revision of this specification can restore it for a `hash`-ordered record already issued.
+
+**Two further consequences favour `path`, and they are why it is the default rather than merely the first-listed.**
 
 - **The tree shape is reproducible and therefore checkable.**
-  It is a function of the path set alone, so two implementations can be compared structurally rather than only on a final root.
-  That matters enormously when five of them must agree, and it is the decisive argument.
-- **Absence proofs stay available** at essentially no cost, which is what lets section 2.2 preserve the capability rather than foreclose it.
+  Under `path` it is a function of the path set alone, so two implementations can be compared structurally rather than only on a final root.
+  That matters enormously when five of them must agree, and it was the decisive argument when this was a single choice rather than an axis.
 - **Debugging survives the salt ruling.**
-  Since decision D4 was ruled D4b, salts are independently random, so sorting by leaf hash would now make tree shape effectively random per record - the worst case for diagnosing a cross-implementation disagreement.
-- **Paid: a disclosure reveals the gaps.**
-  A verifier given leaves at two paths learns how many withheld leaves sort between them, because the positions are determined by the path order.
-  Sorting by leaf hash would have hidden that.
-  The leak is bounded in practice, since these profiles are published and their path sets are largely known already, but it is real and structural, and sections 2.2 and 10.1 state it rather than leaving a reader to infer that sorting by path is free.
+  Since decision D4 was ruled D4b, salts are independently random, so under `hash` ordering the tree shape is effectively random per record, which is the worst case for diagnosing a cross-implementation disagreement.
+  This is a cost paid by whoever operates a `hash`-ordered deployment rather than a reason the option should not exist, and the conformance corpus carries `hash`-ordered vectors precisely so that the diagnosis burden falls on the corpus rather than on a production incident.
+
+dogtag sorts by hash (`merkle.rs:24-26`), so `hash` ordering is also the shape a dogtag-derived deployment already has.
+
+This is decision D5, ruled D5a on 2026-07-28 and **amended on 2026-08-02** to make both orderings available and record-selectable; the absence-proof consequence is decision D6, **ruled** out of scope for version 1 with the capability preserved for `path`-ordered records (section 2.2).
+
+### 9.5 How the ordering identifier is bound, and what each binding is worth
+
+**Ordering is authority rather than a hint, for the same reason `hashAlg` is**: it selects which tree a verifier reconstructs, and section 11.3 states normatively that anything outside the root is never authority.
+So this section is section 7.4's structure applied to a second axis, deliberately and not by coincidence.
+
+**A reserved leaf cannot BIND the ordering, and `roax.ordering` does not claim to.**
+The arithmetic is section 7.4's and it is unchanged: a leaf declaring the ordering is itself placed in the tree *by* the ordering it names, so an attacker who computes a whole record under ordering `O` produces a self-consistent record whose `roax.ordering` leaf says `O`, whose every leaf is placed under `O`, and whose root is the one he was aiming at.
+He controls the root, so committing the field inside it binds nothing.
+
+**`ROAX-CANON/1` commits the ordering as a reserved leaf anyway, and section 11.2 argues why that is not 7.4's mistake under a new name.**
+The short form: 7.4's leaf was dangerous because weak hash algorithms exist and the leaf enabled a downgrade attack, whereas `path` and `hash` are equally strong and a liar about ordering merely produces a root that does not match the anchor.
+The leaf is therefore **redundant rather than dangerous**, and what it adds is committed issuer intent: evidence the issuer chose this ordering at issuance rather than merely that a verifier computed it that way.
+
+> **It is NOT AUTHORITY, and this document says so wherever it is mentioned.**
+> H2 below is unchanged by its existence: a verifier takes the ordering from the anchoring registry, never from the envelope and never from this leaf.
+> Section 11.2 states the full rule, including the one thing a verifier MAY do with it.
+
+So the three mechanisms below are what the *binding* rests on, and the leaf sits beside them rather than among them.
+They are listed with what each is actually worth:
+
+**H1.
+The ordering's domain suffix `ORD` is part of `DOMAIN`**, which is a length-prefixed component of every leaf preimage (section 8).
+**Stated honestly, this buys almost nothing cryptographically**, for the same reason the leaf did not: the attacker computes both records under the same domain string.
+What it does buy is real but narrower.
+It removes **cross-ordering root ambiguity by construction**, so the same content under two orderings can never collide on a root by accident.
+Put at its narrowest and most useful: **a leaf is bound to exactly one ordering, so the same leaf set cannot be reassembled into the other tree.**
+
+The failure is sharper than a root mismatch, and the sharper claim is the accurate one.
+Because the two orderings have different domain strings, a copy issued under one ordering and verified under the other fails at the **leaf hash**, not at the tree.
+Every recomputed leaf hash differs, so the disclosed copy's audit path check fails for every leaf independently of tree shape.
+That matters because it holds even where tree shape cannot distinguish the two: a record whose leaves happen to sort identically under both orderings, and the single-leaf case where every ordering of one leaf is the same ordering.
+Without `ORD` those cases would verify under either ordering, and a verifier that had retired one would have no signal at all.
+
+**It costs the disclosure path nothing, which is worth stating because it looks as though it should.**
+A verifier already needs `DOMAIN` to build any leaf preimage, because `DOMAIN` carries `hashAlg`.
+`ORD` joins a string the verifier was already assembling, so H1 adds a field to an existing lookup rather than a new class of dependency.
+Section 9.6 works that through for each of the three cases.
+
+**H2.
+The anchoring registry MUST record the ordering alongside `(root, hashAlg)`, and a verifier MUST take the ordering from the registry, never from the envelope.**
+This is the one that works.
+Authority for which tree to reconstruct then comes from the same place authority for the root comes from, which section 11.3 requires of every other authoritative field.
+This document does not design the anchoring registry (section 2.2), so this is recorded as a requirement handed forward to that work rather than as something closed here.
+It is the same handoff section 7.4 makes for `hashAlg`, and it extends the registry tuple from `(root, hashAlg)` to `(root, hashAlg, ordering)`.
+
+**H3.
+A verifier MUST reject any ordering that is not on its own configured allow-list.**
+This closes the case H2 does not: an ordering that was legitimately registered and has since been retired.
+Without H3 a verifier that has retired `hash` ordering still reconstructs a `hash`-ordered tree because the registry says to.
+An allow-list is also how a deployment enforces the absence-proof decision of section 9.4 across records it did not issue.
+
+The general shape is section 7.4's and is worth restating because this is its second instance: **a self-describing document cannot authenticate its own description.**
+The description has to come from outside, which here means the anchoring layer.
+
+**Why the two domain suffixes are asymmetric, stated as a decision rather than left to be reverse-engineered.**
+`path` ordering contributes the empty string, so a path-ordered record's `DOMAIN` is byte-identical to what `ROAX-CANON/1` specified before this axis existed.
+That is deliberate and it is load-bearing.
+`canon` is pinned to the constant `ROAX-CANON/1` in both envelope schemas, and `DOMAIN` is what binds the canonicalization version into every leaf preimage; giving `path` a non-empty suffix would change every leaf hash of every record already issued under `ROAX-CANON/1`, leaving two mutually unverifiable constructions both answering to that one name.
+Adding an ordering axis is an addition to the version-1 construction family and does not license redefining what version 1 already computed.
+The asymmetry is therefore a compatibility rule with a stated reason, and an implementation MUST take the suffix from the registry table in section 9 rather than deriving it from the ordering's name.
+It is not evidence that `path` is privileged as a construction: `hashAlg` shows the same shape from the other side, where `SHA-256` and `Poseidon-BN254` produce different domain strings without either being the version-1 one.
+
+**Which orderings are defined.**
+`ROAX-CANON/1` defines both `path` and `hash`, completely, for any `hashAlg` whose construction it defines.
+This is the axis on which `ROAX-CANON/1` is *not* short: unlike `Poseidon-BN254`, whose parameterization this document does not pin, neither ordering has an unpinned component.
+
+> **Normative, and unchanged by this section:** a record MUST NOT be issued with `hashAlg: "Poseidon-BN254"` until a revision of this specification pins that parameterization (section 7.4).
+> Selecting either ordering does not affect that prohibition in any way.
+> `hash` ordering is defined over `leafHash` byte strings, which exist only once `H` is defined, so a `hash`-ordered `Poseidon-BN254` record is forbidden twice over rather than enabled by this section.
+
+### 9.6 Where the ordering is an input, and where it is not
+
+**This section exists because the obvious assumption is wrong in the common case, and nothing else in this document says so.**
+The natural reading of "leaf ordering" is that every verifier must reconstruct the tree and therefore must know the ordering.
+A verifier of a **disclosed** copy does not reconstruct the tree at all.
+
+**Disclosed-copy verification does not depend on the ordering for anything to do with tree shape.**
+Section 10 requires a disclosed copy to carry each revealed leaf's **index**, and section 9.2 verifies a proof against `(leaf hash, leaf index, tree size, audit path, root)` per RFC 9162 section 2.1.3.2, which takes all five as inputs.
+The ordering fixed each index at **issuance**.
+A verifier is handed the index and walks the audit path from it, so it never sorts anything, never places a leaf, and would compute the same result under any ordering whatsoever.
+
+> **The ordering is needed for the LEAF PREIMAGE, exactly as `hashAlg` already is, and for nothing structural.**
+> Section 10 step 2 recomputes `leafHash` per section 8, and `DOMAIN` contains both `hashAlg` and `ORD`.
+> So a disclosed-copy verifier needs the ordering for building the domain string and for no other purpose.
+> The index and the audit path are carried, and the tree is never rebuilt.
+
+**That is the distinction worth carrying away, and it is why H1 adds no new class of dependency.**
+A disclosed-copy verifier was never free of `DOMAIN`: it already had to obtain `hashAlg` to build the preimage at all.
+Putting `ORD` into the same string extends a lookup that already existed rather than introducing one, which is why H1 costs the disclosure path nothing beyond one more field in the same fetch.
+
+**What keeping H1 buys, stated plainly and no more, in the same register section 7.4 uses for `hashAlg`.**
+A leaf is bound to exactly one ordering, so the same leaf set cannot be reassembled into the other tree.
+That is real and it is narrow.
+It is not a defence against an attacker who controls the whole record, for section 7.4's reason: he computes under one ordering throughout and the domain string agrees with him.
+
+**This is also what makes the position-privacy property of `hash` ordering real rather than nominal.**
+Under `hash` ordering a disclosed **index** reveals nothing about where the field sits in the record, because the index is a position in leaf-hash order and a leaf hash carries no positional information.
+Since ordinary disclosure verification consumes the index and never reconstructs the tree, that property survives the entire verification path intact: there is no step at which a verifier recovers, or needs to recover, where a disclosed leaf sat among the record's paths.
+
+**Where the ordering genuinely is structural, stated so the three cases are not conflated:**
+
+| Case | Structural use | Leaf-preimage use |
+|---|---|---|
+| Issuance | Yes, it places every leaf in the tree | Yes, through `DOMAIN` |
+| Full-copy verification | Yes, the tree is rebuilt from the record | Yes, through `DOMAIN` |
+| Disclosed-copy verification | **None**, the index is carried and the tree is never rebuilt | Yes, through `DOMAIN`, exactly as `hashAlg` is |
+| Absence proofs | Yes, and under `path` only: adjacency in the canonical order (sections 2.2 and 9.4) | Yes, through `DOMAIN` |
+
+**This is what makes `roax.ordering` honest to describe as redundant.**
+On the disclosure path the leaf is never consulted: verification succeeds or fails on the domain string and the audit path, whether or not the leaf was revealed, and section 11.2 forbids a verifier from selecting the ordering from it in any case.
+Its value is committed issuer intent for audit and for dispute, which is precisely what section 11.2 claims for it and no more.
+
+**And it is where this document must be as honest as section 7.4 is.**
+Every case above needs an ordering from somewhere, and section 9.5's H2 says that somewhere is the anchoring registry.
+**The anchoring registry is a requirement handed forward, not a mechanism this document designs** (section 2.2), so H2 does not answer the question today; it records who must answer it.
+Until that work lands, a verifier takes the ordering from its own configuration under H3, which is an allow-list rather than a source of authority, and a deployment that verifies records it did not issue has no authenticated source for the ordering at all.
+That gap is smaller than it looks for the disclosed path, because a wrong ordering there fails closed at step 2 rather than yielding a wrong answer, and it is exactly as large as it looks for full-copy verification.
+Stating it is the point: an implementer who reads H2 as a solved mechanism will build against something that does not exist.
 
 ---
 
@@ -943,14 +1139,17 @@ It trusts the `leaf_hash` you hand it, so on its own it proves nothing" (`merkle
 
 ### 10.1 What a verifier learns, and what it does not
 
-**Learns:** each disclosed path, value and salt; the total leaf count; the disclosed indices; the sibling hashes on each audit path; and **how many withheld leaves sort between any two disclosed ones**, since leaf indices are positions in the encoded-path order of section 9.
+**Learns:** each disclosed path, value and salt; the total leaf count; the disclosed indices; the sibling hashes on each audit path; and, **under `path` ordering only**, **how many withheld leaves sort between any two disclosed ones**, since under that ordering leaf indices are positions in the encoded-path order of section 9.
 
 **Does not learn:** any other path, value or salt - and therefore nothing brute-forceable about withheld low-entropy fields such as name, national identifier, passport number, birth date or gender, all of which appear in the reference records.
 
 **The gap count is a real structural leak and is named rather than left implicit.**
-It is the residual cost of ordering by path (decision D5a), and it is the one thing ordering by leaf hash would have hidden.
-Section 9.3 states what that ordering bought in exchange.
-In practice the leak is bounded, because these profiles are published and their path sets are largely known already, so a verifier who knows the profile can often infer the same information without any disclosure at all - but "usually inferable anyway" is not "not disclosed", and section 2.2 lists it among the properties this design does not provide.
+It is the residual cost of ordering by path (decision D5a), and since the 2026-08-02 amendment to decision D5 it is also the reason `hash` ordering exists rather than a cost with no alternative.
+Section 9.4 states what each ordering buys in exchange for the other.
+In practice the leak is bounded, because these profiles are published and their path sets are largely known already, so a verifier who knows the profile can often infer the same information without any disclosure at all - but "usually inferable anyway" is not "not disclosed", and section 2.2 lists it among the properties this design does not provide by default.
+
+**Under `hash` ordering a disclosed index carries no positional information at all**, because the ordering is over leaf hashes and a leaf hash says nothing about where its field sits.
+A verifier still learns the total leaf count and the disclosed indices, so this is gap privacy rather than leaf-count privacy; section 2.2 lists the leaf count as inherent to the construction and no ordering changes that.
 
 #### Why a withheld leaf's salt is the whole ballgame
 
@@ -1133,6 +1332,7 @@ Nothing about them is special-cased except where they come from.
 | `roax.recordId` | `[KEY("roax.recordId")]` | 2 STRING | the envelope's `recordId` | always | mandatory |
 | `roax.issuer.id` | `[KEY("roax.issuer.id")]` | 2 STRING | the envelope's `issuer.id` | always | mandatory |
 | `roax.issuer.keyId` | `[KEY("roax.issuer.keyId")]` | 2 STRING | the envelope's `issuer.keyId` | only when `issuer.keyId` is present | OPTIONAL |
+| `roax.ordering` | `[KEY("roax.ordering")]` | 2 STRING | the record's leaf ordering identifier | only when the ordering is not the default `path` | OPTIONAL |
 
 Every reserved leaf is a STRING, so every value is normalized to NFC and encoded per section 6.1 like any other string.
 
@@ -1159,12 +1359,53 @@ That is the same trap section 11.3 records for mutable routing fields, arriving 
 An anchored root freezes what it commits, so a rule that forced disclosure of the key identifier would leave an already-issued record with no rotation path at all, which is the precise shape of foreclosure the future-proofing constraint exists to prevent.
 Section 10.2 therefore narrows the minimum-disclosure floor to the five mandatory paths rather than to every reserved path, and says so in the place an editor would otherwise widen it back.
 
-`issuer.keyId` is also the one reserved leaf whose *presence* varies.
 **An absent `issuer.keyId` emits no leaf**; it MUST NOT be emitted as a NULL leaf or as an empty string, because those are three different roots and only one of them can be right.
-The reserved leaf count is therefore 5 or 6.
+The same rule governs `roax.ordering`, which is the second reserved leaf whose *presence* varies: a `path`-ordered record emits no ordering leaf at all, and MUST NOT emit `"path"`, a NULL, or an empty string in its place.
+The reserved leaf count is therefore 5, 6 or 7.
+
+#### `roax.ordering` departs from section 7.4, and the departure is argued rather than assumed
+
+**Section 7.4 removed `roax.hashAlg` and this section adds `roax.ordering`, so the difference between the two has to be stated or the earlier ruling reads as reversed by drift.**
+It is not reversed.
+The two cases differ on the fact that made 7.4's leaf dangerous.
+
+**7.4's leaf was dangerous because weak hash algorithms exist.**
+An attacker computes a whole record under a broken hash `W`, declares `W`, and a verifier that trusts the declaration runs `W` and is defeated.
+The leaf is hashed under the very thing it fails to constrain, so it is not merely useless but actively harmful: it is a downgrade attack with a field that looks like a defence.
+
+**Ordering has no weak option, and that is the whole of the difference.**
+`path` and `hash` sorting are equally strong.
+Neither weakens any hash, neither changes what a leaf preimage contains, and neither admits a forgery the other refuses.
+There is no downgrade to attack toward, so a liar about ordering gains nothing: he produces a tree whose root simply does not match the anchored one, and the verification fails at the root comparison every verifier already performs.
+
+**So the leaf is redundant rather than dangerous, and what it adds is committed issuer intent.**
+Without it, a disclosed copy shows only that *a verifier computed* the record under some ordering.
+With it, the copy carries evidence that the *issuer chose* that ordering **at issuance**, inside the root, disclosable and checkable like any other reserved leaf.
+That is a real addition for audit and for dispute, and it costs one leaf on the records that carry it.
+
+> **Normative, and stated in the same breath because 7.4's real lesson is that a binding readers mistake for authority is worse than none:**
+>
+> `roax.ordering` is **NOT AUTHORITY**.
+> A verifier MUST take the ordering from the anchoring registry (section 9.5, H2), never from this leaf, never from the envelope, and never from any other field the presenter controls.
+> A verifier MUST NOT use this leaf to *select* the ordering it reconstructs the tree under, and MUST NOT accept a copy because this leaf agrees with something.
+> Having taken the ordering from the registry, a verifier MAY check that a disclosed `roax.ordering` agrees with it and MUST reject the copy on disagreement; that check is an integrity assertion over an already-selected ordering, not a source for one.
+
+A binding that does not bind is worse than none **only when a reader mistakes it for one**, which is why the paragraph above says plainly what this leaf is and what it is not.
+7.4's leaf could not be rescued by such a paragraph, because its danger was a live downgrade attack rather than a misreading; this one has no attack to rescue it from.
+
+**The leaf is conditional for the same compatibility reason `ORD` is asymmetric (section 9.5), and that is a cost of this amendment rather than a tidy result.**
+A reserved leaf emitted always would change the leaf set, and therefore the root, of every `path`-ordered record already issued under `ROAX-CANON/1`.
+That is precisely the two-mutually-unverifiable-constructions-under-one-name outcome section 9.5 refuses, and refusing it here for a leaf while accepting it there for a domain string would be incoherent.
+So a `path`-ordered record commits its ordering through `DOMAIN` in every leaf preimage (section 8) rather than through a readable leaf, and only a `hash`-ordered record carries the readable evidence.
+State that limit rather than describing the intent commitment as universal: for the default ordering it is implicit in the preimage, and a reader who wants it explicit for every record is asking for `ROAX-CANON/2`.
+
+**`roax.ordering` MUST NOT be added to the minimum-disclosure floor.**
+The reasoning is `issuer.keyId`'s, arriving from a different direction: the floor exists so a verifier can say what it is looking at (section 10.2), and the ordering is something a verifier has already obtained from the registry before it evaluates a single leaf.
+Requiring its disclosure would add a mandatory field that answers a question already answered, and would make the floor differ between two records that differ only in an ordering neither verifier reads from the copy.
+Section 10.2's floor stays at the five mandatory paths.
 
 **Two leaves that an earlier draft committed have been removed, and the reasons differ.**
-`roax.hashAlg` was removed because a leaf cannot bind the algorithm it is hashed under at all (section 7.4).
+`roax.hashAlg` was removed because a leaf cannot bind the algorithm it is hashed under at all (section 7.4), and the subsection above states why `roax.ordering` is not that leaf under a new name.
 `roax.canon` was removed because it is redundant rather than wrong: `canon` is already inside `DOMAIN` in every leaf preimage (section 8), so a v2 library cannot be tricked into applying v2 rules to a v1 record, and the leaf paid roughly 290 bytes on every disclosed copy for a property already bought.
 
 Without this table the specification's headline claim in the preamble does not hold, which is why that claim names this section.
@@ -1571,8 +1812,8 @@ Eight confirmed what it already said; two changed it.
 |---|---|---|
 | **D3** wire format | JSON for v1; dCBOR permitted as a transport and normatively forbidden as the digest rule | 13.2 |
 | **D4** salt strategy | **D4b**, one independently random CSPRNG salt per leaf. **Changed this document**: the KDF, the master salt and the record identifier in a preimage are gone | 7, 7.1, 7.2, 7.3, 8, 10.2, 11.2 |
-| **D5** leaf ordering | D5a, by `encodePath` bytes, with the residual gap leak stated | 9, 9.3, 10.1, 2.2 |
-| **D6** absence proofs | Out of scope for v1, capability deliberately preserved | 2.2, 9.3 |
+| **D5** leaf ordering | D5a, by `encodePath` bytes, with the residual gap leak stated. **Amended 2026-08-02**: `hash` ordering is a second first-class option, selected per record and declared, with `path` the default and a conditional `roax.ordering` leaf committing issuer intent without being authority | 9, 9.4, 9.5, 10.1, 2.2, 8, 11.2 |
+| **D6** absence proofs | Out of scope for v1, capability deliberately preserved. **Amended 2026-08-02**: preserved for `path`-ordered records, and foreclosed rather than deferred for `hash`-ordered ones | 2.2, 9.4 |
 | **D7** unknown paths | D7a, fail closed, with the type map stated as a versioned issuer-extensible artifact | 4.2, 4.3 |
 | **D8** inside the root | Identity in, routing out, plus a mandatory corpus vector that fails a verifier trusting an outside field | 11.2, 11.3 |
 | **D9** big blobs | Inline for v1; **extended this document** with a content-addressed binding defined now and selected by no v1 profile, plus a pinned canonical base64 form | 6.1, 6.3, 6.5 |

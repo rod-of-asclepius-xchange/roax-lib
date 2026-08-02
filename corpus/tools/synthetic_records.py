@@ -394,6 +394,88 @@ def build_record_vectors():
     return out
 
 
+# Class 21. (vector name, fixture, issuer key id). One record issued under BOTH orderings.
+#
+# The point of the class is that a runner cannot pass it by computing one ordering: every vector
+# carries both roots, both leaf-hash sequences and both leaf counts, and the builder refuses to
+# emit a vector whose two roots agree. A runner that ignored the second ordering would report a
+# missing root rather than a green.
+ORDERING_VECTOR_PLAN = [
+    ("ordering-typed-scalars", "typed-scalars.json", None),
+    ("ordering-typed-scalars-with-key-id", "typed-scalars.json",
+     "did:web:corpus.roax.invalid#key-1"),
+    ("ordering-structure-explicit-null", "structure-explicit-null.json", None),
+]
+
+
+def build_ordering_vectors():
+    """Class 21. One record, both leaf orderings, asserting TWO roots that differ.
+
+    Specification section 9 makes leaf ordering a per-record choice between `path` and `hash`,
+    and section 9.5 puts the ordering's domain suffix inside every leaf preimage. Both halves
+    are asserted here: the roots differ, and so does every leaf hash, which is what proves the
+    difference is not merely a permutation of one leaf set.
+
+    ONE salt set serves both orderings. It is drawn over the HASH-ordered leaf set because that
+    set is a superset - it carries the conditional `roax.ordering` leaf that a path-ordered
+    issuance does not emit (section 11.2) - and a path-keyed set is looked up by path, so the
+    extra entry is simply never read on the path-ordered side. Two salt sets would make the two
+    roots differ for a reason that has nothing to do with ordering.
+    """
+    import json_literal
+
+    type_map = synthetic_type_map()
+    out = []
+    for name, fixture, key_id in ORDERING_VECTOR_PLAN:
+        record = json_literal.loads(RECORD_FIXTURES[fixture])
+        identity = (SYNTHETIC_RECORD_TYPE, SYNTHETIC_SCHEMA_VERSION, RECORD_ID_A, ISSUER_ID, key_id)
+        superset = ref.ordered_leaves(record, type_map, *identity, ordering=ref.ORDERING_HASH)
+        salt_doc = _salt_doc(name, superset)
+        salts = ref.salt_set_from_document(salt_doc, superset)
+
+        sides = {}
+        for ordering in (ref.ORDERING_PATH, ref.ORDERING_HASH):
+            root, leaves, _salts, hashes = ref.build_tree(
+                "SHA-256", record, type_map, salts, *identity, ordering=ordering
+            )
+            sides[ordering] = {
+                "leafCount": len(leaves),
+                "root": root.hex(),
+                # In TREE order, so a runner that reproduces the root but places the leaves
+                # wrongly still fails. The display path is for a human reading a diff and is
+                # never an input to anything (spec section 5.2).
+                "leafHashes": [h.hex() for h in hashes],
+                "displayPaths": [ref.display_path(leaf.segments) for leaf in leaves],
+            }
+
+        if sides["path"]["root"] == sides["hash"]["root"]:
+            raise SystemExit(f"corpus defect: {name} produces the same root under both orderings")
+        if set(sides["path"]["leafHashes"]) & set(sides["hash"]["leafHashes"]):
+            raise SystemExit(f"corpus defect: {name} shares a leaf hash across orderings")
+        # Section 11.2: the ordering leaf is emitted for `hash` and for nothing else.
+        if ref.RESERVED_ORDERING in sides["path"]["displayPaths"]:
+            raise SystemExit(f"corpus defect: {name} emits roax.ordering under path ordering")
+        if ref.RESERVED_ORDERING not in sides["hash"]["displayPaths"]:
+            raise SystemExit(f"corpus defect: {name} omits roax.ordering under hash ordering")
+
+        vec = {
+            "name": name,
+            "class": 21,
+            "recordType": SYNTHETIC_RECORD_TYPE,
+            "schemaVersion": SYNTHETIC_SCHEMA_VERSION,
+            "issuerId": ISSUER_ID,
+            "recordFile": "corpus/fixtures/records/" + fixture,
+            "saltsFile": salt_sets.reference_for(name),
+            "saltPairing": "path",
+            "recordId": RECORD_ID_A,
+            "orderings": sides,
+        }
+        if key_id is not None:
+            vec["issuerKeyId"] = key_id
+        out.append(vec)
+    return out
+
+
 # Class 19. (vector name, site, salt-set name, NFD fixture, NFC fixture).
 #
 # BOTH SITES ARE BUILT. docs/conformance-corpus.md class 19 always required both, because an

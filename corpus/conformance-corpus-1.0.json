@@ -1,8 +1,9 @@
 {
-  "corpusVersion": "1.1.0",
+  "corpusVersion": "1.2.0",
   "canon": "ROAX-CANON/1",
   "hashAlg": "SHA-256",
   "unicodeVersion": "15.1",
+  "defaultOrdering": "path",
   "vectors": {
     "encodePath": [
       {
@@ -1084,7 +1085,8 @@
         "tag": 4,
         "value": "0.010",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "4f7a5030040438e908881871ab88a178e2de3ef57be45b28edd1b68c42a8dc4b"
+        "leafHash": "4f7a5030040438e908881871ab88a178e2de3ef57be45b28edd1b68c42a8dc4b",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-0.01",
@@ -1097,7 +1099,8 @@
         "tag": 4,
         "value": "0.01",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "3951fe66ad27302212dd78897fdb9d8326aca44474ef5308cfe8f0387d17b21d"
+        "leafHash": "3951fe66ad27302212dd78897fdb9d8326aca44474ef5308cfe8f0387d17b21d",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-1.50",
@@ -1110,7 +1113,8 @@
         "tag": 4,
         "value": "1.50",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "608de43432cd0633b690440a8315444e8eb8f2fe90f326aee192bf09fd8c1612"
+        "leafHash": "608de43432cd0633b690440a8315444e8eb8f2fe90f326aee192bf09fd8c1612",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-1.5",
@@ -1123,7 +1127,8 @@
         "tag": 4,
         "value": "1.5",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "7021dc80928d2380c1f13b3d0b53ee5759c175adecd1be3eaa091ed80e0f1bcc"
+        "leafHash": "7021dc80928d2380c1f13b3d0b53ee5759c175adecd1be3eaa091ed80e0f1bcc",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-2.0",
@@ -1136,7 +1141,8 @@
         "tag": 4,
         "value": "2.0",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "56c35546cec20e0151fe55e042174071a6e59ab6ecbd4836405e0d8aa5d9c36b"
+        "leafHash": "56c35546cec20e0151fe55e042174071a6e59ab6ecbd4836405e0d8aa5d9c36b",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-2",
@@ -1149,7 +1155,8 @@
         "tag": 4,
         "value": "2",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "6e6eb3e6e347dd2d4f95a83eda3d92b6d84830a0e716d3e0a50ad91c7f5f04c7"
+        "leafHash": "6e6eb3e6e347dd2d4f95a83eda3d92b6d84830a0e716d3e0a50ad91c7f5f04c7",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-neg-0.0",
@@ -1162,7 +1169,8 @@
         "tag": 4,
         "value": "-0.0",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "e67e02eba8624faba88d4f3caaac1f83c1971e17fa41f8c52706bf098f14f6a8"
+        "leafHash": "e67e02eba8624faba88d4f3caaac1f83c1971e17fa41f8c52706bf098f14f6a8",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-neg-0.00",
@@ -1175,7 +1183,8 @@
         "tag": 4,
         "value": "-0.00",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "f0fafaf9777ff31163113051ef2d1f8387ac37044b085f4a3436e3c27c1a86e0"
+        "leafHash": "f0fafaf9777ff31163113051ef2d1f8387ac37044b085f4a3436e3c27c1a86e0",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-neg-zero-integral",
@@ -1188,7 +1197,8 @@
         "tag": 4,
         "value": "-0",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "4ea6cf65b43fd0827cb7749298a1d84d7423690cc341e5d1873ec346d943d184"
+        "leafHash": "4ea6cf65b43fd0827cb7749298a1d84d7423690cc341e5d1873ec346d943d184",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-tiny-20dp",
@@ -1201,7 +1211,8 @@
         "tag": 4,
         "value": "0.00000000000000000001",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "bc950e202515a86cd325c6e2615a3cf63effa677d7ed57cd765172bc8e8fc65b"
+        "leafHash": "bc950e202515a86cd325c6e2615a3cf63effa677d7ed57cd765172bc8e8fc65b",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-40-digit-integer-part",
@@ -1214,7 +1225,8 @@
         "tag": 4,
         "value": "1234567890123456789012345678901234567890",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "0e197dcb5c5da1898e1eff5e8b10e2de0303de8950bba93a67f9ba8dfa96ad16"
+        "leafHash": "0e197dcb5c5da1898e1eff5e8b10e2de0303de8950bba93a67f9ba8dfa96ad16",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-40-digit-fraction",
@@ -1227,7 +1239,8 @@
         "tag": 4,
         "value": "0.1234567890123456789012345678901234567890",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "256cc637b7da4094a8d4c34256d820c6608505816dc87d8e2bffe4bc841060b9"
+        "leafHash": "256cc637b7da4094a8d4c34256d820c6608505816dc87d8e2bffe4bc841060b9",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-beyond-double",
@@ -1240,7 +1253,8 @@
         "tag": 4,
         "value": "1234567890123456789.1",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "52360e7bf8ff3b746bcde647646bdb1be3b69b928491a5e8371346fe3bce66f0"
+        "leafHash": "52360e7bf8ff3b746bcde647646bdb1be3b69b928491a5e8371346fe3bce66f0",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-int64-max",
@@ -1253,7 +1267,8 @@
         "tag": 4,
         "value": "9223372036854775807",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "686475895f74a76b9cea96a541c7a35b9e99b2fe527597ce72d7c039a004ac6d"
+        "leafHash": "686475895f74a76b9cea96a541c7a35b9e99b2fe527597ce72d7c039a004ac6d",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-1e2",
@@ -1266,7 +1281,8 @@
         "tag": 4,
         "value": "1e2",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "45092424d7c38cdcbe32c12767211607b98083ed1ef38c406435eb885e715a56"
+        "leafHash": "45092424d7c38cdcbe32c12767211607b98083ed1ef38c406435eb885e715a56",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-1.0e2",
@@ -1279,7 +1295,8 @@
         "tag": 4,
         "value": "1.0e2",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "45092424d7c38cdcbe32c12767211607b98083ed1ef38c406435eb885e715a56"
+        "leafHash": "45092424d7c38cdcbe32c12767211607b98083ed1ef38c406435eb885e715a56",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-100",
@@ -1292,7 +1309,8 @@
         "tag": 4,
         "value": "100",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "45092424d7c38cdcbe32c12767211607b98083ed1ef38c406435eb885e715a56"
+        "leafHash": "45092424d7c38cdcbe32c12767211607b98083ed1ef38c406435eb885e715a56",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-100.0",
@@ -1305,7 +1323,8 @@
         "tag": 4,
         "value": "100.0",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "cf154353756ccd837f094f1b0fdab1527cf1e7d78094963072f4fc9dbeed4f81"
+        "leafHash": "cf154353756ccd837f094f1b0fdab1527cf1e7d78094963072f4fc9dbeed4f81",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-1.00e1",
@@ -1318,7 +1337,8 @@
         "tag": 4,
         "value": "1.00e1",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "7fae7a3a5feedc65c5e779c6921ec751cd2d39ac459e1b63bd80f1700eed4a90"
+        "leafHash": "7fae7a3a5feedc65c5e779c6921ec751cd2d39ac459e1b63bd80f1700eed4a90",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-1.5e-2",
@@ -1331,7 +1351,8 @@
         "tag": 4,
         "value": "1.5e-2",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "dbee58fa397579f89525ea65fe19d1d2a71da540a6ad573871326428334d01b5"
+        "leafHash": "dbee58fa397579f89525ea65fe19d1d2a71da540a6ad573871326428334d01b5",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-1e-3",
@@ -1344,7 +1365,8 @@
         "tag": 4,
         "value": "1e-3",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "fce2dead41473a3f044f36f126ea44b11acd937d031e925aae7b282e44481c38"
+        "leafHash": "fce2dead41473a3f044f36f126ea44b11acd937d031e925aae7b282e44481c38",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-0e5",
@@ -1357,7 +1379,8 @@
         "tag": 4,
         "value": "0e5",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "4ea6cf65b43fd0827cb7749298a1d84d7423690cc341e5d1873ec346d943d184"
+        "leafHash": "4ea6cf65b43fd0827cb7749298a1d84d7423690cc341e5d1873ec346d943d184",
+        "ordering": "path"
       },
       {
         "name": "leaf-integer-int64-max",
@@ -1370,7 +1393,8 @@
         "tag": 3,
         "value": "9223372036854775807",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "f39c53ea153c1a93fe69689e21dd8a3776fdec681fdba75e56756f1ade65e7f9"
+        "leafHash": "f39c53ea153c1a93fe69689e21dd8a3776fdec681fdba75e56756f1ade65e7f9",
+        "ordering": "path"
       },
       {
         "name": "leaf-integer-int64-min",
@@ -1383,7 +1407,8 @@
         "tag": 3,
         "value": "-9223372036854775808",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "8010e27f0d48c798b7ad72de7f68f3fba6a3950ee0582394cf577017903e0e15"
+        "leafHash": "8010e27f0d48c798b7ad72de7f68f3fba6a3950ee0582394cf577017903e0e15",
+        "ordering": "path"
       },
       {
         "name": "leaf-integer-40-digit",
@@ -1396,7 +1421,8 @@
         "tag": 3,
         "value": "1234567890123456789012345678901234567890",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "a89d302191390ff72466003c673deea56393429c89c6382d6f0417d4a852d661"
+        "leafHash": "a89d302191390ff72466003c673deea56393429c89c6382d6f0417d4a852d661",
+        "ordering": "path"
       },
       {
         "name": "leaf-integer-neg-zero",
@@ -1409,7 +1435,8 @@
         "tag": 3,
         "value": "-0",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "c199c9da090a037b38aa8e3ec0cf25785a472c0972370fa90bc8228e8baf8085"
+        "leafHash": "c199c9da090a037b38aa8e3ec0cf25785a472c0972370fa90bc8228e8baf8085",
+        "ordering": "path"
       },
       {
         "name": "leaf-integer-zero",
@@ -1422,7 +1449,8 @@
         "tag": 3,
         "value": "0",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "c199c9da090a037b38aa8e3ec0cf25785a472c0972370fa90bc8228e8baf8085"
+        "leafHash": "c199c9da090a037b38aa8e3ec0cf25785a472c0972370fa90bc8228e8baf8085",
+        "ordering": "path"
       },
       {
         "name": "leaf-integer-five",
@@ -1435,7 +1463,8 @@
         "tag": 3,
         "value": "5",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "c5d6f2fb1b88f4f59885330568390fdf1155f1187d60577e829db7b792ac177e"
+        "leafHash": "c5d6f2fb1b88f4f59885330568390fdf1155f1187d60577e829db7b792ac177e",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-at-digit-bound",
@@ -1448,7 +1477,8 @@
         "tag": 4,
         "value": "1e1023",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "f7d2a5ba8c5b803673b9cb98a977f2e55f28f2419ff4d23444fdd2a2ad239855"
+        "leafHash": "f7d2a5ba8c5b803673b9cb98a977f2e55f28f2419ff4d23444fdd2a2ad239855",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-nfc-e-acute",
@@ -1461,7 +1491,8 @@
         "tag": 2,
         "value": "é",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "831f7f57d2a8d2db8c3969236afee384beac960a8658ea3d42e699323084f81a"
+        "leafHash": "831f7f57d2a8d2db8c3969236afee384beac960a8658ea3d42e699323084f81a",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-nfd-e-acute",
@@ -1474,7 +1505,8 @@
         "tag": 2,
         "value": "é",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "831f7f57d2a8d2db8c3969236afee384beac960a8658ea3d42e699323084f81a"
+        "leafHash": "831f7f57d2a8d2db8c3969236afee384beac960a8658ea3d42e699323084f81a",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-above-bmp",
@@ -1487,7 +1519,8 @@
         "tag": 2,
         "value": "😀",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "38e9669bcba0fc3f5e2e2132b3367acfd6a51904a20b5d07689992de2ed6b1e6"
+        "leafHash": "38e9669bcba0fc3f5e2e2132b3367acfd6a51904a20b5d07689992de2ed6b1e6",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-fullwidth-z",
@@ -1500,7 +1533,8 @@
         "tag": 2,
         "value": "Ｚ",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "247cdf84d57e6444fb7e2b45e7e7f136b47fe64920e2091f942a9850c7f352e8"
+        "leafHash": "247cdf84d57e6444fb7e2b45e7e7f136b47fe64920e2091f942a9850c7f352e8",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-ascii-z",
@@ -1513,7 +1547,8 @@
         "tag": 2,
         "value": "Z",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "54d31d188c3444268e0518827400926c79b5467b9495b177b139ae01a18290ce"
+        "leafHash": "54d31d188c3444268e0518827400926c79b5467b9495b177b139ae01a18290ce",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-kelvin-sign",
@@ -1526,7 +1561,8 @@
         "tag": 2,
         "value": "K",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "01fbfc2f8a19412de13e9dbc2de35181f08b6b523a2fd33f04ecad17329b64d7"
+        "leafHash": "01fbfc2f8a19412de13e9dbc2de35181f08b6b523a2fd33f04ecad17329b64d7",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-ascii-k",
@@ -1539,7 +1575,8 @@
         "tag": 2,
         "value": "K",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "01fbfc2f8a19412de13e9dbc2de35181f08b6b523a2fd33f04ecad17329b64d7"
+        "leafHash": "01fbfc2f8a19412de13e9dbc2de35181f08b6b523a2fd33f04ecad17329b64d7",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-hangul-decomposed",
@@ -1552,7 +1589,8 @@
         "tag": 2,
         "value": "각",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "0e91a0ddaf9e681ac3d1692eb61209c95f83d5d616b3b386ace31bb33542381e"
+        "leafHash": "0e91a0ddaf9e681ac3d1692eb61209c95f83d5d616b3b386ace31bb33542381e",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-hangul-composed",
@@ -1565,7 +1603,8 @@
         "tag": 2,
         "value": "각",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "0e91a0ddaf9e681ac3d1692eb61209c95f83d5d616b3b386ace31bb33542381e"
+        "leafHash": "0e91a0ddaf9e681ac3d1692eb61209c95f83d5d616b3b386ace31bb33542381e",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-angstrom-singleton",
@@ -1578,7 +1617,8 @@
         "tag": 2,
         "value": "Å",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "01b181161f5cab2b36a163ac3344671538b48399677b6bdee3c83a695594e7da"
+        "leafHash": "01b181161f5cab2b36a163ac3344671538b48399677b6bdee3c83a695594e7da",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-a-ring-composed",
@@ -1591,7 +1631,8 @@
         "tag": 2,
         "value": "Å",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "01b181161f5cab2b36a163ac3344671538b48399677b6bdee3c83a695594e7da"
+        "leafHash": "01b181161f5cab2b36a163ac3344671538b48399677b6bdee3c83a695594e7da",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-combining-mark-reordering",
@@ -1604,7 +1645,8 @@
         "tag": 2,
         "value": "q̣̇",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "09ee738a13d4e8ca75fa12850a8f503ecb55ff19e4513015a37db7f833a5bbba"
+        "leafHash": "09ee738a13d4e8ca75fa12850a8f503ecb55ff19e4513015a37db7f833a5bbba",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-combining-mark-canonical-order",
@@ -1617,7 +1659,8 @@
         "tag": 2,
         "value": "q̣̇",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "09ee738a13d4e8ca75fa12850a8f503ecb55ff19e4513015a37db7f833a5bbba"
+        "leafHash": "09ee738a13d4e8ca75fa12850a8f503ecb55ff19e4513015a37db7f833a5bbba",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-vietnamese-decomposed",
@@ -1630,7 +1673,8 @@
         "tag": 2,
         "value": "ệ",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "d832a645014a86c0c3f0d9f51c0a3f16345e1af6430040b2fec56ff3b74b6c30"
+        "leafHash": "d832a645014a86c0c3f0d9f51c0a3f16345e1af6430040b2fec56ff3b74b6c30",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-vietnamese-composed",
@@ -1643,7 +1687,8 @@
         "tag": 2,
         "value": "ệ",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "d832a645014a86c0c3f0d9f51c0a3f16345e1af6430040b2fec56ff3b74b6c30"
+        "leafHash": "d832a645014a86c0c3f0d9f51c0a3f16345e1af6430040b2fec56ff3b74b6c30",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-no-composition-arabic",
@@ -1656,7 +1701,8 @@
         "tag": 2,
         "value": "مرحبا",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "1ce0681551c94334179e6593a3ade800e304292a58ee88546a47d9fb1881c972"
+        "leafHash": "1ce0681551c94334179e6593a3ade800e304292a58ee88546a47d9fb1881c972",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-devanagari-nukta",
@@ -1669,7 +1715,8 @@
         "tag": 2,
         "value": "क़",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "5782a11348fe6bbd1b5debcbf020bc61b6330fbd8ab25cba0678924c32012088"
+        "leafHash": "5782a11348fe6bbd1b5debcbf020bc61b6330fbd8ab25cba0678924c32012088",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-five",
@@ -1682,7 +1729,8 @@
         "tag": 2,
         "value": "5",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "62a26dc4f05e139bb082c7f6216d91235617065286675daec7899f60053b14ea"
+        "leafHash": "62a26dc4f05e139bb082c7f6216d91235617065286675daec7899f60053b14ea",
+        "ordering": "path"
       },
       {
         "name": "leaf-decimal-5.0",
@@ -1695,7 +1743,8 @@
         "tag": 4,
         "value": "5.0",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "13d472da3ee42425570c1bf413304b1f986786e376c3fcfb22311466c291bff0"
+        "leafHash": "13d472da3ee42425570c1bf413304b1f986786e376c3fcfb22311466c291bff0",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-true",
@@ -1708,7 +1757,8 @@
         "tag": 2,
         "value": "true",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "aceb0dbd6ea66eb948db40d33c009dda2c2df4acfabfe38a1017fc465eca89f7"
+        "leafHash": "aceb0dbd6ea66eb948db40d33c009dda2c2df4acfabfe38a1017fc465eca89f7",
+        "ordering": "path"
       },
       {
         "name": "leaf-bool-true",
@@ -1721,7 +1771,8 @@
         "tag": 1,
         "value": true,
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "b2d8e7a1b0879fc82cde7b8d9f1a133f8c1921aab4372bbd92bbab6f3418fa82"
+        "leafHash": "b2d8e7a1b0879fc82cde7b8d9f1a133f8c1921aab4372bbd92bbab6f3418fa82",
+        "ordering": "path"
       },
       {
         "name": "leaf-bool-false",
@@ -1734,7 +1785,8 @@
         "tag": 1,
         "value": false,
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "573f3218ccde369168b08ff4c4f13235240d52d0804ae3a21d5bec36fff4c793"
+        "leafHash": "573f3218ccde369168b08ff4c4f13235240d52d0804ae3a21d5bec36fff4c793",
+        "ordering": "path"
       },
       {
         "name": "leaf-integer-100",
@@ -1747,7 +1799,8 @@
         "tag": 3,
         "value": "100",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "6dcd3433668f8d2b3f0fa76ebe79fb108724f20352176aaf458116ebf2ec2f2b"
+        "leafHash": "6dcd3433668f8d2b3f0fa76ebe79fb108724f20352176aaf458116ebf2ec2f2b",
+        "ordering": "path"
       },
       {
         "name": "leaf-bytes-decoded-octets",
@@ -1760,7 +1813,8 @@
         "tag": 5,
         "value": "48656c6c6f2c20524f415821",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "3b9b457b26684b1c626afc9d8acd64b86d1b782ba6a822850616ce58105bd547"
+        "leafHash": "3b9b457b26684b1c626afc9d8acd64b86d1b782ba6a822850616ce58105bd547",
+        "ordering": "path"
       },
       {
         "name": "leaf-string-base64-text",
@@ -1773,7 +1827,8 @@
         "tag": 2,
         "value": "SGVsbG8sIFJPQVgh",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "f93975fa8179c9a6784a31e677cb0d2327cad3b3c6959179eb32f1a0349bf674"
+        "leafHash": "f93975fa8179c9a6784a31e677cb0d2327cad3b3c6959179eb32f1a0349bf674",
+        "ordering": "path"
       },
       {
         "name": "leaf-bytes-empty",
@@ -1786,7 +1841,8 @@
         "tag": 5,
         "value": "",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "3aac49d92c6323e33eddc5f2e78eaa9e338503f69dcb770ce3e1f8dfee4b3319"
+        "leafHash": "3aac49d92c6323e33eddc5f2e78eaa9e338503f69dcb770ce3e1f8dfee4b3319",
+        "ordering": "path"
       },
       {
         "name": "leaf-null-value",
@@ -1798,7 +1854,8 @@
         ],
         "tag": 0,
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "128a75e2e4ad797ca3965fd23a3859af2771b65df1bcc84b6e05a02ab31881c4"
+        "leafHash": "128a75e2e4ad797ca3965fd23a3859af2771b65df1bcc84b6e05a02ab31881c4",
+        "ordering": "path"
       },
       {
         "name": "leaf-empty-array-value",
@@ -1810,7 +1867,8 @@
         ],
         "tag": 6,
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "0bd6dfa348336add0efb3870dd1f69ac8468a34a255ab96affa1e2d1e769ed7a"
+        "leafHash": "0bd6dfa348336add0efb3870dd1f69ac8468a34a255ab96affa1e2d1e769ed7a",
+        "ordering": "path"
       },
       {
         "name": "leaf-empty-object-value",
@@ -1822,7 +1880,8 @@
         ],
         "tag": 7,
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "9a688020bb086efa97a78a1971aae70f7d32c35c25fdadc85cdb951050211127"
+        "leafHash": "9a688020bb086efa97a78a1971aae70f7d32c35c25fdadc85cdb951050211127",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-root",
@@ -1831,7 +1890,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "0fa67c630f06d70ef25db9d368104ad8757d78568a83007d58c211ac57a492db"
+        "leafHash": "0fa67c630f06d70ef25db9d368104ad8757d78568a83007d58c211ac57a492db",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-single-key",
@@ -1844,7 +1904,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "5151214d0077a3a83e668590831b2ec3e3ab50f0b46104a6823be2ff523a6199"
+        "leafHash": "5151214d0077a3a83e668590831b2ec3e3ab50f0b46104a6823be2ff523a6199",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-empty-string-key",
@@ -1857,7 +1918,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "ba5bfbce5927bddba2271677a8ffa9a233a89af239e775d5a811823a23970d77"
+        "leafHash": "ba5bfbce5927bddba2271677a8ffa9a233a89af239e775d5a811823a23970d77",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-nested-a-b",
@@ -1873,7 +1935,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "97d4e0949eb12837f7fb4300ed7dea74cebbc8419e90c3249fff8996578223ac"
+        "leafHash": "97d4e0949eb12837f7fb4300ed7dea74cebbc8419e90c3249fff8996578223ac",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-literal-dotted-key",
@@ -1886,7 +1949,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "4a2af3ee12272b200e11db03036227dac4977a97a547625386416ffb8aa63ef1"
+        "leafHash": "4a2af3ee12272b200e11db03036227dac4977a97a547625386416ffb8aa63ef1",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-key-with-dot",
@@ -1899,7 +1963,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "5538efa67f232de2eb480e67d20f071bc9963172e8afae88aafe0fde11a02a8d"
+        "leafHash": "5538efa67f232de2eb480e67d20f071bc9963172e8afae88aafe0fde11a02a8d",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-key-with-brackets",
@@ -1912,7 +1977,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "65897655fa6fb823708ee77f39f691e2a83c35a947acf5fb7277ed884f32abf8"
+        "leafHash": "65897655fa6fb823708ee77f39f691e2a83c35a947acf5fb7277ed884f32abf8",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-key-with-all-three",
@@ -1925,7 +1991,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "5934b184f594ada133bc39f6cbbccfc14056a5edf73a7ba0d2b411a3c821d435"
+        "leafHash": "5934b184f594ada133bc39f6cbbccfc14056a5edf73a7ba0d2b411a3c821d435",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-array-of-one",
@@ -1941,7 +2008,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "53802fe162925e1dc408ac4b8b5966c3f596f6aa018876de97540e985ca55301"
+        "leafHash": "53802fe162925e1dc408ac4b8b5966c3f596f6aa018876de97540e985ca55301",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-index-zero",
@@ -1954,7 +2022,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "7662c76b10ced93a8bcae1a11fe52dc11d5f84a46c2c285df3369846819949d2"
+        "leafHash": "7662c76b10ced93a8bcae1a11fe52dc11d5f84a46c2c285df3369846819949d2",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-index-max-u32",
@@ -1967,7 +2036,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "593536de471affbb2b6f5e36213cb60082719f122b3b95def8b9a9004f978352"
+        "leafHash": "593536de471affbb2b6f5e36213cb60082719f122b3b95def8b9a9004f978352",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-deep-nesting",
@@ -2001,7 +2071,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "8e092d9920ec7ac9957c5edcdb0c38934ba14e96f3a13ffc6290789a2e789033"
+        "leafHash": "8e092d9920ec7ac9957c5edcdb0c38934ba14e96f3a13ffc6290789a2e789033",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-numeric-key-zero",
@@ -2014,7 +2085,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "65d4b0fe32956d814df2adecd64d65fe762e8713f006e1d0d8f505a3293f06c0"
+        "leafHash": "65d4b0fe32956d814df2adecd64d65fe762e8713f006e1d0d8f505a3293f06c0",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-mixed",
@@ -2036,7 +2108,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "c4235facb453a7e0ec034737e9ab1cfc058420a6ab327509d3fc4392c8ce8646"
+        "leafHash": "c4235facb453a7e0ec034737e9ab1cfc058420a6ab327509d3fc4392c8ce8646",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-nfc-key",
@@ -2049,7 +2122,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "462c6fa14c8bf0c2dcaf06ecda46104ed9ba796bbf7e83865ea7cb3a12b8c584"
+        "leafHash": "462c6fa14c8bf0c2dcaf06ecda46104ed9ba796bbf7e83865ea7cb3a12b8c584",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-nfd-key",
@@ -2062,7 +2136,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "462c6fa14c8bf0c2dcaf06ecda46104ed9ba796bbf7e83865ea7cb3a12b8c584"
+        "leafHash": "462c6fa14c8bf0c2dcaf06ecda46104ed9ba796bbf7e83865ea7cb3a12b8c584",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-above-bmp-key",
@@ -2075,7 +2150,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "36e52c2c94236777b2cf47d7ae7501d923ebaf56db4234844b450b127a7995c0"
+        "leafHash": "36e52c2c94236777b2cf47d7ae7501d923ebaf56db4234844b450b127a7995c0",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-fullwidth-z-key",
@@ -2088,7 +2164,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "7410721982498ca3f588f8510125cd62dbd0c90b96a6e72d2bcaf4a78a0b7228"
+        "leafHash": "7410721982498ca3f588f8510125cd62dbd0c90b96a6e72d2bcaf4a78a0b7228",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-ascii-z-key",
@@ -2101,7 +2178,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "5bb6d8bf83c73fab1ca27eead4e7044878eb98f16f139de3845cf94f40f0acdb"
+        "leafHash": "5bb6d8bf83c73fab1ca27eead4e7044878eb98f16f139de3845cf94f40f0acdb",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-bare-roax-key",
@@ -2114,7 +2192,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "96950fade9bbf4d59cd821128366e55cf5f35f1d49be25476d9435f491e0c303"
+        "leafHash": "96950fade9bbf4d59cd821128366e55cf5f35f1d49be25476d9435f491e0c303",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-roax-x-key",
@@ -2130,7 +2209,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "85af63968f6003fade0f75de3f4b7786fc36efa34582518f4a5d05f93dc57dcb"
+        "leafHash": "85af63968f6003fade0f75de3f4b7786fc36efa34582518f4a5d05f93dc57dcb",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-roax-dotted-not-first",
@@ -2146,7 +2226,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "e8723e72a8bcb5e3edbbc79b061d69f4a50d37a01b011155a24f2677b5f7c7aa"
+        "leafHash": "e8723e72a8bcb5e3edbbc79b061d69f4a50d37a01b011155a24f2677b5f7c7aa",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-kelvin-key",
@@ -2159,7 +2240,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "688306458a4628c79c3d66a2ee2ea8d70c8080521d7285c6eefe27fee5a4c229"
+        "leafHash": "688306458a4628c79c3d66a2ee2ea8d70c8080521d7285c6eefe27fee5a4c229",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-reserved-record-type",
@@ -2172,7 +2254,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "3da4c9c1c6cd3847c0680e0377db5b6c7a6de29f2f1a0f1c3ed114c08bd3d6d1"
+        "leafHash": "3da4c9c1c6cd3847c0680e0377db5b6c7a6de29f2f1a0f1c3ed114c08bd3d6d1",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-reserved-schema-version",
@@ -2185,7 +2268,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "9e509ccb7135da093be013cbe6d187ced0463b99ac1d1be2a1d6aa25367967da"
+        "leafHash": "9e509ccb7135da093be013cbe6d187ced0463b99ac1d1be2a1d6aa25367967da",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-reserved-record-id",
@@ -2198,7 +2282,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "036746b9b946b955a7875136fb4484bfaea5a3fab3aebd4370e74c0d9bf4170c"
+        "leafHash": "036746b9b946b955a7875136fb4484bfaea5a3fab3aebd4370e74c0d9bf4170c",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-reserved-issuer-id",
@@ -2211,7 +2296,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "9b534384507fa5114ce2cd8cc8cd3c78aacc0a544ec85cbe0ef2fa6e61955a6d"
+        "leafHash": "9b534384507fa5114ce2cd8cc8cd3c78aacc0a544ec85cbe0ef2fa6e61955a6d",
+        "ordering": "path"
       },
       {
         "name": "leaf-at-path-reserved-issuer-key-id",
@@ -2224,7 +2310,8 @@
         "tag": 2,
         "value": "x",
         "saltHex": "000102030405060708090a0b0c0d0e0f",
-        "leafHash": "73e4bf3bf08a40a2429788a3155f2794e653fedf348947b968418b5a6e66ea8f"
+        "leafHash": "73e4bf3bf08a40a2429788a3155f2794e653fedf348947b968418b5a6e66ea8f",
+        "ordering": "path"
       }
     ],
     "tree": [
@@ -5893,7 +5980,8 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "bbc2c37d82f2b03dceefe9742047658085b9416198b0d2b421566711e959b833"
+        "root": "bbc2c37d82f2b03dceefe9742047658085b9416198b0d2b421566711e959b833",
+        "ordering": "path"
       },
       {
         "name": "record-structure-empty-object",
@@ -5906,7 +5994,8 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "0c8f3d521c04af6a02f14f452b67b948854488690263253998d0ebb484e70cc8"
+        "root": "0c8f3d521c04af6a02f14f452b67b948854488690263253998d0ebb484e70cc8",
+        "ordering": "path"
       },
       {
         "name": "record-structure-explicit-null",
@@ -5919,7 +6008,8 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "067e03416521fccc2258d7892a27532ccd7b7af87dba7d196bafc87836aba838"
+        "root": "067e03416521fccc2258d7892a27532ccd7b7af87dba7d196bafc87836aba838",
+        "ordering": "path"
       },
       {
         "name": "record-entry-layout-flattened",
@@ -5932,7 +6022,8 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 8,
-        "root": "f792d98e2011b914d8661a43b306e272276d30d67c51798f4d104adec1de5176"
+        "root": "f792d98e2011b914d8661a43b306e272276d30d67c51798f4d104adec1de5176",
+        "ordering": "path"
       },
       {
         "name": "record-entry-layout-normalized",
@@ -5945,7 +6036,8 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 8,
-        "root": "8b338329fe325e0af8ca61ed1044142b88650ced964048071a04fc2945602781"
+        "root": "8b338329fe325e0af8ca61ed1044142b88650ced964048071a04fc2945602781",
+        "ordering": "path"
       },
       {
         "name": "record-guard-bare-roax",
@@ -5958,7 +6050,8 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "e210c4686e1c0ad825c2e165e8533a981fe049dd4945d8195f6c6b7ebeddfff1"
+        "root": "e210c4686e1c0ad825c2e165e8533a981fe049dd4945d8195f6c6b7ebeddfff1",
+        "ordering": "path"
       },
       {
         "name": "record-guard-roax-x",
@@ -5971,7 +6064,8 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "c0aa310b62653a6ed509b8bbd8a7c046a6930412e2e737b7365c5d962e301b1c"
+        "root": "c0aa310b62653a6ed509b8bbd8a7c046a6930412e2e737b7365c5d962e301b1c",
+        "ordering": "path"
       },
       {
         "name": "record-guard-nested-roax-dotted",
@@ -5984,7 +6078,8 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "3d9bf0bec5cf85b63122b4bae73a5f6f29a12beb286ad3a2fd264f742e0ac592"
+        "root": "3d9bf0bec5cf85b63122b4bae73a5f6f29a12beb286ad3a2fd264f742e0ac592",
+        "ordering": "path"
       },
       {
         "name": "record-guard-kelvin-key",
@@ -5997,7 +6092,8 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 6,
-        "root": "d913e52ad4c918f87466d9fbd40070119379f8d293ab85ce1a7ad50f79313107"
+        "root": "d913e52ad4c918f87466d9fbd40070119379f8d293ab85ce1a7ad50f79313107",
+        "ordering": "path"
       },
       {
         "name": "record-fhir-ruled-bindings",
@@ -6010,7 +6106,8 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 8,
-        "root": "36025461595b5ed9d9d01576fa2f7350fcc3cbe9e4495baa8a3e9d421ae96178"
+        "root": "36025461595b5ed9d9d01576fa2f7350fcc3cbe9e4495baa8a3e9d421ae96178",
+        "ordering": "path"
       },
       {
         "name": "record-typed-scalars",
@@ -6023,7 +6120,8 @@
         "saltPairing": "path",
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 9,
-        "root": "7846cbd141f123da932004f049303eaa8bd7180d329bfc2c74d54f484f688c4f"
+        "root": "7846cbd141f123da932004f049303eaa8bd7180d329bfc2c74d54f484f688c4f",
+        "ordering": "path"
       },
       {
         "name": "record-typed-scalars-with-key-id",
@@ -6037,7 +6135,8 @@
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "leafCount": 10,
         "root": "de356f8f967a2a166f012172e339df1ecc31b5a45f406fd8da03b3a6ca356953",
-        "issuerKeyId": "did:web:corpus.roax.invalid#key-1"
+        "issuerKeyId": "did:web:corpus.roax.invalid#key-1",
+        "ordering": "path"
       },
       {
         "name": "record-sg.gov.moh.vaccination-healthcert-no-key-id",
@@ -6050,7 +6149,8 @@
         "saltPairing": "positional",
         "recordId": "urn:uuid:aaaaaaa1-0000-4000-8000-000000000001",
         "leafCount": 91,
-        "root": "0006a8bb35adada03b698db10929ed4191291d7b0d51278dbfb09564c102cc47"
+        "root": "0006a8bb35adada03b698db10929ed4191291d7b0d51278dbfb09564c102cc47",
+        "ordering": "path"
       },
       {
         "name": "record-sg.gov.moh.vaccination-healthcert-with-key-id",
@@ -6064,7 +6164,8 @@
         "saltPairing": "positional",
         "recordId": "urn:uuid:aaaaaaa1-0000-4000-8000-000000000001",
         "leafCount": 92,
-        "root": "b69865a8b8482969907993a2de31664e7c100fcf990116bda33d837786f4f7d6"
+        "root": "b69865a8b8482969907993a2de31664e7c100fcf990116bda33d837786f4f7d6",
+        "ordering": "path"
       },
       {
         "name": "record-sg.gov.moh.recovery-healthcert-no-key-id",
@@ -6077,7 +6178,8 @@
         "saltPairing": "positional",
         "recordId": "urn:uuid:aaaaaaa3-0000-4000-8000-000000000003",
         "leafCount": 69,
-        "root": "2cc986bb42bedfb35b5ec0490859b75a0d1744bfdad6d7278346833c925e42a1"
+        "root": "2cc986bb42bedfb35b5ec0490859b75a0d1744bfdad6d7278346833c925e42a1",
+        "ordering": "path"
       },
       {
         "name": "record-sg.gov.moh.recovery-healthcert-with-key-id",
@@ -6091,7 +6193,8 @@
         "saltPairing": "positional",
         "recordId": "urn:uuid:aaaaaaa3-0000-4000-8000-000000000003",
         "leafCount": 70,
-        "root": "bfb3cdf4016bdd0567612adc281f7522eae78bfba8ac43c12bc272235d0b26e7"
+        "root": "bfb3cdf4016bdd0567612adc281f7522eae78bfba8ac43c12bc272235d0b26e7",
+        "ordering": "path"
       }
     ],
     "unlinkability": [
@@ -6133,7 +6236,8 @@
         "trials": 4,
         "expectDistinctSaltsWithinIssuance": true,
         "expectDistinctSaltsAcrossIssuances": true,
-        "expectDistinctLeafHashesAcrossIssuances": true
+        "expectDistinctLeafHashesAcrossIssuances": true,
+        "ordering": "path"
       },
       {
         "name": "unlinkability-shared-record-id",
@@ -6168,7 +6272,8 @@
         "recordIds": [
           "urn:uuid:11111111-1111-4111-8111-111111111111",
           "urn:uuid:11111111-1111-4111-8111-111111111111"
-        ]
+        ],
+        "ordering": "path"
       },
       {
         "name": "unlinkability-reserved-and-record-leaf",
@@ -6190,7 +6295,8 @@
         "trials": 4,
         "expectDistinctSaltsWithinIssuance": true,
         "expectDistinctSaltsAcrossIssuances": true,
-        "expectDistinctLeafHashesAcrossIssuances": true
+        "expectDistinctLeafHashesAcrossIssuances": true,
+        "ordering": "path"
       }
     ],
     "normalization": [
@@ -6206,7 +6312,8 @@
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "issuerId": "did:web:corpus.roax.invalid",
         "expectSameRoot": true,
-        "root": "bec3821d0d990e73f8985c240fec53b5bff44b6990938b31184c9df715fe3a71"
+        "root": "bec3821d0d990e73f8985c240fec53b5bff44b6990938b31184c9df715fe3a71",
+        "ordering": "path"
       },
       {
         "name": "normalization-nfc-key-end-to-end",
@@ -6220,7 +6327,8 @@
         "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
         "issuerId": "did:web:corpus.roax.invalid",
         "expectSameRoot": true,
-        "root": "15b5cc28b423f333117d36965366711c2b8dbc4a145ba9a9bbd5966d7a6cb1fb"
+        "root": "15b5cc28b423f333117d36965366711c2b8dbc4a145ba9a9bbd5966d7a6cb1fb",
+        "ordering": "path"
       }
     ],
     "envelope": [
@@ -6229,455 +6337,520 @@
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-hl7-fhir-bundle-complete.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "floor-hl7-fhir-bundle-omits-issuer-key-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-hl7-fhir-bundle-omits-issuer-key-id.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "floor-hl7-fhir-bundle-omits-roax-recordType",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-hl7-fhir-bundle-omits-roax-recordType.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-hl7-fhir-bundle-omits-roax-schemaVersion",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-hl7-fhir-bundle-omits-roax-schemaVersion.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-hl7-fhir-bundle-omits-roax-recordId",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-hl7-fhir-bundle-omits-roax-recordId.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-hl7-fhir-bundle-omits-roax-issuer-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-hl7-fhir-bundle-omits-roax-issuer-id.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-hl7-fhir-bundle-omits-resourceType",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-hl7-fhir-bundle-omits-resourceType.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "minimum-disclosure-floor",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-pdt-healthcert-complete",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-pdt-healthcert-complete.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-pdt-healthcert-omits-issuer-key-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-pdt-healthcert-omits-issuer-key-id.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-pdt-healthcert-omits-roax-recordType",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-pdt-healthcert-omits-roax-recordType.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-pdt-healthcert-omits-roax-schemaVersion",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-pdt-healthcert-omits-roax-schemaVersion.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-pdt-healthcert-omits-roax-recordId",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-pdt-healthcert-omits-roax-recordId.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-pdt-healthcert-omits-roax-issuer-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-pdt-healthcert-omits-roax-issuer-id.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-pdt-healthcert-omits-version",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-pdt-healthcert-omits-version.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "minimum-disclosure-floor",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-pdt-healthcert-omits-type",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-pdt-healthcert-omits-type.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "minimum-disclosure-floor",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-pdt-healthcert-omits-validFrom",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-pdt-healthcert-omits-validFrom.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "minimum-disclosure-floor",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-recovery-healthcert-complete",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-recovery-healthcert-complete.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-recovery-healthcert-omits-issuer-key-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-recovery-healthcert-omits-issuer-key-id.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-recovery-healthcert-omits-roax-recordType",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-recovery-healthcert-omits-roax-recordType.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-recovery-healthcert-omits-roax-schemaVersion",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-recovery-healthcert-omits-roax-schemaVersion.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-recovery-healthcert-omits-roax-recordId",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-recovery-healthcert-omits-roax-recordId.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-recovery-healthcert-omits-roax-issuer-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-recovery-healthcert-omits-roax-issuer-id.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-recovery-healthcert-omits-version",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-recovery-healthcert-omits-version.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "minimum-disclosure-floor",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-recovery-healthcert-omits-type",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-recovery-healthcert-omits-type.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "minimum-disclosure-floor",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-recovery-healthcert-omits-validFrom",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-recovery-healthcert-omits-validFrom.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "minimum-disclosure-floor",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-recovery-healthcert-omits-validUntil",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-recovery-healthcert-omits-validUntil.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "minimum-disclosure-floor",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-vaccination-healthcert-complete",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-vaccination-healthcert-complete.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-vaccination-healthcert-omits-issuer-key-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-vaccination-healthcert-omits-issuer-key-id.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-vaccination-healthcert-omits-roax-recordType",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-vaccination-healthcert-omits-roax-recordType.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-vaccination-healthcert-omits-roax-schemaVersion",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-vaccination-healthcert-omits-roax-schemaVersion.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-vaccination-healthcert-omits-roax-recordId",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-vaccination-healthcert-omits-roax-recordId.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-vaccination-healthcert-omits-roax-issuer-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-vaccination-healthcert-omits-roax-issuer-id.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-vaccination-healthcert-omits-validFrom",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-vaccination-healthcert-omits-validFrom.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "minimum-disclosure-floor",
+        "ordering": "path"
       },
       {
         "name": "floor-sg-gov-moh-vaccination-healthcert-omits-notarisationMetadata-reference",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/floor-sg-gov-moh-vaccination-healthcert-omits-notarisationMetadata-reference.json",
         "expectAccept": false,
-        "reason": "minimum-disclosure-floor"
+        "reason": "minimum-disclosure-floor",
+        "ordering": "path"
       },
       {
         "name": "identity-outer-record-type-downgrade",
         "class": 18,
         "envelopeFile": "corpus/fixtures/envelopes/identity-outer-record-type-downgrade.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "identity-outer-schema-version-mismatch",
         "class": 18,
         "envelopeFile": "corpus/fixtures/envelopes/identity-outer-schema-version-mismatch.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "identity-outer-record-id-mismatch",
         "class": 18,
         "envelopeFile": "corpus/fixtures/envelopes/identity-outer-record-id-mismatch.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "identity-outer-issuer-id-mismatch",
         "class": 18,
         "envelopeFile": "corpus/fixtures/envelopes/identity-outer-issuer-id-mismatch.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "typemap-floor-hl7-fhir-bundle-complete",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-hl7-fhir-bundle-complete.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "typemap-floor-hl7-fhir-bundle-omits-roax-typeMap-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-hl7-fhir-bundle-omits-roax-typeMap-id.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "typemap-floor-sg-gov-moh-pdt-healthcert-complete",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-sg-gov-moh-pdt-healthcert-complete.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "typemap-floor-sg-gov-moh-pdt-healthcert-omits-roax-typeMap-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-sg-gov-moh-pdt-healthcert-omits-roax-typeMap-id.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "typemap-floor-sg-gov-moh-recovery-healthcert-complete",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-sg-gov-moh-recovery-healthcert-complete.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "typemap-floor-sg-gov-moh-recovery-healthcert-omits-roax-typeMap-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-sg-gov-moh-recovery-healthcert-omits-roax-typeMap-id.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "identity-outer-type-map-id-mismatch",
         "class": 18,
         "envelopeFile": "corpus/fixtures/envelopes/identity-outer-type-map-id-mismatch.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "identity-outer-type-map-member-stripped",
         "class": 18,
         "envelopeFile": "corpus/fixtures/envelopes/identity-outer-type-map-member-stripped.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "typemap-floor-sg-gov-moh-vaccination-healthcert-complete",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-sg-gov-moh-vaccination-healthcert-complete.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "typemap-floor-sg-gov-moh-vaccination-healthcert-omits-roax-typeMap-id",
         "class": 14,
         "envelopeFile": "corpus/fixtures/envelopes/typemap-floor-sg-gov-moh-vaccination-healthcert-omits-roax-typeMap-id.json",
         "expectAccept": false,
-        "reason": "outer-identity-mismatch"
+        "reason": "outer-identity-mismatch",
+        "ordering": "path"
       },
       {
         "name": "guard-accept-bare-roax",
         "class": 15,
         "envelopeFile": "corpus/fixtures/envelopes/guard-accept-bare-roax.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "guard-accept-roax-x",
         "class": 15,
         "envelopeFile": "corpus/fixtures/envelopes/guard-accept-roax-x.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "guard-accept-nested-roax-dotted",
         "class": 15,
         "envelopeFile": "corpus/fixtures/envelopes/guard-accept-nested-roax-dotted.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "guard-accept-kelvin-key",
         "class": 15,
         "envelopeFile": "corpus/fixtures/envelopes/guard-accept-kelvin-key.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "guard-reject-reserved-collision",
         "class": 15,
         "envelopeFile": "corpus/fixtures/envelopes/guard-reject-reserved-collision.json",
         "expectAccept": false,
-        "reason": "reserved-namespace"
+        "reason": "reserved-namespace",
+        "ordering": "path"
       },
       {
         "name": "salt-leak-exact-revealed-set",
         "class": 17,
         "envelopeFile": "corpus/fixtures/envelopes/salt-leak-exact-revealed-set.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "salt-leak-named-leaf-without-value",
         "class": 17,
         "envelopeFile": "corpus/fixtures/envelopes/salt-leak-named-leaf-without-value.json",
         "expectAccept": false,
-        "reason": "disclosed-leaf-named-without-value"
+        "reason": "disclosed-leaf-named-without-value",
+        "ordering": "path"
       },
       {
         "name": "salt-leak-disclosed-copy-with-salts-array",
         "class": 17,
         "envelopeFile": "corpus/fixtures/envelopes/salt-leak-disclosed-copy-with-salts-array.json",
         "expectAccept": false,
-        "reason": "disclosed-copy-carries-salts"
+        "reason": "disclosed-copy-carries-salts",
+        "ordering": "path"
       },
       {
         "name": "salt-leak-disclosed-copy-with-wrong-typed-salts",
         "class": 17,
         "envelopeFile": "corpus/fixtures/envelopes/salt-leak-disclosed-copy-with-wrong-typed-salts.json",
         "expectAccept": false,
-        "reason": "disclosed-copy-carries-salts"
+        "reason": "disclosed-copy-carries-salts",
+        "ordering": "path"
       },
       {
         "name": "salt-leak-disclosed-copy-with-master-salt",
         "class": 17,
         "envelopeFile": "corpus/fixtures/envelopes/salt-leak-disclosed-copy-with-master-salt.json",
         "expectAccept": false,
-        "reason": "master-salt-in-envelope"
+        "reason": "master-salt-in-envelope",
+        "ordering": "path"
       },
       {
         "name": "full-copy-complete-salts",
         "class": 17,
         "envelopeFile": "corpus/fixtures/envelopes/full-copy-complete-salts.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "full-copy-salts-omit-one-leaf",
         "class": 17,
         "envelopeFile": "corpus/fixtures/envelopes/full-copy-salts-omit-one-leaf.json",
         "expectAccept": false,
-        "reason": "salt-missing-for-leaf"
+        "reason": "salt-missing-for-leaf",
+        "ordering": "path"
       },
       {
         "name": "full-copy-salts-duplicate-path",
         "class": 17,
         "envelopeFile": "corpus/fixtures/envelopes/full-copy-salts-duplicate-path.json",
         "expectAccept": false,
-        "reason": "salts-duplicate-path"
+        "reason": "salts-duplicate-path",
+        "ordering": "path"
       },
       {
         "name": "full-copy-salts-length-not-leaf-count",
         "class": 17,
         "envelopeFile": "corpus/fixtures/envelopes/full-copy-salts-length-not-leaf-count.json",
         "expectAccept": false,
-        "reason": "salts-length-not-leaf-count"
+        "reason": "salts-length-not-leaf-count",
+        "ordering": "path"
       },
       {
         "name": "algorithm-sha-256-accepted",
         "class": 11,
         "envelopeFile": "corpus/fixtures/envelopes/algorithm-sha-256-accepted.json",
         "expectAccept": true,
-        "reason": "ok"
+        "reason": "ok",
+        "ordering": "path"
       },
       {
         "name": "algorithm-poseidon-fails-closed",
         "class": 11,
         "envelopeFile": "corpus/fixtures/envelopes/algorithm-poseidon-fails-closed.json",
         "expectAccept": false,
-        "reason": "hash-alg-not-allowed"
+        "reason": "hash-alg-not-allowed",
+        "ordering": "path"
       },
       {
         "name": "profile-unknown-fails-closed",
         "class": 11,
         "envelopeFile": "corpus/fixtures/envelopes/profile-unknown-fails-closed.json",
         "expectAccept": false,
-        "reason": "profile-unknown"
+        "reason": "profile-unknown",
+        "ordering": "path"
       }
     ],
     "roundTrip": [
@@ -6778,7 +6951,8 @@
           "version": "1.0.0"
         },
         "intent": "one leaf per disclosure carrier form, issued and then verified through this implementation's own verifier",
-        "issuerKeyId": "did:web:corpus.roax.invalid#key-1"
+        "issuerKeyId": "did:web:corpus.roax.invalid#key-1",
+        "ordering": "path"
       },
       {
         "name": "roundtrip-without-issuer-key-id",
@@ -6876,7 +7050,204 @@
           "id": "sha256:35bc27621917d80e0a2736f4492eba3816ddc3de230279d635ca5e8973a594da",
           "version": "1.0.0"
         },
-        "intent": "the same round trip with issuer.keyId ABSENT, so the producer must emit NO leaf for it rather than a NULL leaf or an empty string - three different roots of which only one is right (specification section 11.2)"
+        "intent": "the same round trip with issuer.keyId ABSENT, so the producer must emit NO leaf for it rather than a NULL leaf or an empty string - three different roots of which only one is right (specification section 11.2)",
+        "ordering": "path"
+      }
+    ],
+    "ordering": [
+      {
+        "name": "ordering-typed-scalars",
+        "class": 21,
+        "recordType": "org.roax.corpus.synthetic",
+        "schemaVersion": "1.0",
+        "issuerId": "did:web:corpus.roax.invalid",
+        "recordFile": "corpus/fixtures/records/typed-scalars.json",
+        "saltsFile": "corpus/fixtures/salts/ordering-typed-scalars.json",
+        "saltPairing": "path",
+        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
+        "orderings": {
+          "path": {
+            "leafCount": 9,
+            "root": "755f54f987701c56bd4106f17243265227738e30dd08f517cfe195a2dcf0139a",
+            "leafHashes": [
+              "0c0cc2818c0665384a0d35218ebbacb53ec77364067a0303ad2e8ae0e772f433",
+              "6e43ee343723c891eb9be03f63319bdc0d860716e17a12343e2c7ef6f22442af",
+              "e7e4febb1fb3239acf31b773f67c61547e4471210a5782543b33502e54a3d4c4",
+              "7b17f95f6fa140f5d79ca27bb26f3e33b77ba750d4cc2f6bdc995a495436817c",
+              "b7154773984c2e8e726477750c1c811de1d3276e0f569a4e8e43b92013fd90a2",
+              "42de631a815a22a50dc0827257f65eb408b1667dda8962ba97d55fe8b4c0f955",
+              "00dc1d2206926ebcdb044fd07f8ed4828f410eb139223af2345c222e162c3ec3",
+              "798c6f4bc370bd9552c415c6983f8c8ae17894b4a2901405df18804460a38590",
+              "6d404b80ad07c54f3cbea8364f27d6aef7f542047d1b5a910132774e3ee79c4a"
+            ],
+            "displayPaths": [
+              "flag",
+              "marker",
+              "roax.recordId",
+              "roax.issuer.id",
+              "roax.recordType",
+              "roax.schemaVersion",
+              "counts.text",
+              "counts.decimal",
+              "counts.integer"
+            ]
+          },
+          "hash": {
+            "leafCount": 10,
+            "root": "c5fae9085d3fbc9ea95d4cbfb22f9209a2ee6b5ce60c2665aef669f95f9d8a27",
+            "leafHashes": [
+              "21257bf8ca4b3cea0a14a405ba482aa1189fe27f302fc8899558cc9ade580372",
+              "2cdde68ba11a1cc44bace33db3c78797b1b6e7a14be4d90d14d514e658a31281",
+              "3260ca312830b12956c91a760559d5cb9c6917c0310add69bac229f5bd0a82ff",
+              "a5a9fbc151efe6146bc984ea5a60a7a392badf7458f8e97079a76cf39b7e56ba",
+              "b09aad29b3ea3103a41be4c06fbe6f9de2e6617d80cd533381251c066a9a438f",
+              "b27b998f99f3bfb464466c6c7c306c0ace9b4ecfc38f021333fa37767107a729",
+              "b8a27f4472b5e664916162fee540fc078f6c7b970635f6159d85d388bff740d9",
+              "cbef913e6881d27c0cc74b1c336f4a760d2bae66e8e0d2165e265ba98c9bfdfc",
+              "d191258762f4f2f441767ff3b895bf8302f03a696f907195558e4ef70497135f",
+              "fd4acff36f778c045af9df7c74048d8417dd0b9f1e696330006c77d55259e862"
+            ],
+            "displayPaths": [
+              "roax.ordering",
+              "counts.decimal",
+              "marker",
+              "roax.recordId",
+              "counts.integer",
+              "counts.text",
+              "roax.schemaVersion",
+              "roax.issuer.id",
+              "flag",
+              "roax.recordType"
+            ]
+          }
+        }
+      },
+      {
+        "name": "ordering-typed-scalars-with-key-id",
+        "class": 21,
+        "recordType": "org.roax.corpus.synthetic",
+        "schemaVersion": "1.0",
+        "issuerId": "did:web:corpus.roax.invalid",
+        "recordFile": "corpus/fixtures/records/typed-scalars.json",
+        "saltsFile": "corpus/fixtures/salts/ordering-typed-scalars-with-key-id.json",
+        "saltPairing": "path",
+        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
+        "orderings": {
+          "path": {
+            "leafCount": 10,
+            "root": "deb8df10e229dde841ee8d7c751e94f51442b6bfe87e7cd693ca6dc76f69ffcf",
+            "leafHashes": [
+              "13b934b674f681e057d68429978fd7f47711b15f270154ca0adcfa84cd8d2c58",
+              "f9406545ad366966e5866f9c8bc8e2495e546005cefbc2555612ee3babe08305",
+              "f7f5370b0f4ce200aff2b90c1a94114d076c620be95243f8025d84d031bbd2b2",
+              "9f62995f9a426d8be1b0ffaf6c9142665f365d20b63232f76c59d0c4b75972ec",
+              "40fcbedec94ca3e8c92c015515960eb522deefafb67dbeb2b5c0fa8dfc2f0c02",
+              "ac364cca827a071fd2529a95820331af61bf9b8e2b110c4def7d497360d6d3b9",
+              "c0165ade201c7316a63231a8856f7df536047558bf2db8a21b793dc1f62de896",
+              "cc289d0ea20a266a22e0a795176a52a97bcd08fd46a85d098baab6f310a3bb72",
+              "9896e211a667c2db86f9456a55dd25b1dc83f7b035413f74e995dc21af229e99",
+              "479cf71ed8474fe958c51d93486e223feda14cade45d5026803bf23c0260ac95"
+            ],
+            "displayPaths": [
+              "flag",
+              "marker",
+              "roax.recordId",
+              "roax.issuer.id",
+              "roax.recordType",
+              "roax.issuer.keyId",
+              "roax.schemaVersion",
+              "counts.text",
+              "counts.decimal",
+              "counts.integer"
+            ]
+          },
+          "hash": {
+            "leafCount": 11,
+            "root": "9797d37d27c14fa38b786c86b8a604b2dc256bd83ee0496261986c0898ec8ce7",
+            "leafHashes": [
+              "3135aed87c953f1d2c6e2a3feb9a65c298573b9ce2c6e7784c4b2de7ca348e22",
+              "36585501cbbd727b0da76ff24a7230d30a0c575574ce35a52f45ccb2f78f8046",
+              "40b5e53b8a6f146d16dc0a0c8010b37f434bdd441bfce7e28ef5714efe81b255",
+              "4f5bfaaa32b831c0fe3fa088a88cdccca38b1f416bb8521ee59538e62022ca92",
+              "7ccbd3c465b845a87f955e81922547e1cdd54d2bb51e4487e0bb601a6560530b",
+              "81f680c92263f27861da7a41e70dcf71b0f84ffc53a5aee2615a28cefc1f9afd",
+              "8b18503b5518a9591701e94394761337b80bb4c71fa53f9f4ae46f8f656d5c6c",
+              "9428fd4ed51eac9907bb81983ed095e7a2457f4d2fef4d2381285be15411339f",
+              "bf94bdab2d28b80f2b5e5d83e86f216326a330d8969c948e36b5dc9407813f37",
+              "c506f92403c508c4d9c51d5584b54274b9e316152c17d9d810fa806e14add244",
+              "dab9727611a3af2aa6e9543c589100e5491bf109818af1165e12654ace90cc8a"
+            ],
+            "displayPaths": [
+              "counts.decimal",
+              "marker",
+              "roax.recordType",
+              "roax.recordId",
+              "counts.text",
+              "roax.issuer.id",
+              "roax.ordering",
+              "counts.integer",
+              "roax.schemaVersion",
+              "flag",
+              "roax.issuer.keyId"
+            ]
+          }
+        },
+        "issuerKeyId": "did:web:corpus.roax.invalid#key-1"
+      },
+      {
+        "name": "ordering-structure-explicit-null",
+        "class": 21,
+        "recordType": "org.roax.corpus.synthetic",
+        "schemaVersion": "1.0",
+        "issuerId": "did:web:corpus.roax.invalid",
+        "recordFile": "corpus/fixtures/records/structure-explicit-null.json",
+        "saltsFile": "corpus/fixtures/salts/ordering-structure-explicit-null.json",
+        "saltPairing": "path",
+        "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
+        "orderings": {
+          "path": {
+            "leafCount": 6,
+            "root": "000add60651b912935f60fef5a48641a85f2d129282c148755736abb0d95a20d",
+            "leafHashes": [
+              "9a652ff94f1b2e325b66cab74bbea917772f11902ab23e5f06c1f4607a044931",
+              "1e0fe67bf01599909d5afacc593245bb8751b3f3d41e54668089ffd76182ca57",
+              "9864b7b212c4012f8cb204d573a7120c2248dffbe05b9ae788dc824490e0af02",
+              "8d8992f1d367c9600f4fa02df602012d5b108019687e1ace6d318d319048513f",
+              "08d14e47f2cc34b3f895227c3b4934e4e37f80a8c8ba5761f2f09c8e396c8fee",
+              "39d608519072d9f800155031d7d9310a602b96810a4c5f1568ffcb532183351f"
+            ],
+            "displayPaths": [
+              "marker",
+              "roax.recordId",
+              "roax.issuer.id",
+              "roax.recordType",
+              "roax.schemaVersion",
+              "a.b"
+            ]
+          },
+          "hash": {
+            "leafCount": 7,
+            "root": "a14297aaadd90efdf612293598c792b97bc5fdffb95b0dff3449b4095679b7fe",
+            "leafHashes": [
+              "016480151e7ac84cd07fb9ca076580667e9646540a36ed4d92621c233fc36266",
+              "3df77da9839c3350e388bf365733d0f791c52d0d352215f16e1f062115e027a8",
+              "5747592b8ab404e2808fe5aa8ce969b2f0b6feb0c4799cd79ba20dd05cd9516e",
+              "89deff3d2e52ca4d79bc21341b6b00fc1980c97a5949a34df4dee61e5c421fd1",
+              "b98a20ed188621699557dca36229ac4e6448468763cdfcf390a1a50a97c1a52f",
+              "e405b48a85229662aa3a1ae4b2e0d4f238473b51cd4fb7746a836cd007f85270",
+              "ef6de5fca090ee03bbf0ae3ed9b0b8fd6d7e0dc0d6fbb5175c999815ab980b52"
+            ],
+            "displayPaths": [
+              "a.b",
+              "roax.schemaVersion",
+              "roax.recordType",
+              "roax.recordId",
+              "marker",
+              "roax.issuer.id",
+              "roax.ordering"
+            ]
+          }
+        }
       }
     ]
   }

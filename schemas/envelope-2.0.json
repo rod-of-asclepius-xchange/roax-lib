@@ -16,34 +16,42 @@
     "issuer"
   ],
   "additionalProperties": false,
-
   "properties": {
     "canon": {
       "description": "Canonicalization version. Bound into the Merkle root via the domain string in every leaf preimage (spec sections 8 and 12). It is no longer also in a salt preimage: decision D4 was ruled D4b and salts are drawn from a CSPRNG rather than derived, so there is no salt preimage in this design (spec section 7.1). The binding is unweakened by that - the domain string is unchanged and every leaf still carries it, so a v2 library cannot apply v2 rules to a v1 record and get a matching root.",
       "const": "ROAX-CANON/1"
     },
-
     "hashAlg": {
       "description": "Hash algorithm, selected per record. ZK-friendly and non-ZK hashes are both first-class (decision B, ruled). CAUTION - THIS FIELD IS NOT AUTHORITY, and the envelope cannot make it so: a reserved leaf naming the algorithm would itself be hashed under that algorithm, so an attacker computing a whole record under a weak algorithm produces a self-consistent record whose own leaf agrees with him. An earlier draft committed roax.hashAlg for this purpose and it was removed as a binding that does not bind (spec section 7.4). What holds instead: (H1) hashAlg is a length-prefixed component of the domain string 'ROAX-CANON/1/' + hashAlg, present in every LEAF preimage, which removes cross-algorithm root ambiguity by construction but is NOT a defence on its own - it no longer sits in a salt preimage either, because decision D4 was ruled D4b and salt derivation is gone, though the domain string itself is unchanged by that ruling (spec sections 7.1 and 7.4); (H2) the anchoring registry MUST record the pair (root, hashAlg) and a verifier MUST take hashAlg from the REGISTRY, never from this field; (H3) a verifier MUST reject any hashAlg absent from its own configured allow-list, which is what closes the retired-algorithm case. Only SHA-256 has a construction DEFINED by ROAX-CANON/1. Poseidon-BN254 is REGISTERED but its parameterization - field, rate and capacity, round constants, and the byte-string-to-field-element encoding the byte layouts do not survive without - is NOT yet pinned, and a record MUST NOT be issued under it until a revision pins it.",
-      "enum": ["SHA-256", "Poseidon-BN254"]
+      "enum": [
+        "SHA-256",
+        "Poseidon-BN254"
+      ]
     },
-
+    "ordering": {
+      "description": "Leaf ordering, selected per record (spec section 9). `path` orders leaves by ascending encodePath bytes and `hash` by ascending leafHash bytes; both are first-class, exactly as ZK-friendly and non-ZK hashes both are under decision B, and the amended decision D5 rules them selectable rather than fixed. ABSENT MEANS `path`, which is the default of section 9. CAUTION - THIS FIELD IS NOT AUTHORITY, and the envelope cannot make it so, for the reason hashAlg records above. What holds instead: (H1) the ordering's domain suffix is part of the domain string in every LEAF preimage - \"\" for path and \"/hash\" for hash - which removes cross-ordering root ambiguity by construction and means a leaf is bound to exactly one ordering, so the same leaf set cannot be reassembled into the other tree; that is real and it is narrow, and it is NOT a defence on its own (spec section 9.5); (H2) the anchoring registry MUST record the ordering alongside (root, hashAlg) and a verifier MUST take it from the REGISTRY, never from this field; (H3) a verifier MUST reject any ordering absent from its own configured allow-list, which is what covers an ordering legitimately registered and since retired. The ordering is ALSO committed as the conditional reserved leaf roax.ordering when it is not the default (section 11.2). That leaf departs from section 7.4's rejection of a roax.hashAlg leaf deliberately and is argued there: weak hash algorithms exist so that leaf enabled a downgrade, whereas path and hash sorting are equally strong, so the ordering leaf is redundant rather than dangerous and what it buys is committed issuer intent. It is NOT AUTHORITY either. Where the ordering is needed at all: for the leaf preimage, exactly as hashAlg already is, and for nothing structural on the disclosure path, because a disclosed copy carries each leaf's index and the tree is never rebuilt (section 9.6). OPTIONAL under this schema version too, and absence means `path`. It is NOT required, because requiring it would say the ordering is read from the envelope, and H2 says a verifier takes it from the anchoring registry instead. A field a verifier must not rely on is not one the schema should compel.",
+      "enum": [
+        "path",
+        "hash"
+      ]
+    },
     "recordType": {
       "description": "Profile identifier, in lowercase reverse-DNS form. Committed inside the root at the reserved path roax.recordType. NORMATIVE: the registry of valid values is docs/profiles/, one document per value, and adding a value REQUIRES adding a profile document declaring at minimum its schemaVersion, its type-map scope and its non-redactable path set (spec section 10.2). The v1 registry is sg.gov.moh.vaccination-healthcert, sg.gov.moh.pdt-healthcert, sg.gov.moh.recovery-healthcert and hl7.fhir.bundle. A pattern rather than an enum, because the registry is extensible by adding a profile document and is not a closed universe; the pattern constrains the FORM only, and a syntactically valid value with no profile document is not a valid record. This field does not select a type map by itself. The exact artifact is selected by typeMap.id, and a verifier MUST require that artifact's recordType to equal this value before using any binding from it (spec sections 4.2 and 11.2).",
       "type": "string",
       "pattern": "^[a-z0-9]+(-[a-z0-9]+)*(\\.[a-z0-9]+(-[a-z0-9]+)*)+$"
     },
-
     "schemaVersion": {
       "description": "Version of the record profile named by recordType. Committed inside the root at the reserved path roax.schemaVersion. OPAQUE TO THE PROTOCOL: this value is never parsed, never ordered and never range-compared, and it is validated ONLY by exact match against the profile registry in docs/profiles/ and against the exact artifact selected by typeMap.id (spec sections 4.2 and 12.1). Deliberately carries no dotted-numeric pattern. FHIR's own CapabilityStatement.fhirVersion enumeration holds 22 values, 4 two-part and 18 three-part, so NO dotted numeric pattern accepts them all; FHIR further states that version strings carry no expectation of lexicographical sequence. A shape constraint could only reject valid input. Cost accepted knowingly: a typo here is not caught by JSON Schema, and is instead caught one step later when the selected type-map artifact does not match and lookup fails closed (spec section 4.2).",
       "type": "string",
       "minLength": 1
     },
-
     "typeMap": {
       "description": "Exact type-map artifact selector. Both fields are discovery hints until the verifier proves the mandatory reserved leaf roax.typeMap.id against the root and verifies that the selected artifact has the stated content ID (spec sections 4.2, 11.2 and 11.3). A verifier MUST select by the exact id and MUST NOT search for a latest or highest version. The version MUST equal the selected artifact's typeMapVersion, but it is not a separate leaf because the content ID transitively binds every artifact byte, including that version (spec section 12.1).",
       "type": "object",
-      "required": ["id", "version"],
+      "required": [
+        "id",
+        "version"
+      ],
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -58,84 +66,108 @@
         }
       }
     },
-
     "recordId": {
       "description": "Stable identifier for this record. Committed inside the root at the reserved path roax.recordId (spec section 11.2), and nothing else consumes it. SHOULD be unique per record, for the ordinary reason that an identifier that is not unique does not identify. NOT load-bearing for unlinkability: an earlier draft folded this value into every salt preimage and warned that reusing it across a reissuance weakened cross-record unlinkability, which was true of that construction and is FALSE of this one. Decision D4 was ruled D4b, so every salt is now drawn independently from a CSPRNG and there is no preimage for a record identifier to enter (spec section 7.1). One consequence is recorded in spec sections 10.2 and 11.2: roax.recordId is still in the minimum-disclosure floor, but it is now mandatory to disclose by POLICY rather than by ARITHMETIC, because a verifier that does not receive it can still verify every leaf it did receive.",
       "type": "string",
       "minLength": 1
     },
-
     "root": {
       "description": "RFC 9162 Merkle Tree Head over all leaves, lowercase hex, no 0x prefix.",
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     },
-
     "leafCount": {
       "description": "Total number of leaves in the tree, which is the UNION of the record's own leaves and the reserved roax.* leaves - NOT the record's leaves alone (spec sections 3.3 and 11.2). Five reserved leaves are always emitted (roax.recordType, roax.schemaVersion, roax.typeMap.id, roax.recordId, roax.issuer.id) and roax.issuer.keyId adds a sixth when issuer.keyId is present. Needed to verify an RFC 9162 inclusion proof, which takes the tree size as an INPUT, so an implementation that counts only the record produces a leafCount that does not match its own root. The minimum is 6: a record contributing zero leaves of its own MUST be rejected at issuance (spec section 3.3), so the tree is never empty. NOT a leaf and not a domain component, deliberately - a leaf stating the leaf count would change the leaf count. CAUTION - NOT AUTHENTICATED IN A DISCLOSED COPY, and an earlier version of this description said otherwise. It sits outside the root, so spec section 11.3 applies to it in full and a verifier MUST NOT treat it as authority. The claim that a wrong leafCount would make the audit path fail was MEASURED FALSE: RFC 9162 section 2.1.3.2 takes the tree size as an input, so on an 8-leaf tree the internal node MTH(L[0:4]) presented as the leaf at index 0 with a forged tree size of 2 verifies against the genuine root (spec section 11.1, reproduced on Node v22.21.0). What defends against that is spec section 10 step 2 - the verifier recomputes the leaf hash from the disclosed fields and never accepts one - plus the 0x00 leaf-domain byte. In a FULL copy the verifier derives this count itself while rebuilding the tree and a disagreement MUST be a rejection (spec section 11.1).",
       "type": "integer",
       "minimum": 6
     },
-
     "issuer": {
       "description": "Issuer IDENTITY. Committed inside the root at reserved paths (spec section 11.2). Distinct from anchor, which is routing only.",
       "type": "object",
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "format": "uri" },
-        "keyId": { "type": "string" }
-      }
-    },
-
-    "anchor": {
-      "description": "Routing hint ONLY. NEVER authority. Outside the Merkle root, therefore attacker-controlled (spec section 11.3). A verifier MUST re-derive authority from the anchoring layer it is itself configured with, never from these values. No contract set is permanent; these fields are illustrative.",
-      "type": "object",
-      "required": ["chainId", "registry"],
-      "additionalProperties": false,
-      "properties": {
-        "chainId": { "type": "integer", "minimum": 0 },
-        "registry": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
-        "txHash": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
-        "anchoredAt": { "type": "string", "format": "date-time" }
-      }
-    },
-
-    "disclosure": {
-      "description": "Present in a DISCLOSED copy only. Mutually exclusive with `record`.",
-      "type": "object",
-      "required": ["mode", "leaves"],
-      "additionalProperties": false,
-      "properties": {
-        "mode": { "const": "selective" },
-        "leaves": {
-          "type": "array",
-          "minItems": 1,
-          "items": { "$ref": "#/$defs/disclosedLeaf" }
+        "id": {
+          "type": "string",
+          "format": "uri"
+        },
+        "keyId": {
+          "type": "string"
         }
       }
     },
-
+    "anchor": {
+      "description": "Routing hint ONLY. NEVER authority. Outside the Merkle root, therefore attacker-controlled (spec section 11.3). A verifier MUST re-derive authority from the anchoring layer it is itself configured with, never from these values. No contract set is permanent; these fields are illustrative.",
+      "type": "object",
+      "required": [
+        "chainId",
+        "registry"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "chainId": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "registry": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "txHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "anchoredAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "disclosure": {
+      "description": "Present in a DISCLOSED copy only. Mutually exclusive with `record`.",
+      "type": "object",
+      "required": [
+        "mode",
+        "leaves"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "selective"
+        },
+        "leaves": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/disclosedLeaf"
+          }
+        }
+      }
+    },
     "record": {
       "description": "Present in a FULL copy only. The typed record. Paired with `salts`, which supplies the salt of every leaf, a verifier recomputes the root from scratch. Mutually exclusive with `disclosure`. CAUTION: this object carries record numbers in their original JSON form, so the parser requirement of spec section 6.4 applies to the WHOLE ENVELOPE and not only to a bare record. An implementation that reads a full copy through a float-based JSON parser destroys the very literals it is about to recompute the root from (spec section 7.3).",
       "type": "object"
     },
-
     "salts": {
       "description": "Present in a FULL copy only, where it is REQUIRED; FORBIDDEN in a disclosed copy. One entry per leaf of the UNION defined in spec section 3.3, so it covers the reserved roax.* leaves as well as the record's own, and its length equals leafCount. Without it a full copy has no route to any leaf hash and therefore none to the root, because leafHash needs the leaf's salt and the record body carries no salts. It discloses nothing extra: a full copy already reveals every value at every path, and a salt is only useful for confirming a value you do not have. THE PROTOCOL GENERATES THESE SALTS. Each is 16 bytes drawn INDEPENDENTLY from a CSPRNG at issuance by the issuing library itself, per spec section 7, with at least 128 bits of entropy. They are NOT data an issuing institution supplies, collects, stores in its own systems, or adds to any existing dataset, and carrying them here is purely a matter of envelope format that imposes NO new data-collection burden on any hospital, laboratory or other issuer. DECISION D4 IS RULED D4b (2026-07-28): there is no masterSalt, no KDF and no salt preimage anywhere in this design, and consequently no seed field belongs in this envelope - spec section 7.3 rule 3 forbids carrying any value from which a withheld leaf's salt could be obtained, which binds any future revision that reintroduces derivation. THE BYTES IN THIS ARRAY DID NOT CHANGE WITH THAT RULING. The envelope was always agnostic between the two answers, which is why the ruling rewrote spec section 7 and left this format alone. minItems mirrors the leafCount minimum of 6; if one moves the other MUST move with it.",
       "type": "array",
       "minItems": 6,
-      "items": { "$ref": "#/$defs/leafSalt" }
+      "items": {
+        "$ref": "#/$defs/leafSalt"
+      }
     }
   },
-
   "$defs": {
     "pathSegment": {
       "description": "One structured path segment. The verifier re-encodes the path from THESE, per spec section 5. The display path is never hashed and MUST NOT be parsed to reconstruct segments.",
       "oneOf": [
         {
           "type": "object",
-          "required": ["key"],
+          "required": [
+            "key"
+          ],
           "additionalProperties": false,
           "properties": {
             "key": {
@@ -146,7 +178,9 @@
         },
         {
           "type": "object",
-          "required": ["index"],
+          "required": [
+            "index"
+          ],
           "additionalProperties": false,
           "properties": {
             "index": {
@@ -159,18 +193,22 @@
         }
       ]
     },
-
     "leafSalt": {
       "description": "The salt of one leaf in a FULL copy, addressed by its structured path. Deliberately carries no displayPath: a full copy already contains the whole record, so a display string buys nothing here and every display-path surface is another place the spec section 5.2 trap gets reconstructed.",
       "type": "object",
-      "required": ["segments", "salt"],
+      "required": [
+        "segments",
+        "salt"
+      ],
       "additionalProperties": false,
       "properties": {
         "segments": {
           "description": "The structured path of the leaf this salt belongs to. Authoritative, and matched against decoded segments rather than a rendered string (spec section 5).",
           "type": "array",
           "minItems": 0,
-          "items": { "$ref": "#/$defs/pathSegment" }
+          "items": {
+            "$ref": "#/$defs/pathSegment"
+          }
         },
         "salt": {
           "description": "The salt for this path, 16 bytes as lowercase hex.",
@@ -179,17 +217,24 @@
         }
       }
     },
-
     "disclosedLeaf": {
       "type": "object",
-      "required": ["segments", "index", "tag", "salt", "auditPath"],
+      "required": [
+        "segments",
+        "index",
+        "tag",
+        "salt",
+        "auditPath"
+      ],
       "additionalProperties": false,
       "properties": {
         "segments": {
           "description": "The structured path. Authoritative for hashing.",
           "type": "array",
           "minItems": 0,
-          "items": { "$ref": "#/$defs/pathSegment" }
+          "items": {
+            "$ref": "#/$defs/pathSegment"
+          }
         },
         "displayPath": {
           "description": "Human-readable form such as a.b[0].c. DISPLAY ONLY. Never hashed, never parsed back into segments (spec section 5.2).",
@@ -217,62 +262,171 @@
         "auditPath": {
           "description": "RFC 9162 section 2.1.3 audit path, root-ward, lowercase hex.",
           "type": "array",
-          "items": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
         }
       },
-
       "allOf": [
         {
           "description": "Tags NULL(0), EMPTY_ARRAY(6) and EMPTY_OBJECT(7) carry no value.",
-          "if": { "properties": { "tag": { "enum": [0, 6, 7] } }, "required": ["tag"] },
-          "then": { "not": { "required": ["value"], "properties": { "value": true } } },
-          "else": { "required": ["value"], "properties": { "value": true } }
+          "if": {
+            "properties": {
+              "tag": {
+                "enum": [
+                  0,
+                  6,
+                  7
+                ]
+              }
+            },
+            "required": [
+              "tag"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "value"
+              ],
+              "properties": {
+                "value": true
+              }
+            }
+          },
+          "else": {
+            "required": [
+              "value"
+            ],
+            "properties": {
+              "value": true
+            }
+          }
         },
         {
           "description": "BOOL(1) carries a JSON boolean.",
-          "if": { "properties": { "tag": { "const": 1 } }, "required": ["tag"] },
-          "then": { "properties": { "value": { "type": "boolean" } } }
+          "if": {
+            "properties": {
+              "tag": {
+                "const": 1
+              }
+            },
+            "required": [
+              "tag"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "boolean"
+              }
+            }
+          }
         },
         {
           "description": "STRING(2) carries a string.",
-          "if": { "properties": { "tag": { "const": 2 } }, "required": ["tag"] },
-          "then": { "properties": { "value": { "type": "string" } } }
+          "if": {
+            "properties": {
+              "tag": {
+                "const": 2
+              }
+            },
+            "required": [
+              "tag"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string"
+              }
+            }
+          }
         },
         {
           "description": "INTEGER(3) carries a canonical integer STRING: no leading zeros, -0 normalized to 0 (spec section 6.2).",
-          "if": { "properties": { "tag": { "const": 3 } }, "required": ["tag"] },
+          "if": {
+            "properties": {
+              "tag": {
+                "const": 3
+              }
+            },
+            "required": [
+              "tag"
+            ]
+          },
           "then": {
             "properties": {
-              "value": { "type": "string", "pattern": "^-?(0|[1-9][0-9]*)$" }
+              "value": {
+                "type": "string",
+                "pattern": "^-?(0|[1-9][0-9]*)$"
+              }
             }
           }
         },
         {
           "description": "DECIMAL(4) carries a canonical decimal STRING in positional notation. Trailing zeros in the fraction are SIGNIFICANT and preserved: 0.010 is not 0.01 (FHIR R4 SHALL, spec section 6.2). Exponent notation has already been expanded, so it is not accepted here.",
-          "if": { "properties": { "tag": { "const": 4 } }, "required": ["tag"] },
+          "if": {
+            "properties": {
+              "tag": {
+                "const": 4
+              }
+            },
+            "required": [
+              "tag"
+            ]
+          },
           "then": {
             "properties": {
-              "value": { "type": "string", "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$" }
+              "value": {
+                "type": "string",
+                "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+              }
             }
           }
         },
         {
           "description": "BYTES(5) carries lowercase hex of even length. Where the record held that value as base64, the text MUST have been in the single canonical form ROAX-CANON/1 pins - RFC 4648 section 4, standard alphabet, padded, no line wrapping, canonical trailing bits - before decoding (spec section 6.3).",
-          "if": { "properties": { "tag": { "const": 5 } }, "required": ["tag"] },
+          "if": {
+            "properties": {
+              "tag": {
+                "const": 5
+              }
+            },
+            "required": [
+              "tag"
+            ]
+          },
           "then": {
             "properties": {
-              "value": { "type": "string", "pattern": "^([0-9a-f]{2})*$" }
+              "value": {
+                "type": "string",
+                "pattern": "^([0-9a-f]{2})*$"
+              }
             }
           }
         },
         {
           "description": "BLOB_REF(8) carries the blob's byte length and the SHA-256 digest of its bytes; the blob itself travels out of band. The encoded value bytes are u64be(blobByteLength) || u32be(len(blobDigest)) || blobDigest (spec section 6.5). THE LENGTH IS INSIDE THE COMMITMENT ON PURPOSE: a digest alone lets a substituted blob of a different size pass anything that does not separately check the size. blobByteLength is a canonical integer STRING and not a JSON integer, for the same reason INTEGER and DECIMAL are strings - it is a type-tagged value component and a hash-preimage input, and a JSON number would be parsed through a float by the implementations under test (spec sections 6.2 and 6.4). The digest is SHA-256 regardless of hashAlg; spec section 6.5 states that as an inference with its reasoning, not as a carried ruling. REGISTERED, SELECTED BY NOTHING IN V1 - see the caution on tag above.",
-          "if": { "properties": { "tag": { "const": 8 } }, "required": ["tag"] },
+          "if": {
+            "properties": {
+              "tag": {
+                "const": 8
+              }
+            },
+            "required": [
+              "tag"
+            ]
+          },
           "then": {
             "properties": {
               "value": {
                 "type": "object",
-                "required": ["blobByteLength", "blobDigest"],
+                "required": [
+                  "blobByteLength",
+                  "blobDigest"
+                ],
                 "additionalProperties": false,
                 "properties": {
                   "blobByteLength": {
@@ -293,33 +447,81 @@
       ]
     }
   },
-
   "allOf": [
     {
       "description": "A full copy and a disclosed copy are mutually exclusive. A verifier that sees both MUST reject.",
       "not": {
-        "required": ["record", "disclosure"],
-        "properties": { "record": true, "disclosure": true }
+        "required": [
+          "record",
+          "disclosure"
+        ],
+        "properties": {
+          "record": true,
+          "disclosure": true
+        }
       }
     },
     {
       "description": "Exactly one of them must be present.",
       "anyOf": [
-        { "required": ["record"], "properties": { "record": true } },
-        { "required": ["disclosure"], "properties": { "disclosure": true } }
+        {
+          "required": [
+            "record"
+          ],
+          "properties": {
+            "record": true
+          }
+        },
+        {
+          "required": [
+            "disclosure"
+          ],
+          "properties": {
+            "disclosure": true
+          }
+        }
       ]
     },
     {
       "description": "A FULL copy MUST carry `salts`. Without it there is no route from the record to any leaf hash, because leafHash needs salt(path) and the record body carries no salts (spec section 7.3).",
-      "if": { "required": ["record"], "properties": { "record": true } },
-      "then": { "required": ["salts"], "properties": { "salts": true } }
+      "if": {
+        "required": [
+          "record"
+        ],
+        "properties": {
+          "record": true
+        }
+      },
+      "then": {
+        "required": [
+          "salts"
+        ],
+        "properties": {
+          "salts": true
+        }
+      }
     },
     {
       "description": "A DISCLOSED copy MUST NOT carry `salts`. This is what makes a withheld leaf's salt UNREPRESENTABLE rather than merely forbidden: with this array absent, disclosure.leaves[].salt is the only place a salt can appear, and every entry there belongs by construction to a leaf the copy reveals (spec section 10.1).",
-      "if": { "required": ["disclosure"], "properties": { "disclosure": true } },
-      "then": { "not": { "required": ["salts"], "properties": { "salts": true } } }
+      "if": {
+        "required": [
+          "disclosure"
+        ],
+        "properties": {
+          "disclosure": true
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "salts"
+          ],
+          "properties": {
+            "salts": true
+          }
+        }
+      }
     }
   ],
-
   "$comment": "What this schema DOES express structurally, so nobody weakens it by accident: a disclosed copy cannot carry the salt of a withheld leaf, because `salts` is forbidden alongside `disclosure` and disclosure.leaves[].salt is therefore the only salt location. That leak is unrepresentable, not merely prohibited. Do not add a `salts` field to the disclosed branch for symmetry; it would reopen exactly that hole. What this schema CANNOT express, which therefore MUST be enforced in code and is covered by the conformance corpus: (1) the minimum-disclosure floor - each profile declares non-redactable paths that a disclosed copy MUST contain, including roax.typeMap.id (spec section 10.2); JSON Schema cannot check set membership of decoded path segments against a per-profile list. (2) The reserved-namespace guard - a record-supplied path is rejected when its FIRST SEGMENT is a KEY whose NFC-NORMALIZED key begins with the ASCII prefix 'roax.' (spec section 11.2). Three ways to get this wrong. It is NOT a display-path test: spec section 5.2 forbids reasoning over display paths, and an implementation that reconstructs 'a.b[0].c' to run this check is doing what that section forbids. It applies to the FIRST SEGMENT ONLY, because every reserved path is a single segment, so [KEY('a'), KEY('roax.foo')] differs in segment count and cannot collide. And it compares the NFC-NORMALIZED key rather than the bytes as received, because section 6.1 normalizes before hashing, so a raw-byte check tests a different string from the one committed. Note an ordinary record key named 'roax' or 'roaxX', with no dot, is ACCEPTED - it collides with nothing, and an earlier draft that rejected both was written against a multi-segment reserved-path model this specification has since abandoned. (3) leafCount equals the size of the UNION of the record's own leaves and the 5-or-6 reserved roax.* leaves, and the `salts` array has exactly that many entries, one per leaf (spec sections 3.3 and 11.2); JSON Schema can pin the floor of 6 but cannot relate the three counts, nor require that a full copy's derived count matches the declared one. (4) That every leaf listed in disclosure.leaves is genuinely revealed rather than named with its value withheld. (5) That a verifier takes authority from the root and from its own configured anchoring layer rather than from any field in this document. EVERY field outside the root is a hint (spec section 11.3), and that includes hashAlg, anchor, leafCount, the typeMap descriptor and the top-level copies of the reserved-leaf values. In particular, typeMap.id becomes authoritative only after the verifier proves roax.typeMap.id against the root and verifies the artifact content ID. A schema cannot express 'do not believe this field', so the corpus fails an implementation that does. (6) That typeMap.version equals the selected artifact's typeMapVersion. (7) That a tag-8 BLOB_REF leaf is rejected: this schema pins its carrier form, and no version-1 profile selects the binding (spec section 6.5). See docs/conformance-corpus.md classes 10, 14, 15, 17 and 18."
 }
