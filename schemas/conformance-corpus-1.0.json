@@ -1180,7 +1180,7 @@
           "minLength": 1
         },
         "issuerKeyId": {
-          "description": "The conditional reserved leaf of spec section 11.2. Its presence raises both sides' leafCount by one.",
+          "description": "A conditional reserved leaf of spec section 11.2, the other being roax.ordering. Its presence raises both sides' leafCount by one.",
           "type": "string",
           "minLength": 1
         },

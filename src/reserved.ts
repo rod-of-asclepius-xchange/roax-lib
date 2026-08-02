@@ -52,8 +52,9 @@ export interface RecordIdentity {
   /**
    * The issuing key identifier, committed at `roax.issuer.keyId`.
    *
-   * The one CONDITIONAL reserved leaf. An absent `keyId` emits no leaf, so the reserved leaf count
-   * is 5 or 6 under `schemas/envelope-2.0.json` and 4 or 5 under `schemas/envelope-1.0.json`.
+   * The FIRST of the two CONDITIONAL reserved leaves; `ordering` below is the second. An absent
+   * `keyId` emits no leaf, so with both conditionals in play the reserved leaf count is 5, 6 or 7
+   * under `schemas/envelope-2.0.json` and 4, 5 or 6 under `schemas/envelope-1.0.json`.
    */
   readonly issuerKeyId?: string | undefined;
   /**

@@ -77,9 +77,7 @@ def check_ordering(ordering: str) -> str:
     return ordering
 
 
-def domain_string(
-    hash_alg: str = DEFAULT_HASH_ALG, ordering: str = DEFAULT_ORDERING
-) -> bytes:
+def domain_string(hash_alg: str = DEFAULT_HASH_ALG, ordering: str = DEFAULT_ORDERING) -> bytes:
     """``"ROAX-CANON/1/" + hashAlg + ORD`` as ASCII (specification sections 7, 7.4, 8 and 9.5).
 
     Not a bare ``"ROAX-CANON/1"``, and algorithm-qualified AND ordering-qualified.

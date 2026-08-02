@@ -798,7 +798,11 @@ def _verify_disclosed_copy(env, cfg, hasher, root, leaf_count) -> VerificationRe
         # the LEAF PREIMAGE, exactly as ``hashAlg`` already is, and for nothing structural
         # (section 9.6).
         computed = leaf_hash(
-            segments, tag, value, salt, hasher=hasher,
+            segments,
+            tag,
+            value,
+            salt,
+            hasher=hasher,
             ordering=check_ordering(cfg.anchored_ordering),
         )
 

@@ -601,7 +601,7 @@ Retagging a path the map already covers changes the root of every already-issued
 
 ### D8 - What goes inside the root. **RULED 2026-07-28: as recommended, plus a mandatory corpus vector**
 
-**Written into the spec:** `canon` is bound through the domain string in every leaf; `roax.recordType`, `roax.schemaVersion`, `roax.typeMap.id`, `roax.recordId` and `roax.issuer.id` are the five mandatory reserved leaves; `roax.issuer.keyId` is the conditional reserved leaf; routing hints stay outside; and outside-the-root fields are hints and never authority (specification sections 8, 11.2 and 11.3).
+**Written into the spec:** `canon` is bound through the domain string in every leaf; `roax.recordType`, `roax.schemaVersion`, `roax.typeMap.id`, `roax.recordId` and `roax.issuer.id` are the five mandatory reserved leaves; `roax.issuer.keyId` is a conditional reserved leaf, joined by `roax.ordering` under the 2026-08-02 amendment to D5 above; routing hints stay outside; and outside-the-root fields are hints and never authority (specification sections 8, 11.2 and 11.3).
 
 **The tension is real in both directions and dogtag hit both ends.**
 

@@ -334,7 +334,12 @@ def declared_ordering(vector) -> str:
 #: not threaded would compute a ``hash``-ordered vector as ``path`` and report green, which is the
 #: quiet-skip defect one loop down from the group guard.
 ORDERING_SENSITIVE_GROUPS = (
-    "leaf", "record", "unlinkability", "normalization", "envelope", "roundTrip",
+    "leaf",
+    "record",
+    "unlinkability",
+    "normalization",
+    "envelope",
+    "roundTrip",
 )
 ORDERING_THREADED_GROUPS = frozenset({"leaf", "record"})
 

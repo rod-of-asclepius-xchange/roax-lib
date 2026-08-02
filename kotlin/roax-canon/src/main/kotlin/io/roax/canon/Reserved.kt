@@ -11,9 +11,9 @@ package io.roax.canon
 enum class EnvelopeProfile {
 
     /**
-     * `schemas/envelope-1.0.json`: four always-emitted reserved leaves, plus the conditional
-     * `roax.issuer.keyId`. This is what the committed conformance corpus was built under, and it
-     * still governs every envelope issued under it.
+     * `schemas/envelope-1.0.json`: four always-emitted reserved leaves, plus the two conditional
+     * ones, `roax.issuer.keyId` and `roax.ordering`. This is what the committed conformance corpus
+     * was built under, and it still governs every envelope issued under it.
      */
     V1_NO_TYPE_MAP_BINDING,
 

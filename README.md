@@ -39,7 +39,7 @@ That registry is [`docs/profiles/`](docs/profiles/), one document per `recordTyp
    It takes Ajv 8 and `ajv-formats` from a directory outside the tree named by `ROAX_AJV`, and `--skip-schema-validation` runs the dependency-free subset without them ([`docs/type-maps.md`](docs/type-maps.md) section 6).
 3. **Registering that profile with a verifier**, which every library takes as *configuration* rather than as a source edit.
    Rust ships no profile implementation at all - `Profile` is a trait the caller implements ([`rust/src/envelope.rs:17`](rust/src/envelope.rs)), so even the Singapore profiles are caller-side there.
-   The other four ship the registry as an overridable default: TypeScript's `knownProfiles` and `floorFor` config ([`src/envelope.ts:616`](src/envelope.ts) and `:971`), Python's `ProfileRegistry.with_profile`, Swift's public `ProfileRegistry(profiles:)` beside its `versionOne` default, and Kotlin's `ProfileRegistry.with` beside `ProfileRegistry.DEFAULT`.
+   The other four ship the registry as an overridable default: TypeScript's `knownProfiles` and `floorFor` config ([`src/envelope.ts:645`](src/envelope.ts) and `:1010`), Python's `ProfileRegistry.with_profile`, Swift's public `ProfileRegistry(profiles:)` beside its `versionOne` default, and Kotlin's `ProfileRegistry.with` beside `ProfileRegistry.DEFAULT`.
    No library embeds or loads a published type-map artifact; the resolver is supplied by the caller in all five.
 
 **One honest limit, because an unqualified claim of extensibility is exactly the defect this repository keeps catching.**

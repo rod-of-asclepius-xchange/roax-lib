@@ -47,15 +47,15 @@ Specification section 3.3 says, in the sentence added to guard decision D7:
 So under the specification's rule both records **fail closed and have no root at all**, while `record-structure-empty-array` and `record-structure-empty-object` assert one.
 
 **Measured, by running this implementation both ways on a bare checkout**, where class 10 reports 4 skipped because its records live outside this repository.
-**Both rows were re-measured on corpus 1.1.0's 501 vectors**, at `bba14101` under Node v22.21.0.
-Neither row was run against a reference checkout, so no `map-authorized` count with those records is claimed here, and both rows are therefore the WITHOUT-references variants of the runs section 11 tabulates rather than a separate measurement.
+**Both rows were re-measured on corpus 1.2.0's 504 vectors**, at `c942b92` under Node v22.21.0.
+Neither row was run against a reference checkout, so no `map-authorized` count with those records is claimed here, and both rows are therefore the WITHOUT-references variants of the runs section 12 tabulates rather than a separate measurement.
 
-| Empty-container policy, both WITHOUT a reference checkout | Corpus result, on corpus 1.1.0 |
+| Empty-container policy, both WITHOUT a reference checkout | Corpus result, on corpus 1.2.0 |
 |---|---|
-| `mechanical` - tag 6 or 7 from the observed kind, without consulting the map | 720 pass, 0 fail, 4 skipped |
-| `map-authorized` - specification section 3.3 | 716 pass, **2 fail**, both class 5, 4 skipped |
+| `mechanical` - tag 6 or 7 from the observed kind, without consulting the map | 744 pass, 0 fail, 4 skipped |
+| `map-authorized` - specification section 3.3 | 740 pass, **2 fail**, both class 5, 4 skipped |
 
-The two rows differ by four assertions where only two vectors flip, which is not a third failure hiding somewhere: a record vector asserts `leafCount` and `root` separately, and a throw out of `commitRecord` emits one failure in place of both passes (`conformance/run.ts:525-528`).
+The two rows differ by four assertions where only two vectors flip, which is not a third failure hiding somewhere: a record vector asserts `leafCount` and `root` separately, and a throw out of `commitRecord` emits one failure in place of both passes (`conformance/run.ts:674-677`).
 
 The two failures are `record-structure-empty-array` and `record-structure-empty-object`, each with `type-map-fail-closed: no binding in org.roax.corpus.synthetic for kind array|object at a.b`.
 
@@ -220,7 +220,7 @@ Recorded so a passing run does not read as coverage it does not have.
   What changed is the corpus-only map, which binds `blob.bytes` at tag 5 (`corpus/type-maps/org.roax.corpus.synthetic.json:96-101`), so the four `reject-bytes-base64-*` vectors and the `record-fhir-ruled-bindings` record now drive `decodeBase64Strict` through `carrierFromJson`.
   It is implemented and unit-tested as well, including the non-canonical final quantum that RFC 4648 section 3.5 identifies.
 - **The `BYTES` carrier form, which is hex and not the record's base64.**
-  The two are different spellings of the same bytes and the code had them confused: `carrierFromJson` kept the base64 and `encodeValue` decoded it, so a disclosed tag-5 leaf was emitted as `AAECAw==` where both envelope schemas require `^([0-9a-f]{2})*$` (`schemas/envelope-1.0.json:259-264`, `schemas/envelope-2.0.json:260-265`).
+  The two are different spellings of the same bytes and the code had them confused: `carrierFromJson` kept the base64 and `encodeValue` decoded it, so a disclosed tag-5 leaf was emitted as `AAECAw==` where both envelope schemas require `^([0-9a-f]{2})*$` (`schemas/envelope-1.0.json:400-405`, `schemas/envelope-2.0.json:401-406`).
   That copy verified against its own root while being schema-invalid, and a schema-valid hex carrier was rejected or decoded as different bytes - the failure was symmetric and silent.
   Base64 is now decoded once, at record projection in `carrierFromJson`, and `encodeValue` reads strict lowercase even-length hex through `fromHex`.
   **No committed vector moved, because no vector carried a tag-5 value at all then**: the conformance total is unchanged at 680 passed, 0 failed, 2 NOT RUN, which is the measurement that shows the committed bytes and roots were preserved.
@@ -340,23 +340,24 @@ The other four libraries carry the same pin in their own suites, for the same re
 
 ## 12. What was measured
 
-Node v22.21.0, TypeScript 5.9.3, `SHA-256`, corpus `1.1.0`.
+Node v22.21.0, TypeScript 5.9.3, `SHA-256`, corpus `1.2.0`.
 
-**Every number in this table was re-measured on the commit that carries it.**
-Nothing here is carried forward from an earlier run.
+**Every MEASURED number in this table was re-measured on the commit that carries it, and the two rows needing a reference checkout are marked DERIVED because this commit had none.**
+The leaf-ordering amendment carried class 10's four vectors forward byte-identical rather than rebuilding them (`corpus/README.md`), so class 10's 8 assertions are the only term either derivation spans, and each derived row names the measured figure it starts from rather than being presented as a run.
+Row 2 derives from row 1 of this table; row 3 derives from finding 2's `map-authorized` row, which is the same run under the other empty-container reading.
 
 | Run | Result |
 |---|---|
-| `npm test`, the default | **720 assertions, 0 failures, 4 NOT RUN** - class 10, whose records live outside this repository |
-| the same with `ROAX_REFERENCE_RECORDS` set | **728 assertions, 0 failures, 0 NOT RUN** |
-| `ROAX_EMPTY_CONTAINERS=map-authorized`, the section 3.3 reading | **724 passed, 2 failed**, exit 1 |
-| `test/unit.ts` | **37 tests, 0 failures** |
+| `npm test`, the default | **744 assertions, 0 failures, 4 NOT RUN** - class 10, whose records live outside this repository |
+| the same with `ROAX_REFERENCE_RECORDS` set | **752 assertions, 0 failures, 0 NOT RUN** - DERIVED as 744 + 8 |
+| `ROAX_EMPTY_CONTAINERS=map-authorized`, the section 3.3 reading | **748 passed, 2 failed**, exit 1 - DERIVED as 740 + 8 |
+| `test/unit.ts` | **39 tests, 0 failures** |
 
 The runner's total line spells the third column `skipped` while the per-vector note for each of those 4 entries reads `NOT RUN` and names its reason; they are the same 4 class-10 vectors, and neither spelling adds them to the passed count.
 
 **The corpus runs were made under `emptyContainerPolicy: 'mechanical'`, which is the corpus's rule and NOT specification section 3.3's.**
 Finding 2 above gives that reading in full, and the third row of the table above is a run under the other one: the two failures are `record-structure-empty-array` and `record-structure-empty-object`, both on `type-map-fail-closed: no binding in org.roax.corpus.synthetic for kind array|object at a.b`.
-That row and finding 2's `map-authorized` row are the same run family rather than two measurements, and they differ by exactly the 8 class-10 assertions a reference checkout adds: 724 = 728 - 4 here, against 716 = 720 - 4 there, with the same 2 failures on both sides.
+That row and finding 2's `map-authorized` row are the same run family rather than two measurements, and they differ by exactly the 8 class-10 assertions a reference checkout adds: 748 = 752 - 4 here, against 740 = 744 - 4 there, with the same 2 failures on both sides.
 A green corpus is therefore evidence of agreement with the committed vectors and is not, on its own, evidence of conformance to section 3.3 - the two are mutually exclusive as things stand.
 The runner DECLARES the active policy on every run, beside the Unicode declaration and for the same reason: a total line read on its own must not stand for a conformance claim the run did not make.
 
@@ -365,9 +366,9 @@ The runner DECLARES the active policy on every run, beside the Unicode declarati
 **Without `ROAX_REFERENCE_RECORDS` class 10 does not execute, and its 8 assertions across four vectors are counted as NOT RUN rather than as passed.**
 That is the first row of the table above, and it is the row a reader with no reference checkout will reproduce.
 
-**The second row is a with-records run, and it is stated only because it was re-measured rather than carried forward.**
+**The second row is a with-records figure, and on this commit it is DERIVED rather than measured.**
 An earlier revision of this section carried such a row - 684 assertions across all 19 classes, measured when the class carried two vectors - and removed it, because it was not reproducible on the machine that wrote it and a measurement that cannot be reproduced must not sit in a table of measurements as though it were current.
-The rule that removal established still holds and is why the row is back rather than why it was absent: it is here because this run reproduced it against the pinned reference checkout, not because the earlier one was restored.
+That rule still holds and is what forces the DERIVED label rather than the row's removal: the leaf-ordering amendment ran without a reference checkout and carried class 10's four vectors forward byte-identical, so the row is arithmetic over a run that did happen rather than a run nobody made, and it is labelled so a reader is never asked to take it for one.
 
 The class needs records this repository deliberately does not vendor.
 Its four vectors are two real Singapore MOH samples with and without an issuer key identifier: the recovery-healthcert records at 69 and 70 leaves, resolving against `references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/sample-data.ts#sampleDocument`, and the vaccination-healthcert records at 91 and 92 leaves, resolving against `references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/sample-data.ts#sampleVaccineHealthCert`, which the 2026-07-30 `dose` and `expiryDateTime` rulings made committable.

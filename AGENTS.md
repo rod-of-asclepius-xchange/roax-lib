@@ -392,7 +392,7 @@ These are the things a future agent is most likely to get wrong.
 
 - **The specification does not say whether NFC-colliding sibling keys must be rejected when their descendant leaf paths remain distinct.**
   It requires raw map keys to be unique and normalizes each encoded KEY segment, so `{"é":{"a":1},"é":{"b":2}}` has no duplicate raw key and no duplicate complete encoded leaf path (`docs/spec/roax-canon-1.md` sections 3.2, 3.3 and 5).
-  The Rust implementation rejects duplicate complete encoded leaf paths but accepts this disjoint-descendant shape, and no committed vector distinguishes that reading (`rust/src/commitment.rs:611-619`; `corpus/README.md`, specification ambiguity 6).
+  The Rust implementation rejects duplicate complete encoded leaf paths but accepts this disjoint-descendant shape, and no committed vector distinguishes that reading (`rust/src/commitment.rs:729-737`; `corpus/README.md`, specification ambiguity 6).
 
 - **The leaf set is a union, not the record.**
   Reserved `roax.*` leaves join the record's leaves before the sort (spec sections 3.3 and 11.2).
@@ -500,7 +500,7 @@ These are the things a future agent is most likely to get wrong.
 
 - **A selective disclosure derives its context from the sealed commitment.**
   Accepting a second caller-supplied context lets safe values from two issuances be mixed into an envelope that its own verifier rejects at outer-identity binding.
-  The Rust `Commitment` therefore retains its exact issuance context and `disclose` accepts no replacement (`rust/src/commitment.rs:236-288`; `rust/src/envelope.rs:408-423`; specification sections 10 and 11.3).
+  The Rust `Commitment` therefore retains its exact issuance context and `disclose` accepts no replacement (`rust/src/commitment.rs:309-361`; `rust/src/envelope.rs:537-541`; specification sections 10 and 11.3).
 
 - **The binding runs BEFORE the minimum-disclosure floor, and the floor is selected from the COMMITTED `roax.recordType` leaf.**
   Derived from section 11.3, not chosen: authority has to be established before an outer field selects anything, and floor-then-bind is trust-then-verify.
