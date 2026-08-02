@@ -49,9 +49,8 @@ It was re-checked against dogtag before being adopted here, because the audit re
 
 ## What each profile document must declare
 
-**This directory is the `recordType` registry.**
-`schemas/envelope-2.0.json` constrains `recordType` to a lowercase reverse-DNS *form* rather than to a closed list, because the list is extensible.
-It is the registry that closes it: **adding a `recordType` value REQUIRES adding a profile document here declaring at least the first three rows below**, and a syntactically valid `recordType` with no profile document is not a valid record.
+The opening above states why this directory is the `recordType` registry, with the schema and specification citations behind it.
+This is the operative consequence of that: **adding a `recordType` value REQUIRES adding a profile document here declaring at least the first three rows below**, and a syntactically valid `recordType` with no profile document is not a valid record.
 
 The v1 registry is `sg.gov.moh.vaccination-healthcert`, `sg.gov.moh.pdt-healthcert`, `sg.gov.moh.recovery-healthcert` and `hl7.fhir.bundle`.
 
@@ -103,7 +102,8 @@ Each of the four documents below records, in its own last section, what its fami
 
 ## Provenance
 
-All four profiles were derived from the reference schemata read in place, read-only, under `references/schemata/src/sg/gov/moh`, at Open-Attestation/schemata commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`.
+All four profiles were derived from the reference schemata read in place, read-only, at Open-Attestation/schemata commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`, principally under `references/schemata/src/sg/gov/moh`.
+That path is where that checkout vendors the files and is not a statement about who authors them: the FHIR 4.0.1 full and lite schemas sit under it at `fhir/4.0.1/` and are HL7's, while the vaccination wrapper's notarisation metadata is defined in the same checkout under `references/schemata/src/sg/gov/tech/notarise/1.0/`.
 
 **No reference schema is copied into this repository.**
 `references/` is excluded by `.gitignore` by design.
