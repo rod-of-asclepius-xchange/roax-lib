@@ -135,6 +135,21 @@ object EnvelopeWriter {
     private fun header(sb: StringBuilder, ctx: IssuanceContext, root: ByteArray, leafCount: Int) {
         sb.append("\"canon\":").also { string(sb, ctx.canon) }
         sb.append(",\"hashAlg\":").also { string(sb, ctx.hashAlgId) }
+        if (ctx.identity.ordering != Ordering.PATH) {
+            // SELF-DESCRIPTION, and NOT AUTHORITY. A verifier takes the ordering from the
+            // anchoring registry (specification section 9.5, H2); [EnvelopeVerifier] never reads
+            // this member, and nothing here reads it back to select an ordering.
+            //
+            // Emitted only for a NON-DEFAULT ordering, so a path-ordered envelope stays
+            // byte-identical to what this library issued before the axis existed - the same
+            // ROAX-CANON/1 compatibility rule that gives `path` the empty domain suffix.
+            // Omitting it on a `hash`-ordered copy would not be silence: both envelope schemas
+            // define the member's ABSENCE as meaning `path`, so such a copy would ASSERT an
+            // ordering it was not issued under. A self-description that lies is worse than none
+            // even where nothing reads it, which is the reasoning section 7.4 used to reject a
+            // `roax.hashAlg` reserved leaf.
+            sb.append(",\"ordering\":").also { string(sb, ctx.identity.ordering.id) }
+        }
         sb.append(",\"recordType\":").also { string(sb, ctx.identity.recordType) }
         sb.append(",\"schemaVersion\":").also { string(sb, ctx.identity.schemaVersion) }
         sb.append(",\"recordId\":").also { string(sb, ctx.identity.recordId) }

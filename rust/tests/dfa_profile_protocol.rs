@@ -8,6 +8,7 @@
 //! the resolver methods behind them were covered.
 
 use roax_canon::type_map::content_id;
+use roax_canon::Ordering;
 use roax_canon::{
     disclose, issue_full_copy, parse_envelope, verify_disclosed, verify_full, CommitmentContext,
     DfaTypeMap, Error, HashAlgorithm, Issuer, JsonKind, JsonValue, ParsedEnvelope, Path, Profile,
@@ -98,6 +99,7 @@ fn context_for(map: &DfaTypeMap, record_id: &str) -> CommitmentContext {
             id: "did:example:issuer".to_owned(),
             key_id: None,
         },
+        ordering: Ordering::default(),
     }
 }
 
@@ -188,6 +190,7 @@ fn a_published_artifact_drives_issue_verify_disclose_and_verify() {
     let policy = VerificationPolicy {
         anchored_root: copy.root(),
         anchored_hash_algorithm: HashAlgorithm::Sha256,
+        anchored_ordering: Ordering::default(),
     };
     assert_eq!(
         verify_full(&copy, &profile, policy)
@@ -256,6 +259,7 @@ fn both_high_level_call_sites_resolve_a_decomposed_key_like_its_composed_twin() 
     let policy = VerificationPolicy {
         anchored_root: copy.root(),
         anchored_hash_algorithm: HashAlgorithm::Sha256,
+        anchored_ordering: Ordering::default(),
     };
     let disclosure = disclose(&commitment, &profile, &[key_path(&["\u{e9}"])])
         .expect("the composed disclosure must build");

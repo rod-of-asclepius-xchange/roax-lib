@@ -57,8 +57,8 @@ public enum LeafConstruction {
     /// under a weak algorithm computes the domain string under it too - and what
     /// it does buy is that the same content under two algorithms cannot collide
     /// on a root by accident.
-    public static func domain(hashAlg: String) -> [UInt8] {
-        Array(("ROAX-CANON/1/" + hashAlg).utf8)
+    public static func domain(hashAlg: String, ordering: Ordering = .path) -> [UInt8] {
+        Array(("ROAX-CANON/1/" + hashAlg + ordering.domainSuffix).utf8)
     }
 
     /// The one leaf-preimage builder in this implementation.
@@ -81,10 +81,11 @@ public enum LeafConstruction {
         tag: TypeTag,
         encodedValue: [UInt8],
         salt: [UInt8],
-        hashAlg: String
+        hashAlg: String,
+        ordering: Ordering = .path
     ) throws -> [UInt8] {
         guard salt.count == 16 else { throw ROAXError.saltLength(salt.count) }
-        let domain = domain(hashAlg: hashAlg)
+        let domain = domain(hashAlg: hashAlg, ordering: ordering)
 
         var out = [UInt8]()
         out.reserveCapacity(1 + 4 + domain.count + 4 + encodedPath.count
@@ -108,7 +109,8 @@ public enum LeafConstruction {
         tag: TypeTag,
         encodedValue: [UInt8],
         salt: [UInt8],
-        hash: H.Type
+        hash: H.Type,
+        ordering: Ordering = .path
     ) throws -> [UInt8] {
         let encodedPath = PathEncoding.encode(segments)
         return H.hash(try preimage(
@@ -116,7 +118,8 @@ public enum LeafConstruction {
             tag: tag,
             encodedValue: encodedValue,
             salt: salt,
-            hashAlg: H.identifier
+            hashAlg: H.identifier,
+            ordering: ordering
         ))
     }
 
@@ -126,7 +129,8 @@ public enum LeafConstruction {
         tag: TypeTag,
         encodedValue: [UInt8],
         salt: [UInt8],
-        hash: H.Type
+        hash: H.Type,
+        ordering: Ordering = .path
     ) throws -> Leaf {
         let encodedPath = PathEncoding.encode(segments)
         let h = H.hash(try preimage(
@@ -134,7 +138,8 @@ public enum LeafConstruction {
             tag: tag,
             encodedValue: encodedValue,
             salt: salt,
-            hashAlg: H.identifier
+            hashAlg: H.identifier,
+            ordering: ordering
         ))
         return Leaf(
             segments: segments,

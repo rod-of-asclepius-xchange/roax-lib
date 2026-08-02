@@ -98,7 +98,7 @@ Kotlin's runner probes BOTH names under `ROAX_REFERENCE_RECORDS`, so one directo
 `swift/` is a SwiftPM package: `Sources/ROAXCanon` is the library, `Sources/ROAXCanonCorpus` is the corpus runner, `Sources/roax-conformance` is its command-line front end and `Tests/ROAXCanonTests` is the suite.
 See [`swift/README.md`](swift/README.md) and [`swift/FINDINGS.md`](swift/FINDINGS.md).
 Build and gate it with `swift build --package-path swift`, `swift test --package-path swift` and `swift run --package-path swift roax-conformance`.
-It passes 501 of 501 vectors with a reference checkout and reports exactly the four class-10 vectors NOT RUN without one, exiting 2 rather than 0 so a bare run does not read as a pass.
+It passes 504 of 504 vectors with a reference checkout and reports exactly the four class-10 vectors NOT RUN without one, exiting 2 rather than 0 so a bare run does not read as a pass.
 
 **The runner is a LIBRARY target rather than only an executable, and that is deliberate**: it makes `swift test` a real gate over the committed corpus instead of a second suite that could pass while the corpus failed.
 
@@ -121,7 +121,7 @@ Keep those two codes apart when you touch either.
 
 `kotlin/` is a two-module Gradle build: `roax-canon` is the library and its tests, and `roax-canon-android` packages the same `src/main` as an AAR without a second copy of the code.
 See [`kotlin/README.md`](kotlin/README.md), and [`kotlin/FINDINGS.md`](kotlin/FINDINGS.md) for what the build found.
-Run it with `gradle -p kotlin :roax-canon:test`, which runs the corpus and every other test; it passes 501 of 501 vectors with zero NOT RUN once `ROAX_REFERENCE_RECORDS` is set.
+Run it with `gradle -p kotlin :roax-canon:test`, which runs the corpus and every other test; it passes 504 of 504 vectors with zero NOT RUN once `ROAX_REFERENCE_RECORDS` is set.
 
 **Three things about this module are easy to get wrong.**
 
@@ -132,7 +132,7 @@ Run it with `gradle -p kotlin :roax-canon:test`, which runs the corpus and every
 - **The Unicode version is a property of the runtime and cannot be pinned from inside the library.**
   Section 6.1 pins 15.1; JDK 17 ships Unicode 13.0 and JDK 25 ships 16.0, and no installed JDK has 15.1.
   `Nfc` is therefore injectable and declares its version, and the corpus runner prints the comparison every run.
-  Measured: all 501 vectors pass under both JDKs, and the digest over the NFC forms of every string in the corpus is byte-identical on both, pinned as a live guard by `PlatformNfcTablesTest`; `kotlin/FINDINGS.md` section 2 owns the counts.
+  Measured: all 504 vectors pass under both JDKs, and the digest over the NFC forms of every string in the corpus is byte-identical on both, pinned as a live guard by `PlatformNfcTablesTest`; `kotlin/FINDINGS.md` section 2 owns the counts.
   **That digest is over the corpus's strings, so it moves whenever the corpus grows.**
   Re-derive it by running the test on BOTH JDKs and re-pinning only if they agree - re-pinning from one runtime silently retires the cross-version comparison, which is the whole point of the constant.
   Re-run the other one with `-Proax.testJdk=25`.
@@ -169,6 +169,62 @@ Add a group to the corpus file and every runner goes red until it is consumed - 
 `--draw-salts` redraws EVERY committed set, which changes every root in the corpus and buries an additive change in a corpus-wide diff.
 `TREE_LEAF_DOMAIN_VERSION` is pinned at `1.0.0` and deliberately decoupled from `CORPUS_VERSION` for the same reason: it used to interpolate the corpus version, so any addition rewrote all 173 tree, 165 inclusion and 11 negative-proof vectors.
 Do not re-couple them.
+
+## Leaf ordering is SELECTABLE per record, and `path` is the default
+
+**Specification section 9 defines two orderings and the amended decision D5 rules both first-class**, mirroring decision B's shape for hash algorithms: `path` sorts leaves by ascending `encodePath` bytes, `hash` by ascending `leafHash` bytes.
+The trade is a genuine one and neither dominates: `path` admits absence proofs and leaks gap counts, `hash` leaks nothing about position and **forecloses absence proofs permanently** for records issued under it.
+Decision D6 is amended to say so - the capability is preserved for `path`-ordered records and is impossible rather than undefined for `hash`-ordered ones.
+
+**The whole change is ADDITIVE to the committed corpus, and the reason is worth keeping.**
+`path` contributes the EMPTY domain suffix, so a path-ordered record's `DOMAIN` is byte-identical to what `ROAX-CANON/1` computed before the axis existed, and `roax.ordering` is emitted only for a non-default ordering.
+Not one committed expected value moved: 501 vectors to 504, with 174 existing vectors gaining a declared `ordering` field.
+**Do not "fix" that asymmetry into symmetry.**
+Giving `path` a non-empty suffix, or emitting the leaf always, changes every leaf hash of every record already issued under `ROAX-CANON/1`, which is a version-2 change wearing a version-1 label.
+It is also infeasible in this tree: the four class-10 vectors cannot be recomputed without the gitignored reference checkout, so a build that moved them would delete them.
+
+**Four things about the implementation are easy to get wrong.**
+
+- **Salts are assigned in `encodePath` order under BOTH orderings**, and only tree PLACEMENT differs.
+  A leaf hash is computed over its salt, so assigning salts in tree order is circular under `hash`.
+  Kotlin's `commitWithSaltsByPath` learns the order from a placeholder-salt pass and then consumes real salts positionally; once `commit` returned tree order that pass gave a hash order over placeholder salts, and every salt would have paired with the wrong leaf and produced a plausible wrong root rather than an error.
+  Under `path` the fix is the identity, which is why nothing could see it before.
+- **Equal leaf hashes are REJECTED under `hash` ordering, never tie-broken.**
+  Paths are already unique and every variable component of the section 8 preimage is length-prefixed, so two equal hashes are a collision; tie-breaking by path would absorb evidence of a broken hash into a well-defined tree and hand back a root.
+- **`roax.ordering` is a reserved leaf and is NOT AUTHORITY, and both halves must be stated together.**
+  It departs from section 7.4's rejection of a `roax.hashAlg` leaf deliberately, and section 11.2 argues the departure: 7.4's leaf was dangerous because weak hash algorithms exist and it enabled a downgrade, whereas both orderings are equally strong, so this one is redundant rather than dangerous and what it buys is committed issuer intent.
+  A verifier MUST take the ordering from the anchoring registry (section 9.5, H2), never from the leaf or the envelope member.
+  Rust models this properly: the envelope's `ordering` member is accepted for shape and never read, and `VerificationPolicy::anchored_ordering` is the only source.
+- **Where the ordering is needed is narrower than it looks, and section 9.6 owns it.**
+  A DISCLOSED copy carries each leaf's index and the tree is never rebuilt, so the ordering is needed for the **leaf preimage** only - exactly as `hashAlg` already is - and for nothing structural.
+  That is what makes `hash` ordering's position privacy real: a disclosed index is a position in leaf-hash order and reveals nothing about record shape.
+  Do not describe H1 as buying more than it does: a leaf is bound to exactly one ordering, so the same leaf set cannot be reassembled into the other tree, and that is real and narrow.
+
+**The VERIFY path is a separate surface from the ISSUE path, and it needed its own field in every library.**
+This is the lesson worth carrying to a third axis.
+Making issuance ordering-aware left every verifier rebuilding a full copy under the default, so the TypeScript library issued a `hash`-ordered envelope and then refused it - twice over, since its member allow-list also did not know the `ordering` member it had just emitted.
+Each library now takes the ordering from its own registry field (`anchoredOrdering`, `anchored_ordering`, `anchorOrdering`, `VerificationPolicy::anchored_ordering`) and never from the envelope, which is H2.
+**No corpus vector reaches any of this**, because no class-20 vector is `hash`-ordered, so it was found by issuing one by hand and is pinned by nothing in the corpus today.
+Rust needed a second fix on the same path: it recognized only a fixed set of reserved keys on a disclosed leaf, so a copy legitimately disclosing `roax.ordering` was refused as a namespace collision, while the other four use a prefix test and were unaffected.
+
+**The ISSUE path had its own version of the same gap, on the outer `ordering` member rather than on the leaf.**
+TypeScript emitted it for a non-default ordering while Python, Kotlin and Rust - the other three JSON emitters - emitted nothing, and both envelope schemas define the member's ABSENCE as meaning `path`, so those copies ASSERTED an ordering they were not issued under.
+All four now emit it for `hash` and for nothing else, which keeps a path-ordered envelope byte-identical to what each issued before the axis existed; Swift serializes no envelope, so it holds whatever a caller writes.
+**No verifier reads it and that is unchanged**: it is SELF-DESCRIPTION, the registry stays the sole authority, and the reason to emit it at all is that a self-description which lies is worse than none - section 7.4's own reasoning for rejecting a `roax.hashAlg` leaf.
+Nothing in the corpus could see this either, for the same reason as the verify-path defect, so each library asserts the member in its own ordering test.
+
+**Class 21 is the enforcement.**
+Three vectors, each one record under BOTH orderings, asserting two roots that differ AND two **disjoint** leaf-hash sets.
+Disjointness is the stronger assertion and is what H1 buys; a runner checking only the roots would pass an implementation that permuted one leaf set into the other tree.
+One salt set serves both sides, drawn over the hash-ordered superset, because two sets would make the roots differ for a reason unrelated to ordering.
+
+**Adding a group went red in every runner before it went green, which is the intended order.**
+Rust's `deny_unknown_fields`, and the explicit consumed-group lists in the other four plus `check_corpus.mjs`, all failed until each consumed `ordering`.
+**The per-vector `ordering` FIELD needed a separate guard**, because a field inside a group a runner already reads is invisible to the group check.
+Every runner now checks EVERY vector of the six ordering-sensitive groups and refuses one that omits the declaration.
+**Only `leaf` and `record` actually THREAD the declaration through today**, so the guard is total by failing CLOSED instead: a vector declaring `hash` in `unlinkability`, `normalization`, `envelope` or `roundTrip` makes its runner exit non-zero naming the group, rather than being computed under the default and reported green.
+Thread the declaration through that loop before adding such a vector.
+That split is deliberate and is worth keeping visible - "the runner asserts the declaration" and "the runner computes under the declaration" are different claims, and writing the first while meaning the second is how a guard comes to be trusted for something it does not do.
 
 ## The type-map binding is triggered by what is COMMITTED, in all five libraries
 
@@ -336,13 +392,14 @@ These are the things a future agent is most likely to get wrong.
 
 - **The specification does not say whether NFC-colliding sibling keys must be rejected when their descendant leaf paths remain distinct.**
   It requires raw map keys to be unique and normalizes each encoded KEY segment, so `{"é":{"a":1},"é":{"b":2}}` has no duplicate raw key and no duplicate complete encoded leaf path (`docs/spec/roax-canon-1.md` sections 3.2, 3.3 and 5).
-  The Rust implementation rejects duplicate complete encoded leaf paths but accepts this disjoint-descendant shape, and no committed vector distinguishes that reading (`rust/src/commitment.rs:611-619`; `corpus/README.md`, specification ambiguity 6).
+  The Rust implementation rejects duplicate complete encoded leaf paths but accepts this disjoint-descendant shape, and no committed vector distinguishes that reading (`rust/src/commitment.rs:729-737`; `corpus/README.md`, specification ambiguity 6).
 
 - **The leaf set is a union, not the record.**
   Reserved `roax.*` leaves join the record's leaves before the sort (spec sections 3.3 and 11.2).
   A flattener that walks the record only produces a different root.
   Each reserved path is a **single `KEY` segment carrying the literal dotted name**, so `roax.recordType` is one segment `KEY("roax.recordType")` and *not* two.
-  There are five mandatory reserved leaves, including `roax.typeMap.id`, plus `roax.issuer.keyId`, which is the one conditional leaf: absent means no leaf, not a NULL leaf.
+  There are five mandatory reserved leaves, including `roax.typeMap.id`, plus TWO conditional ones: `roax.issuer.keyId` and `roax.ordering`, each of which emits no leaf when it is absent rather than a NULL leaf.
+  Specification section 11.2 owns that statement and puts the reserved count at 5, 6 or 7; cite it rather than restating a count here.
   The tree floor is therefore 6.
 
 - **The reserved-namespace guard tests the NFC-normalized key of the FIRST segment** for the ASCII prefix `roax.` (spec section 11.2).
@@ -439,11 +496,11 @@ These are the things a future agent is most likely to get wrong.
   Section 11.3 says fields outside the root are hints; section 11.2 commits `recordType`, `schemaVersion`, `typeMap.id`, `recordId` and `issuer.id` as leaves so a disclosed copy can be checked against them.
   The outer `recordType` is what SELECTS the profile floor, and PDT's floor is a strict subset of recovery's, so an unbound one lets a holder relabel a recovery copy as PDT, withhold `validUntil`, and still have every inclusion proof verify against the genuine root.
   Compare under NFC on both sides: a STRING leaf commits its normalized form.
-  `roax.issuer.keyId` MUST NOT be bound - it is the conditional leaf.
+  `roax.issuer.keyId` MUST NOT be bound - it is a conditional leaf, so binding it would turn an absent key identifier into a mismatch.
 
 - **A selective disclosure derives its context from the sealed commitment.**
   Accepting a second caller-supplied context lets safe values from two issuances be mixed into an envelope that its own verifier rejects at outer-identity binding.
-  The Rust `Commitment` therefore retains its exact issuance context and `disclose` accepts no replacement (`rust/src/commitment.rs:236-288`; `rust/src/envelope.rs:408-423`; specification sections 10 and 11.3).
+  The Rust `Commitment` therefore retains its exact issuance context and `disclose` accepts no replacement (`rust/src/commitment.rs:309-361`; `rust/src/envelope.rs:537-541`; specification sections 10 and 11.3).
 
 - **The binding runs BEFORE the minimum-disclosure floor, and the floor is selected from the COMMITTED `roax.recordType` leaf.**
   Derived from section 11.3, not chosen: authority has to be established before an outer field selects anything, and floor-then-bind is trust-then-verify.

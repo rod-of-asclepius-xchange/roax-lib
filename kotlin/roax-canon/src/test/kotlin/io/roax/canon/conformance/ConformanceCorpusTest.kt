@@ -7,6 +7,7 @@ import io.roax.canon.EnvelopeProfile
 import io.roax.canon.EnvelopeVerifier
 import io.roax.canon.IssuanceContext
 import io.roax.canon.Merkle
+import io.roax.canon.Ordering
 import io.roax.canon.PlatformNfc
 import io.roax.canon.Reason
 import io.roax.canon.RecordIdentity
@@ -75,6 +76,14 @@ class ConformanceCorpusTest {
      */
     @Test
     fun `every vector group is consumed`() {
+        // Total by construction: every ordering-sensitive vector is checked, and one declaring an
+        // ordering its group is not computed under fails closed rather than being computed under
+        // the default (specification section 9).
+        assertEquals(
+            null,
+            Corpus.unsupportedDeclaredOrdering(),
+            "a vector declares an ordering this runner does not compute its group under",
+        )
         val unconsumed = Corpus.unconsumedGroups()
         assertTrue(
             unconsumed.isEmpty(),
@@ -226,7 +235,14 @@ class ConformanceCorpusTest {
             // The salt is an INPUT: decision D4 is ruled D4b, so nothing derives one.
             assertEquals(
                 Corpus.str(v, "leafHash"),
-                Bytes.toHex(leafHash(segments, tag, Corpus.value(tag, v["value"]), salt, Sha256, CANON, nfc)),
+                // A leaf vector is ordering-sensitive even though it carries no tree: the
+                // ordering reaches the preimage through DOMAIN (section 9.5, H1).
+                Bytes.toHex(
+                    leafHash(
+                        segments, tag, Corpus.value(tag, v["value"]), salt, Sha256, CANON, nfc,
+                        ordering = Corpus.declaredOrdering(v),
+                    ),
+                ),
                 "leafHash ${Corpus.str(v, "name")}",
             )
             n++
@@ -358,6 +374,7 @@ class ConformanceCorpusTest {
                 recordId = Corpus.str(v, "recordId"),
                 issuerId = Corpus.str(v, "issuerId"),
                 issuerKeyId = Corpus.strOrNull(v, "issuerKeyId"),
+                ordering = Corpus.declaredOrdering(v),
             )
             val saltSet = Corpus.saltSet(Corpus.str(v, "saltsFile"), nfc)
 
@@ -457,6 +474,66 @@ class ConformanceCorpusTest {
             if (profile.isNotEmpty()) "$profile.json" else null,
             if (export.isNotEmpty()) "$export.json" else null,
         )
+    }
+
+    // ---------------------------------------------------------- class 21: leaf ordering, both --
+
+    @Test
+    fun `ordering vectors`() {
+        var n = 0
+        for (v in Corpus.vectors("ordering")) {
+            val name = Corpus.str(v, "name")
+            val record = loadRecord(Corpus.str(v, "recordFile"))
+                ?: throw IllegalStateException("ordering fixture $name is in this repository")
+            // ONE salt set serves both sides: salts are assigned in encodePath order under BOTH
+            // orderings (section 9), and the committed set is drawn over the hash-ordered superset.
+            val saltSet = Corpus.saltSet(Corpus.str(v, "saltsFile"), nfc)
+            val sides = Corpus.obj(v["orderings"]!!)
+
+            val seen = HashMap<String, Pair<String, List<String>>>()
+            for (member in sides.members) {
+                val orderingName = member.key
+                val side = Corpus.obj(member.value)
+                val identity = RecordIdentity(
+                    recordType = Corpus.str(v, "recordType"),
+                    schemaVersion = Corpus.str(v, "schemaVersion"),
+                    recordId = Corpus.str(v, "recordId"),
+                    issuerId = Corpus.str(v, "issuerId"),
+                    issuerKeyId = Corpus.strOrNull(v, "issuerKeyId"),
+                    ordering = Ordering.parse(orderingName),
+                )
+                val commitment = buildRoot(record, identity, saltSet)
+                val hashes = commitment.leaves.map { Bytes.toHex(it.leafHash) }
+                assertEquals(
+                    Corpus.int(side, "leafCount"), commitment.leafCount,
+                    "$orderingName leafCount $name",
+                )
+                assertEquals(Corpus.str(side, "root"), commitment.rootHex, "$orderingName root $name")
+                assertEquals(
+                    Corpus.strings(side["leafHashes"]!!), hashes,
+                    "$orderingName leafHashes $name",
+                )
+                seen[orderingName] = commitment.rootHex to hashes
+                n++
+            }
+
+            // The two cross-ordering assertions, which are what would still catch an
+            // implementation reproducing both roots by accident. The leaf-hash sets are disjoint
+            // because the ordering is inside DOMAIN and therefore inside every leaf preimage
+            // (section 9.5, H1).
+            val pathSide = seen["path"]
+            val hashSide = seen["hash"]
+            if (pathSide != null && hashSide != null) {
+                assertNotEquals(pathSide.first, hashSide.first, "roots differ $name")
+                assertEquals(
+                    emptyList<String>(),
+                    pathSide.second.filter { it in hashSide.second },
+                    "leaf hashes disjoint across orderings $name",
+                )
+                n += 2
+            }
+        }
+        Report.pass("ordering", n)
     }
 
     // ------------------------------------------------------ class 12: cross-record unlinkability --

@@ -39,7 +39,7 @@ That registry is [`docs/profiles/`](docs/profiles/), one document per `recordTyp
    It takes Ajv 8 and `ajv-formats` from a directory outside the tree named by `ROAX_AJV`, and `--skip-schema-validation` runs the dependency-free subset without them ([`docs/type-maps.md`](docs/type-maps.md) section 6).
 3. **Registering that profile with a verifier**, which every library takes as *configuration* rather than as a source edit.
    Rust ships no profile implementation at all - `Profile` is a trait the caller implements ([`rust/src/envelope.rs:17`](rust/src/envelope.rs)), so even the Singapore profiles are caller-side there.
-   The other four ship the registry as an overridable default: TypeScript's `knownProfiles` and `floorFor` config ([`src/envelope.ts:616`](src/envelope.ts) and `:971`), Python's `ProfileRegistry.with_profile`, Swift's public `ProfileRegistry(profiles:)` beside its `versionOne` default, and Kotlin's `ProfileRegistry.with` beside `ProfileRegistry.DEFAULT`.
+   The other four ship the registry as an overridable default: TypeScript's `knownProfiles` and `floorFor` config ([`src/envelope.ts:645`](src/envelope.ts) and `:1010`), Python's `ProfileRegistry.with_profile`, Swift's public `ProfileRegistry(profiles:)` beside its `versionOne` default, and Kotlin's `ProfileRegistry.with` beside `ProfileRegistry.DEFAULT`.
    No library embeds or loads a published type-map artifact; the resolver is supplied by the caller in all five.
 
 **One honest limit, because an unqualified claim of extensibility is exactly the defect this repository keeps catching.**
@@ -115,6 +115,11 @@ What remains open under B is the `Poseidon-BN254` parameterization, which is not
 **The ten further decisions were ruled on 2026-07-28** and the specification is written on those rulings.
 Eight confirmed what it already recommended.
 Two changed it: salts are now one independent CSPRNG draw per leaf with no master salt and no derivation, and a content-addressed blob binding is defined without being selected by any version-1 profile.
+
+**Two of those ten were amended on 2026-08-02, on the reasoning rather than by authority.**
+**D5 - leaf ordering - now takes B's shape**: `path` ordering by encoded path and `hash` ordering by leaf hash are both first-class and selected per record, with `path` the default, and the ordering identifier is folded into the same domain string the algorithm identifier is.
+It is likewise not bound by a leaf a verifier may rely on: the ordering is committed as `roax.ordering` for a non-default ordering, and the specification states in the same breath that the leaf is committed issuer intent and **not authority**, which comes from the anchoring registry.
+The choice is a real trade rather than a preference, so **D6 - absence proofs - is amended in consequence**: the capability stays preserved for `path`-ordered records and is **impossible rather than undefined** for `hash`-ordered ones, which is what a deployment is actually choosing between when it picks an ordering.
 Specification section 15 tables where each ruling lands, and `docs/decisions.md` part 2 gives every one of them with its reasoning, so any of them can be overturned on the reasoning rather than on authority.
 
 **One further question was identified after those rulings and was ruled on 2026-07-30: D14** - whether the type-map lookup matches over an NFC-normalized key or over the bytes as received.

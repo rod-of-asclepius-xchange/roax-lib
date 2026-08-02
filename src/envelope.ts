@@ -12,7 +12,14 @@
 import { fail, RoaxError } from './errors.js';
 import { toHex, fromHex, nfc } from './bytes.js';
 import { encodePath, displayPath, isKeySegment, type Path, type PathSegment } from './path.js';
-import { resolveHashFunction, CANON_VERSION, type HashAlgName } from './hash.js';
+import {
+  resolveHashFunction,
+  resolveOrdering,
+  CANON_VERSION,
+  ORDERING_DEFAULT,
+  type HashAlgName,
+  type Ordering,
+} from './hash.js';
 import { leafHash } from './leaf.js';
 import { verifyInclusion } from './tree.js';
 import {
@@ -125,9 +132,25 @@ export interface VerifierConfig {
    * accidentally hide a registered profile's floor.
    */
   readonly floorFor?: ((recordType: string) => ProfileFloor | undefined) | undefined;
-  /** H2: the `(root, hashAlg)` pair the verifier's OWN anchoring registry records. */
+  /** H2: the `(root, hashAlg, ordering)` triple the verifier's OWN anchoring registry records. */
   readonly anchoredRoot?: string | undefined;
   readonly anchoredHashAlg?: HashAlgName | undefined;
+  /**
+   * H2 for the leaf ordering (specification section 9.5).
+   *
+   * **This is the ONLY source of the ordering on the verification path.** The envelope's own
+   * `ordering` member is accepted for shape and never read, and the committed `roax.ordering`
+   * leaf is committed issuer intent rather than authority (section 11.2): both are supplied by
+   * the party the check constrains.
+   *
+   * Defaults to `path`, which is the specification's default and the same default in all five
+   * libraries. A verifier that accepts `hash`-ordered records MUST set this from its registry.
+   *
+   * Stated as honestly as section 7.4 states H2 for `hashAlg`: the anchoring registry is a
+   * requirement HANDED FORWARD rather than a mechanism the specification designs (section 2.2),
+   * so what this field models today is the verifier's own configured expectation.
+   */
+  readonly anchoredOrdering?: Ordering | undefined;
   /**
    * The registry the verifier is configured with. An envelope naming another is never read.
    *
@@ -184,6 +207,12 @@ const DEFAULT_ALLOW_LIST: readonly HashAlgName[] = ['SHA-256'];
 const KNOWN_TOP_LEVEL = new Set([
   'canon',
   'hashAlg',
+  // ACCEPTED FOR SHAPE AND DELIBERATELY NOT READ. Both envelope schemas permit this member, so
+  // rejecting it would refuse a conforming envelope - and this library ISSUES it for a non-default
+  // ordering, so rejecting it would mean issuing an envelope its own verifier refuses, which is the
+  // exact finding conformance corpus class 20 exists for. Using it would violate specification
+  // section 9.5 H2: a verifier takes the ordering from the anchoring registry, never from here.
+  'ordering',
   'recordType',
   'schemaVersion',
   'typeMap',
@@ -270,10 +299,10 @@ function requiredString(object: JsonValue, name: string): string {
  * **A present-but-non-string member reads as absent rather than as a rejection, and that leniency
  * lives here alone.** Every one of these members - `issuer.keyId`, `anchor.txHash`,
  * `anchor.anchoredAt` and a disclosed leaf's `displayPath` - is either a hint outside the root
- * (specification section 11.3) or, in `keyId`'s case, the one conditional reserved leaf whose
- * absence means no leaf rather than a NULL leaf. Three hand-rolled copies of this read had the
- * leniency written into each of them, where a reader had to compare them to see it was the same
- * rule.
+ * (specification section 11.3) or, in `keyId`'s case, a conditional reserved leaf whose
+ * absence means no leaf rather than a NULL leaf (section 11.2). Three hand-rolled copies of this
+ * read had the leniency written into each of them, where a reader had to compare them to see it
+ * was the same rule.
  */
 function optionalString(object: JsonValue, name: string): string | undefined {
   const v = memberOf(object, name);
@@ -746,12 +775,17 @@ function verifyFullCopy(
       `a full copy is re-flattened, which needs the exact type map for ${envelope.recordType}`,
     );
   }
+  // A FULL copy is the case that needs the ordering structurally: this rebuilds the whole tree,
+  // so the ordering decides both leaf placement and every leaf preimage through DOMAIN. It comes
+  // from the registry and never from the envelope (section 9.5, H2).
+  const ordering = resolveOrdering(config.anchoredOrdering ?? ORDERING_DEFAULT);
   const commitment = commitRecord(envelope.record as JsonValue, {
     hash,
     resolver,
-    identity,
+    identity: { ...identity, ordering },
     salts,
     emptyContainerPolicy: config.emptyContainerPolicy,
+    ordering,
   });
   // Section 11.1: in a full copy the verifier derives the leaf count itself, and a derived count
   // that disagrees with the field MUST be a rejection - not a warning, and not a silent preference
@@ -865,12 +899,16 @@ function verifyDisclosedCopy(
       stepOneUndischarged = true;
     }
 
+    // Section 10 step 2, and the ONE place a disclosed copy needs the ordering at all: it is
+    // needed for the LEAF PREIMAGE, exactly as `hashAlg` already is, and for nothing structural,
+    // because the index and audit path are carried and the tree is never rebuilt (section 9.6).
     const computed = leafHash(
       hash,
       leaf.segments,
       leaf.tag,
       leaf.value,
       fromHex(leaf.salt, 'a disclosed salt'),
+      resolveOrdering(config.anchoredOrdering ?? ORDERING_DEFAULT),
     );
     const ok = verifyInclusion(
       hash,
@@ -944,8 +982,9 @@ function verifyDisclosedCopy(
         'discriminator that separates the two. Set requireTypeMapIdentity to reject the pair.',
     );
   }
-  // `roax.issuer.keyId` is deliberately NOT bound. It is the one conditional leaf, and requiring
-  // its disclosure would permanently bind an anchored record to the key it was issued under.
+  // `roax.issuer.keyId` is deliberately NOT bound. It is a conditional leaf (section 11.2), and
+  // requiring its disclosure would permanently bind an anchored record to the key it was issued
+  // under.
   for (const [path, outerValue, label] of bindings) {
     const leaf = committedByPath.get(toHex(encodePath(path)));
     if (leaf === undefined) {

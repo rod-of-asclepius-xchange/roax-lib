@@ -22,7 +22,13 @@ import {
 import { encodePath, displayPath, type Path, type PathSegment } from '../src/path.js';
 import { encodeValue, isTypeTag, type CarrierValue } from '../src/value.js';
 import { toHex, fromHex, describeUnicodeEnvironment } from '../src/bytes.js';
-import { resolveHashFunction, type HashAlgName } from '../src/hash.js';
+import {
+  resolveHashFunction,
+  resolveOrdering,
+  ORDERING_DEFAULT,
+  type HashAlgName,
+  type Ordering,
+} from '../src/hash.js';
 import { leafHash } from '../src/leaf.js';
 import { merkleTreeHead, inclusionProof, verifyInclusion } from '../src/tree.js';
 import { readJson, type JsonKind } from '../src/json.js';
@@ -126,7 +132,68 @@ const CONSUMED_GROUPS: readonly string[] = [
   'normalization',
   'envelope',
   'roundTrip',
+  'ordering',
 ];
+
+/**
+ * The ordering a vector DECLARES, asserted rather than tolerated (specification section 9).
+ *
+ * Tolerating it would be the group guard's defect one level down: an unknown field inside a group
+ * this runner already consumes passes silently, so a `hash`-ordered vector added to an
+ * ordering-sensitive group would be computed as `path` and reported green. Reading it here means
+ * the runner cannot be wrong about which ordering a vector asserts without saying so.
+ */
+function declaredOrdering(v: { name: string; ordering?: string }): Ordering {
+  if (v.ordering === undefined) {
+    throw new Error(
+      `${v.name} is in an ordering-sensitive group and declares no ordering; ` +
+        `specification section 9 requires the ordering to be explicit`,
+    );
+  }
+  return resolveOrdering(v.ordering);
+}
+
+/**
+ * The groups whose expected values depend on the leaf ordering, and the ones this runner actually
+ * THREADS the declaration through.
+ *
+ * They are held apart deliberately, because the difference is what the check below exists for: a
+ * group that is ordering-sensitive but not threaded would compute a `hash`-ordered vector as
+ * `path` and report green, which is the quiet-skip defect one loop down from the group guard.
+ */
+const ORDERING_SENSITIVE_GROUPS = [
+  'leaf',
+  'record',
+  'unlinkability',
+  'normalization',
+  'envelope',
+  'roundTrip',
+] as const;
+const ORDERING_THREADED_GROUPS: ReadonlySet<string> = new Set(['leaf', 'record']);
+
+/**
+ * Check EVERY ordering-sensitive vector, not only the ones in a threaded group.
+ *
+ * A vector declaring nothing is a corpus defect. One declaring an ordering its group is not
+ * computed under fails CLOSED here, rather than being silently computed under the default.
+ */
+function checkDeclaredOrderingsSupported(corpus: Corpus): string | undefined {
+  for (const group of ORDERING_SENSITIVE_GROUPS) {
+    for (const raw of corpus.vectors[group] ?? []) {
+      const v = raw as { name: string; ordering?: string };
+      const ordering = declaredOrdering(v);
+      if (ordering !== ORDERING_DEFAULT && !ORDERING_THREADED_GROUPS.has(group)) {
+        return (
+          `${group} vector ${v.name} declares ordering ${ordering}, but this runner computes ` +
+          `the ${group} group under ${ORDERING_DEFAULT} only. Thread the declaration through ` +
+          `that loop before adding such a vector; computing it under the default would report ` +
+          `a green it did not earn.`
+        );
+      }
+    }
+  }
+  return undefined;
+}
 
 function checkEveryGroupIsConsumed(corpus: Corpus): string[] {
   return Object.keys(corpus.vectors).filter((name) => !CONSUMED_GROUPS.includes(name));
@@ -149,6 +216,12 @@ function main(): number {
     return 1;
   }
 
+  const unsupportedOrdering = checkDeclaredOrderingsSupported(corpus);
+  if (unsupportedOrdering !== undefined) {
+    console.error(`FAILED: ${unsupportedOrdering}`);
+    return 1;
+  }
+
   const report = new Report();
   const hash = resolveHashFunction(corpus.hashAlg);
 
@@ -167,6 +240,7 @@ function main(): number {
   runNegativeProof(corpus, report, hash);
   runTypeMap(corpus, report);
   runRecord(corpus, report, hash);
+  runOrdering(corpus, report, hash);
   runNormalization(corpus, report, hash);
   runEnvelope(corpus, report);
   runRoundTrip(corpus, report);
@@ -267,13 +341,23 @@ function runLeaf(corpus: Corpus, report: Report, hash: ReturnType<typeof resolve
       value?: unknown;
       saltHex: string;
       leafHash: string;
+      ordering?: string;
     };
     if (!isTypeTag(v.tag)) {
       report.fail(v.class, `${v.name}: unknown tag ${v.tag}`);
       continue;
     }
+    // A leaf vector is ordering-sensitive even though it carries no tree: the ordering reaches
+    // the preimage through DOMAIN (specification section 9.5, H1).
     const actual = toHex(
-      leafHash(hash, segmentsOf(v.segments), v.tag, carrierOf(v.value), fromHex(v.saltHex)),
+      leafHash(
+        hash,
+        segmentsOf(v.segments),
+        v.tag,
+        carrierOf(v.value),
+        fromHex(v.saltHex),
+        declaredOrdering(v),
+      ),
     );
     expectEqual(report, v.class, v.name, actual, v.leafHash);
   }
@@ -533,6 +617,7 @@ function identityOf(v: {
   issuerId: string;
   typeMapId?: string;
   issuerKeyId?: string;
+  ordering?: Ordering;
 }): RecordIdentity {
   return {
     recordType: v.recordType,
@@ -541,6 +626,7 @@ function identityOf(v: {
     issuerId: v.issuerId,
     typeMapId: v.typeMapId,
     issuerKeyId: v.issuerKeyId,
+    ordering: v.ordering,
   };
 }
 
@@ -561,6 +647,7 @@ function runRecord(corpus: Corpus, report: Report, hash: ReturnType<typeof resol
       saltPairing?: string;
       leafCount: number;
       root: string;
+      ordering?: string;
     };
     if (v.recordFile === undefined || v.saltsFile === undefined) {
       report.skip(v.class, `${v.name}: carried as an envelope file, which this runner does not read`);
@@ -575,15 +662,93 @@ function runRecord(corpus: Corpus, report: Report, hash: ReturnType<typeof resol
       continue;
     }
     try {
+      const ordering = declaredOrdering(v);
       const commitment = commitRecord(readFixture(located.path), {
         hash,
         resolver: resolverFor(v.recordType),
-        identity: identityOf(v),
+        identity: identityOf({ ...v, ordering }),
         salts: saltSourceFrom(v.saltsFile, v.saltPairing ?? 'path'),
         emptyContainerPolicy: EMPTY_CONTAINER_POLICY,
+        ordering,
       });
       expectEqual(report, v.class, `${v.name} (leafCount)`, commitment.leafCount, v.leafCount);
       expectEqual(report, v.class, `${v.name} (root)`, toHex(commitment.root), v.root);
+    } catch (e) {
+      report.fail(v.class, `${v.name}: ${String(e)}`);
+    }
+  }
+}
+
+/**
+ * Class 21. One record issued under BOTH leaf orderings (specification section 9).
+ *
+ * The vector carries both roots, both leaf-hash sequences in TREE order and both leaf counts, so
+ * this cannot be passed by computing one ordering. The cross-ordering assertions are what would
+ * still catch an implementation reproducing both roots by accident: the two leaf-hash sets must be
+ * DISJOINT, because the ordering is inside DOMAIN and therefore inside every leaf preimage
+ * (section 9.5, H1).
+ */
+function runOrdering(corpus: Corpus, report: Report, hash: ReturnType<typeof resolveHashFunction>): void {
+  for (const raw of corpus.vectors['ordering'] ?? []) {
+    const v = raw as {
+      name: string;
+      class: number;
+      recordType: string;
+      schemaVersion: string;
+      recordId: string;
+      issuerId: string;
+      typeMapId?: string;
+      issuerKeyId?: string;
+      recordFile: string;
+      saltsFile: string;
+      saltPairing: string;
+      orderings: Record<string, { leafCount: number; root: string; leafHashes: string[] }>;
+    };
+    const located = resolveRecordFile(v.recordFile);
+    if (located.kind === 'unavailable') {
+      report.skip(v.class, `${v.name}: NOT RUN. ${located.reason}`);
+      continue;
+    }
+    try {
+      const seen: Record<string, { root: string; hashes: string[] }> = {};
+      for (const name of Object.keys(v.orderings)) {
+        const ordering = resolveOrdering(name);
+        const commitment = commitRecord(readFixture(located.path), {
+          hash,
+          resolver: resolverFor(v.recordType),
+          identity: identityOf({ ...v, ordering }),
+          // One salt set serves both sides: salts are assigned in encodePath order under BOTH
+          // orderings (section 9), and the set is drawn over the hash-ordered superset.
+          salts: saltSourceFrom(v.saltsFile, v.saltPairing),
+          emptyContainerPolicy: EMPTY_CONTAINER_POLICY,
+          ordering,
+        });
+        const expected = v.orderings[name]!;
+        const hashes = commitment.leaves.map((l) => toHex(l.hash));
+        expectEqual(report, v.class, `${v.name} (${name} leafCount)`, commitment.leafCount, expected.leafCount);
+        expectEqual(report, v.class, `${v.name} (${name} root)`, toHex(commitment.root), expected.root);
+        expectEqual(
+          report,
+          v.class,
+          `${v.name} (${name} leafHashes)`,
+          hashes.join(','),
+          expected.leafHashes.join(','),
+        );
+        seen[name] = { root: toHex(commitment.root), hashes };
+      }
+      const pathSide = seen['path'];
+      const hashSide = seen['hash'];
+      if (pathSide !== undefined && hashSide !== undefined) {
+        expectEqual(
+          report,
+          v.class,
+          `${v.name} (roots differ)`,
+          String(pathSide.root !== hashSide.root),
+          'true',
+        );
+        const overlap = pathSide.hashes.filter((h) => hashSide.hashes.includes(h));
+        expectEqual(report, v.class, `${v.name} (leaf hashes disjoint)`, overlap.join(','), '');
+      }
     } catch (e) {
       report.fail(v.class, `${v.name}: ${String(e)}`);
     }

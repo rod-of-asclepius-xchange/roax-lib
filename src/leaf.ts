@@ -19,7 +19,12 @@
  */
 
 import { concatBytes, u32be, u64be } from './bytes.js';
-import { domainString, type HashFunction } from './hash.js';
+import {
+  domainString,
+  ORDERING_DEFAULT,
+  type HashFunction,
+  type Ordering,
+} from './hash.js';
 import { encodePath, type Path } from './path.js';
 import { encodeValue, type CarrierValue, type TypeTagValue } from './value.js';
 import { fail } from './errors.js';
@@ -34,17 +39,25 @@ export interface Leaf {
   readonly salt: Uint8Array;
 }
 
+/**
+ * Specification section 8.
+ *
+ * `ordering` reaches this preimage ONLY through `DOMAIN` (section 9.5, H1), which is why a leaf
+ * is ordering-sensitive even though it carries no tree: a copy issued under one ordering and
+ * verified under the other fails here rather than at the tree.
+ */
 export function leafHash(
   hash: HashFunction,
   path: Path,
   tag: TypeTagValue,
   value: CarrierValue | undefined,
   salt: Uint8Array,
+  ordering: Ordering = ORDERING_DEFAULT,
 ): Uint8Array {
   if (salt.length !== SALT_LENGTH) {
     fail('salt-length', `a salt is exactly ${SALT_LENGTH} bytes, got ${salt.length}`);
   }
-  const domain = domainString(hash.name);
+  const domain = domainString(hash.name, ordering);
   const encodedPath = encodePath(path);
   const encodedValue = encodeValue(tag, value);
   const preimage = concatBytes([

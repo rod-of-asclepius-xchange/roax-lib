@@ -7,6 +7,7 @@
  */
 
 import { fail } from './errors.js';
+import { ORDERING_DEFAULT, resolveOrdering, type Ordering } from './hash.js';
 import { nfc } from './bytes.js';
 import { isKeySegment, type Path } from './path.js';
 import { TypeTag, type TypeTagValue } from './value.js';
@@ -25,6 +26,7 @@ export const RESERVED_PATHS = {
   recordId: 'roax.recordId',
   issuerId: 'roax.issuer.id',
   issuerKeyId: 'roax.issuer.keyId',
+  ordering: 'roax.ordering',
 } as const;
 
 /** The ASCII prefix the guard tests for. */
@@ -50,10 +52,28 @@ export interface RecordIdentity {
   /**
    * The issuing key identifier, committed at `roax.issuer.keyId`.
    *
-   * The one CONDITIONAL reserved leaf. An absent `keyId` emits no leaf, so the reserved leaf count
-   * is 5 or 6 under `schemas/envelope-2.0.json` and 4 or 5 under `schemas/envelope-1.0.json`.
+   * The FIRST of the two CONDITIONAL reserved leaves; `ordering` below is the second. An absent
+   * `keyId` emits no leaf, so with both conditionals in play the reserved leaf count is 5, 6 or 7
+   * under `schemas/envelope-2.0.json` and 4, 5 or 6 under `schemas/envelope-1.0.json`.
    */
   readonly issuerKeyId?: string | undefined;
+  /**
+   * The record's leaf ordering, committed at `roax.ordering` (specification section 11.2).
+   *
+   * The SECOND conditional reserved leaf. It is emitted only when the ordering is not the default
+   * `path`; a path-ordered record emits NO ordering leaf and must not emit `"path"`, a NULL or an
+   * empty string in its place, because those are different roots and only one can be right. The
+   * conditionality is the same `ROAX-CANON/1` compatibility rule that gives `path` an empty domain
+   * suffix, and section 11.2 argues it rather than leaving it to be reverse-engineered.
+   *
+   * THIS LEAF IS NOT AUTHORITY. It is written from the ordering supplied here and is never read
+   * back to select one: a verifier takes the ordering from the anchoring registry (section 9.5,
+   * H2). Section 11.2 argues why committing it is not section 7.4's rejected `roax.hashAlg` leaf
+   * under a new name - weak hash algorithms exist so that leaf enabled a downgrade, whereas both
+   * orderings are equally strong, so this one is redundant rather than dangerous and what it buys
+   * is committed issuer intent.
+   */
+  readonly ordering?: Ordering | undefined;
 }
 
 export interface ReservedLeafSpec {
@@ -94,6 +114,13 @@ export function reservedLeaves(identity: RecordIdentity): ReservedLeafSpec[] {
       path: [{ key: RESERVED_PATHS.issuerKeyId }],
       tag: TypeTag.STRING,
       value: identity.issuerKeyId,
+    });
+  }
+  if (resolveOrdering(identity.ordering ?? ORDERING_DEFAULT) !== ORDERING_DEFAULT) {
+    out.push({
+      path: [{ key: RESERVED_PATHS.ordering }],
+      tag: TypeTag.STRING,
+      value: identity.ordering as string,
     });
   }
   return out;

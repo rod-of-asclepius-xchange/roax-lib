@@ -45,7 +45,12 @@ REPO_ROOT = os.path.dirname(CORPUS_DIR)
 # major one and the file stays governed by schemas/conformance-corpus-1.0.json. Bumped rather than
 # left alone because an implementation pinning the old value should fail loudly rather than run an
 # older expectation set against a newer file - rust/tests/conformance_corpus.rs does exactly that.
-CORPUS_VERSION = "1.1.0"
+#
+# 1.2.0 adds class 21 (leaf ordering) and the `ordering` declaration on every ordering-sensitive
+# vector. Both are additive: not one committed expected value moved, because `path` ordering
+# contributes the empty domain suffix and emits no `roax.ordering` leaf (spec section 9.5). A
+# MAJOR bump would have said the opposite and been wrong.
+CORPUS_VERSION = "1.2.0"
 
 # The domain string class 8's stand-in leaves are generated under, DELIBERATELY DECOUPLED FROM
 # `CORPUS_VERSION` and pinned at the value it had when those vectors were first built.
@@ -62,9 +67,11 @@ TREE_LEAF_DOMAIN_VERSION = "1.0.0"
 # highest-numbered class is never checked for coverage, which is the silent skip the coverage
 # report exists to prevent. 17 until the ten engineering decisions were ruled on 2026-07-28, which
 # added class 18 (outside-the-root authority, decision D8) and class 19 (NFC end to end, D12).
+# 21 since leaf ordering became selectable (spec section 9): class 21 issues ONE record under both
+# orderings and asserts two roots that differ.
 # 20 since the issue-then-verify round trip was added: every class before it runs an implementation's
 # VERIFIER against a third party's bytes, and none runs it against that implementation's own output.
-CLASS_COUNT = 20
+CLASS_COUNT = 21
 # docs/conformance-corpus.md class 8 makes these leaf counts mandatory, and
 # schemas/conformance-corpus-1.0.json names this check as what enforces that, since a requirement
 # on the SET of tree vectors is not expressible per vector. Held separately from
@@ -497,6 +504,81 @@ def build_moh_type_map_vectors(notes):
     return out
 
 
+# The vector groups whose expected values depend on the leaf ordering, so every vector in them
+# must SAY which ordering it was computed under (spec section 9).
+#
+# `leaf` is in the list because the ordering reaches every leaf preimage through DOMAIN
+# (section 9.5, H1), which is the half of this that is easy to miss: a leaf vector carries no
+# tree at all and is still ordering-sensitive.
+#
+# `tree`, `inclusion` and `negativeProof` are deliberately ABSENT. They operate on already-hashed
+# leaves supplied in the vector and their leaf hashes come from a synthetic corpus-only domain
+# (TREE_LEAF_DOMAIN_VERSION), so no ordering was used to produce them and declaring one would be
+# a claim the vector cannot support. `encodePath`, `encodeValue`, `reject` and `typeMap` sit
+# below the leaf preimage entirely.
+#
+# `ordering` itself is absent because a class-21 vector carries BOTH orderings and declares each
+# inside `orderings`; stamping one on the vector would contradict its own contents.
+ORDERING_SENSITIVE_GROUPS = (
+    "leaf", "record", "unlinkability", "normalization", "envelope", "roundTrip",
+)
+
+
+def _carry_forward_class_10(rebuilt, notes):
+    """Keep the committed class-10 vectors when this build could not rebuild them.
+
+    A build without `--references` cannot recompute the MOH record vectors, because those
+    records are third-party and live outside this repository by design. Before this function
+    existed such a build wrote a corpus with those four vectors DELETED, so anyone rebuilding
+    for an unrelated reason silently removed the only end-to-end coverage of a real national
+    profile and the diff looked like an ordinary regeneration.
+
+    Deleting committed evidence is the worse failure, so they are carried forward verbatim and
+    the operator is told, by name, that they were not recomputed.
+
+    > This is safe ONLY for a change that does not alter what a path-ordered record commits.
+    > Validate any canonicalization change against a reference checkout; a preserved vector
+    > proves nothing about the change that preserved it.
+    """
+    if rebuilt:
+        return []
+    out_path = os.path.join(CORPUS_DIR, "conformance-corpus-1.0.json")
+    if not os.path.exists(out_path):
+        return []
+    with open(out_path, "r", encoding="utf-8") as handle:
+        committed = json.load(handle)
+    carried = [
+        vec for vec in committed.get("vectors", {}).get("record", [])
+        if vec.get("class") == 10
+    ]
+    if not carried:
+        return []
+    names = ", ".join(vec["name"] for vec in carried)
+    notes.append(moh_records.NotRunNote(
+        f"class 10 CARRIED FORWARD unchanged from the committed corpus, not recomputed: {names}. "
+        "Rerun with --references to rebuild them; a canonicalization change is NOT validated by "
+        "this build."
+    ))
+    return carried
+
+
+def _declare_orderings(corpus):
+    """Stamp the declared ordering onto every vector of an ordering-sensitive group.
+
+    Every committed vector is `path`-ordered, which is why this is a stamp rather than a
+    per-vector input today. It is done in ONE place on purpose: the alternative is the same
+    literal repeated across six builder modules, which is the shape that goes stale in four
+    places at once elsewhere in this repository.
+
+    A vector that already declares an ordering keeps it, so a future non-default vector in one
+    of these groups is not silently relabelled.
+    """
+    for group in ORDERING_SENSITIVE_GROUPS:
+        for vec in corpus["vectors"][group]:
+            vec.setdefault("ordering", ref.ORDERING_PATH)
+    return corpus
+
+
 def build(references=None, notes=None, check=False):
     """Build the corpus. In check mode no fixture is written; every one is compared instead.
 
@@ -515,6 +597,7 @@ def build(references=None, notes=None, check=False):
     moh, moh_notes = moh_records.build_record_vectors(references)
     records.extend(moh)
     notes.extend(moh_notes)
+    records.extend(_carry_forward_class_10(moh, notes))
 
     type_map_vectors = synthetic_records.build_type_map_vectors()
     envelopes = build_envelope_fixtures(HASH_ALG)
@@ -526,12 +609,14 @@ def build(references=None, notes=None, check=False):
 
     unlinkability = build_unlinkability()
     normalization = synthetic_records.build_normalization_vectors()
+    ordering_vectors = synthetic_records.build_ordering_vectors()
 
-    return {
+    return _declare_orderings({
         "corpusVersion": CORPUS_VERSION,
         "canon": ref.CANON,
         "hashAlg": HASH_ALG,
         "unicodeVersion": UNICODE_VERSION,
+        "defaultOrdering": ref.ORDERING_PATH,
         "vectors": {
             "encodePath": build_encode_path(),
             "encodeValue": build_encode_value(),
@@ -546,8 +631,9 @@ def build(references=None, notes=None, check=False):
             "normalization": normalization,
             "envelope": envelopes,
             "roundTrip": round_trip,
+            "ordering": ordering_vectors,
         },
-    }
+    })
 
 
 def serialize(corpus) -> str:

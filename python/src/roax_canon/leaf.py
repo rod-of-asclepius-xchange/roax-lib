@@ -43,12 +43,48 @@ CANON = "ROAX-CANON/1"
 SALT_BYTES = 16
 
 
-def domain_string(hash_alg: str = DEFAULT_HASH_ALG) -> bytes:
-    """``"ROAX-CANON/1/" + hashAlg`` as ASCII (specification sections 7, 7.4 and 8).
+#: Leaf ordering, selected per record (specification section 9).
+#:
+#: Two first-class options, exactly as decision B makes ZK-friendly and non-ZK hashes both
+#: first-class and selectable per record; the amended decision D5 rules ordering the same kind
+#: of axis. ``path`` is the DEFAULT, and it is the same default in all five libraries because
+#: section 9 makes that normative: a default differing between implementations would be the
+#: silent divergence this project exists to prevent.
+ORDERING_PATH = "path"
+ORDERING_HASH = "hash"
+DEFAULT_ORDERING = ORDERING_PATH
 
-    Not a bare ``"ROAX-CANON/1"``.
+#: The domain suffix each ordering contributes to ``DOMAIN`` (specification sections 8 and 9).
+#:
+#: The asymmetry is a stated compatibility rule rather than an accident, and section 9.5 argues
+#: it: ``path`` contributes the EMPTY string so that a path-ordered record's domain string is
+#: byte-identical to what ``ROAX-CANON/1`` specified before this axis existed. Read the suffix
+#: from this table; never derive it from the ordering's name.
+ORDERING_DOMAIN_SUFFIX = {ORDERING_PATH: "", ORDERING_HASH: "/hash"}
+
+
+def check_ordering(ordering: str) -> str:
+    """Fail closed on an ordering this version does not define.
+
+    This is H3 of specification section 9.5 at its narrowest: an unregistered ordering is
+    refused rather than approximated by the default.
     """
-    return f"{CANON}/{hash_alg}".encode("ascii")
+    if ordering not in ORDERING_DOMAIN_SUFFIX:
+        raise RoaxError(
+            ErrorCode.ORDERING_NOT_DEFINED,
+            f"ROAX-CANON/1 defines no leaf ordering named {ordering!r}",
+        )
+    return ordering
+
+
+def domain_string(hash_alg: str = DEFAULT_HASH_ALG, ordering: str = DEFAULT_ORDERING) -> bytes:
+    """``"ROAX-CANON/1/" + hashAlg + ORD`` as ASCII (specification sections 7, 7.4, 8 and 9.5).
+
+    Not a bare ``"ROAX-CANON/1"``, and algorithm-qualified AND ordering-qualified.
+    One string with one length prefix: ``ORD`` is part of the domain rather than a component
+    of its own.
+    """
+    return f"{CANON}/{hash_alg}{ORDERING_DOMAIN_SUFFIX[check_ordering(ordering)]}".encode("ascii")
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,8 +126,14 @@ def leaf_hash(
     *,
     hash_alg: str = DEFAULT_HASH_ALG,
     hasher: HashAlgorithm | None = None,
+    ordering: str = DEFAULT_ORDERING,
 ) -> bytes:
     """The 32-byte leaf hash.
+
+    ``ordering`` reaches this preimage ONLY through ``DOMAIN`` (specification section 9.5,
+    H1), which is why a leaf is ordering-sensitive even though it carries no tree: a copy
+    issued under one ordering and verified under the other fails here rather than at the
+    tree.
 
     Every variable-length component is length-prefixed, so no two distinct
     ``(path, tag, salt, value)`` tuples share a preimage.
@@ -111,7 +153,7 @@ def leaf_hash(
         )
 
     h = hasher if hasher is not None else get_hash(hash_alg)
-    domain = domain_string(h.name)
+    domain = domain_string(h.name, ordering)
     encoded_path = encode_path(segments)
     encoded_value = encode_value(tag, value)
 

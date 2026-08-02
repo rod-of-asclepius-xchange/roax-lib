@@ -67,9 +67,16 @@ Confirmed from the fixtures rather than assumed: `corpus/fixtures/envelopes/guar
 `AGENTS.md` already records this and calls closing it corpus-rebuild work.
 It is repeated here only because it is the single thing that would silently break a reader who implemented section 11.2 as written and then ran the corpus: **every** record and envelope vector fails, on leaf count and on root.
 
-`roax_canon.reserved_leaves` models both structural sets and defaults to `RESERVED_V1`, because that is the set every committed artifact uses (`python/src/roax_canon/record.py:50-65` and `:138-162`).
-The package cannot issue, emit or verify envelope 2.0 yet: exact structured-path DFA artifact loading and content-ID reproduction are deliberately not implemented, so those operations reject with `type-map-rejected` rather than trusting the display-pattern corpus resolver by `recordType` (`python/src/roax_canon/record.py:363-369`; `python/src/roax_canon/disclose.py:47-56`; `python/src/roax_canon/verify.py:514-520`; specification section 4.2).
-No committed vector exercises the structural 2.0 leaf set.
+`roax_canon.reserved_leaves` models both structural sets and defaults to `RESERVED_V1`, because that is the set most of the committed corpus uses: 59 of the 69 envelope fixtures commit no `roax.typeMap.id` (`python/src/roax_canon/record.py:55-71` and `:169-195`).
+
+**The package DOES issue, emit and verify under the 2.0 structural reserved leaf set, and an earlier version of this item said it could not.**
+That claim rested on a blanket `RESERVED_V2` refusal which was itself the defect: an issuer knows which artifact it used and supplies its content ID, so committing `roax.typeMap.id` requires fetching or reproducing nothing (`python/src/roax_canon/record.py:448-462`; `python/src/roax_canon/disclose.py:47-58`; `python/src/roax_canon/verify.py:535-541`).
+Selecting `reserved_set=RESERVED_V2` on a `VerifierConfig` is an opt-in STRICTNESS rather than a refusal: it requires the outer `typeMap` member and raises the JSON carrier floor to six (`python/src/roax_canon/verify.py:499-510`).
+The minimum-disclosure floor widens to the five reserved paths of `RESERVED_FLOOR_V2`, and it is selected from the COMMITTED bindings first with `cfg.reserved_set` only as the fallback, which is this repository's rule that a trigger comes from what a copy commits rather than from what it presents (`python/src/roax_canon/verify.py:898-899`; `python/src/roax_canon/profiles.py:61-86`).
+
+**What remains unimplemented is the VERIFIER-side obligation of specification section 10, so this is NOT envelope-2.0 support and must not be described as such.**
+The package does not fetch the artifact its identifier names, does not reproduce that artifact's content ID from fetched bytes, and does not compare the artifact's own `recordType`, `schemaVersion` or `typeMapVersion` against the envelope's; [`README.md`](README.md) owns that statement under "What is deliberately not built" (specification section 4.2).
+Ten committed envelope fixtures do exercise the structural 2.0 leaf set, against an earlier version of this item saying none did: the four `typemap-floor-<profile>-complete` at class 14, the four `roundtrip-*` at class 20, and the two `identity-outer-type-map-*` at class 18.
 
 ---
 
@@ -338,7 +345,7 @@ The tree floor of 6 that the same paragraph derives is consequently reached by e
 One leaf, not zero, which is the whole of the defect: the guarded state does not exist.
 
 **Two conditions on that reproduction, both measured rather than assumed, because an unconditioned version of this claim would be wrong.**
-The `[]` row is a `flatten` result and not an issuable record: specification section 11.1 shapes `record` as an object present in a full copy only (`docs/spec/roax-canon-1.md:1039-1040`) and requires exactly one of `record` and `disclosure` (`docs/spec/roax-canon-1.md:1092`), and `schemas/envelope-1.0.json:118-120` types it `"object"`, so `[]` as a whole record is refused at issuance with `envelope-shape` before the leaf count is ever consulted.
+The `[]` row is a `flatten` result and not an issuable record: specification section 11.1 shapes `record` as an object present in a full copy only and pairs it with `disclosure` as the disclosed-copy alternative (`docs/spec/roax-canon-1.md:1255-1256`), and `schemas/envelope-1.0.json:148-150` types it `"object"`, so `[]` as a whole record is refused at issuance with `envelope-shape` before the leaf count is ever consulted.
 And `{}` commits but does not verify unconditionally.
 `build_tree(loads("{}"), ..., authorize_empty_containers=False)` yields a 5-leaf tree with a root, so the record is anchored rather than rejected, which is what section 3.3 forbids.
 `verify_envelope(full_copy(built))` then returns accepted with reason `ok` **only when the verifier carries the same structural setting**, `VerifierConfig(authorize_empty_containers=False)`.

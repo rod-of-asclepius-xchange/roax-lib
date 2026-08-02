@@ -42,16 +42,27 @@ rebuilds, and on an 8-leaf tree an internal node presented as a leaf with a forg
 ``leafCount`` is therefore **not** authenticated in a disclosed copy and is used for
 nothing here beyond being the tree size RFC 9162 requires as an input.
 
-Envelope 2.0 verification is deliberately fail-closed in this package.
-That version requires exact structured-path DFA selection by the content ID committed at
-``roax.typeMap.id`` under specification section 4.2, while this package implements
-neither published-artifact loading nor content-ID reproduction.
+Selecting :data:`RESERVED_V2` is an opt-in STRICTNESS rather than a refusal, and an earlier
+version of this docstring called it fail-closed.
+It requires the outer ``typeMap`` member and raises the JSON carrier floor to six, and a copy
+satisfying both is ACCEPTED on both copy kinds: measured by verifying the committed
+``typemap-floor-*-complete`` and ``roundtrip-*`` fixtures under it.
+**No corpus vector reaches that measurement**, because the corpus runner verifies every
+envelope vector under its ``VerifierConfig.reserved_set``, which it leaves at the
+:data:`RESERVED_V1` default.
+
+What this package genuinely does not do is the VERIFIER-side obligation of specification
+section 10: fetching the artifact the content ID names, reproducing that content ID from the
+fetched bytes, and comparing the artifact's own ``recordType``, ``schemaVersion`` and
+``typeMapVersion`` against the envelope's.
+`README.md` owns that limit under "What is deliberately not built".
+**This is not envelope-2.0 support and must not be described as such.**
 """
 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Mapping
 
 from .errors import ErrorCode, RoaxError
@@ -64,7 +75,7 @@ from .jsonio import (
     is_uri_string,
 )
 from .flatten import RESERVED_KEY_PREFIX
-from .leaf import CANON, SALT_BYTES, leaf_hash
+from .leaf import CANON, DEFAULT_ORDERING, SALT_BYTES, check_ordering, leaf_hash
 from .path import Key, Segment, display_path, encode_path, segments_from_json
 from .profiles import DEFAULT_PROFILES, ProfileRegistry
 from .record import (
@@ -94,6 +105,11 @@ _TOP_LEVEL_MEMBERS = frozenset(
     {
         "canon",
         "hashAlg",
+        # ACCEPTED FOR SHAPE AND DELIBERATELY NOT READ. Both envelope schemas permit this
+        # member, so rejecting it would refuse a conforming envelope. Using it would violate
+        # specification section 9.5 H2: a verifier takes the ordering from the anchoring
+        # registry, never from the envelope.
+        "ordering",
         "recordType",
         "schemaVersion",
         "typeMap",
@@ -149,7 +165,7 @@ _REQUIRED_MEMBERS = (
 _SEED_MEMBERS = ("masterSalt", "salt", "seed", "saltSeed", "kdfKey")
 
 #: The reserved paths whose committed leaf is bound to an outer envelope field.
-#: ``roax.issuer.keyId`` is deliberately absent: it is the one conditional leaf, and an
+#: ``roax.issuer.keyId`` is deliberately absent: it is a conditional leaf, and an
 #: absent one emits no leaf at all (specification section 11.2).
 _IDENTITY_BINDINGS_V1 = (
     ("roax.recordType", ("recordType",)),
@@ -187,9 +203,12 @@ class VerifierConfig:
     11.3, and that member's own description in the schema).
     The section 4.2 binding arrived with `schemas/envelope-2.0.json`, which requires the
     member and commits the leaf.
-    This package cannot verify that version yet: it deliberately has no published-DFA
-    artifact loader or content-ID reproduction, so selecting :data:`RESERVED_V2` fails
-    closed rather than trusting a display-pattern resolver by record type.
+    Selecting :data:`RESERVED_V2` here is an opt-in strictness rather than a refusal: it
+    requires that member, raises the JSON carrier floor to six, and accepts a copy meeting
+    both.
+    It does not gain an artifact-aware resolver - ``resolvers`` stays a caller-supplied map
+    per ``recordType``, and the section 10 limit named in this module's docstring still
+    applies.
     """
 
     profiles: ProfileRegistry = DEFAULT_PROFILES
@@ -198,6 +217,22 @@ class VerifierConfig:
     reserved_set: str = RESERVED_V1
     anchored_root: bytes | None = None
     anchored_hash_alg: str | None = None
+    #: The leaf ordering **as the anchoring registry reports it** (section 9.5, H2).
+    #:
+    #: This is the ONLY source of the ordering on the verification path. The envelope's own
+    #: ``ordering`` member is accepted for shape and never read, and the committed
+    #: ``roax.ordering`` leaf is committed issuer intent rather than authority (section 11.2):
+    #: both are supplied by the party the check constrains.
+    #:
+    #: Defaults to ``path``, the specification's default and the same default in all five
+    #: libraries. A verifier accepting ``hash``-ordered records MUST set this from its registry,
+    #: which is also H3 at its narrowest: an ordering this verifier is not configured for is
+    #: refused rather than followed.
+    #:
+    #: Stated as honestly as section 7.4 states H2 for ``hashAlg``: the anchoring registry is a
+    #: requirement HANDED FORWARD rather than a mechanism the specification designs (section 2.2),
+    #: so what this models today is the verifier's own configured expectation.
+    anchored_ordering: str = DEFAULT_ORDERING
     registry_address: str | None = None
     registry_chain_id: int | None = None
     authorize_empty_containers: bool = True
@@ -598,9 +633,12 @@ def _verify_full_copy(env, cfg, hasher, root, leaf_count, record_type) -> Verifi
     # drops the committed leaf, which changes both `leafCount` and the root, so there is nothing
     # here for a presenter to steer. That is why the outer member is sufficient evidence on THIS
     # path and is not on the disclosed one (specification section 11.1).
+    # A FULL copy is the case that needs the ordering structurally: this rebuilds the whole
+    # tree, so the ordering decides both leaf placement and every leaf preimage through DOMAIN.
+    # It comes from the registry and never from the envelope (section 9.5, H2).
     built = build_tree(
         env["record"],
-        identity,
+        replace(identity, ordering=check_ordering(cfg.anchored_ordering)),
         resolver,
         MappingSalts(by_path),
         hash_alg=hasher.name,
@@ -770,7 +808,17 @@ def _verify_disclosed_copy(env, cfg, hasher, root, leaf_count) -> VerificationRe
 
         value = _decode_carrier(tag, raw.get("value"))
         salt = _hexbytes(raw["salt"], field_name="salt", size=SALT_BYTES)
-        computed = leaf_hash(segments, tag, value, salt, hasher=hasher)
+        # Section 10 step 2, and the ONE place a disclosed copy needs the ordering at all: for
+        # the LEAF PREIMAGE, exactly as ``hashAlg`` already is, and for nothing structural
+        # (section 9.6).
+        computed = leaf_hash(
+            segments,
+            tag,
+            value,
+            salt,
+            hasher=hasher,
+            ordering=check_ordering(cfg.anchored_ordering),
+        )
 
         index = as_int(raw["index"], field="index")
         audit_path = raw["auditPath"]

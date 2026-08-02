@@ -56,6 +56,23 @@ RESERVED_TYPE_MAP_ID = "roax.typeMap.id"
 RESERVED_RECORD_ID = "roax.recordId"
 RESERVED_ISSUER_ID = "roax.issuer.id"
 RESERVED_ISSUER_KEY_ID = "roax.issuer.keyId"
+RESERVED_ORDERING = "roax.ordering"
+
+# Leaf ordering (spec section 9). Two first-class options, selected per record, `path` the
+# default. The domain suffix is asymmetric ON PURPOSE and section 9.5 argues why: `path`
+# contributes the empty string so that a path-ordered record's DOMAIN is byte-identical to what
+# ROAX-CANON/1 specified before this axis existed. Take the suffix from this table rather than
+# deriving it from the name.
+ORDERING_PATH = "path"
+ORDERING_HASH = "hash"
+ORDERING_DOMAIN_SUFFIX = {ORDERING_PATH: "", ORDERING_HASH: "/hash"}
+
+
+def check_ordering(ordering: str) -> str:
+    """Fail closed on an unregistered ordering rather than defaulting to one (section 9)."""
+    if ordering not in ORDERING_DOMAIN_SUFFIX:
+        raise RoaxError("ordering-not-defined", repr(ordering))
+    return ordering
 
 # Section 10.2. The four reserved paths every profile's disclosure floor must contain.
 # roax.issuer.keyId is deliberately NOT here: it is committed but OPTIONAL to disclose.
@@ -106,14 +123,19 @@ class RoaxError(Exception):
 # --------------------------------------------------------------------------------------------
 
 
-def domain(hash_alg: str) -> bytes:
-    """Section 7: DOMAIN is ASCII "ROAX-CANON/1/" followed by hashAlg. Algorithm-qualified."""
+def domain(hash_alg: str, ordering: str = ORDERING_PATH) -> bytes:
+    """Sections 7 and 8: ASCII "ROAX-CANON/1/" + hashAlg + ORD. Algorithm- and ordering-qualified.
+
+    ORD is "" for `path` and "/hash" for `hash`, so a path-ordered record's DOMAIN is exactly
+    what it was before leaf ordering became selectable. Section 9.5 argues that asymmetry as a
+    compatibility rule rather than leaving it to be reverse-engineered.
+    """
     if hash_alg != "SHA-256":
         # Poseidon-BN254 is registered in the envelope schema but ROAX-CANON/1 defines no
         # construction for it: the field, rate and capacity, round constants and the
         # byte-string-to-field-element encoding are all unpinned (section 7.4).
         raise RoaxError("hash-alg-not-defined", hash_alg)
-    return (CANON + "/" + hash_alg).encode("ascii")
+    return (CANON + "/" + hash_alg + ORDERING_DOMAIN_SUFFIX[check_ordering(ordering)]).encode("ascii")
 
 
 def H(hash_alg: str, data: bytes) -> bytes:
@@ -435,11 +457,12 @@ def salt_set_from_document(doc, ordered) -> "SaltSet":
 # --------------------------------------------------------------------------------------------
 
 
-def leaf_hash(hash_alg: str, segments, tag: int, value, salt: bytes) -> bytes:
-    """Section 8."""
+def leaf_hash(hash_alg: str, segments, tag: int, value, salt: bytes,
+              ordering: str = ORDERING_PATH) -> bytes:
+    """Section 8. `ordering` reaches the preimage only through DOMAIN (section 9.5, H1)."""
     if len(salt) != 16:
         raise RoaxError("salt-length", str(len(salt)))
-    dom = domain(hash_alg)
+    dom = domain(hash_alg, ordering)
     p = encode_path(segments)
     v = encode_value(tag, value)
     preimage = (
@@ -676,8 +699,17 @@ def carrier(tag: int, node):
 
 
 def reserved_leaves(record_type: str, schema_version: str, record_id: str, issuer_id: str,
-                    issuer_key_id=None, type_map_id=None):
+                    issuer_key_id=None, type_map_id=None, ordering: str = ORDERING_PATH):
     """Section 11.2. Four always, plus roax.issuer.keyId only when issuer.keyId is present.
+
+    roax.ordering is the SECOND conditional leaf and is emitted only when the ordering is not
+    the default `path`. A path-ordered record emits no ordering leaf at all and MUST NOT emit
+    "path", a NULL or an empty string in its place, for the same reason an absent issuer.keyId
+    emits nothing: those are different roots and only one of them can be right. Section 11.2
+    argues the conditionality as a ROAX-CANON/1 compatibility rule.
+
+    The leaf is NOT AUTHORITY. Nothing in this module selects an ordering from it; `ordering`
+    is an input here and the leaf is written from it, never read back to decide anything.
 
     An absent issuer.keyId emits NO leaf. It MUST NOT become a NULL leaf or an empty string:
     those are three different roots and only one of them can be right.
@@ -698,12 +730,21 @@ def reserved_leaves(record_type: str, schema_version: str, record_id: str, issue
         out.append(Leaf([{"key": RESERVED_TYPE_MAP_ID}], TAG_STRING, type_map_id))
     if issuer_key_id is not None:
         out.append(Leaf([{"key": RESERVED_ISSUER_KEY_ID}], TAG_STRING, issuer_key_id))
+    if check_ordering(ordering) != ORDERING_PATH:
+        out.append(Leaf([{"key": RESERVED_ORDERING}], TAG_STRING, ordering))
     return out
 
 
 def ordered_leaves(record, type_map, record_type: str, schema_version: str, record_id: str,
-                   issuer_id: str, issuer_key_id=None, type_map_id=None):
+                   issuer_id: str, issuer_key_id=None, type_map_id=None,
+                   ordering: str = ORDERING_PATH):
     """Sections 3.3 and 9. The leaf set, in encodePath order, WITHOUT any salt.
+
+    This is SALT-ASSIGNMENT order and it is encodePath order under BOTH orderings, which is
+    what section 9 makes normative and what keeps `hash` ordering implementable: a leaf hash is
+    computed over its salt, so a rule assigning salts in tree order would be circular. Tree
+    placement is `tree_order` below, and only that function looks at `ordering` for anything
+    other than which reserved leaves exist.
 
     Split out from build_tree when decision D4 was ruled D4b. Leaf order is a function of the
     path set alone (spec section 9), so it is computable before a salt exists - which is what
@@ -721,7 +762,7 @@ def ordered_leaves(record, type_map, record_type: str, schema_version: str, reco
         raise RoaxError("record-contributes-no-leaves", "")
 
     leaves = reserved_leaves(
-        record_type, schema_version, record_id, issuer_id, issuer_key_id, type_map_id
+        record_type, schema_version, record_id, issuer_id, issuer_key_id, type_map_id, ordering
     ) + record_leaves
 
     encoded = [(encode_path(leaf.segments), leaf) for leaf in leaves]
@@ -732,23 +773,52 @@ def ordered_leaves(record, type_map, record_type: str, schema_version: str, reco
     return [leaf for _, leaf in encoded]
 
 
+def tree_order(ordering: str, ordered, leaf_salts, hashes):
+    """Section 9. Reorder (leaf, salt, hash) triples from salt-assignment order to TREE order.
+
+    `path` is the identity, because salt-assignment order already is encodePath order. `hash`
+    sorts by ascending leaf-hash bytes.
+
+    Equal leaf hashes are REJECTED rather than tie-broken. Paths are already unique and every
+    variable component of the preimage is length-prefixed (section 8), so two equal hashes over
+    distinct paths are a collision. Breaking the tie by path would absorb evidence of a broken
+    hash into a well-defined tree and produce a root, which is the failure shape section 9
+    forbids by name.
+    """
+    if check_ordering(ordering) == ORDERING_PATH:
+        return ordered, leaf_salts, hashes
+    if len(set(hashes)) != len(hashes):
+        raise RoaxError("leaf-hash-collision", "")
+    triples = sorted(zip(hashes, ordered, leaf_salts), key=lambda t: t[0])
+    return (
+        [t[1] for t in triples],
+        [t[2] for t in triples],
+        [t[0] for t in triples],
+    )
+
+
 def build_tree(hash_alg: str, record, type_map, salts: "SaltSet", record_type: str,
                schema_version: str, record_id: str, issuer_id: str, issuer_key_id=None,
-               type_map_id=None):
-    """Sections 3.3, 7, 8 and 9. Returns (root, ordered leaves, salts, leaf hashes).
+               type_map_id=None, ordering: str = ORDERING_PATH):
+    """Sections 3.3, 7, 8 and 9. Returns (root, ordered leaves, salts, leaf hashes) in TREE order.
 
     `salts` is a SaltSet and is an INPUT: under decision D4b nothing here derives a salt
     (spec section 7). A leaf with no committed salt is an error rather than a fresh draw.
+
+    The two orders are kept apart deliberately. Salts are paired in encodePath order under both
+    orderings (section 9), and only the returned sequence is in tree order, because a leaf's
+    INDEX is its position in the tree and that is what a disclosed copy carries.
     """
     ordered = ordered_leaves(
         record, type_map, record_type, schema_version, record_id, issuer_id, issuer_key_id,
-        type_map_id
+        type_map_id, ordering
     )
     leaf_salts = [salts.for_leaf(leaf.segments) for leaf in ordered]
     hashes = [
-        leaf_hash(hash_alg, leaf.segments, leaf.tag, leaf.value, salt)
+        leaf_hash(hash_alg, leaf.segments, leaf.tag, leaf.value, salt, ordering)
         for leaf, salt in zip(ordered, leaf_salts)
     ]
+    ordered, leaf_salts, hashes = tree_order(ordering, ordered, leaf_salts, hashes)
     return mth(hash_alg, hashes), ordered, leaf_salts, hashes
 
 

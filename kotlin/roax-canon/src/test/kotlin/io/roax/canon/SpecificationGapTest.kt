@@ -234,6 +234,65 @@ class SpecificationGapTest {
         assertTrue(json.contains("\"decimal\": 0.01"), "the record body must be embedded verbatim")
     }
 
+    // ------------------------- GAP: the ordering axis, which no corpus vector reaches -----------
+
+    /**
+     * A `hash`-ordered full copy round-trips only under the registry that names that ordering.
+     *
+     * Pinned HERE because every class-20 round-trip vector is path-ordered, so nothing in the
+     * corpus asks this library to issue a `hash`-ordered envelope and then verify it. That is the
+     * surface on which the TypeScript library was found issuing an envelope its own verifier
+     * refused, which is exactly what conformance corpus class 20 exists to catch.
+     */
+    @Test
+    fun `GAP - a hash-ordered full copy verifies only under the registry that names that ordering`() {
+        val recordBytes = Corpus.bytes("corpus/fixtures/records/typed-scalars.json")
+        val saltSet = Corpus.saltSet(
+            "corpus/fixtures/salts/ordering-typed-scalars.json", nfc,
+        ) as Corpus.SaltSet.ByPath
+
+        for (ordering in listOf(Ordering.PATH, Ordering.HASH)) {
+            val commitment = commitWithSaltsByPath(
+                record = JsonReader.parse(recordBytes),
+                context = IssuanceContext(
+                    identity().copy(ordering = ordering),
+                    EnvelopeProfile.V1_NO_TYPE_MAP_BINDING,
+                ),
+                resolver = synthetic,
+                saltsByEncodedPath = saltSet.byEncodedPath,
+                nfc = nfc,
+            )
+            // Specification section 11.2: the ordering leaf is committed for `hash` and for
+            // nothing else, so the two sides differ in leaf COUNT as well as in order.
+            val paths = commitment.leaves.map { it.displayPath }
+            assertEquals(ordering == Ordering.HASH, paths.contains(Reserved.ORDERING))
+
+            val json = EnvelopeWriter.fullCopy(commitment, recordBytes, nfc)
+            // The outer member is SELF-DESCRIPTION and is asserted here because no verifier reads
+            // it, so nothing else in this suite can see it go missing. Both envelope schemas
+            // define its ABSENCE as meaning `path`, so a hash-ordered copy without it would
+            // assert an ordering it was not issued under.
+            val head = JsonReader.parse(json.toByteArray()) as io.roax.canon.json.JsonObject
+            assertEquals(
+                if (ordering == Ordering.PATH) null else ordering.id,
+                (head["ordering"] as? io.roax.canon.json.JsonString)?.value,
+            )
+            // H2: the ordering comes from the anchoring registry. BOTH answers are exercised, so
+            // the refusal of the wrong one is evidence rather than an untested branch (9.5).
+            for (registrySays in listOf(Ordering.PATH, Ordering.HASH)) {
+                val result = EnvelopeVerifier.verify(
+                    json.toByteArray(),
+                    verifierConfig().copy(anchorOrdering = registrySays),
+                )
+                assertEquals(
+                    registrySays == ordering,
+                    result is VerificationResult.Accepted,
+                    "issued ${ordering.id}, registry ${registrySays.id}",
+                )
+            }
+        }
+    }
+
     // ------------------------------------------------ GAP 3: ambiguity 2, the bound's counting ---
 
     @Test

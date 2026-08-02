@@ -4,19 +4,30 @@
   "title": "ROAX conformance corpus schema v1",
   "description": "Schema for the shared cross-language test-vector file. Because ROAX may ship five independent libraries and cannot lean on a single core behind an FFI layer the way dogtag does (spec section 14.3), this corpus is the entire enforcement mechanism for cross-language agreement, not a safety net. Normative content requirements: docs/conformance-corpus.md. THIS FILE GOVERNS corpus/conformance-corpus-1.0.json AS COMMITTED, and corpus/tools/validate_schemas.mjs measures that. THE D4b RULING LANDED IN THIS FILE RATHER THAN ONLY IN ITS SUCCESSOR, together with the rebuilt artifact: saltVector, unlinkabilitySide and recordVector.masterSaltHex are deleted rather than marked superseded, because spec section 1.1 and docs/conformance-corpus.md section 1.1 require a canonicalization change to land with the vectors that assert it, and leaving the deleted derivation expressible here would have left the corpus implementing a construction the specification no longer has. What schemas/conformance-corpus-2.0.json carries beyond this file is the type-map binding: it REQUIRES the exact type-map artifact identity on the type-map and record vectors, where this file leaves those fields optional so the committed class-10 and class-11 vectors stay valid against the schema that governs them.",
   "type": "object",
-  "required": ["corpusVersion", "canon", "hashAlg", "unicodeVersion", "vectors"],
+  "required": [
+    "corpusVersion",
+    "canon",
+    "hashAlg",
+    "unicodeVersion",
+    "vectors",
+    "defaultOrdering"
+  ],
   "additionalProperties": false,
-
   "properties": {
     "corpusVersion": {
       "description": "Version of this corpus file. The three-part semver pattern is KEPT on purpose: this is one of ROAX's OWN artifacts, so this project defines the identifier and may constrain its shape (spec section 12.1). Every EXTERNALLY defined version in this file is opaque instead - see unicodeVersion below and recordVector.schemaVersion.",
       "type": "string",
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
     },
-    "canon": { "const": "ROAX-CANON/1" },
+    "canon": {
+      "const": "ROAX-CANON/1"
+    },
     "hashAlg": {
       "description": "The hash algorithm these vectors were produced under. It is not merely a label: it is appended to the domain string, which is ASCII 'ROAX-CANON/1/' + hashAlg and sits in every leaf preimage, so every expected hash in this file is specific to it (spec sections 8 and 7.4). It no longer sits in a salt preimage, because decision D4 was ruled D4b and salt derivation is gone (spec section 7.1); the domain string itself is unchanged. Matches the envelope enum deliberately. Only SHA-256 has a construction DEFINED by ROAX-CANON/1; Poseidon-BN254 is registered but its parameterization is not yet pinned, so no Poseidon corpus can exist until a revision pins it (spec section 7.4). STATED LIMIT: the enum deliberately still accepts Poseidon-BN254, mirroring the envelope, so 'no Poseidon corpus can exist' rests on the corpus build having no way to produce one - HASH_ALG is a module constant in corpus/tools/build_corpus.py and no flag selects another - rather than on this keyword. There is nothing to enforce structurally yet, because a Poseidon corpus has no expected values to be wrong about until the parameterization is pinned.",
-      "enum": ["SHA-256", "Poseidon-BN254"]
+      "enum": [
+        "SHA-256",
+        "Poseidon-BN254"
+      ]
     },
     "unicodeVersion": {
       "description": "The Unicode version whose NFC tables the expected values were produced under. ROAX-CANON/1 pins 15.1, and '15.1' is the canonical form for this pin (spec section 6.1). An implementation running different tables MAY legitimately differ on vectors in the 'unicodeVersion' class, and must say so rather than silently passing. STATED LIMIT: that is an obligation on the implementation's conformance REPORT, not on this file, so nothing here can enforce it; conformance class 16 owns it and is explicit that it detects a version mismatch by declaration rather than by demonstration. OPAQUE: the Unicode Consortium defines this identifier, not this project, so it carries no shape constraint (spec section 12.1). The earlier two-part pattern rejected '15.1.0', which is the official Unicode Standard version string for the very release being pinned. Widened rather than made a const, because a const would foreclose a future re-pin and the corpus is versioned independently of the specification.",
@@ -27,137 +38,302 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "encodePath": { "type": "array", "items": { "$ref": "#/$defs/encodePathVector" } },
-        "encodeValue": { "type": "array", "items": { "$ref": "#/$defs/encodeValueVector" } },
-        "reject": { "type": "array", "items": { "$ref": "#/$defs/rejectVector" } },
-        "leaf": { "type": "array", "items": { "$ref": "#/$defs/leafVector" } },
-        "tree": { "type": "array", "items": { "$ref": "#/$defs/treeVector" } },
-        "inclusion": { "type": "array", "items": { "$ref": "#/$defs/inclusionVector" } },
-        "negativeProof": { "type": "array", "items": { "$ref": "#/$defs/negativeProofVector" } },
-        "typeMap": { "type": "array", "items": { "$ref": "#/$defs/typeMapVector" } },
-        "record": { "type": "array", "items": { "$ref": "#/$defs/recordVector" } },
-        "unlinkability": { "type": "array", "items": { "$ref": "#/$defs/unlinkabilityVector" } },
-        "normalization": { "type": "array", "items": { "$ref": "#/$defs/normalizationVector" } },
-        "envelope": { "type": "array", "items": { "$ref": "#/$defs/envelopeVector" } },
-        "roundTrip": { "type": "array", "items": { "$ref": "#/$defs/roundTripVector" } }
+        "encodePath": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/encodePathVector"
+          }
+        },
+        "encodeValue": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/encodeValueVector"
+          }
+        },
+        "reject": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rejectVector"
+          }
+        },
+        "leaf": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/leafVector"
+          }
+        },
+        "tree": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/treeVector"
+          }
+        },
+        "inclusion": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/inclusionVector"
+          }
+        },
+        "negativeProof": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/negativeProofVector"
+          }
+        },
+        "typeMap": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/typeMapVector"
+          }
+        },
+        "record": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recordVector"
+          }
+        },
+        "unlinkability": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/unlinkabilityVector"
+          }
+        },
+        "normalization": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/normalizationVector"
+          }
+        },
+        "envelope": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/envelopeVector"
+          }
+        },
+        "roundTrip": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/roundTripVector"
+          }
+        },
+        "ordering": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/orderingVector"
+          }
+        }
       }
+    },
+    "defaultOrdering": {
+      "description": "The leaf ordering a vector is computed under when it declares none, which is the default of specification section 9. It is pinned to `path` rather than left free: a corpus whose default differed from the specification's would make every silent vector wrong in a way no single vector could reveal. Vectors in ordering-sensitive groups declare their own ordering anyway, so this states the file's baseline rather than supplying a fallback any runner depends on.",
+      "const": "path"
     }
   },
-
   "$defs": {
-    "hex32": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "name": { "type": "string", "minLength": 1 },
+    "hex32": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
     "classRef": {
       "description": "Which numbered class in docs/conformance-corpus.md this vector discharges. Every class must be reachable from at least one vector; a class with no vectors is a coverage gap and the corpus build MUST report it. The maximum tracks the class count stated in section 3 of that document and MUST move with it. Raised from 17 to 19 on 2026-07-28 when the ten engineering decisions were ruled: class 18 fails an implementation that treats an outside-the-root field as authority (decision D8) and class 19 asserts NFC end to end with a root (decision D12). Class numbers are stable - class 12 kept its number and its subject when decision D4 was ruled D4b and lost only its mechanism, so nothing renumbered. Both classes are expressible in this schema version: class 18 through envelopeVector.verifierConfig, and class 19 through the `normalization` group below. FOUR DEFINITIONS PIN THEIR CLASS MORE TIGHTLY THAN THIS RANGE, and they are listed here because this is where the coupling note belongs: unlinkabilityVector is const 12, normalizationVector is const 19, roundTripVector is const 20, and envelopeVector is an enum of 11, 13 to 18 (class 11 carries the three envelope-level fail-closed vectors; see that field). Adding a class therefore means checking five places in this file, not one, plus section 3 of docs/conformance-corpus.md. The pins are worth that cost because a mislabelled vector marks the class it names as covered while testing nothing about it, which is the silently-vacuous-vector failure this file guards in several other places. RAISED FROM 19 TO 20 when the issue-then-verify round trip was added: class 20 is the only class that runs an implementation against its own PRODUCED envelope rather than against bytes another program wrote, and roundTripVector below is a further definition pinning its class with a const.",
       "type": "integer",
       "minimum": 1,
-      "maximum": 20
+      "maximum": 21
     },
-
     "tagRef": {
       "description": "A ROAX type tag (spec section 6.1): 0 NULL, 1 BOOL, 2 STRING, 3 INTEGER, 4 DECIMAL, 5 BYTES, 6 EMPTY_ARRAY, 7 EMPTY_OBJECT, 8 BLOB_REF. Tag 8 is REGISTERED and selected by no version-1 profile (spec section 6.5). THIS SCHEMA DELIBERATELY DOES NOT RESTRICT WHERE TAG 8 MAY APPEAR, and that is not an oversight to be closed later: pinning the carrier form once, before five implementations exist, is the reason the tag is defined now, so an encodeValue vector that fixes the encoded bytes of a BLOB_REF value is legitimate and wanted. What spec section 6.5 forbids is narrower than the tag's presence - a type map binding a path to it, and an envelope carrying a tag-8 leaf - so the conforming ISSUANCE-shaped vector carrying it today is the class-11 typeMap vector asserting that such a map is rejected. Schema-valid is deliberately not the same as issuable here, exactly as Poseidon-BN254 is registered in the hashAlg enum and forbidden in issuance. Widened from 7 to 8 when decision D9 was ruled.",
       "type": "integer",
       "minimum": 0,
       "maximum": 8
     },
-
     "carrierValue": {
       "description": "A record value in CARRIER form, as it is written into a vector file. A JSON NUMBER IS UNREPRESENTABLE HERE, at any depth, and that is the one constraint in this schema that guards the load-bearing invariant of the whole project: a number is never parsed through a float (docs/decisions.md part 0, spec section 6.4). It was prose on two carriers and absent on two others until this was noticed. The failure it prevents is worse than an invalid vector, because it happens before any implementation is involved: a vector written as 0.010 is destroyed by the runner's own JSON parser into 0.01, and the corpus then certifies five independent libraries as agreeing on a DECIMAL trailing-zero premise the file format had already thrown away (spec section 6.2, FHIR R4 SHALL). INTEGER and DECIMAL therefore travel as canonical strings, and so does BLOB_REF's blobByteLength, which is a hash-preimage input for the same reason (spec section 6.5). THIS DUPLICATES NO PER-TAG MAPPING: walking the per-tag allOf conditionals of schemas/envelope-1.0.json shows that no tag carries a JSON number under any of them - BOOL is a boolean, STRING, INTEGER, DECIMAL and BYTES are strings, BLOB_REF is an object of two strings, and NULL, EMPTY_ARRAY and EMPTY_OBJECT carry no value at all - so the rule is uniform across every tag and nothing here can fall out of step with that file. Which type a given tag carries is still pinned there and deliberately not restated here. NOTE THE CONTRAST with schemas/envelope-1.0.json's `record` property, which is NOT constrained this way and MUST NOT BE: a full copy carries the record in its original JSON form, numbers included, and there the parser requirement of spec section 6.4 is what protects the literals rather than the schema.",
-      "not": { "type": "number" },
+      "not": {
+        "type": "number"
+      },
       "allOf": [
         {
           "description": "Recurse into an array, so a number cannot hide inside one.",
-          "if": { "type": "array" },
-          "then": { "type": "array", "items": { "$ref": "#/$defs/carrierValue" } }
+          "if": {
+            "type": "array"
+          },
+          "then": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/carrierValue"
+            }
+          }
         },
         {
           "description": "Recurse into an object, so a number cannot hide inside one. This is what makes the constraint hold for the BLOB_REF carrier, whose blobByteLength is a nested member.",
-          "if": { "type": "object" },
-          "then": { "type": "object", "additionalProperties": { "$ref": "#/$defs/carrierValue" } }
+          "if": {
+            "type": "object"
+          },
+          "then": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/carrierValue"
+            }
+          }
         }
       ]
     },
-
     "segments": {
       "type": "array",
       "items": {
         "oneOf": [
-          { "type": "object", "required": ["key"], "additionalProperties": false,
-            "properties": { "key": { "type": "string" } } },
-          { "type": "object", "required": ["index"], "additionalProperties": false,
-            "properties": { "index": { "type": "integer", "minimum": 0, "maximum": 4294967295 } } }
+          {
+            "type": "object",
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "index"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              }
+            }
+          }
         ]
       }
     },
-
     "encodePathVector": {
       "type": "object",
-      "required": ["name", "class", "segments", "encodedHex"],
+      "required": [
+        "name",
+        "class",
+        "segments",
+        "encodedHex"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "$ref": "#/$defs/name" },
-        "class": { "$ref": "#/$defs/classRef" },
-        "segments": { "$ref": "#/$defs/segments" },
-        "encodedHex": { "type": "string", "pattern": "^([0-9a-f]{2})*$" },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "class": {
+          "$ref": "#/$defs/classRef"
+        },
+        "segments": {
+          "$ref": "#/$defs/segments"
+        },
+        "encodedHex": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{2})*$"
+        },
         "displayPath": {
           "type": "string",
           "description": "Display only. Never hashed. STATED LIMIT: that is a rule about what an IMPLEMENTATION does with this string, not a constraint on the string, so no keyword here can express it and the implementation plus conformance class 6 own it. Spec section 5.2 gives the trap in full: reconstructing segments by parsing this form is what the structured encoding exists to make unnecessary."
         }
       }
     },
-
     "encodeValueVector": {
       "type": "object",
-      "required": ["name", "class", "tag", "encodedHex"],
+      "required": [
+        "name",
+        "class",
+        "tag",
+        "encodedHex"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "$ref": "#/$defs/name" },
-        "class": { "$ref": "#/$defs/classRef" },
-        "tag": { "$ref": "#/$defs/tagRef" },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "class": {
+          "$ref": "#/$defs/classRef"
+        },
+        "tag": {
+          "$ref": "#/$defs/tagRef"
+        },
         "input": {
           "description": "Input in carrier form. Numbers are STRINGS here; a JSON number in a test vector would be parsed through a float by the very implementations under test. That is now enforced by the carrierValue reference rather than asserted in this sentence.",
           "$ref": "#/$defs/carrierValue"
         },
-        "encodedHex": { "type": "string", "pattern": "^([0-9a-f]{2})*$" }
+        "encodedHex": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{2})*$"
+        }
       }
     },
-
     "rejectVector": {
       "description": "MUST error. An implementation that silently canonicalizes any of these is non-conformant.",
       "type": "object",
-      "required": ["name", "class", "reason"],
+      "required": [
+        "name",
+        "class",
+        "reason"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "$ref": "#/$defs/name" },
-        "class": { "$ref": "#/$defs/classRef" },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "class": {
+          "$ref": "#/$defs/classRef"
+        },
         "recordType": {
           "description": "OPTIONAL, and its presence changes how a runner must consume the vector. When it is absent the vector is fed to the value encoder or the path encoder, in the carrier form its `tag` or `segments` names. When it is PRESENT the `input` is a WHOLE RECORD carried as {\"$jsonText\": ...}, and the runner MUST flatten it through the committed type map for this `recordType` and expect `reason`. That second shape exists because a tag-bearing reject vector reaches the value encoder already in the CARRIER form, so it can never exercise a rejection that happens where a RECORD value is converted INTO that carrier - and that is exactly where the ruled BYTES input-admissibility rejections and the ruled FHIR primitive-array null-placeholder rejection live (docs/type-maps.md section 1.3). The map MUST be the committed one and never a resolve-everything stand-in: several of these vectors assert that a path has NO binding for an observed kind, and a permissive map makes exactly those unfalsifiable. No record identity is carried, because flattening needs none: what such a vector asserts is a rejection at the record boundary and not a tree.",
           "type": "string",
           "minLength": 1
         },
-        "tag": { "$ref": "#/$defs/tagRef" },
+        "tag": {
+          "$ref": "#/$defs/tagRef"
+        },
         "input": {
           "description": "The input that MUST error. UNCONSTRAINED, and deliberately so: this is a RAW INPUT UNDER TEST, not a record value in carrier form, and the two are different things. An earlier revision applied #/$defs/carrierValue here on the reasoning that no JSON number is ever a legitimate rejection input. THAT REASONING WAS WRONG, and the corpus itself is the counterexample: the class-6 vectors reject-index-at-2-32 and reject-index-beyond-2-32 carry {\"$segments\": [{\"index\": 4294967296}]}, and that index MUST be a JSON number to express what the vector tests, which is an array index at and beyond 2^32 that spec section 5 requires an implementation to reject. Carried as a string it is a different test and does not exercise the rule at all. What survives from that reasoning, and is still true, is narrower: the class-3 NUMERIC rejection inputs are carried as strings, because `01`, `1.`, `.5`, `+1`, `NaN` and `Infinity` are not valid JSON number tokens in the first place, and the one that is, `1.4e+9999`, is precisely the case a float-based parser turns into Infinity before the runner hands it to the implementation under test, which would delete the vector's own subject (docs/conformance-corpus.md class 3). That is a fact about those particular vectors rather than a constraint this field can carry, because a constraint here cannot tell a numeric literal under test from a path index under test. The no-JSON-number guard belongs on the genuine value carriers, where it is enforced: encodeValueVector.input, leafVector.value and unlinkabilityVector.value."
         },
-        "segments": { "$ref": "#/$defs/segments" },
-        "reason": { "type": "string", "minLength": 1 }
+        "segments": {
+          "$ref": "#/$defs/segments"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "allOf": [
         {
           "description": "A recordType binds the input shape. Stated structurally rather than in prose, because a runner dispatches on it: the record travels as $jsonText, and neither `tag` nor `segments` may appear, since neither the value encoder nor the path encoder is what consumes the vector.",
           "if": {
             "type": "object",
-            "required": ["recordType"],
-            "properties": { "recordType": true }
+            "required": [
+              "recordType"
+            ],
+            "properties": {
+              "recordType": true
+            }
           },
           "then": {
             "type": "object",
-            "required": ["input"],
+            "required": [
+              "input"
+            ],
             "properties": {
               "input": {
                 "type": "object",
-                "required": ["$jsonText"],
-                "properties": { "$jsonText": true }
+                "required": [
+                  "$jsonText"
+                ],
+                "properties": {
+                  "$jsonText": true
+                }
               },
               "tag": false,
               "segments": false
@@ -166,63 +342,147 @@
         }
       ]
     },
-
     "leafVector": {
       "description": "One leafHash over (path, tag, value, salt) per spec section 8. The salt is an INPUT here and nothing derives it: decision D4 is ruled D4b, so each salt is 16 bytes drawn independently from a CSPRNG (spec section 7). This definition replaced the deleted saltVector, which asserted that a (masterSalt, recordId, path) triple produced a given salt under a derivation that no longer exists.",
       "type": "object",
-      "required": ["name", "class", "segments", "tag", "saltHex", "leafHash"],
+      "required": [
+        "name",
+        "class",
+        "segments",
+        "tag",
+        "saltHex",
+        "leafHash",
+        "ordering"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "$ref": "#/$defs/name" },
-        "class": { "$ref": "#/$defs/classRef" },
-        "segments": { "$ref": "#/$defs/segments" },
-        "tag": { "$ref": "#/$defs/tagRef" },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "class": {
+          "$ref": "#/$defs/classRef"
+        },
+        "segments": {
+          "$ref": "#/$defs/segments"
+        },
+        "tag": {
+          "$ref": "#/$defs/tagRef"
+        },
         "value": {
           "description": "The leaf's value in carrier form. Absent for the tags that carry none - NULL, EMPTY_ARRAY and EMPTY_OBJECT (spec section 6.1).",
           "$ref": "#/$defs/carrierValue"
         },
-        "saltHex": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
-        "leafHash": { "$ref": "#/$defs/hex32" }
+        "saltHex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "leafHash": {
+          "$ref": "#/$defs/hex32"
+        },
+        "ordering": {
+          "description": "The leaf ordering this vector's expected values were computed under (spec section 9). REQUIRED on every ordering-sensitive vector rather than optional, because the ordering is inside DOMAIN and therefore inside every leaf preimage (section 9.5, H1): a vector that did not say would assert a leaf hash or a root that no runner could attribute to an ordering. A runner MUST read it rather than tolerate it - an unknown field inside a group a runner already consumes passes silently, which is the quiet-skip defect the group guard exists to prevent, one level down. Every committed vector declares `path`, which is the default (section 9); `hash` is exercised by the class-21 `ordering` group, which declares both inside each vector instead.",
+          "enum": [
+            "path",
+            "hash"
+          ]
+        }
       }
     },
-
     "treeVector": {
       "description": "RFC 9162 MTH over already-hashed leaves. Leaf counts 1,2,3,5,7,8,9,130 are mandatory (docs/conformance-corpus.md class 8): the RFC split rule is where a hand-rolled tree goes wrong. STATED LIMIT: that is a requirement on the SET of vectors, not on any one of them, so no per-vector keyword here can express it and corpus/tools/build_corpus.py carries the check instead - MANDATORY_TREE_SIZES there is compared against the sizes the plan actually builds, and a missing one fails the build rather than shipping a corpus that silently stopped covering the split rule.",
       "type": "object",
-      "required": ["name", "class", "leafHashes", "root"],
+      "required": [
+        "name",
+        "class",
+        "leafHashes",
+        "root"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "$ref": "#/$defs/name" },
-        "class": { "$ref": "#/$defs/classRef" },
-        "leafHashes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/hex32" } },
-        "root": { "$ref": "#/$defs/hex32" }
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "class": {
+          "$ref": "#/$defs/classRef"
+        },
+        "leafHashes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/hex32"
+          }
+        },
+        "root": {
+          "$ref": "#/$defs/hex32"
+        }
       }
     },
-
     "inclusionVector": {
       "type": "object",
-      "required": ["name", "class", "leafHash", "index", "treeSize", "auditPath", "root", "expect"],
+      "required": [
+        "name",
+        "class",
+        "leafHash",
+        "index",
+        "treeSize",
+        "auditPath",
+        "root",
+        "expect"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "$ref": "#/$defs/name" },
-        "class": { "$ref": "#/$defs/classRef" },
-        "leafHash": { "$ref": "#/$defs/hex32" },
-        "index": { "type": "integer", "minimum": 0 },
-        "treeSize": { "type": "integer", "minimum": 1 },
-        "auditPath": { "type": "array", "items": { "$ref": "#/$defs/hex32" } },
-        "root": { "$ref": "#/$defs/hex32" },
-        "expect": { "type": "boolean" }
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "class": {
+          "$ref": "#/$defs/classRef"
+        },
+        "leafHash": {
+          "$ref": "#/$defs/hex32"
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "treeSize": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "auditPath": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hex32"
+          }
+        },
+        "root": {
+          "$ref": "#/$defs/hex32"
+        },
+        "expect": {
+          "type": "boolean"
+        }
       }
     },
-
     "negativeProofVector": {
       "description": "MUST NOT verify. Includes the internal-node-presented-as-leaf case, which is dogtag's C1 hazard (spec section 9.3). CAUTION - AN EARLIER VERSION OF THIS DESCRIPTION WAS WRONG. It said RFC 9162 rejects that case structurally because it is position-bound. It does not: RFC 9162 section 2.1.3.2 takes the tree size as an INPUT, so an attacker supplying both the leaf hash and the tree size can choose a shape that walks an internal node to the genuine root. Measured on an 8-leaf tree and reproduced on Node v22.21.0: MTH(L[0:4]) presented as the leaf at index 0, with a forged tree size of 2 and the audit path [MTH(L[4:8])], VERIFIES (spec section 11.1). What closes the case is the 0x00 leaf-domain byte together with spec section 10 step 2, which requires a verifier to recompute the leaf hash from the disclosed path, tag, value and salt and never to accept one. CONSEQUENCE FOR THE RUNNER: these vectors MUST be driven through the full disclosed-copy verification path, not through a bare fold primitive. A runner handing a leaf hash straight to verifyInclusion is testing the primitive dogtag documents as proving nothing on its own (merkle.rs:86-91), and will record a pass for an implementation with no defence at all.",
       "type": "object",
-      "required": ["name", "class", "attack", "leafHash", "index", "treeSize", "auditPath", "root"],
+      "required": [
+        "name",
+        "class",
+        "attack",
+        "leafHash",
+        "index",
+        "treeSize",
+        "auditPath",
+        "root"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "$ref": "#/$defs/name" },
-        "class": { "$ref": "#/$defs/classRef" },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "class": {
+          "$ref": "#/$defs/classRef"
+        },
         "attack": {
           "description": "forged-tree-size is the case the leafCount correction added: a treeSize the attacker chose, rather than the tree's real size, to place a node of his choosing where a leaf should be. leafCount is outside the root and is not authority (spec sections 11.1 and 11.3).",
           "enum": [
@@ -235,22 +495,45 @@
             "extended-audit-path"
           ]
         },
-        "leafHash": { "$ref": "#/$defs/hex32" },
-        "index": { "type": "integer", "minimum": 0 },
-        "treeSize": { "type": "integer", "minimum": 1 },
-        "auditPath": { "type": "array", "items": { "$ref": "#/$defs/hex32" } },
-        "root": { "$ref": "#/$defs/hex32" }
+        "leafHash": {
+          "$ref": "#/$defs/hex32"
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "treeSize": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "auditPath": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hex32"
+          }
+        },
+        "root": {
+          "$ref": "#/$defs/hex32"
+        }
       }
     },
-
     "typeMapVector": {
       "description": "Asserts that a given path under a given type map resolves to a given tag, fails closed, or that the MAP ITSELF is rejected. EXACTLY ONE of expectTag, expectFailClosed and expectMapRejected is required: with none the vector asserts nothing, and with more than one it asserts contradictory things. Every other vector type in this file requires its assertion, and class 11 is the highest-risk surface in the design (docs/conformance-corpus.md), so a silently vacuous vector is the worst place to allow one. THE EXACT-ARTIFACT FIELDS ARE OPTIONAL HERE AND REQUIRED IN schemas/conformance-corpus-2.0.json. Specification section 4.2 selects a map by content ID rather than by recordType, so a vector that names only a recordType does not identify what it was resolved against; that is a real gap and it is left open in this schema version for one reason only, that requiring the fields would invalidate the committed class-11 vectors, which carry none of them. The successor requires all four, and closing the gap means rebuilding the corpus rather than tightening this file.",
       "type": "object",
-      "required": ["name", "class", "recordType", "segments"],
+      "required": [
+        "name",
+        "class",
+        "recordType",
+        "segments"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "$ref": "#/$defs/name" },
-        "class": { "$ref": "#/$defs/classRef" },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "class": {
+          "$ref": "#/$defs/classRef"
+        },
         "typeMapId": {
           "description": "OPTIONAL in this schema version, REQUIRED in 2.0. Content ID of the exact immutable artifact under test (spec section 4.2).",
           "type": "string",
@@ -261,15 +544,30 @@
           "type": "string",
           "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
         },
-        "recordType": { "type": "string" },
+        "recordType": {
+          "type": "string"
+        },
         "schemaVersion": {
           "description": "OPTIONAL in this schema version, REQUIRED in 2.0. Opaque profile-owned version that must equal the exact artifact field (spec sections 4.2 and 12.1).",
           "type": "string",
           "minLength": 1
         },
-        "segments": { "$ref": "#/$defs/segments" },
-        "jsonKind": { "enum": ["string", "number", "boolean", "null", "object", "array"] },
-        "expectTag": { "$ref": "#/$defs/tagRef" },
+        "segments": {
+          "$ref": "#/$defs/segments"
+        },
+        "jsonKind": {
+          "enum": [
+            "string",
+            "number",
+            "boolean",
+            "null",
+            "object",
+            "array"
+          ]
+        },
+        "expectTag": {
+          "$ref": "#/$defs/tagRef"
+        },
         "expectFailClosed": {
           "description": "const true rather than a boolean, matching expectSameRoot and the three class-12 assertions in this file. A vector setting this to false asserted the negation of its own branch - the path IS covered - while naming no tag, which is the silently vacuous vector the oneOf above exists to forbid, reached from inside a branch instead of by omitting one.",
           "const": true
@@ -282,22 +580,33 @@
       "oneOf": [
         {
           "description": "Asserts a resolved tag.",
-          "required": ["expectTag"],
-          "properties": { "expectTag": true }
+          "required": [
+            "expectTag"
+          ],
+          "properties": {
+            "expectTag": true
+          }
         },
         {
           "description": "Asserts that the path is not covered and the implementation fails closed (spec section 4.2, decision D7 ruled D7a).",
-          "required": ["expectFailClosed"],
-          "properties": { "expectFailClosed": true }
+          "required": [
+            "expectFailClosed"
+          ],
+          "properties": {
+            "expectFailClosed": true
+          }
         },
         {
           "description": "Asserts that the TYPE MAP is rejected outright rather than that a lookup within it fails. Added when decision D9 was ruled: a map binding any path to tag 8 BLOB_REF MUST be rejected, because the content-addressed binding is defined and selected by no version-1 profile (spec section 6.5). This is a different outcome from failing closed - the path IS covered, by a binding no profile has declared - and conflating the two would let an implementation pass by treating an undeclared binding as an unknown path.",
-          "required": ["expectMapRejected"],
-          "properties": { "expectMapRejected": true }
+          "required": [
+            "expectMapRejected"
+          ],
+          "properties": {
+            "expectMapRejected": true
+          }
         }
       ]
     },
-
     "recordVector": {
       "description": "A whole record with its root. The three real MOH samples are mandatory (class 10). Records are referenced by file rather than inlined, so that no reference schema or sample is copied into this repository. EVERY input to the root that the protocol REQUIRES is required here, because the leaf set is the UNION of the record's leaves and the reserved roax.* leaves (spec sections 3.3 and 11.2): recordType, schemaVersion, recordId and issuerId are reserved-leaf values under this schema version and therefore change the root, so a vector omitting any of them is not reproducible and the class-10 assertion would be untestable. The top-level canon and hashAlg supply the rest, via the domain string. THE PER-LEAF SALTS ARE THE REMAINING INPUT AND THE oneOf BELOW MAKES THEM STRUCTURALLY UNAVOIDABLE: decision D4 is ruled D4b, so every salt is an independent random draw that nothing can re-derive (spec section 7), and a vector that names only a bare record file asserts a root no runner can recompute. Under the deleted D4a construction a masterSaltHex plus recordId sufficed, which is why this used to be expressible as an optional field; it is not any more. typeMapId is the fifth reserved-leaf value under specification section 4.2 and is OPTIONAL here and REQUIRED in schemas/conformance-corpus-2.0.json, for the same reason the envelope requirement moved to schemas/envelope-2.0.json: the committed class-10 vectors were computed over a four-reserved-leaf union and requiring it would invalidate them rather than correct them. A vector that omits it asserts a root computed without that leaf.",
       "type": "object",
@@ -309,12 +618,17 @@
         "schemaVersion",
         "issuerId",
         "leafCount",
-        "root"
+        "root",
+        "ordering"
       ],
       "additionalProperties": false,
       "properties": {
-        "name": { "$ref": "#/$defs/name" },
-        "class": { "$ref": "#/$defs/classRef" },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "class": {
+          "$ref": "#/$defs/classRef"
+        },
         "recordType": {
           "description": "Committed as the reserved leaf roax.recordType, so it is an input to the root and not a label.",
           "type": "string"
@@ -349,42 +663,80 @@
         },
         "saltPairing": {
           "description": "How the salt set in saltsFile pairs its salts to leaves. REQUIRED alongside recordFile, because the two shapes are not distinguishable by inspection and a runner that guesses wrong computes a wrong root rather than an error. 'path' is the default shape and the one every hand-authored fixture uses: entries carry explicit segments, exactly as schemas/envelope-1.0.json defines the `salts` array, so pairing is self-describing. 'positional' is a bare array of salts in encodePath order, and it exists for ONE reason recorded here so it is not mistaken for an optimization - see the note below.",
-          "enum": ["path", "positional"]
+          "enum": [
+            "path",
+            "positional"
+          ]
         },
         "saltsFile": {
           "description": "The file carrying the per-leaf salts this vector's root was computed with, one per leaf of the union. REQUIRED alongside recordFile rather than optional, because a bare record file plus a root is not a reproducible assertion: every salt is an independent random draw that nothing can re-derive (spec section 7, decision D4 ruled D4b). This field replaced masterSaltHex, which expressed a derivation that no longer exists. Its shape is named by saltPairing. WHY CLASS 10 PAIRS POSITIONALLY WHILE ENVELOPES PAIR BY PATH, and this must not be 'harmonized' away: spec section 7.2 rejects positional pairing FOR AN ENVELOPE because it makes salt-to-leaf pairing depend on the reader reproducing the section 9 sort correctly before it can read the salts at all, which in production is a hazard. In a corpus vector, reproducing that sort IS THE THING UNDER TEST, so the same property that makes positional pairing dangerous in an envelope is what makes it valid here - a mispairing surfaces as a failed vector rather than as a silently wrong root. The reason class 10 needs it: its records are the genuine third-party MOH reference samples at 69 and 70 leaves, and a path-keyed salt set would enumerate every path of a shipped reference sample into this PUBLIC repository, which AGENTS.md forbids for the reference schemata - not even a fragment. A positional array discloses only the leaf count, and leafCount is already published in this very vector. IF SOMEONE LATER HARMONIZES THESE TWO, THE DANGEROUS DIRECTION IS MAKING ENVELOPES POSITIONAL. Do not.",
           "type": "string"
         },
-        "recordId": { "type": "string" },
+        "recordId": {
+          "type": "string"
+        },
         "leafCount": {
           "description": "The UNION count: the record's own leaves plus the 4 always-emitted reserved leaves of this schema version, plus 1 when issuerKeyId is present, plus 1 more when typeMapId is present. The floor is 5, because a record contributing zero leaves of its own MUST be rejected at issuance (spec section 3.3), and the if/then below raises it to 6 when issuerKeyId is present, because that case emits 5 reserved leaves rather than 4. In schemas/conformance-corpus-2.0.json roax.typeMap.id is always emitted and the floor is 6. STATED LIMIT, ENFORCED BY THE CORPUS BUILD RATHER THAN HERE: the floor is all a schema can check, because the record's own leaf count lives in the referenced file, and the optional typeMapId leaf moves the count without an if/then of its own. SAID PRECISELY, BECAUSE THE SHAPE OF THE ENFORCEMENT IS NOT A REJECTION: the build DERIVES this count rather than reading an authored one, flattening that file and adding the reserved leaves of spec section 11.2, so a disagreeing value cannot be produced in the first place; what catches one edited in by hand afterwards is build_corpus.py --check comparing the serialized corpus and check_corpus.mjs recomputing the count against the vector, with one gap stated rather than left to be discovered: a class-10 vector whose record lives outside this repository is stripped by the first and skipped by the second unless the reference checkout is supplied, which run.sh reports as NOT RUN and exits 2, a third status that is neither a pass nor a failure, rather than counting as a pass. That is the same relationship schemas/envelope-1.0.json records for salts.length, where a real envelope has no build to derive it and the structural floor is all there is.",
           "type": "integer",
           "minimum": 5
         },
-        "root": { "$ref": "#/$defs/hex32" }
+        "root": {
+          "$ref": "#/$defs/hex32"
+        },
+        "ordering": {
+          "description": "The leaf ordering this vector's expected values were computed under (spec section 9). REQUIRED on every ordering-sensitive vector rather than optional, because the ordering is inside DOMAIN and therefore inside every leaf preimage (section 9.5, H1): a vector that did not say would assert a leaf hash or a root that no runner could attribute to an ordering. A runner MUST read it rather than tolerate it - an unknown field inside a group a runner already consumes passes silently, which is the quiet-skip defect the group guard exists to prevent, one level down. Every committed vector declares `path`, which is the default (section 9); `hash` is exercised by the class-21 `ordering` group, which declares both inside each vector instead.",
+          "enum": [
+            "path",
+            "hash"
+          ]
+        }
       },
       "if": {
         "description": "An issuerKeyId means a fifth reserved leaf, so the union floor moves with it.",
-        "required": ["issuerKeyId"],
-        "properties": { "issuerKeyId": true }
+        "required": [
+          "issuerKeyId"
+        ],
+        "properties": {
+          "issuerKeyId": true
+        }
       },
       "then": {
-        "properties": { "leafCount": { "type": "integer", "minimum": 6 } }
+        "properties": {
+          "leafCount": {
+            "type": "integer",
+            "minimum": 6
+          }
+        }
       },
       "oneOf": [
         {
           "description": "A bare record file together with the salt set its root was computed under. Both are required: neither alone determines the root.",
-          "required": ["recordFile", "saltsFile", "saltPairing"],
-          "properties": { "recordFile": true, "saltsFile": true, "saltPairing": true, "envelopeFile": false }
+          "required": [
+            "recordFile",
+            "saltsFile",
+            "saltPairing"
+          ],
+          "properties": {
+            "recordFile": true,
+            "saltsFile": true,
+            "saltPairing": true,
+            "envelopeFile": false
+          }
         },
         {
           "description": "A full envelope copy, which already carries both. saltsFile is forbidden here rather than merely unnecessary: two carriers of the same salts can disagree, and a runner has no rule for which one the asserted root was computed under.",
-          "required": ["envelopeFile"],
-          "properties": { "envelopeFile": true, "recordFile": false, "saltsFile": false, "saltPairing": false }
+          "required": [
+            "envelopeFile"
+          ],
+          "properties": {
+            "envelopeFile": true,
+            "recordFile": false,
+            "saltsFile": false,
+            "saltPairing": false
+          }
         }
       ]
     },
-
     "unlinkabilityVector": {
       "description": "Class 12. Two records for the same subject, sharing a path AND a value at that path, MUST produce DIFFERENT leaf hashes for that path (spec section 7). This is the only vector class that catches an implementation whose salts are not independent, and that violation is invisible to every other class because each record verifies perfectly on its own. It has to catch three reachable mistakes, and the three assertions below map onto them one for one: a salt derived deterministically so that reissuance reproduces the same root, which reads like a feature; ONE DRAW REUSED ACROSS THE LEAVES OF A RECORD, which needs two DISTINCT paths compared WITHIN a single issuance and is why this vector carries a `paths` array rather than one `segments`; and one draw reused across records, which is the patient-linkage failure itself. THESE VECTORS ASSERT RELATIONS RATHER THAN PINNED VALUES, and that is forced by the ruling rather than a shortcut: decision D4 is ruled D4b, so the salts are independently random and no fixed expectation can exist for what the implementation under test must draw freshly. ONE TAG AND ONE VALUE ARE SHARED BY EVERY PATH rather than stated per path, which is what lets `paths` be a bare array of segment lists whose distinctness the schema can enforce with uniqueItems; it also makes the vector strictly stronger, because two leaves carrying the same tag and value at different paths additionally expose a salt derived from record content, which per-path values would mask. HONEST LIMIT: this detects a DETERMINISTIC or REUSED salt. It does NOT detect a weak or predictable CSPRNG - an implementation drawing 16 bytes from a poorly seeded generator passes every trial while providing far less than the 128 bits spec section 7 requires. No fixed vector file can test a randomness source; that gap belongs to implementation review and is stated in docs/conformance-corpus.md class 12 rather than left for a passing run to imply.",
       "type": "object",
@@ -396,11 +748,14 @@
         "trials",
         "expectDistinctSaltsWithinIssuance",
         "expectDistinctSaltsAcrossIssuances",
-        "expectDistinctLeafHashesAcrossIssuances"
+        "expectDistinctLeafHashesAcrossIssuances",
+        "ordering"
       ],
       "additionalProperties": false,
       "properties": {
-        "name": { "$ref": "#/$defs/name" },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
         "class": {
           "description": "Always 12. Pinned rather than left to classRef's 1-to-20 range, because the class number is what the corpus build's coverage check counts: a class-12 vector mislabelled as any other class would mark THAT class covered by a vector testing nothing about it, and leave class 12 reading as a gap. The same silently-vacuous shape this file guards elsewhere, one level up.",
           "$ref": "#/$defs/classRef",
@@ -411,7 +766,9 @@
           "type": "array",
           "minItems": 2,
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/segments" }
+          "items": {
+            "$ref": "#/$defs/segments"
+          }
         },
         "tag": {
           "description": "The type tag bound at EVERY path in `paths`. One tag for the whole vector, because the class is about salt independence and nothing in it varies with the tag; tag variation is classes 1 and 7. STATED LIMIT, NOT MECHANICALLY ENFORCED AND SAID SO RATHER THAN NAMED TO AN ENFORCER: a tag is not a property of a vector but of a path under a type map, and resolution fails closed for an uncovered path (spec section 4.2, decision D7 ruled D7a). AN EARLIER REVISION OF THIS SENTENCE SAID THE BUILD CONSTRUCTS A SYNTHETIC TYPE MAP BINDING EVERY ENTRY IN `paths` TO THIS TAG, AND THAT WAS A DESCRIPTION OF SOMETHING NEITHER IMPLEMENTATION DOES. Both hash the leaf directly with this authored tag - build_unlinkability in corpus/tools/build_corpus.py and the class-12 loop in corpus/tools/check_corpus.mjs - and two of the three committed vectors name reserved paths, roax.recordId and roax.issuer.id, whose tag is fixed at STRING by spec section 11.2 and which no type map binds at all; a pattern could not name either of them anyway, because parse_pattern in corpus/tools/roax_ref.py reads a dot as a segment boundary and each of those keys is a SINGLE segment containing one (corpus/README.md, ambiguity 5). What makes the field coherent is instead that class 12 is BEHAVIOURAL over authored paths and issues no record, so nothing is resolved and nothing can fail closed. No referenced MOH sample is involved and none could be, since the class needs two paths carrying one value.",
@@ -425,7 +782,9 @@
         "recordIds": {
           "description": "OPTIONAL. The record identifiers to issue the trials under, when the vector wants to pin that a SHARED identifier still yields different leaf hashes. Under decision D4b the record identifier is not an input to any salt or preimage, so this changes nothing about the expected outcome; it exists so a vector can state that explicitly, because the deleted derived-salt construction did fold it in and a reader who knows that construction would otherwise wonder.",
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "trials": {
           "description": "How many independent issuances the runner performs. Minimum 2, which is the pair the class is about; more raises confidence against an implementation that varies only the first draw.",
@@ -443,17 +802,38 @@
         "expectDistinctLeafHashesAcrossIssuances": {
           "description": "At EACH path, the leaf hash MUST differ across trials. This is the class's stated property expressed on the value a verifier actually sees. THERE IS DELIBERATELY NO within-issuance leaf-hash assertion: two leaves at different paths have different encoded paths inside the leaf preimage (spec section 8), so their hashes differ whether or not the salts do, and asserting it would read as coverage it is not.",
           "const": true
+        },
+        "ordering": {
+          "description": "The leaf ordering this vector's expected values were computed under (spec section 9). REQUIRED on every ordering-sensitive vector rather than optional, because the ordering is inside DOMAIN and therefore inside every leaf preimage (section 9.5, H1): a vector that did not say would assert a leaf hash or a root that no runner could attribute to an ordering. A runner MUST read it rather than tolerate it - an unknown field inside a group a runner already consumes passes silently, which is the quiet-skip defect the group guard exists to prevent, one level down. Every committed vector declares `path`, which is the default (section 9); `hash` is exercised by the class-21 `ordering` group, which declares both inside each vector instead.",
+          "enum": [
+            "path",
+            "hash"
+          ]
         }
       }
     },
-
     "normalizationVector": {
       "description": "Class 19. One record whose string differs before and after NFC, carried in BOTH forms, asserting that the two produce the SAME root (spec section 6.1, decision D12 ruled D12a). Class 4 already asserts NFC against NFD at LEAF level in values and keys; this class asserts the property of the whole pipeline over the union of spec section 3.3, which is where the routes a leaf-level vector misses actually are - a key compared before normalization, a reserved-leaf value written straight from the envelope, a path segment re-encoded from a cached form. THE ASSERTION IS EQUALITY, so the vector is complete without a pinned root: what it fixes is that both forms yield one value and that it is the same one. The optional root pins that value once the corpus file exists, as a regression against normalization silently changing. Use a string whose NFC form is stable across recent Unicode versions - the version pin is class 16's subject, and class 16 is explicit about what it can and cannot demonstrate.",
       "type": "object",
-      "required": ["name", "class", "site", "recordFileNFD", "recordFileNFC", "saltsFile", "recordType", "schemaVersion", "recordId", "issuerId", "expectSameRoot"],
+      "required": [
+        "name",
+        "class",
+        "site",
+        "recordFileNFD",
+        "recordFileNFC",
+        "saltsFile",
+        "recordType",
+        "schemaVersion",
+        "recordId",
+        "issuerId",
+        "expectSameRoot",
+        "ordering"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "$ref": "#/$defs/name" },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
         "class": {
           "description": "Always 19, pinned for the reason given on unlinkabilityVector.class.",
           "$ref": "#/$defs/classRef",
@@ -461,7 +841,10 @@
         },
         "site": {
           "description": "Where the differing sequence sits. BOTH are required by docs/conformance-corpus.md class 19, because an implementation can normalize values and not keys, and BOTH ARE BUILT: the key site was withheld while decision D14 was open and was built under ruled D14a on 2026-07-30 (docs/decisions.md Part 2a). NOT ENFORCED BY THIS SCHEMA, AND IT CANNOT BE: that is a requirement on the SET of class-19 vectors and not on any one of them, so no keyword here reaches it, and a pair of contains keywords on vectors.normalization would not express it either, since an absent array escapes entirely. IT IS ENFORCED IN THE CORPUS BUILD, which is where a set-level requirement belongs and where the class-coverage check classRef describes also runs: corpus/tools/build_corpus.py fails the build when class 19 is missing either site, through the class-19 builder it calls in corpus/tools/synthetic_records.py.",
-          "enum": ["value", "key"]
+          "enum": [
+            "value",
+            "key"
+          ]
         },
         "recordType": {
           "description": "Committed as the reserved leaf roax.recordType. REQUIRED here for exactly the reason recordVector requires it: the leaf set is the UNION of the record's own leaves and the reserved roax.* leaves (spec sections 3.3 and 11.2), so a runner holding only the two record files and the salt set cannot reconstruct the union and therefore cannot recompute the root this vector asserts. An earlier revision of this definition named only the record files and saltsFile, which left its own root unrecomputable by the same argument recordVector already states about itself.",
@@ -487,40 +870,77 @@
           "type": "string",
           "minLength": 1
         },
-        "recordFileNFD": { "type": "string" },
-        "recordFileNFC": { "type": "string" },
+        "recordFileNFD": {
+          "type": "string"
+        },
+        "recordFileNFC": {
+          "type": "string"
+        },
         "saltsFile": {
           "description": "The per-leaf salts both forms are computed under, in the `salts` shape schemas/envelope-1.0.json defines. REQUIRED, and required structurally rather than as advice, for the same reason recordVector requires a salt source: under decision D4b every salt is an independent random draw (spec section 7), so two issuances of the two forms produce different roots for a reason that has nothing to do with normalization, and expectSameRoot would then assert nothing. The two forms MUST share one salt set.",
           "type": "string"
         },
-        "expectSameRoot": { "const": true },
+        "expectSameRoot": {
+          "const": true
+        },
         "root": {
           "description": "OPTIONAL. The single root both forms produce, once computed.",
           "$ref": "#/$defs/hex32"
+        },
+        "ordering": {
+          "description": "The leaf ordering this vector's expected values were computed under (spec section 9). REQUIRED on every ordering-sensitive vector rather than optional, because the ordering is inside DOMAIN and therefore inside every leaf preimage (section 9.5, H1): a vector that did not say would assert a leaf hash or a root that no runner could attribute to an ordering. A runner MUST read it rather than tolerate it - an unknown field inside a group a runner already consumes passes silently, which is the quiet-skip defect the group guard exists to prevent, one level down. Every committed vector declares `path`, which is the default (section 9); `hash` is exercised by the class-21 `ordering` group, which declares both inside each vector instead.",
+          "enum": [
+            "path",
+            "hash"
+          ]
         }
       }
     },
-
     "envelopeVector": {
       "description": "Classes 13-18: envelope and record-level invariants that JSON Schema alone cannot express, notably the minimum-disclosure floor (class 14), the reserved-namespace guard (class 15, which tests the NFC-normalized key of the FIRST SEGMENT for the prefix 'roax.' and is NOT a display-path test - see spec section 11.2), the prohibition on a disclosed copy carrying a withheld leaf's salt (class 17), and the outside-the-root authority vectors (class 18).",
       "type": "object",
-      "required": ["name", "class", "envelopeFile", "expectAccept"],
+      "required": [
+        "name",
+        "class",
+        "envelopeFile",
+        "expectAccept",
+        "ordering"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "$ref": "#/$defs/name" },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
         "class": {
           "description": "The classes that legitimately carry an envelope vector, enumerated rather than given as a range, and pinned for the reason on unlinkabilityVector.class. AN EARLIER REVISION SAID 13 TO 18 AND WAS WRONG: class 11 carries three envelope vectors - algorithm-sha-256-accepted, algorithm-poseidon-fails-closed and profile-unknown-fails-closed - because 'this hashAlg has no defined construction' and 'this recordType has no profile' are fail-closed assertions about the schema binding that can only be made at envelope level, and class 11 is where the binding lives (docs/conformance-corpus.md class 11). The range excluded them and rejected the committed corpus, which is how the error was found. An enum is used because these class numbers are not a contiguous span and never were; 12 is behavioural and carries no envelope, and 19's carrier is normalizationVector. The if/then/else below then splits 18, which is the only one PERMITTING verifierConfig.",
           "$ref": "#/$defs/classRef",
           "type": "integer",
-          "enum": [11, 13, 14, 15, 16, 17, 18]
+          "enum": [
+            11,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ]
         },
-        "envelopeFile": { "type": "string" },
-        "expectAccept": { "type": "boolean" },
+        "envelopeFile": {
+          "type": "string"
+        },
+        "expectAccept": {
+          "type": "boolean"
+        },
         "verifierConfig": {
           "description": "What the VERIFIER is configured with for this vector. Class 18 vectors are the only ones whose outcome depends on this rather than on the envelope alone, which is the whole point of the class: it fails an implementation that takes authority from a field in the document instead. Without this block the expected outcome of such a vector is not determined by the file, so the if/then/else on this definition PERMITS it at class 18 and FORBIDS it everywhere else. A REVISION REQUIRING IT AT CLASS 18 WAS MADE AND REVERTED, and the `then` branch below records why: it rejected the committed corpus, whose four class-18 vectors are the identity rows and are determined by the envelope alone. The completeness rule - a vector whose outcome DOES turn on the verifier's configuration must carry this block - is what no keyword can express, and it is NOT MECHANICALLY ENFORCED TODAY, stated here rather than named to an enforcer that does not exist. THE FOUR MEMBERS ANY VERIFIER HAS ARE ALL REQUIRED - the anchored root, the anchored algorithm, the allow-list and the configured registry - which guards the same silently-vacuous-vector failure as the neighbouring typeMapVector's three-branch oneOf but more tightly: there the vector needs exactly one of three assertions, whereas a class-18 verifier configuration is under-determined unless every member is stated. The upper-edge ACCEPT vector of docs/conformance-corpus.md class 18 is the proof of that - it accepts only if the anchored pair matches, the algorithm is on the allow-list, and the registry read is the verifier's own, so a partial block would let it pass or fail for a reason the file did not fix. Decision D8 is ruled with this class attached to it, because a normative sentence alone was demonstrably not enough - dogtag had the equivalent understanding written down and still shipped the documentStore bug (spec section 11.3).",
           "type": "object",
           "additionalProperties": false,
-          "required": ["anchoredRoot", "anchoredHashAlg", "hashAlgAllowList", "registryAddress"],
+          "required": [
+            "anchoredRoot",
+            "anchoredHashAlg",
+            "hashAlgAllowList",
+            "registryAddress"
+          ],
           "properties": {
             "anchoredRoot": {
               "description": "The root the verifier's own anchoring registry records. Authority for the root comes from here, never from the envelope.",
@@ -528,14 +948,22 @@
             },
             "anchoredHashAlg": {
               "description": "The hash algorithm the registry records against that root. A verifier MUST take hashAlg from HERE and never from the envelope (spec section 7.4, H2). A vector whose envelope hashAlg disagrees with this value MUST be rejected.",
-              "enum": ["SHA-256", "Poseidon-BN254"]
+              "enum": [
+                "SHA-256",
+                "Poseidon-BN254"
+              ]
             },
             "hashAlgAllowList": {
               "description": "The algorithms this verifier is configured to accept. Closes the retired-algorithm case that the registry alone does not (spec section 7.4, H3): a vector whose algorithm is registered but absent from this list MUST be rejected. A DISCRIMINATING H3 vector sets this to [\"Poseidon-BN254\"] against a SHA-256 envelope, because that is the only shape in which an implementation with no allow-list at all fails; a Poseidon envelope is rejected anyway for having no defined construction (spec section 7.4), so a vector built the other way round records a pass without an allow-list existing. Minimum one entry: a verifier configured with an empty list rejects everything, and every vector run against it would then pass for that reason instead of the one it names.",
               "type": "array",
               "minItems": 1,
               "uniqueItems": true,
-              "items": { "enum": ["SHA-256", "Poseidon-BN254"] }
+              "items": {
+                "enum": [
+                  "SHA-256",
+                  "Poseidon-BN254"
+                ]
+              }
             },
             "registryAddress": {
               "description": "The anchoring registry the verifier is configured with. An envelope naming a DIFFERENT registry in its anchor block MUST NOT cause the verifier to read that one - this is the dogtag documentStore bug in this design's shape. An absent anchor block MUST NOT make an otherwise verifiable record unverifiable, which is the accept vector at the upper edge of class 18.",
@@ -548,22 +976,40 @@
             }
           }
         },
-        "reason": { "type": "string" }
+        "reason": {
+          "type": "string"
+        },
+        "ordering": {
+          "description": "The leaf ordering this vector's expected values were computed under (spec section 9). REQUIRED on every ordering-sensitive vector rather than optional, because the ordering is inside DOMAIN and therefore inside every leaf preimage (section 9.5, H1): a vector that did not say would assert a leaf hash or a root that no runner could attribute to an ordering. A runner MUST read it rather than tolerate it - an unknown field inside a group a runner already consumes passes silently, which is the quiet-skip defect the group guard exists to prevent, one level down. Every committed vector declares `path`, which is the default (section 9); `hash` is exercised by the class-21 `ordering` group, which declares both inside each vector instead.",
+          "enum": [
+            "path",
+            "hash"
+          ]
+        }
       },
       "if": {
-        "properties": { "class": { "const": 18 } },
-        "required": ["class"]
+        "properties": {
+          "class": {
+            "const": 18
+          }
+        },
+        "required": [
+          "class"
+        ]
       },
       "then": {
         "description": "Class 18 is the outside-the-root authority class, and verifierConfig is PERMITTED here and nowhere else. STATED LIMIT, NOT MECHANICALLY ENFORCED ANYWHERE TODAY: it is required for a vector whose outcome depends on what the VERIFIER is configured with, and inapplicable to one the envelope alone determines, and no keyword can tell those apart. Nothing in corpus/tools/ reads this block, and naming the corpus build as its enforcer would be worse than admitting the gap, because the vectors that would need the check are the registry-dependent rows this note describes next and they cannot be built yet; the enforcer becomes possible in the same change that builds them. An earlier revision required it on every class-18 vector, which was written when this class was expected to be the registry rows alone; the four identity rows that actually exist - a top-level recordType, schemaVersion, recordId or issuer.id disagreeing with the reserved leaf committed inside the root - are fully determined by the envelope, so requiring a config on them would have forced an inert block whose presence suggested the outcome turned on something it did not. That revision rejected the committed corpus, which is how it was found. The registry-dependent rows are NOT YET BUILT and are recorded as a named gap in docs/conformance-corpus.md class 18, because they need the anchoring registry that spec section 2.2 deliberately leaves undesigned, and building them here would make this corpus invent that interface - which section 1.2 of the corpus document forbids.",
-        "properties": { "verifierConfig": true }
+        "properties": {
+          "verifierConfig": true
+        }
       },
       "else": {
         "description": "Every other class this carrier serves is determined by the envelope alone, so a verifierConfig here would be inert and would suggest the outcome turns on something it does not.",
-        "properties": { "verifierConfig": false }
+        "properties": {
+          "verifierConfig": false
+        }
       }
     },
-
     "roundTripVector": {
       "description": "Class 20: the issue-then-verify round trip, which is the one class that runs an implementation against its OWN output. EVERY OTHER CLASS RUNS A VERIFIER AGAINST BYTES ANOTHER PROGRAM WROTE. Every committed envelope fixture is produced by corpus/tools/build_corpus.py, so until this class existed nothing asked an implementation to PRODUCE an envelope, and an implementation could therefore issue a disclosed copy its own verifier refused while passing every vector in the file. That is not hypothetical: it happened, in a library that passed all 488 vectors including salt-leak-named-leaf-without-value, the vector naming the very condition its own output violated, and it was found by a human reading the library rather than by this corpus. What makes the producing side worth a class rather than obvious is that THE DISCLOSURE CARRIERS ARE PER TAG AND ARE NOT THE RECORD'S OWN SPELLINGS: NULL, EMPTY_ARRAY and EMPTY_OBJECT carry no value member at all, BOOL carries a JSON boolean, INTEGER and DECIMAL carry STRINGS already in section 6.2 canonical output form, and BYTES carries lowercase HEX where the record spelled base64 (spec sections 6.1 and 10). PINNED RATHER THAN BEHAVIOURAL, unlike unlinkabilityVector: class 12 must draw its own randomness because it is ABOUT randomness, nothing here is, so the salt set is a committed input and both produced envelopes are compared field by field against committed fixtures. A vector asserting only 'my verifier accepts my output' would be self-consistency, and a lax verifier would pass it while producing the same malformed copy; the static class 17 row fails the lax VERIFIER and this class fails the lax PRODUCER, and neither closes the gap alone.",
       "type": "object",
@@ -582,7 +1028,8 @@
         "disclosePaths",
         "expectedFullCopyFile",
         "expectedDisclosedCopyFile",
-        "expectSelfVerifies"
+        "expectSelfVerifies",
+        "ordering"
       ],
       "additionalProperties": false,
       "properties": {
@@ -681,6 +1128,162 @@
         "intent": {
           "description": "What this vector is for, in prose. Consumed by no runner; present because a class-20 vector's point is not readable off its fields.",
           "type": "string"
+        },
+        "ordering": {
+          "description": "The leaf ordering this vector's expected values were computed under (spec section 9). REQUIRED on every ordering-sensitive vector rather than optional, because the ordering is inside DOMAIN and therefore inside every leaf preimage (section 9.5, H1): a vector that did not say would assert a leaf hash or a root that no runner could attribute to an ordering. A runner MUST read it rather than tolerate it - an unknown field inside a group a runner already consumes passes silently, which is the quiet-skip defect the group guard exists to prevent, one level down. Every committed vector declares `path`, which is the default (section 9); `hash` is exercised by the class-21 `ordering` group, which declares both inside each vector instead.",
+          "enum": [
+            "path",
+            "hash"
+          ]
+        }
+      }
+    },
+    "orderingVector": {
+      "description": "Class 21. ONE record, ONE salt set, issued under BOTH leaf orderings, asserting two roots that differ. Specification section 9 makes leaf ordering a per-record choice between `path` and `hash`, mirroring decision B's shape for hash algorithms, and this class is what stops the second ordering existing only in prose. A single salt set serves both sides deliberately: it is drawn over the HASH-ordered leaf set, which is a superset because that side also emits `roax.ordering`, and a path-keyed set is read by path so the extra entry is never consulted on the path-ordered side. Two salt sets would make the roots differ for a reason that has nothing to do with ordering. This vector carries no top-level `ordering` field, because it declares one per side inside `orderings` and a single stamp would contradict its contents.",
+      "type": "object",
+      "required": [
+        "name",
+        "class",
+        "recordType",
+        "schemaVersion",
+        "recordId",
+        "issuerId",
+        "recordFile",
+        "saltsFile",
+        "saltPairing",
+        "orderings"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "class": {
+          "description": "Always 21. Pinned rather than left to classRef's range, for the reason unlinkabilityVector.class gives: a vector mislabelled as another class marks THAT class covered by a vector testing nothing about it and leaves this one reading as a gap.",
+          "$ref": "#/$defs/classRef",
+          "const": 21
+        },
+        "recordType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schemaVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recordId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issuerId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issuerKeyId": {
+          "description": "A conditional reserved leaf of spec section 11.2, the other being roax.ordering. Its presence raises both sides' leafCount by one.",
+          "type": "string",
+          "minLength": 1
+        },
+        "recordFile": {
+          "description": "The record body, carrying no salts.",
+          "type": "string"
+        },
+        "saltsFile": {
+          "description": "The per-leaf salts, shared by both orderings.",
+          "type": "string"
+        },
+        "saltPairing": {
+          "description": "Path-keyed, always. A positional set could not serve both sides: it is an array in encodePath order and the two sides have different leaf counts.",
+          "enum": [
+            "path"
+          ]
+        },
+        "orderings": {
+          "description": "Keyed by ordering identifier. BOTH are required: a vector carrying one side asserts nothing about the axis it exists to test.",
+          "type": "object",
+          "required": [
+            "path",
+            "hash"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "description": "What this record commits under ONE leaf ordering. Carried per ordering rather than as two sibling vectors so that a runner cannot compute one and report green: the two sides share every input, so any difference between them is attributable to the ordering alone.",
+              "type": "object",
+              "required": [
+                "leafCount",
+                "root",
+                "leafHashes",
+                "displayPaths"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "leafCount": {
+                  "description": "The size of the leaf union under this ordering. It DIFFERS between the two sides of a vector whenever the record is hash-ordered, because `roax.ordering` is emitted for a non-default ordering and for nothing else (spec section 11.2).",
+                  "type": "integer",
+                  "minimum": 6
+                },
+                "root": {
+                  "description": "The Merkle root under this ordering.",
+                  "$ref": "#/$defs/hex32"
+                },
+                "leafHashes": {
+                  "description": "Every leaf hash, in TREE order, so a runner that reproduces the root but places leaves wrongly still fails. The two sides of a vector share NO leaf hash, because the ordering is a component of DOMAIN (spec section 9.5, H1).",
+                  "type": "array",
+                  "minItems": 6,
+                  "items": {
+                    "$ref": "#/$defs/hex32"
+                  }
+                },
+                "displayPaths": {
+                  "description": "The display path of each leaf, in TREE order, for a human reading a diff. It is display only and is never an input to anything a runner computes (spec section 5.2).",
+                  "type": "array",
+                  "minItems": 6,
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "hash": {
+              "description": "What this record commits under ONE leaf ordering. Carried per ordering rather than as two sibling vectors so that a runner cannot compute one and report green: the two sides share every input, so any difference between them is attributable to the ordering alone.",
+              "type": "object",
+              "required": [
+                "leafCount",
+                "root",
+                "leafHashes",
+                "displayPaths"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "leafCount": {
+                  "description": "The size of the leaf union under this ordering. It DIFFERS between the two sides of a vector whenever the record is hash-ordered, because `roax.ordering` is emitted for a non-default ordering and for nothing else (spec section 11.2).",
+                  "type": "integer",
+                  "minimum": 6
+                },
+                "root": {
+                  "description": "The Merkle root under this ordering.",
+                  "$ref": "#/$defs/hex32"
+                },
+                "leafHashes": {
+                  "description": "Every leaf hash, in TREE order, so a runner that reproduces the root but places leaves wrongly still fails. The two sides of a vector share NO leaf hash, because the ordering is a component of DOMAIN (spec section 9.5, H1).",
+                  "type": "array",
+                  "minItems": 6,
+                  "items": {
+                    "$ref": "#/$defs/hex32"
+                  }
+                },
+                "displayPaths": {
+                  "description": "The display path of each leaf, in TREE order, for a human reading a diff. It is display only and is never an input to anything a runner computes (spec section 5.2).",
+                  "type": "array",
+                  "minItems": 6,
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

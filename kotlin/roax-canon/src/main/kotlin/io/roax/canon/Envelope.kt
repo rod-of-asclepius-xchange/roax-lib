@@ -45,6 +45,24 @@ data class VerifierConfig(
      * algorithm that is still on the list.
      */
     val anchorHashAlg: String? = null,
+    /**
+     * The leaf ordering **as the anchoring registry reports it** (section 9.5, mechanism H2).
+     *
+     * This is the ONLY source of the ordering on the verification path. The envelope's own
+     * `ordering` member is never read, and the committed `roax.ordering` leaf is committed issuer
+     * intent rather than authority (section 11.2): both are supplied by the party the check
+     * constrains.
+     *
+     * Defaults to [Ordering.PATH], the specification's default and the same default in all five
+     * libraries. A verifier accepting `hash`-ordered records MUST set this from its registry,
+     * which is also H3 at its narrowest: an ordering this verifier is not configured for is
+     * refused rather than followed.
+     *
+     * Stated as honestly as section 7.4 states H2 for `hashAlg`: the anchoring registry is a
+     * requirement HANDED FORWARD rather than a mechanism the specification designs (section 2.2),
+     * so what this models today is the verifier's own configured expectation.
+     */
+    val anchorOrdering: Ordering = Ordering.PATH,
     /** The root as the anchoring layer reports it (section 11.3). Null skips the check. */
     val anchorRoot: ByteArray? = null,
     val emptyContainers: EmptyContainerAuthorization = EmptyContainerAuthorization.REQUIRED,
@@ -192,6 +210,9 @@ object EnvelopeVerifier {
             issuerId = str(issuer, "id"),
             issuerKeyId = (issuer["keyId"] as? JsonString)?.value,
             typeMapId = outerTypeMapId(env),
+            // From the REGISTRY, never from the envelope (section 9.5, H2). A full copy needs it
+            // structurally, because verifying one rebuilds the whole tree.
+            ordering = config.anchorOrdering,
         )
 
         val committed = if (hasRecord) {
@@ -293,7 +314,13 @@ object EnvelopeVerifier {
             // 11.1 records - a recomputed leaf hash is 0x00-domained by construction while an
             // internal node is 0x01-domained, so it cannot equal one except by defeating
             // second-preimage resistance.
-            val recomputed = leafHash(segments, tag, value, salt, hash, canon, config.nfc)
+            // Section 10 step 2, and the ONE place a disclosed copy needs the ordering at all:
+            // for the LEAF PREIMAGE, exactly as `hashAlg` already is, and for nothing structural,
+            // because the index and audit path are carried and the tree is never rebuilt (9.6).
+            val recomputed = leafHash(
+                segments, tag, value, salt, hash, canon, config.nfc,
+                ordering = config.anchorOrdering,
+            )
 
             val auditPath = ((leaf["auditPath"] as? JsonArray)?.elements ?: emptyList()).map {
                 val h = it as? JsonString
@@ -502,7 +529,7 @@ object EnvelopeVerifier {
      * vectors are **accepted**.
      *
      * Compared under NFC on both sides, because a STRING leaf commits its normalized form.
-     * `roax.issuer.keyId` is deliberately NOT bound: it is the one conditional leaf, so binding it
+     * `roax.issuer.keyId` is deliberately NOT bound: it is a conditional leaf, so binding it
      * would turn an absent key identifier into a mismatch and break key rotation on an
      * already-anchored record (section 11.2).
      */

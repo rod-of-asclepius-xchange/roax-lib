@@ -2,7 +2,7 @@
 
 An independent library, written from [`docs/spec/roax-canon-1.md`](../docs/spec/roax-canon-1.md) alone.
 
-It passes all 501 vectors of the committed conformance corpus with zero NOT RUN, producing roots byte-identical to the Rust, TypeScript, Python and Swift libraries wherever the corpus covers a behaviour.
+It passes all 504 vectors of the committed conformance corpus with zero NOT RUN, producing roots byte-identical to the Rust, TypeScript, Python and Swift libraries wherever the corpus covers a behaviour.
 What it found on the way is in [`FINDINGS.md`](FINDINGS.md), and three of those findings are things a future implementer will hit in any JVM language.
 
 ## What is here

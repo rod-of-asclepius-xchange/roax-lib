@@ -96,6 +96,9 @@ fun commit(
     // is NOT alphabetical: the length prefix precedes the key bytes, so it sorts by segment count,
     // then segment kind, then key length, then key bytes. A plain memcmp over the encoding is the
     // easiest thing to get identical in five languages, which is what decision D5a bought.
+    // This is SALT-ASSIGNMENT order and it is encodePath order under BOTH leaf orderings
+    // (section 9). It cannot be tree order under `hash`, because a leaf hash is computed over its
+    // salt, so pairing salts in tree order would be circular and unimplementable.
     val encoded = union.map { encodePath(it.segments, nfc) to it }
     val sorted = encoded.sortedWith { a, b -> Bytes.compareUnsigned(a.first, b.first) }
 
@@ -115,17 +118,47 @@ fun commit(
             tag = leaf.tag,
             value = leaf.value,
             salt = salt,
-            leafHash = leafHash(leaf.segments, leaf.tag, leaf.value, salt, hash, context.canon, nfc),
+            leafHash = leafHash(
+                leaf.segments, leaf.tag, leaf.value, salt, hash, context.canon, nfc,
+                ordering = context.identity.ordering,
+            ),
             encodedPath = encodedPath,
         )
     }
 
+    val placed = treeOrder(context.identity.ordering, committed)
     return Commitment(
         context = context,
-        leaves = committed,
-        root = Merkle.merkleTreeHash(committed.map { it.leafHash }, hash),
+        leaves = placed,
+        root = Merkle.merkleTreeHash(placed.map { it.leafHash }, hash),
         hash = hash,
     )
+}
+
+/**
+ * Reorders committed leaves from salt-assignment order into TREE order (section 9).
+ *
+ * [Ordering.PATH] is the identity, because salt-assignment order already is `encodePath` order.
+ * [Ordering.HASH] sorts by ascending leaf-hash bytes.
+ *
+ * Equal leaf hashes are REJECTED rather than tie-broken. Paths are unique already and every
+ * variable component of the section 8 preimage is length-prefixed, so two equal hashes over
+ * distinct paths are a collision; breaking the tie by path would absorb evidence of a broken hash
+ * into a well-defined tree and hand back a root, which section 9 forbids by name.
+ */
+internal fun treeOrder(ordering: Ordering, leaves: List<CommittedLeaf>): List<CommittedLeaf> {
+    if (ordering == Ordering.PATH) return leaves
+    val seen = HashSet<String>(leaves.size)
+    for (leaf in leaves) {
+        if (!seen.add(Bytes.toHex(leaf.leafHash))) {
+            fail(
+                Reason.LEAF_HASH_COLLISION,
+                "two leaves share a leaf hash at ${displayPath(leaf.segments)}; paths are unique, " +
+                    "so this is a hash collision rather than a tie to break",
+            )
+        }
+    }
+    return leaves.sortedWith { a, b -> Bytes.compareUnsigned(a.leafHash, b.leafHash) }
 }
 
 /**
@@ -151,7 +184,16 @@ fun commitWithSaltsByPath(
     // segments in the `salts` array are worth their bytes for.
     val placeholder = ByteArray(SALT_LENGTH_BYTES)
     val shape = commit(record, context, resolver, { placeholder }, nfc, hash, emptyContainers)
-    for (leaf in shape.leaves) {
+    // Re-sort the shape pass back into SALT-ASSIGNMENT order, which is encodePath order under both
+    // leaf orderings (section 9). `commit` returns leaves in TREE order, and under `hash` ordering
+    // that is a different order computed over PLACEHOLDER salts, so consuming it positionally would
+    // pair every real salt with the wrong leaf and yield a plausible wrong root rather than an
+    // error. Under `path` this sort is the identity, which is why the bug was invisible until
+    // ordering became selectable.
+    val assignmentOrder = shape.leaves.sortedWith { a, b ->
+        Bytes.compareUnsigned(a.encodedPath, b.encodedPath)
+    }
+    for (leaf in assignmentOrder) {
         val hex = Bytes.toHex(leaf.encodedPath)
         ordered.add(
             saltsByEncodedPath[hex] ?: fail(

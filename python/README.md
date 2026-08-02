@@ -41,20 +41,23 @@ This is a third runner and it is standalone.
 It does not extend `corpus/tools/run.sh`, which is the existing two-implementation gate; it consumes the vector file, the fixtures and the corpus-side type maps, which is the interface `corpus/README.md` documents for an implementation that is not one of those two.
 The runner does not deliberately write files or modify `corpus/`; the interpreter's normal `__pycache__` writes may still occur.
 
-Measured against corpus `1.1.0`, at `bba14101`: Pass and fail are assertion counts; not-run entries are vectors or required classes.
+Measured against corpus `1.2.0`, at `c942b92`: Pass and fail are assertion counts; not-run entries are vectors or required classes.
 Every figure below moves with the corpus version, which is why the version is stated with them.
 
 | Mode | Pass | Fail | Not run | Classes passed | Result | Exit | Needs the checkout |
 |---|---:|---:|---:|---:|---|---:|---|
-| structural, references available | 793 | 0 | 0 | 20/20 | `PASS` | 0 | yes |
-| structural, references unavailable | 785 | 0 | 4 | 19/20 | `INCOMPLETE / NOT RUN` | 2 | no |
-| authorized, references available | 789 | 2 | 0 | 19/20 | `FAIL` | 1 | yes |
-| authorized, references unavailable | 781 | 2 | 4 | 18/20 | `FAIL` | 1 | no |
+| structural, references available | 823 | 0 | 0 | 21/21 | `PASS` | 0 | yes |
+| structural, references unavailable | 815 | 0 | 4 | 20/21 | `INCOMPLETE / NOT RUN` | 2 | no |
+| authorized, references available | 819 | 2 | 0 | 20/21 | `FAIL` | 1 | yes |
+| authorized, references unavailable | 811 | 2 | 4 | 19/21 | `FAIL` | 1 | no |
 
 **The last column is the provenance of each row, and the four did not come from one run.**
 The two `no` rows are reproducible from a bare clone of this repository and were measured that way.
 The two `yes` rows need the third-party schemata checkout that `.gitignore` excludes, so reproducing either one means supplying `--references` from outside the tree.
-Each `yes` row is its `no` twin plus class 10's four vectors and the eight assertions they carry: 785 + 8 = 793, and 781 + 8 = 789 with the same two class-5 failures on both sides.
+Each `yes` row is its `no` twin plus class 10's four vectors and the eight assertions they carry: 815 + 8 = 823, and 811 + 8 = 819 with the same two class-5 failures on both sides.
+
+**On this commit the two `yes` rows are DERIVED by that arithmetic rather than measured**, because the leaf-ordering amendment was built without a reference checkout and carried class 10's four vectors forward byte-identical rather than rebuilding them ([`../corpus/README.md`](../corpus/README.md)).
+Class 10 is the only term the arithmetic spans, so the derivation is exact; it is labelled because a derived figure must not sit in a table of measurements as though it were a run.
 
 The first row is the only conforming PASS.
 Class 10 reproduces both roots of the MOH recovery sample at `references/schemata/src/sg/gov/moh/recovery-healthcert/2.0/sample-data.ts`, at 69 and 70 leaves, and both roots of the vaccination sample at `references/schemata/src/sg/gov/moh/vaccination-healthcert/1.0/sample-data.ts`, at 91 and 92 leaves.
@@ -64,14 +67,16 @@ That vaccination pair commits at all only because its two blocking paths were ru
 `--references` defaults first to `ROAX_REFERENCES`, then to `references/` at the repository root.
 The checkout is third-party, `.gitignore` excludes it, and it is never committed.
 Without it, class 10 reports its four vectors as NOT RUN with the attempted path and `--references /path/to/schemata` remedy; in structural mode the terminal result is `INCOMPLETE / NOT RUN` and the process exits 2, and in authorized mode the two class-5 failures still decide the exit, which is the table's fourth row.
-It never reports PASS for those 785 assertions.
-Those four vectors resolve their records out of the checkout through the `recordFile` strings committed at `corpus/conformance-corpus-1.0.json:6048`, `:6062`, `:6075` and `:6089`.
+It never reports PASS for those 815 assertions.
+Those four vectors resolve their records out of the checkout through the `recordFile` strings committed at `corpus/conformance-corpus-1.0.json:6147`, `:6162`, `:6176` and `:6191`.
 The two authorized-mode rows are a different measurement, in which the two class-5 empty-container records fail closed and the process exits 1 ([`FINDINGS.md`](FINDINGS.md), item 1).
 An unsupported reject-vector shape, an unsupported record-vector envelope carrier, a missing committed type map, or a present reference module that cannot be extracted is a failure and also exits 1.
 
-A record vector carrying `typeMapId` is the other NOT RUN case, and it is deliberately not a failure.
-That field selects envelope 2.0, which this package does not implement, so such a vector is one the runner cannot run rather than one it ran and disagreed with; it reports NOT RUN with the reason and contributes to exit 2.
-No committed corpus 1.0 record vector carries the field, so nothing reaches this path today and none of the figures above move; it becomes reachable on the migration to [`../schemas/conformance-corpus-2.0.json`](../schemas/conformance-corpus-2.0.json), which requires `typeMapId` on every record vector and which the committed corpus does not yet carry ([`AGENTS.md`](../AGENTS.md), "Validating the schemas").
+**A record vector carrying `typeMapId` is RUN rather than reported NOT RUN, and an earlier version of this section said the opposite.**
+The field selects the envelope 2.0 structural reserved leaf set, which this package does issue and verify under, so the runner takes the field and builds the tree with it rather than declining the vector: `_reserved_set` maps its presence to `RESERVED_V2`, and `run_record` passes that into `build_tree` (`tools/run_corpus.py:761-762`, `:528` and `:565`; the class-21 `run_ordering` loop does the same at `:807`).
+A vector whose build is then rejected is recorded as a FAILURE carrying that reason rather than as a NOT RUN, so the reference checkout remains the only per-vector NOT RUN case this runner has.
+What this package genuinely does not do about a type map is the verifier-side artifact work, which is stated under "What is deliberately not built" below rather than as a runner disposition.
+No committed corpus 1.0 record or ordering vector carries the field, so nothing reaches this path today and none of the figures above move; it becomes reachable on the migration to [`../schemas/conformance-corpus-2.0.json`](../schemas/conformance-corpus-2.0.json), which requires `typeMapId` on every record vector and which the committed corpus does not yet carry ([`AGENTS.md`](../AGENTS.md), "Validating the schemas").
 
 ## Running the unit tests
 
@@ -79,7 +84,7 @@ No committed corpus 1.0 record vector carries the field, so nothing reaches this
 PYTHONPATH=python/src python3 -m unittest discover -s python/tests -t python
 ```
 
-152 tests, standard library `unittest`.
+154 tests, standard library `unittest`.
 They cover what the corpus reaches plus the Python-specific traps it cannot see, because a trap closed by accident reopens on the next edit.
 `tests/test_ts_sample.py` covers `tools/ts_sample.py` for the same reason: its only consumer is the class-10 record path, so a run without the reference checkout exercises none of it.
 
@@ -207,8 +212,9 @@ The structured-path DFA artifacts in `type-maps/`, content-ID reproduction, issu
 The short version: no committed corpus vector exercises them, and adding a large unexercised surface to a library whose acceptance criterion is byte-identical agreement on the corpus would be adding untested code, not coverage.
 **That list used to include the whole of `RESERVED_V2`, and the sentence saying so has been narrowed rather than deleted, because the over-broad version was a defect.**
 It read that issuance, envelope emission and verification all reject with `type-map-rejected` "until an artifact-aware resolver can reproduce and select the exact content ID".
-That is false for the producing side: an issuer knows which artifact it used and supplies its content ID, and nothing about committing `roax.typeMap.id` requires fetching or reproducing anything.
-Content-ID reproduction is a VERIFIER's obligation when it selects a map from candidate bytes (specification section 10), and it is still unimplemented here.
+That is false on all three counts, and not only on the producing side: an issuer knows which artifact it used and supplies its content ID, so nothing about committing `roax.typeMap.id` requires fetching or reproducing anything.
+Selecting `RESERVED_V2` on a `VerifierConfig` is likewise an opt-in STRICTNESS rather than a refusal - it requires the outer `typeMap` member and raises the JSON carrier floor to six, and a copy meeting both is accepted on both copy kinds.
+Content-ID reproduction is a VERIFIER's obligation when it selects a map from candidate bytes (specification section 10), and that obligation is what is still unimplemented here.
 The refusal made this package unable to issue any record the current specification admits, because section 11.2 marks that leaf emitted ALWAYS - and the cost was invisible until conformance corpus class 20 asked an implementation to PRODUCE an envelope rather than only to verify one.
 
 **What this package does and does not do about a type map, one line each.**

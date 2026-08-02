@@ -58,6 +58,7 @@ public struct CorpusRunner {
     static let consumedGroups: Set<String> = [
         "encodePath", "encodeValue", "reject", "leaf", "tree", "inclusion", "negativeProof",
         "typeMap", "record", "unlinkability", "normalization", "envelope", "roundTrip",
+        "ordering",
     ]
 
     /// The groups the corpus carries that this runner does not consume.
@@ -76,6 +77,10 @@ public struct CorpusRunner {
                 class: 0, name: "vector-group-coverage")
             return
         }
+        if let unsupported = unsupportedDeclaredOrdering() {
+            report.record(.fail(unsupported), class: 0, name: "declared-ordering-support")
+            return
+        }
         runEncodePath()
         runEncodeValue()
         runReject()
@@ -85,6 +90,7 @@ public struct CorpusRunner {
         runNegativeProof()
         runTypeMap()
         runRecord()
+        runOrdering()
         runUnlinkability()
         runNormalization()
         runEnvelope()
@@ -236,6 +242,53 @@ public struct CorpusRunner {
 
     // MARK: leaf
 
+    /// The ordering a vector DECLARES (specification section 9).
+    ///
+    /// Read rather than tolerated. `unconsumedGroups` is this runner's group
+    /// guard, but it sees GROUPS, not fields inside a group already consumed, so
+    /// a `hash`-ordered vector added to an ordering-sensitive group would
+    /// otherwise be computed as `path` and reported green.
+    private func declaredOrdering(_ v: JSONValue) throws -> Ordering {
+        guard let declared = stringValue(v["ordering"]) else {
+            throw ROAXError.orderingNotDefined(
+                "\(name(v)) is in an ordering-sensitive group and declares no ordering"
+            )
+        }
+        return try Ordering.parse(declared)
+    }
+
+    /// The groups whose expected values depend on the leaf ordering, and the ones this
+    /// runner actually THREADS the declaration through.
+    ///
+    /// Held apart deliberately: a group that is ordering-sensitive but not threaded
+    /// would compute a `hash`-ordered vector as `path` and report green, which is the
+    /// quiet-skip defect one loop down from the group guard.
+    static let orderingSensitiveGroups = [
+        "leaf", "record", "unlinkability", "normalization", "envelope", "roundTrip",
+    ]
+    static let orderingThreadedGroups: Set<String> = ["leaf", "record"]
+
+    /// Check EVERY ordering-sensitive vector, not only the ones in a threaded group.
+    ///
+    /// A vector declaring nothing is a corpus defect. One declaring an ordering its
+    /// group is not computed under fails CLOSED here rather than under the default.
+    public func unsupportedDeclaredOrdering() -> String? {
+        for group in Self.orderingSensitiveGroups {
+            for v in vectors(group) {
+                guard let ordering = try? declaredOrdering(v) else {
+                    return "\(name(v)) is in an ordering-sensitive group and declares no ordering"
+                }
+                if ordering != .path && !Self.orderingThreadedGroups.contains(group) {
+                    return "\(group) vector \(name(v)) declares ordering \(ordering.rawValue), "
+                        + "but this runner computes the \(group) group under path only. Thread "
+                        + "the declaration through that loop before adding such a vector; "
+                        + "computing it under the default would report a green it did not earn."
+                }
+            }
+        }
+        return nil
+    }
+
     private func runLeaf() {
         for v in vectors("leaf") {
             let outcome: Outcome
@@ -250,9 +303,13 @@ public struct CorpusRunner {
                 let encodedValue = try ValueEncoding.encode(
                     tag: tag, value: try carrier(tag: tag, input: v["value"])
                 )
+                // A leaf vector is ordering-sensitive even though it carries no
+                // tree: the ordering reaches the preimage through DOMAIN
+                // (specification section 9.5, H1).
                 let hash = try LeafConstruction.leafHash(
                     segments: segments, tag: tag, encodedValue: encodedValue,
-                    salt: salt, hash: SHA256Hash.self
+                    salt: salt, hash: SHA256Hash.self,
+                    ordering: try declaredOrdering(v)
                 )
                 let expected = stringValue(v["leafHash"]) ?? ""
                 outcome = hash.roaxHex == expected ? .pass : .fail("leafHash \(hash.roaxHex) != \(expected)")
@@ -454,7 +511,8 @@ public struct CorpusRunner {
                     schemaVersion: schemaVersion,
                     recordId: recordId,
                     issuerId: issuerId,
-                    issuerKeyId: stringValue(v["issuerKeyId"])
+                    issuerKeyId: stringValue(v["issuerKeyId"]),
+                    ordering: try declaredOrdering(v)
                 )
                 let record = try loadJSON(recordSource)
                 let salts = try loadSaltSet(path(saltsFile))
@@ -523,6 +581,104 @@ public struct CorpusRunner {
     }
 
     // MARK: unlinkability
+
+    /// Class 21. One record issued under BOTH leaf orderings (section 9).
+    ///
+    /// The vector carries both roots, both leaf-hash sequences in TREE order and
+    /// both leaf counts, so this class cannot be passed by computing one
+    /// ordering. The cross-ordering assertions are what would still catch an
+    /// implementation reproducing both roots by accident: the two leaf-hash SETS
+    /// must be disjoint, because the ordering is inside DOMAIN and therefore
+    /// inside every leaf preimage (section 9.5, H1).
+    private func runOrdering() {
+        for v in vectors("ordering") {
+            let vectorName = name(v)
+            let vectorClass = cls(v)
+            guard let recordType = stringValue(v["recordType"]),
+                  let schemaVersion = stringValue(v["schemaVersion"]),
+                  let recordId = stringValue(v["recordId"]),
+                  let issuerId = stringValue(v["issuerId"]),
+                  let recordFile = stringValue(v["recordFile"]),
+                  let saltsFile = stringValue(v["saltsFile"]),
+                  let sides = objectValue(v["orderings"])
+            else {
+                report.record(.fail("malformed vector"), class: vectorClass, name: vectorName)
+                continue
+            }
+            do {
+                let record = try loadJSON(path(recordFile))
+                // ONE salt set serves both sides: salts are assigned in
+                // encodePath order under BOTH orderings (section 9), and the
+                // committed set is drawn over the hash-ordered superset.
+                let salts = try loadSaltSet(path(saltsFile))
+                var seen: [String: (root: String, hashes: [String])] = [:]
+                for (orderingName, expected) in sides {
+                    guard case .object = expected else {
+                        report.record(.fail("malformed ordering side \(orderingName)"),
+                                      class: vectorClass, name: vectorName)
+                        continue
+                    }
+                    let side = expected
+                    let ordering = try Ordering.parse(orderingName)
+                    let identity = RecordIdentity(
+                        recordType: recordType,
+                        schemaVersion: schemaVersion,
+                        recordId: recordId,
+                        issuerId: issuerId,
+                        issuerKeyId: stringValue(v["issuerKeyId"]),
+                        ordering: ordering
+                    )
+                    let committer = Committer<SHA256Hash>(
+                        resolver: try typeMap(for: recordType),
+                        emptyContainerPolicy: emptyContainerPolicy
+                    )
+                    let commitment = try committer.commit(
+                        record: record, salts: salts,
+                        context: CommitmentContext(identity: identity)
+                    )
+                    let hashes = commitment.leaves.map(\.hash.roaxHex)
+                    let wantCount = intValue(side["leafCount"]) ?? -1
+                    let wantRoot = stringValue(side["root"]) ?? ""
+                    let wantHashes = (arrayValue(side["leafHashes"]) ?? [])
+                        .compactMap { stringValue($0) }
+                    if commitment.leafCount != wantCount {
+                        report.record(
+                            .fail("\(orderingName) leafCount \(commitment.leafCount) != \(wantCount)"),
+                            class: vectorClass, name: vectorName)
+                        continue
+                    }
+                    if commitment.root.roaxHex != wantRoot {
+                        report.record(
+                            .fail("\(orderingName) root \(commitment.root.roaxHex) != \(wantRoot)"),
+                            class: vectorClass, name: vectorName)
+                        continue
+                    }
+                    if hashes != wantHashes {
+                        report.record(.fail("\(orderingName) leafHashes differ"),
+                                      class: vectorClass, name: vectorName)
+                        continue
+                    }
+                    report.record(.pass, class: vectorClass, name: "\(vectorName) (\(orderingName))")
+                    seen[orderingName] = (commitment.root.roaxHex, hashes)
+                }
+                if let pathSide = seen["path"], let hashSide = seen["hash"] {
+                    report.record(
+                        pathSide.root != hashSide.root
+                            ? .pass
+                            : .fail("both orderings produced the same root"),
+                        class: vectorClass, name: "\(vectorName) (roots differ)")
+                    let overlap = Set(pathSide.hashes).intersection(Set(hashSide.hashes))
+                    report.record(
+                        overlap.isEmpty
+                            ? .pass
+                            : .fail("\(overlap.count) leaf hash(es) shared across orderings"),
+                        class: vectorClass, name: "\(vectorName) (leaf hashes disjoint)")
+                }
+            } catch {
+                report.record(.fail("threw \(error)"), class: vectorClass, name: vectorName)
+            }
+        }
+    }
 
     private func runUnlinkability() {
         for v in vectors("unlinkability") {

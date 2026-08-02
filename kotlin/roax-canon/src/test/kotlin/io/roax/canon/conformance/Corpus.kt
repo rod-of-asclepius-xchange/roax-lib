@@ -3,6 +3,7 @@ package io.roax.canon.conformance
 import io.roax.canon.Bytes
 import io.roax.canon.DisplayPatternTypeMap
 import io.roax.canon.Nfc
+import io.roax.canon.Ordering
 import io.roax.canon.PlatformNfc
 import io.roax.canon.Profile
 import io.roax.canon.ProfileRegistry
@@ -88,7 +89,57 @@ object Corpus {
         "normalization",
         "envelope",
         "roundTrip",
+        "ordering",
     )
+
+    /**
+     * The ordering a vector DECLARES (specification section 9).
+     *
+     * Read rather than tolerated. [unconsumedGroups] is the group guard, but it sees GROUPS, not
+     * fields inside a group already consumed, so a `hash`-ordered vector added to an
+     * ordering-sensitive group would otherwise be computed as `path` and reported green.
+     */
+    fun declaredOrdering(v: JsonObject): Ordering {
+        val declared = strOrNull(v, "ordering") ?: throw IllegalStateException(
+            "${str(v, "name")} is in an ordering-sensitive group and declares no ordering; " +
+                "specification section 9 requires the ordering to be explicit",
+        )
+        return Ordering.parse(declared)
+    }
+
+    /**
+     * The groups whose expected values depend on the leaf ordering, and the ones the runner
+     * actually THREADS the declaration through.
+     *
+     * Held apart deliberately: a group that is ordering-sensitive but not threaded would compute
+     * a `hash`-ordered vector as `path` and report green, which is the quiet-skip defect one loop
+     * down from the group guard.
+     */
+    val orderingSensitiveGroups: List<String> = listOf(
+        "leaf", "record", "unlinkability", "normalization", "envelope", "roundTrip",
+    )
+    val orderingThreadedGroups: Set<String> = setOf("leaf", "record")
+
+    /**
+     * Check EVERY ordering-sensitive vector, not only the ones in a threaded group.
+     *
+     * A vector declaring nothing is a corpus defect. One declaring an ordering its group is not
+     * computed under fails CLOSED here rather than being computed under the default.
+     */
+    fun unsupportedDeclaredOrdering(): String? {
+        for (group in orderingSensitiveGroups) {
+            for (v in vectors(group)) {
+                val ordering = declaredOrdering(v)
+                if (ordering != Ordering.PATH && group !in orderingThreadedGroups) {
+                    return "$group vector ${str(v, "name")} declares ordering ${ordering.id}, but " +
+                        "this runner computes the $group group under ${Ordering.PATH.id} only. " +
+                        "Thread the declaration through that loop before adding such a vector; " +
+                        "computing it under the default would report a green it did not earn."
+                }
+            }
+        }
+        return null
+    }
 
     /** The groups the corpus carries that [consumedGroups] does not name. */
     fun unconsumedGroups(): List<String> =
@@ -226,6 +277,13 @@ object Corpus {
     fun boolOrNull(o: JsonObject, name: String): Boolean? = (o[name] as? JsonBoolean)?.value
 
     fun hex(s: String): ByteArray = Bytes.fromHex(s)
+
+    /** A nested JSON object, for a vector that groups its expectations. */
+    fun obj(v: JsonValue): JsonObject = v as JsonObject
+
+    /** A JSON array of strings, in document order. */
+    fun strings(v: JsonValue): List<String> =
+        ((v as? JsonArray)?.elements ?: emptyList()).map { (it as JsonString).value }
 
     fun hexList(o: JsonObject, name: String): List<ByteArray> =
         ((o[name] as? JsonArray)?.elements ?: emptyList()).map { hex((it as JsonString).value) }

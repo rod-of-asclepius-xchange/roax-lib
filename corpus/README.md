@@ -1,7 +1,7 @@
 # The ROAX conformance corpus
 
 **Status:** first cut.
-501 vectors, all 20 classes reachable, 15 complete, 4 partial and 1 stale.
+504 vectors, all 21 classes reachable, 16 complete, 4 partial and 1 stale.
 **Normative definition:** [`docs/conformance-corpus.md`](../docs/conformance-corpus.md).
 **Schema:** [`schemas/conformance-corpus-1.0.json`](../schemas/conformance-corpus-1.0.json).
 **Specification:** [`docs/spec/roax-canon-1.md`](../docs/spec/roax-canon-1.md), which governs where the two disagree (specification section 1.1).
@@ -15,7 +15,7 @@ If ROAX ships five independent libraries it is the whole enforcement mechanism f
 |---|---|
 | `conformance-corpus-1.0.json` | The vector file. The deliverable. |
 | `type-maps/*.json` | The type maps class 10 and class 11 are asserted against. Three are derived from the reference schemas with a citation on every entry; one is authored for the synthetic fixtures and says so. |
-| `fixtures/records/*.json` | Synthetic records for classes 5, 7, 13, 15, 19 and 20. Authored here; no reference sample is reproduced. |
+| `fixtures/records/*.json` | Synthetic records for classes 5, 7, 13, 15, 19, 20 and 21. Authored here; no reference sample is reproduced. Class 21 adds no record of its own: it reuses two of these under both leaf orderings, so the two roots differ for the ordering and for nothing else. |
 | `fixtures/envelopes/*.json` | Envelopes for classes 11, 14, 15, 17, 18 and 20. Generated. Class 20's four are the copies a conforming implementation must REPRODUCE rather than merely verify. |
 | `fixtures/salts/*.json` | The committed per-leaf salt sets. **Inputs, not generated fixtures**: under decision D4b a salt is an independent CSPRNG draw that nothing can re-derive (specification section 7), so a fresh build cannot recompute one and comparing it against a fresh draw would fail forever. Drawn once by `build_corpus.py --draw-salts` and committed; a build that finds one missing FAILS rather than drawing, because a drawn-on-demand salt would give one machine a root no other machine could reproduce. Class 10's sets pair positionally, everything else by path - `docs/conformance-corpus.md` class 10 says why, and why harmonizing them toward positional envelopes would be the unsafe direction. |
 | `tools/` | Two independent implementations, the generator, the runner and the schema validator. |
@@ -44,10 +44,10 @@ The exit status distinguishes the three gate outcomes:
 | 1 | At least one check ran and failed. |
 | 2 | Nothing failed, but at least one check or vector was `NOT RUN`. |
 
-On the committed tree, the fully configured command above measures 501 vectors, 1,156 implementation-B assertions, and 97 JSON Schema verdicts.
+On the committed tree, the fully configured command above measures 504 vectors, 1,186 implementation-B assertions, and 112 JSON Schema verdicts.
 **Each of the last two needs an input that lives outside this tree, and the two are missing in different ways**, neither of which is drift.
-Without the pinned third-party reference checkout, `check_corpus.mjs` still runs and passes 1,148 assertions while reporting class 10's four vectors NOT RUN; supplying the checkout adds the 8 assertions those vectors carry.
-Without an Ajv 8 and `ajv-formats` installed outside this tree and named by `--modules` or `ROAX_NODE_MODULES`, `validate_schemas.mjs` emits no verdict at all and exits 2, which `run.sh` reports as step 4 NOT RUN rather than as a lower count; with one it emits 97 verdict lines - the corpus file, the four corpus type maps, the 69 envelope fixtures and its 23 conditional probes - and exits 0.
+Without the pinned third-party reference checkout, `check_corpus.mjs` still runs and passes 1,178 assertions while reporting class 10's four vectors NOT RUN; supplying the checkout adds the 8 assertions those vectors carry.
+Without an Ajv 8 and `ajv-formats` installed outside this tree and named by `--modules` or `ROAX_NODE_MODULES`, `validate_schemas.mjs` emits no verdict at all and exits 2, which `run.sh` reports as step 4 NOT RUN rather than as a lower count; with one it emits 112 verdict lines - the corpus file, the four corpus type maps, the 69 envelope fixtures and its 38 conditional probes - and exits 0.
 
 `build_corpus.py --check` and `check_corpus.mjs` use the same three-way status.
 In particular, each exits 2 when the committed external record vectors were not checked.
@@ -130,6 +130,7 @@ The procedure per class:
 | `typeMap` | Resolving `segments` at `jsonKind` against `type-maps/<recordType>.json` yields `expectTag`, or fails closed when `expectFailClosed`. |
 | `normalization` | Build a root over `recordFileNFD` and over `recordFileNFC`, both under the ONE salt set `saltsFile` names, so any difference between the two roots is normalization and nothing else. The two agree iff `expectSameRoot`, and the root equals `root`. |
 | `envelope` | Verifying `envelopeFile` returns `expectAccept`, **and rejects for `reason`**. The reason is not decoration here: several fixtures are rejectable for more than one cause, so a boolean alone would pass an implementation that never ran the check the vector is about. `guard-reject-reserved-collision` is the clearest case - the record it carries cannot be hashed at all, so its envelope holds a placeholder root, and an implementation that skips the reserved-namespace guard rejects it on `root-mismatch` and looks correct. |
+| `ordering` | Commit `recordFile` TWICE under the one salt set `saltsFile` names, once per key of `orderings`, and for each side reproduce its `leafCount`, its `root`, its `leafHashes` in TREE order and its `displayPaths` in TREE order. Then assert across the two sides: the roots DIFFER, and the two leaf-hash sets are **disjoint**. Disjointness is the stronger assertion and is what section 9.5's H1 buys - a runner checking only the roots would pass an implementation that permuted one leaf set into the other tree. The `hash` side carries one more leaf than the `path` side, because a non-default ordering also commits `roax.ordering` (specification section 11.2). |
 
 ### Input escape forms
 
@@ -202,6 +203,40 @@ Counts are vectors in the file, measured by `build_corpus.py --report`.
 | 18 outside-the-root authority | 6 | **partial - the identity rows and the two type-map binding rows; the registry rows are a named gap** |
 | 19 NFC end to end, with a root | 2 | complete - both the value site and the key site, the latter buildable since decision D14 was ruled D14a |
 | 20 issue-then-verify round trip | 2 | complete. The only class that runs an implementation against its own PRODUCED envelope - see below |
+| 21 leaf ordering | 3 | complete. One record under BOTH orderings, asserting two roots that differ and two disjoint leaf-hash sets - see below |
+
+### A build without `--references` carries the class-10 vectors forward, and says so
+
+**Before this, `python3 corpus/tools/build_corpus.py` with no reference checkout wrote a corpus with the four class-10 vectors DELETED.**
+Anyone rebuilding for an unrelated reason silently removed the only end-to-end coverage of a real national profile, and the diff looked like an ordinary regeneration.
+They are now carried forward verbatim and the operator is told, by name, that they were not recomputed.
+
+> **The trade this makes, stated rather than left to be found.**
+> The carry-forward reads the file it is about to write, so under `--check` those four vectors are compared against themselves.
+> That inverts the rule `corpus/tools/synthetic_records.py` states for record fixtures - "reading the file would make a hand-edited fixture agree with itself, which is what check mode exists to catch" - and it is accepted here only because the alternative is deleting committed evidence.
+> The run prints the note in BOTH modes and still exits 2, so the self-agreement is disclosed rather than hidden, and a canonicalization change is validated only by a build with `--references`.
+
+### Class 21 is what stops the second leaf ordering existing only in prose
+
+**Specification section 9 made leaf ordering a per-record choice on 2026-08-02, under the amended decision D5.**
+Every other class in this file runs under `path` ordering and would run identically if `hash` ordering had been specified and never implemented.
+
+Each of the three vectors carries one record, one salt set and one identity, and asserts what that record commits under BOTH orderings.
+The two cross-ordering assertions are the load-bearing ones: the roots differ, and the two leaf-hash sets are **disjoint**, which is stronger.
+Disjointness is what proves the difference is not a permutation of one leaf set into another tree, and it holds because the ordering sits inside `DOMAIN` and therefore inside every leaf preimage (specification section 9.5, H1).
+
+**One salt set serves both sides deliberately.**
+It is drawn over the hash-ordered leaf set, which is a superset because that side also emits the conditional `roax.ordering` leaf.
+Two salt sets would make the roots differ for a reason that has nothing to do with ordering, which is the confounding the class exists to exclude.
+
+**What building it found, in a library that had passed 501 vectors.**
+Kotlin's `commitWithSaltsByPath` learns the leaf order from a placeholder-salt pass and then consumes real salts positionally.
+Once `commit` returned TREE order, that placeholder pass gave a hash order computed over placeholder salts, so every real salt would have paired with the wrong leaf and produced a plausible wrong root rather than an error.
+Under `path` ordering the re-sort that fixes it is the identity, which is exactly why no vector could see it before this class existed.
+
+**The corpus grew by 3 vectors and not one committed expected value moved.**
+`path` ordering contributes the empty domain suffix and emits no ordering leaf, so the amendment is additive by construction: 501 vectors to 504, with 174 existing vectors gaining a declared `ordering` field and nothing recomputed.
+That is what makes `corpusVersion` a MINOR bump to 1.2.0 rather than a major one.
 
 ### Classes 14, 18 and 20 grew because two blind spots were proven rather than argued
 
@@ -323,7 +358,7 @@ Two consequences an implementer needs, and unlike step 3 both ARE observable in 
 
 `profile-unknown` is unaffected and still fires on the outer `recordType` before any of this.
 It is the verifier's own allow-list - the same shape as the `hashAlg` allow-list of section 7.4 H3 - and settles whether this verifier can proceed at all rather than which policy to apply.
-`roax.issuer.keyId` is deliberately not bound, being the one conditional leaf.
+`roax.issuer.keyId` is deliberately not bound, being a conditional leaf (specification section 11.2).
 
 ### Class 13 is partial
 

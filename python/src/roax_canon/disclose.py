@@ -20,10 +20,16 @@ before building the copy.
 Passing ``profile=None`` is reserved for negative fixtures and can produce a copy that
 the verifier rejects.
 
-This module emits envelope 1.0 only.
-Envelope 2.0 requires exact structured-path DFA selection by a reproduced content ID
-under specification section 4.2, so selecting :data:`roax_canon.record.RESERVED_V2`
-rejects until that artifact-aware implementation exists.
+**Both reserved leaf sets are emittable here.**
+Emission needs no artifact: an issuer knows which one it used and supplies its content ID, so
+committing ``roax.typeMap.id`` fetches and reproduces nothing.
+Conformance corpus class 20 drives both emitters below under
+:data:`roax_canon.record.RESERVED_V2`; :func:`_require_emittable_reserved_set` records why the
+refusal that used to sit there was a defect.
+
+Reproducing a content ID from fetched bytes is a VERIFIER's obligation under specification
+section 10 and is still unimplemented; `README.md` owns that limit under "What is deliberately
+not built".
 """
 
 from __future__ import annotations
@@ -32,7 +38,7 @@ from typing import Any, Mapping, Sequence
 
 from .errors import ErrorCode, RoaxError
 from .hashes import get_hash
-from .leaf import CANON
+from .leaf import CANON, DEFAULT_ORDERING, check_ordering
 from .numbers import canonical_decimal, canonical_integer
 from .path import Segment, display_path, encode_path, segments_to_json
 from .profiles import Profile
@@ -60,9 +66,23 @@ def _require_emittable_reserved_set(reserved_set: str) -> None:
 
 def _envelope_head(built: BuiltRecord) -> dict[str, Any]:
     identity = built.identity
+    ordering = check_ordering(identity.ordering)
     head: dict[str, Any] = {
         "canon": CANON,
         "hashAlg": built.hash_alg,
+        # SELF-DESCRIPTION, and NOT AUTHORITY. A verifier takes the ordering from the
+        # anchoring registry (specification section 9.5, H2); this package's own verifier
+        # accepts the member for shape and never reads it, and nothing here reads it back.
+        #
+        # Emitted only for a NON-DEFAULT ordering, so a path-ordered envelope stays
+        # byte-identical to what this package issued before the axis existed - the same
+        # ROAX-CANON/1 compatibility rule that gives `path` the empty domain suffix.
+        # Omitting it on a `hash`-ordered copy would not be silence: both envelope schemas
+        # define the member's ABSENCE as meaning `path`, so such a copy would ASSERT an
+        # ordering it was not issued under. A self-description that lies is worse than none
+        # even where nothing reads it, which is the reasoning section 7.4 used to reject a
+        # `roax.hashAlg` reserved leaf.
+        **({"ordering": ordering} if ordering != DEFAULT_ORDERING else {}),
         "recordType": identity.record_type,
         "schemaVersion": identity.schema_version,
         "recordId": identity.record_id,

@@ -96,6 +96,7 @@ const V = corpus.vectors;
 const CONSUMED_GROUPS = [
   "encodePath", "encodeValue", "reject", "leaf", "tree", "inclusion", "negativeProof",
   "typeMap", "record", "unlinkability", "normalization", "envelope", "roundTrip",
+  "ordering",
 ];
 {
   const unconsumed = Object.keys(V).filter((name) => !CONSUMED_GROUPS.includes(name));
@@ -361,9 +362,56 @@ function runReject(v) {
   ref.encodeValue(v.tag, resolved);
 }
 
+// Every vector in an ordering-sensitive group DECLARES the ordering it was computed under
+// (spec section 9), and this runner ASSERTS that declaration rather than tolerating it.
+//
+// Tolerating it is the group-guard defect wearing a smaller hat: an unknown field inside a group
+// a runner already consumes passes silently, so a `hash`-ordered vector added to one of these
+// groups would be computed as `path` and reported green. Reading it here means the runner cannot
+// be wrong about which ordering a vector asserts without saying so.
+function declaredOrdering(v) {
+  if (v.ordering === undefined) {
+    throw new Error(`corpus defect: ${v.name} is in an ordering-sensitive group and declares no `
+      + `ordering; spec section 9 requires the ordering to be explicit`);
+  }
+  return ref.checkOrdering(v.ordering);
+}
+
+// The groups whose expected values depend on the leaf ordering, and the ones this runner actually
+// THREADS the declaration through. Held apart deliberately, because the difference is the whole
+// point of the check below: a group that is ordering-sensitive but not threaded would compute a
+// `hash`-ordered vector as `path` and report green, which is the quiet-skip defect one loop down
+// from the group guard.
+const ORDERING_SENSITIVE_GROUPS = [
+  "leaf", "record", "unlinkability", "normalization", "envelope", "roundTrip",
+];
+const ORDERING_THREADED_GROUPS = new Set(["leaf", "record"]);
+
+// Every ordering-sensitive vector is checked, not only the ones in a threaded group. A vector that
+// declares nothing is a corpus defect; one that declares an ordering its group is not computed
+// under fails CLOSED here rather than being computed under the wrong one.
+{
+  for (const group of ORDERING_SENSITIVE_GROUPS) {
+    for (const v of V[group] ?? []) {
+      const ordering = declaredOrdering(v);
+      if (ordering !== ref.ORDERING.path && !ORDERING_THREADED_GROUPS.has(group)) {
+        console.error(`FAILED: ${group} vector ${v.name} declares ordering ${ordering}, but this `
+          + `runner computes the ${group} group under ${ref.ORDERING.path} only.`);
+        console.error("  Thread the declaration through that loop before adding such a vector; "
+          + "computing it under the default would report a green it did not earn.");
+        process.exit(1);
+      }
+    }
+  }
+}
+
 for (const v of V.leaf ?? []) {
   const value = "value" in v ? v.value : null;
-  const h = ref.leafHash(HASH_ALG, v.segments, v.tag, value, Buffer.from(v.saltHex, "hex"));
+  // The ordering reaches a LEAF through DOMAIN (spec section 9.5, H1), so a leaf vector is
+  // ordering-sensitive even though it carries no tree at all.
+  const h = ref.leafHash(
+    HASH_ALG, v.segments, v.tag, value, Buffer.from(v.saltHex, "hex"), declaredOrdering(v),
+  );
   check(v, "leafHash", h.toString("hex"), v.leafHash);
 }
 
@@ -472,6 +520,7 @@ for (const v of V.record ?? []) {
     recordId: v.recordId,
     issuerId: v.issuerId,
     issuerKeyId: v.issuerKeyId,
+    ordering: declaredOrdering(v),
   };
   // Under decision D4b a salt is an independent random draw that nothing can re-derive
   // (spec section 7), so the salts come from the committed set the vector names. The pairing
@@ -828,11 +877,62 @@ for (const v of V.roundTrip ?? []) {
   }
 }
 
+// Class 21. One record issued under BOTH leaf orderings (spec section 9).
+//
+// The vector carries both roots, both leaf-hash sequences in TREE order and both leaf counts, so
+// a runner cannot pass this class by computing one ordering and ignoring the other. The
+// cross-ordering assertions below are the ones that would still catch an implementation that
+// reproduced both roots by accident: the two leaf-hash SETS must be disjoint, because the
+// ordering is inside DOMAIN and therefore inside every leaf preimage (section 9.5, H1), and the
+// `roax.ordering` leaf must appear under `hash` and only under `hash` (section 11.2).
+for (const v of V.ordering ?? []) {
+  const map = typeMaps[v.recordType];
+  if (map === undefined) {
+    throw new Error(`corpus defect: ordering ${v.name} names missing type map ${v.recordType}`);
+  }
+  const record = parseRecord(fs.readFileSync(path.join(REPO_ROOT, v.recordFile), "utf8"));
+  const saltDoc = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, v.saltsFile), "utf8"));
+  if (saltDoc.pairing !== v.saltPairing) {
+    throw new Error(`corpus defect: ordering ${v.name} declares saltPairing ${v.saltPairing}, `
+      + `but ${v.saltsFile} declares ${saltDoc.pairing}`);
+  }
+
+  const seen = {};
+  for (const ordering of Object.keys(v.orderings)) {
+    const identity = {
+      recordType: v.recordType,
+      schemaVersion: v.schemaVersion,
+      recordId: v.recordId,
+      issuerId: v.issuerId,
+      issuerKeyId: v.issuerKeyId,
+      ordering: ref.checkOrdering(ordering),
+    };
+    // Salts are assigned in encodePath order under BOTH orderings (spec section 9), which is
+    // what `orderedLeaves` returns; one committed set therefore serves both sides.
+    const assigned = ref.orderedLeaves(record, map, identity);
+    const salts = ref.saltSetFromDocument(saltDoc, assigned);
+    const { root, leaves, hashes } = ref.buildTree(HASH_ALG, record, map, salts, identity);
+    const expected = v.orderings[ordering];
+    check(v, `${ordering} leafCount`, leaves.length, expected.leafCount);
+    check(v, `${ordering} root`, root.toString("hex"), expected.root);
+    check(v, `${ordering} leafHashes`, hashes.map((h) => h.toString("hex")), expected.leafHashes);
+    check(v, `${ordering} displayPaths`,
+      leaves.map((leaf) => ref.displayPath(leaf.segments)), expected.displayPaths);
+    seen[ordering] = { root: root.toString("hex"), hashes: hashes.map((h) => h.toString("hex")) };
+  }
+
+  if (seen.path && seen.hash) {
+    check(v, "roots differ", seen.path.root !== seen.hash.root, true);
+    const overlap = seen.path.hashes.filter((h) => seen.hash.hashes.includes(h));
+    check(v, "leaf hashes disjoint across orderings", overlap, []);
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Reporting
 // ---------------------------------------------------------------------------------------------
 
-const CLASS_COUNT = 20;
+const CLASS_COUNT = 21;
 const byClass = new Map();
 for (const r of results) {
   const bucket = byClass.get(r.cls) ?? { pass: 0, fail: 0, failures: [] };
@@ -909,6 +1009,18 @@ if (EMIT) {
     else put(v, "expectFailClosed");
   }
   for (const v of out.vectors.record ?? []) { put(v, "leafCount"); put(v, "root"); }
+  // Class 21 writes back per SIDE, because each vector carries two of every derived value.
+  // Without this the class-21 fields would be copied through from the input and step 3's
+  // "byte-identical" verdict would over-credit itself over values this run never recomputed.
+  for (const v of out.vectors.ordering ?? []) {
+    for (const ordering of Object.keys(v.orderings ?? {})) {
+      const side = v.orderings[ordering];
+      for (const field of ["leafCount", "root", "leafHashes", "displayPaths"]) {
+        const got = byName.get(`${v.name} ${ordering} ${field}`);
+        if (got !== undefined) side[field] = got;
+      }
+    }
+  }
   // Class 12 and class 19 are absent from this list deliberately. Class 12 derives nothing to
   // write back, and class 19's root is asserted above rather than recomputed into the file.
   for (const v of out.vectors.envelope ?? []) { put(v, "expectAccept"); put(v, "reason"); }

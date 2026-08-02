@@ -1,8 +1,8 @@
 use roax_canon::{
     disclose, fold_inclusion_proof_untrusted, issue_full_copy, merkle_tree_hash, parse_envelope,
     verify_disclosed, CommitmentContext, Disclosure, Error, Hash, HashAlgorithm, Issuer, JsonKind,
-    JsonValue, Path, Profile, ReservedLeafSet, SchemaValidator, TypeResolver, TypeTag,
-    VerificationPolicy,
+    JsonValue, Ordering, Path, Profile, ReservedLeafSet, SchemaValidator, Segment, TypeResolver,
+    TypeTag, VerificationPolicy,
 };
 
 #[derive(Debug)]
@@ -97,6 +97,7 @@ fn context() -> CommitmentContext {
             id: "did:example:issuer".into(),
             key_id: None,
         },
+        ordering: Ordering::default(),
     }
 }
 
@@ -175,6 +176,7 @@ fn untrusted_fold_accepts_the_documented_forged_size_but_disclosure_does_not() {
         VerificationPolicy {
             anchored_root: root,
             anchored_hash_algorithm: HashAlgorithm::Sha256,
+            anchored_ordering: Ordering::default(),
         },
     )
     .expect_err("the safe boundary must recompute the leaf hash");
@@ -195,6 +197,7 @@ fn disclosed_record_paths_cannot_enter_any_reserved_subtree() {
                 VerificationPolicy {
                     anchored_root: [0; 32],
                     anchored_hash_algorithm: HashAlgorithm::Sha256,
+                    anchored_ordering: Ordering::default(),
                 },
             ),
             Err(Error::ReservedNamespaceCollision)
@@ -306,10 +309,75 @@ fn profile_floor_cannot_promote_a_reserved_leaf() {
             VerificationPolicy {
                 anchored_root: commitment.root(),
                 anchored_hash_algorithm: HashAlgorithm::Sha256,
+                anchored_ordering: Ordering::default(),
             },
         ),
         Err(Error::ReservedNamespaceCollision)
     );
+}
+
+/// A `hash`-ordered disclosure verifies only under the registry that names that ordering.
+///
+/// Pinned HERE because no corpus vector reaches it: every class-20 round-trip vector is
+/// path-ordered, so nothing in the corpus asks a library to issue a `hash`-ordered copy and then
+/// verify it. That is the surface on which the TypeScript library was found issuing an envelope
+/// its own verifier refused, which is exactly what conformance corpus class 20 exists to catch.
+#[test]
+fn ordering_comes_from_the_registry_and_a_disagreeing_one_is_refused() {
+    let record = JsonValue::from_slice(br#"{"x":"value"}"#).expect("record");
+    for issued in [Ordering::Path, Ordering::Hash] {
+        let mut issued_context = context();
+        issued_context.ordering = issued;
+        let (full, commitment) =
+            issue_full_copy(&record, &issued_context, &StringProfile).expect("commitment");
+
+        // The outer member is SELF-DESCRIPTION and is asserted here because no verifier reads it,
+        // so nothing else in this suite can see it go missing. Both envelope schemas define its
+        // ABSENCE as meaning `path`, so a hash-ordered copy without it would assert an ordering
+        // it was not issued under.
+        let full_json = full.to_json_value();
+        let JsonValue::Object(ref members) = full_json else {
+            panic!("a full copy is a JSON object");
+        };
+        let declared = members.iter().find(|(name, _)| name == "ordering");
+        match issued {
+            Ordering::Path => assert!(declared.is_none(), "a path-ordered copy emits no member"),
+            Ordering::Hash => assert_eq!(
+                declared.map(|(_, value)| value),
+                Some(&JsonValue::String("hash".into())),
+            ),
+        }
+
+        // Specification section 11.2: the ordering leaf is committed for `hash` and for nothing
+        // else, so the two orderings differ in leaf COUNT as well as in placement.
+        let has_ordering_leaf = commitment
+            .leaves()
+            .iter()
+            .any(|leaf| leaf.path().segments() == [Segment::Key("roax.ordering".into())]);
+        assert_eq!(has_ordering_leaf, issued == Ordering::Hash);
+
+        let disclosure = disclose(&commitment, &StringProfile, &[]).expect("disclosure");
+        // H2: the ordering comes from the anchoring registry. BOTH answers are exercised, so the
+        // refusal of the wrong one is evidence rather than an untested branch (section 9.5).
+        for registry_says in [Ordering::Path, Ordering::Hash] {
+            let outcome = verify_disclosed(
+                &disclosure,
+                &StringProfile,
+                VerificationPolicy {
+                    anchored_root: commitment.root(),
+                    anchored_hash_algorithm: HashAlgorithm::Sha256,
+                    anchored_ordering: registry_says,
+                },
+            );
+            assert_eq!(
+                outcome.is_ok(),
+                registry_says == issued,
+                "issued {}, registry {}",
+                issued.name(),
+                registry_says.name(),
+            );
+        }
+    }
 }
 
 #[test]

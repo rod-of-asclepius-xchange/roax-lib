@@ -45,6 +45,8 @@ from roax_canon import (  # noqa: E402
     VerifierConfig,
     audit_path,
     build_tree,
+    DEFAULT_ORDERING,
+    check_ordering,
     display_path,
     draw_salt,
     encode_path,
@@ -69,7 +71,7 @@ from ts_sample import load_export  # noqa: E402
 REPO = os.path.dirname(os.path.dirname(_HERE))
 CORPUS = os.path.join(REPO, "corpus", "conformance-corpus-1.0.json")
 TYPE_MAP_DIR = os.path.join(REPO, "corpus", "type-maps")
-EXPECTED_CLASSES = tuple(range(1, 21))
+EXPECTED_CLASSES = tuple(range(1, 22))
 REFERENCES_INSTRUCTION = "rerun with --references /path/to/schemata"
 
 # Every vector group this runner consumes. A group present in the corpus file and absent from
@@ -90,6 +92,7 @@ CONSUMED_GROUPS = (
     "normalization",
     "envelope",
     "roundTrip",
+    "ordering",
 )
 
 
@@ -310,11 +313,67 @@ def run_reject(vectors, maps, r: Results) -> None:
         r.bad(cls, name, f"accepted; expected rejection {expected!r}")
 
 
+def declared_ordering(vector) -> str:
+    """The ordering a vector DECLARES, asserted rather than tolerated (spec section 9).
+
+    Tolerating it would be the group guard's defect one level down: an unknown field inside a
+    group this runner already consumes passes silently, so a `hash`-ordered vector added to an
+    ordering-sensitive group would be computed as `path` and reported green.
+    """
+    ordering = vector.get("ordering")
+    if ordering is None:
+        raise ValueError(
+            f"{vector['name']} is in an ordering-sensitive group and declares no ordering; "
+            f"specification section 9 requires the ordering to be explicit"
+        )
+    return check_ordering(ordering)
+
+
+#: The groups whose expected values depend on the leaf ordering, and the ones this runner actually
+#: THREADS the declaration through. Held apart deliberately: a group that is ordering-sensitive but
+#: not threaded would compute a ``hash``-ordered vector as ``path`` and report green, which is the
+#: quiet-skip defect one loop down from the group guard.
+ORDERING_SENSITIVE_GROUPS = (
+    "leaf",
+    "record",
+    "unlinkability",
+    "normalization",
+    "envelope",
+    "roundTrip",
+)
+ORDERING_THREADED_GROUPS = frozenset({"leaf", "record"})
+
+
+def check_declared_orderings_supported(vectors) -> str | None:
+    """Check EVERY ordering-sensitive vector, not only the ones in a threaded group.
+
+    A vector declaring nothing is a corpus defect. One declaring an ordering its group is not
+    computed under fails CLOSED here rather than being computed under the default.
+    """
+    for group in ORDERING_SENSITIVE_GROUPS:
+        for v in vectors.get(group, []):
+            ordering = declared_ordering(v)
+            if ordering != DEFAULT_ORDERING and group not in ORDERING_THREADED_GROUPS:
+                return (
+                    f"{group} vector {v['name']} declares ordering {ordering}, but this runner "
+                    f"computes the {group} group under {DEFAULT_ORDERING} only. Thread the "
+                    f"declaration through that loop before adding such a vector; computing it "
+                    f"under the default would report a green it did not earn."
+                )
+    return None
+
+
 def run_leaf(vectors, r: Results) -> None:
     for x in vectors:
         segs = segments_from_json(x["segments"])
+        # A leaf vector is ordering-sensitive even though it carries no tree: the ordering
+        # reaches the preimage through DOMAIN (specification section 9.5, H1).
         got = leaf_hash(
-            segs, x["tag"], carrier(x["tag"], x.get("value")), bytes.fromhex(x["saltHex"])
+            segs,
+            x["tag"],
+            carrier(x["tag"], x.get("value")),
+            bytes.fromhex(x["saltHex"]),
+            ordering=declared_ordering(x),
         ).hex()
         r.check(x["class"], x["name"], got, x["leafHash"])
 
@@ -481,6 +540,7 @@ def run_record(vectors, maps, r: Results, references, authorize_empty) -> None:
             issuer_id=x["issuerId"],
             issuer_key_id=x.get("issuerKeyId"),
             type_map_id=x.get("typeMapId"),
+            ordering=declared_ordering(x),
         )
         salts_path = os.path.join(REPO, x["saltsFile"])
         try:
@@ -702,6 +762,73 @@ def _reserved_set(vector) -> str:
     return RESERVED_V2 if vector.get("typeMapId") else RESERVED_V1
 
 
+def run_ordering(vectors, maps, r: Results, authorize_empty) -> None:
+    """Class 21. One record issued under BOTH leaf orderings (specification section 9).
+
+    The vector carries both roots, both leaf-hash sequences in TREE order and both leaf
+    counts, so this class cannot be passed by computing one ordering. The cross-ordering
+    assertions are what would still catch an implementation reproducing both roots by
+    accident: the two leaf-hash SETS must be disjoint, because the ordering is inside DOMAIN
+    and therefore inside every leaf preimage (section 9.5, H1).
+    """
+    for x in vectors:
+        cls, name = x["class"], x["name"]
+        try:
+            record = load_file(os.path.join(REPO, x["recordFile"]))
+        except OSError as exc:
+            r.bad(cls, name, f"record fixture unreadable: {exc}")
+            continue
+        # ONE salt set serves both sides: salts are assigned in encodePath order under BOTH
+        # orderings (specification section 9), and the committed set is drawn over the
+        # hash-ordered superset, which also carries the roax.ordering leaf.
+        try:
+            by_path = salts_by_path(os.path.join(REPO, x["saltsFile"]))
+        except (OSError, KeyError, TypeError, ValueError, RoaxError) as exc:
+            r.bad(cls, name, f"invalid committed salt set: {type(exc).__name__}: {exc}")
+            continue
+
+        seen: dict[str, tuple[str, list[str]]] = {}
+        for ordering, expected in x["orderings"].items():
+            identity = RecordIdentity(
+                record_type=x["recordType"],
+                schema_version=x["schemaVersion"],
+                record_id=x["recordId"],
+                issuer_id=x["issuerId"],
+                issuer_key_id=x.get("issuerKeyId"),
+                type_map_id=x.get("typeMapId"),
+                ordering=check_ordering(ordering),
+            )
+            try:
+                built = build_tree(
+                    record,
+                    identity,
+                    maps(x["recordType"]),
+                    MappingSalts(by_path),
+                    reserved_set=_reserved_set(x),
+                    authorize_empty_containers=authorize_empty,
+                )
+            except RoaxError as exc:
+                r.bad(cls, name, f"{ordering}: rejected with {exc.code}: {exc.detail}")
+                break
+            hashes = [h.hex() for h in built.leaf_hashes]
+            r.check(cls, name, built.leaf_count, expected["leafCount"], f"{ordering} leafCount: ")
+            r.check(cls, name, built.root.hex(), expected["root"], f"{ordering} root: ")
+            r.check(cls, name, hashes, expected["leafHashes"], f"{ordering} leafHashes: ")
+            r.check(
+                cls,
+                name,
+                [display_path(leaf.path) for leaf in built.leaves],
+                expected["displayPaths"],
+                f"{ordering} displayPaths: ",
+            )
+            seen[ordering] = (built.root.hex(), hashes)
+        else:
+            if "path" in seen and "hash" in seen:
+                r.check(cls, name, seen["path"][0] != seen["hash"][0], True, "roots differ: ")
+                overlap = sorted(set(seen["path"][1]) & set(seen["hash"][1]))
+                r.check(cls, name, overlap, [], "leaf hashes disjoint: ")
+
+
 def run_unlinkability(vectors, r: Results) -> None:
     """Behavioural: draw with THIS implementation's generator and assert the relations.
 
@@ -855,6 +982,11 @@ def main() -> int:
         print("  A group read as absent would report the same green as before it existed.")
         return 1
 
+    unsupported = check_declared_orderings_supported(vectors)
+    if unsupported is not None:
+        print(f"FAILED: {unsupported}")
+        return 1
+
     print("ROAX-CANON/1 conformance corpus, Python implementation")
     print(
         f"  corpus            {corpus['corpusVersion']}  canon {corpus['canon']}"
@@ -927,6 +1059,7 @@ def main() -> int:
     run_negative_proof(vectors.get("negativeProof", []), r)
     run_type_map(vectors.get("typeMap", []), maps, r)
     run_record(vectors.get("record", []), maps, r, references, authorize_empty)
+    run_ordering(vectors.get("ordering", []), maps, r, authorize_empty)
     run_unlinkability(vectors.get("unlinkability", []), r)
     run_normalization(vectors.get("normalization", []), maps, r, authorize_empty)
     run_envelope(vectors.get("envelope", []), config, r)

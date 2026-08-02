@@ -84,7 +84,7 @@ class RunnerStatusTests(unittest.TestCase):
             )
             self.assertIn(
                 "RESULT: INCOMPLETE / NOT RUN "
-                "(785 assertions passed; 4 not run; 19/20 classes passed)",
+                "(815 assertions passed; 4 not run; 20/21 classes passed)",
                 result.stdout,
             )
             self.assertNotIn("RESULT: PASS", result.stdout)
@@ -126,7 +126,7 @@ class RunnerStatusTests(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "RESULT: FAIL " "(785 passed; 4 failed; 0 not run; 19/20 classes passed)",
+                "RESULT: FAIL " "(815 passed; 4 failed; 0 not run; 20/21 classes passed)",
                 result.stdout,
             )
             self.assertNotIn("Traceback", result.stdout + result.stderr)
@@ -241,6 +241,7 @@ class RunnerStatusTests(unittest.TestCase):
                     "recordFile": os.path.relpath(record_file, run_corpus.REPO),
                     "saltsFile": os.path.relpath(salts_file, run_corpus.REPO),
                     "saltPairing": "path",
+                    "ordering": "path",
                     "leafCount": 0,
                     "root": "0" * 64,
                 }
@@ -274,6 +275,7 @@ class RunnerStatusTests(unittest.TestCase):
                 "recordFile": "record.json",
                 "saltsFile": "salts.json",
                 "saltPairing": "positional",
+                "ordering": "path",
                 "recordType": "org.roax.corpus.synthetic",
                 "schemaVersion": "1.0",
                 "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",
@@ -309,6 +311,7 @@ class RunnerStatusTests(unittest.TestCase):
                 "recordFile": "record.json",
                 "saltsFile": "salts.json",
                 "saltPairing": "guess",
+                "ordering": "path",
                 "recordType": "org.roax.corpus.synthetic",
                 "schemaVersion": "1.0",
                 "recordId": "urn:uuid:11111111-1111-4111-8111-111111111111",

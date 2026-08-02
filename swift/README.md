@@ -10,12 +10,12 @@ A library produced by reading an existing one passes the corpus while destroying
 
 ## Status
 
-**501 of 501 committed corpus vectors pass**, with class 10 run against the pinned reference checkout.
+**504 of 504 committed corpus vectors pass**, with class 10 run against the pinned reference checkout.
 
 | Measure | Result |
 |---|---|
-| Corpus vectors | 501 pass, 0 fail, 0 NOT RUN with a reference checkout. The runner prints 503 outcomes, because each class-20 vector asserts on both copy kinds |
-| Unit and gap tests | 38 pass |
+| Corpus vectors | 504 pass, 0 fail, 0 NOT RUN with a reference checkout. The runner prints more outcomes than vectors, because each class-20 vector asserts on both copy kinds and each class-21 vector asserts on both leaf orderings |
+| Unit and gap tests | 39 pass |
 | Vaccination sample | commits at 91 leaves without an issuer key identifier, 92 with one |
 | Recovery sample | commits at 69 leaves without an issuer key identifier, 70 with one |
 | Runtime dependencies | none; CryptoKit where it exists, and an in-tree SHA-256 otherwise |
@@ -89,6 +89,7 @@ Inside `ROAXCanon`, the pieces that carry a protocol boundary:
 | `Base64.swift` | The RFC 4648 section 4 form pinned by specification section 6.3, as an input-admissibility condition. |
 | `Path.swift` | `encodePath`, the display form that is never hashed, and the reserved-namespace guard. |
 | `TypeMap.swift` | The resolver seam, and the superseded display-pattern matcher the corpus is expressed in. |
+| `Ordering.swift` | The two leaf orderings of specification section 9 and the domain suffix each contributes to `DOMAIN`. `path` is the default and contributes the EMPTY suffix; section 9.5 argues that asymmetry as a compatibility rule, so read the suffix from here rather than deriving it from the case name. |
 | `Commitment.swift` | Flattening, the reserved-leaf union, the section 9 sort and issuance. |
 | `Envelope.swift` | Both copy kinds, the outer-identity binding and the minimum-disclosure floor, in the order section 11.3 derives. |
 | `MerkleTree.swift` | RFC 9162 with the section 9.1 adaptation, over already-hashed leaves. |

@@ -125,8 +125,14 @@ public extension Envelope {
         // `additionalProperties: false` so that no seed field can be added by an
         // issuer (specification section 7.3, rule 3). That closure is enforced
         // here rather than left to a schema validator this package does not ship.
+        //
+        // `ordering` is ACCEPTED FOR SHAPE AND DELIBERATELY NOT READ. Both
+        // envelope schemas permit it, so rejecting it would refuse a conforming
+        // envelope; using it would violate specification section 9.5 H2, which
+        // requires a verifier to take the leaf ordering from the anchoring
+        // registry and never from the envelope.
         let known: Set<String> = [
-            "canon", "hashAlg", "recordType", "schemaVersion", "recordId",
+            "canon", "hashAlg", "ordering", "recordType", "schemaVersion", "recordId",
             "typeMap", "root", "leafCount", "issuer", "anchor",
             "disclosure", "record", "salts",
         ]
@@ -340,19 +346,39 @@ public struct EnvelopeVerifier<H: ROAXHash> {
     public let resolver: TypeResolver?
     public let emptyContainerPolicy: EmptyContainerPolicy
     public let typeMapBinding: TypeMapBindingPolicy
+    /// The leaf ordering **as the anchoring registry reports it** (section 9.5, H2).
+    ///
+    /// This is the ONLY source of the ordering on the verification path. The
+    /// envelope's own `ordering` member is accepted for shape and never read,
+    /// and the committed `roax.ordering` leaf is committed issuer intent rather
+    /// than authority (section 11.2): both are supplied by the party the check
+    /// constrains.
+    ///
+    /// Defaults to `.path`, the specification's default and the same default in
+    /// all five libraries. A verifier accepting `hash`-ordered records MUST set
+    /// this from its registry, which is also H3 at its narrowest: an ordering
+    /// this verifier is not configured for is refused rather than followed.
+    ///
+    /// Stated as honestly as section 7.4 states H2 for `hashAlg`: the anchoring
+    /// registry is a requirement HANDED FORWARD rather than a mechanism the
+    /// specification designs (section 2.2), so what this models today is the
+    /// verifier's own configured expectation.
+    public let anchoredOrdering: Ordering
 
     public init(
         registry: ProfileRegistry = .versionOne,
         allowList: HashAlgorithmAllowList = .versionOneDefault,
         resolver: TypeResolver? = nil,
         emptyContainerPolicy: EmptyContainerPolicy = .mapAuthorized,
-        typeMapBinding: TypeMapBindingPolicy = .boundWhenPresent
+        typeMapBinding: TypeMapBindingPolicy = .boundWhenPresent,
+        anchoredOrdering: Ordering = .path
     ) {
         self.registry = registry
         self.allowList = allowList
         self.resolver = resolver
         self.emptyContainerPolicy = emptyContainerPolicy
         self.typeMapBinding = typeMapBinding
+        self.anchoredOrdering = anchoredOrdering
     }
 
     public func verify(_ envelope: Envelope) throws {
@@ -430,10 +456,23 @@ public struct EnvelopeVerifier<H: ROAXHash> {
             throw ROAXError.typeMapInvalid("a full copy needs a type map to flatten its record")
         }
         let committer = Committer<H>(resolver: resolver, emptyContainerPolicy: emptyContainerPolicy)
+        // A FULL copy is the case that needs the ordering structurally: this
+        // rebuilds the whole tree, so the ordering decides both leaf placement
+        // and every leaf preimage through DOMAIN. It comes from the registry and
+        // never from the envelope (section 9.5, H2).
+        let rebuildIdentity = RecordIdentity(
+            recordType: envelope.identity.recordType,
+            schemaVersion: envelope.identity.schemaVersion,
+            recordId: envelope.identity.recordId,
+            issuerId: envelope.identity.issuerId,
+            issuerKeyId: envelope.identity.issuerKeyId,
+            typeMapId: envelope.identity.typeMapId,
+            ordering: anchoredOrdering
+        )
         let commitment = try committer.commit(
             record: record,
             salts: .byEncodedPath(table),
-            context: CommitmentContext(identity: envelope.identity, hashAlg: envelope.hashAlg)
+            context: CommitmentContext(identity: rebuildIdentity, hashAlg: envelope.hashAlg)
         )
 
         // Specification section 11.1: in a full copy the verifier derives the
@@ -462,12 +501,16 @@ public struct EnvelopeVerifier<H: ROAXHash> {
         var committed = [String: String]()      // reserved key -> committed value
         for leaf in leaves {
             let encodedValue = try Self.encodeDisclosedValue(leaf: leaf)
+            // Section 10 step 2, and the ONE place a disclosed copy needs the
+            // ordering at all: for the LEAF PREIMAGE, exactly as `hashAlg`
+            // already is, and for nothing structural (section 9.6).
             let hash = try LeafConstruction.leafHash(
                 segments: leaf.segments,
                 tag: leaf.tag,
                 encodedValue: encodedValue,
                 salt: leaf.salt,
-                hash: H.self
+                hash: H.self,
+                ordering: anchoredOrdering
             )
             // Never accept a caller-supplied leaf hash. Section 11.1 measured
             // that an attacker who controls both a leaf hash and `leafCount` can
@@ -524,10 +567,10 @@ public struct EnvelopeVerifier<H: ROAXHash> {
         } else if typeMapBinding == .required {
             throw ROAXError.typeMapNotNamed
         }
-        // `roax.issuer.keyId` is deliberately NOT bound: it is the one
-        // conditional leaf and the one reserved leaf that is OPTIONAL to
-        // disclose, because requiring it would break key rotation on an
-        // already-anchored record (section 11.2).
+        // `roax.issuer.keyId` is deliberately NOT bound: it is one of the two
+        // conditional leaves and is OPTIONAL to disclose, because requiring it
+        // would break key rotation on an already-anchored record (section
+        // 11.2).
 
         // Step 3: select the floor from the COMMITTED recordType leaf.
         //

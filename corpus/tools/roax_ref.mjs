@@ -41,7 +41,24 @@ export const RESERVED = {
   recordId: "roax.recordId",
   issuerId: "roax.issuer.id",
   issuerKeyId: "roax.issuer.keyId",
+  ordering: "roax.ordering",
 };
+
+// Section 9. Leaf ordering: two first-class options selected per record, `path` the default.
+// The domain suffix is asymmetric deliberately and section 9.5 argues it as a ROAX-CANON/1
+// compatibility rule - `path` contributes "" so a path-ordered record's DOMAIN is byte-identical
+// to what the specification defined before this axis existed. Read the suffix from this table;
+// do not derive it from the name.
+export const ORDERING = { path: "path", hash: "hash" };
+export const ORDERING_DOMAIN_SUFFIX = { path: "", hash: "/hash" };
+
+// Fail closed on an unregistered ordering rather than falling back to one (section 9).
+export function checkOrdering(ordering) {
+  if (!Object.prototype.hasOwnProperty.call(ORDERING_DOMAIN_SUFFIX, ordering)) {
+    throw new RoaxError("ordering-not-defined", String(ordering));
+  }
+  return ordering;
+}
 // Section 10.2. roax.issuer.keyId is committed but OPTIONAL to disclose and is not in the floor.
 //
 // roax.typeMap.id IS mandatory to disclose (section 11.2) and is deliberately NOT listed here.
@@ -69,11 +86,13 @@ export class RoaxError extends Error {
 // Hash agility (sections 7.4, 8, 9)
 // -------------------------------------------------------------------------------------------
 
-export function domain(hashAlg) {
+// Sections 7 and 8. DOMAIN is algorithm-qualified AND ordering-qualified: "ROAX-CANON/1/" +
+// hashAlg + ORD, one string with one length prefix rather than two components.
+export function domain(hashAlg, ordering = ORDERING.path) {
   // Poseidon-BN254 is registered in the envelope schema, but ROAX-CANON/1 pins no field, rate,
   // capacity, round constants or byte-string-to-field-element encoding for it (section 7.4).
   if (hashAlg !== "SHA-256") throw new RoaxError("hash-alg-not-defined", hashAlg);
-  return Buffer.from(`${CANON}/${hashAlg}`, "ascii");
+  return Buffer.from(`${CANON}/${hashAlg}${ORDERING_DOMAIN_SUFFIX[checkOrdering(ordering)]}`, "ascii");
 }
 
 export function H(hashAlg, data) {
@@ -392,9 +411,11 @@ export function saltSetFromDocument(doc, ordered) {
 // Leaf construction (section 8)
 // -------------------------------------------------------------------------------------------
 
-export function leafHash(hashAlg, segments, tag, value, salt) {
+// Section 8. `ordering` reaches this preimage only through DOMAIN (section 9.5, H1), which is
+// why a disclosed copy issued under one ordering fails at the LEAF rather than at the tree.
+export function leafHash(hashAlg, segments, tag, value, salt, ordering = ORDERING.path) {
   if (salt.length !== 16) throw new RoaxError("salt-length", String(salt.length));
-  const dom = domain(hashAlg);
+  const dom = domain(hashAlg, ordering);
   const p = encodePath(segments);
   const v = encodeValue(tag, value);
   return H(hashAlg, Buffer.concat([
@@ -580,8 +601,15 @@ export function flatten(node, typeMap, segments = []) {
 // throughout and 54 of its 64 envelope fixtures were issued without a type map, so the leaf is
 // conditional here for the same reason schemas/envelope-1.0.json leaves the `typeMap` member
 // optional - requiring it would invalidate every envelope already issued under that schema.
+// Section 11.2. roax.ordering is the SECOND conditional leaf: emitted only when the ordering is
+// not the default `path`, for the ROAX-CANON/1 compatibility reason section 11.2 argues. A
+// path-ordered record emits NO ordering leaf and must not emit "path", a NULL or an empty string
+// in its place. The leaf is written from the `ordering` input and is never read back to select
+// one: it is committed issuer intent, and section 11.2 states normatively that it is not
+// authority.
 export function reservedLeaves({
   recordType, schemaVersion, recordId, issuerId, issuerKeyId, typeMapId,
+  ordering = ORDERING.path,
 }) {
   const out = [
     { segments: [{ key: RESERVED.recordType }], tag: TAG.STRING, value: recordType },
@@ -594,6 +622,9 @@ export function reservedLeaves({
   }
   if (issuerKeyId !== undefined && issuerKeyId !== null) {
     out.push({ segments: [{ key: RESERVED.issuerKeyId }], tag: TAG.STRING, value: issuerKeyId });
+  }
+  if (checkOrdering(ordering) !== ORDERING.path) {
+    out.push({ segments: [{ key: RESERVED.ordering }], tag: TAG.STRING, value: ordering });
   }
   return out;
 }
@@ -628,11 +659,40 @@ export function orderedLeaves(record, typeMap, identity) {
 // Sections 3.3, 7, 8 and 9. `salts` is a SaltSet and is an INPUT: under decision D4b nothing
 // here derives a salt (spec section 7), and a leaf with no committed salt is an error rather
 // than a fresh draw.
+// Section 9. Reorder from salt-assignment order (encodePath, both orderings) into TREE order.
+//
+// Equal leaf hashes are REJECTED rather than tie-broken. Paths are unique already and every
+// variable component of the section 8 preimage is length-prefixed, so two equal hashes over
+// distinct paths are a collision; tie-breaking by path would absorb that into a well-defined
+// tree and hand back a root, which section 9 forbids by name.
+export function treeOrder(ordering, leaves, leafSalts, hashes) {
+  if (checkOrdering(ordering) === ORDERING.path) return { leaves, salts: leafSalts, hashes };
+  const seen = new Set();
+  for (const h of hashes) {
+    const key = h.toString("hex");
+    if (seen.has(key)) throw new RoaxError("leaf-hash-collision", "");
+    seen.add(key);
+  }
+  const triples = leaves.map((leaf, i) => ({ leaf, salt: leafSalts[i], hash: hashes[i] }));
+  triples.sort((a, b) => Buffer.compare(a.hash, b.hash));
+  return {
+    leaves: triples.map((t) => t.leaf),
+    salts: triples.map((t) => t.salt),
+    hashes: triples.map((t) => t.hash),
+  };
+}
+
 export function buildTree(hashAlg, record, typeMap, salts, identity) {
-  const ordered = orderedLeaves(record, typeMap, identity);
-  const leafSalts = ordered.map((leaf) => salts.forLeaf(leaf.segments));
-  const hashes = ordered.map((leaf, i) => leafHash(hashAlg, leaf.segments, leaf.tag, leaf.value, leafSalts[i]));
-  return { root: mth(hashAlg, hashes), leaves: ordered, salts: leafSalts, hashes };
+  const ordering = checkOrdering(identity.ordering ?? ORDERING.path);
+  // Salts are paired in encodePath order under BOTH orderings (section 9): a leaf hash is
+  // computed over its salt, so pairing in tree order would be circular under `hash`.
+  const assigned = orderedLeaves(record, typeMap, identity);
+  const assignedSalts = assigned.map((leaf) => salts.forLeaf(leaf.segments));
+  const assignedHashes = assigned.map((leaf, i) => leafHash(
+    hashAlg, leaf.segments, leaf.tag, leaf.value, assignedSalts[i], ordering,
+  ));
+  const t = treeOrder(ordering, assigned, assignedSalts, assignedHashes);
+  return { root: mth(hashAlg, t.hashes), leaves: t.leaves, salts: t.salts, hashes: t.hashes };
 }
 
 // -------------------------------------------------------------------------------------------

@@ -277,6 +277,55 @@ probe("round-trip vector labelled as another class", false,
 probe("round-trip vector naming a disclose path in display notation", false,
   (doc) => { roundTrip(doc).disclosePaths = ["counts.integer"]; });
 
+// orderingVector and the `ordering` declaration (spec section 9). The declaration is REQUIRED on
+// every ordering-sensitive vector, which is the half a compile check cannot see: a schema that
+// merely PERMITTED the field would accept the corpus unchanged today and would still accept a
+// future `hash`-ordered vector that forgot to say so, which is the silent-divergence shape the
+// whole file exists to prevent.
+probe("leaf vector without its ordering declaration", false,
+  (doc) => { delete doc.vectors.leaf[0].ordering; });
+probe("record vector without its ordering declaration", false,
+  (doc) => { delete doc.vectors.record[0].ordering; });
+probe("envelope vector without its ordering declaration", false,
+  (doc) => { delete doc.vectors.envelope[0].ordering; });
+probe("leaf vector declaring an unregistered ordering", false,
+  (doc) => { doc.vectors.leaf[0].ordering = "document"; });
+// The registered non-default value must be ACCEPTED by the schema even though no committed
+// vector in these groups uses it, or the schema would forbid the very thing the amendment added.
+probe("leaf vector declaring the non-default hash ordering", true,
+  (doc) => { doc.vectors.leaf[0].ordering = "hash"; });
+
+const ordering = (doc) => doc.vectors.ordering[0];
+probe("ordering vector as committed", true, () => {});
+// A class-21 vector carrying one side asserts nothing about the axis it exists to test.
+probe("ordering vector carrying only the path side", false,
+  (doc) => { delete ordering(doc).orderings.hash; });
+probe("ordering vector carrying only the hash side", false,
+  (doc) => { delete ordering(doc).orderings.path; });
+probe("ordering vector carrying an unregistered third ordering", false,
+  (doc) => { ordering(doc).orderings.document = clone(ordering(doc).orderings.path); });
+// The leaf hashes are what prove tree PLACEMENT rather than only the root.
+probe("ordering vector without its per-side leaf hashes", false,
+  (doc) => { delete ordering(doc).orderings.hash.leafHashes; });
+probe("ordering vector labelled as another class", false,
+  (doc) => { ordering(doc).class = 10; });
+// A class-21 vector must not ALSO carry a single top-level ordering: it would contradict the two
+// it declares inside `orderings`.
+probe("ordering vector also carrying a top-level ordering stamp", false,
+  (doc) => { ordering(doc).ordering = "path"; });
+// A positional salt set cannot serve both sides, whose leaf counts differ by the roax.ordering
+// leaf, so the enum admits `path` alone here where recordVector admits both.
+probe("ordering vector declaring a positional salt set", false,
+  (doc) => { ordering(doc).saltPairing = "positional"; });
+
+// The file-level default is pinned to the specification's default rather than left free. A corpus
+// declaring the other one would make every vector that declares nothing wrong at once, which no
+// single vector could reveal.
+probe("corpus declaring hash as its default ordering", false,
+  (doc) => { doc.defaultOrdering = "hash"; });
+probe("corpus declaring no default ordering at all", false,
+  (doc) => { delete doc.defaultOrdering; });
+
 console.log(failures
   ? `FAILED: ${failures}`
   : "OK: corpus, type maps, envelope fixtures, and conditional probes validated as expected");

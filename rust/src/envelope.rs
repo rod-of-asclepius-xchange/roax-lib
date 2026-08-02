@@ -1,6 +1,6 @@
 use crate::commitment::{
-    commit_record, issue_record, leaf_hash, Commitment, CommitmentContext, HashAlgorithm,
-    ReservedLeafSet, Salt, SaltMap, SchemaValidator,
+    commit_record, issue_record, leaf_hash_ordered, Commitment, CommitmentContext, HashAlgorithm,
+    Ordering, ReservedLeafSet, Salt, SaltMap, SchemaValidator,
 };
 use crate::error::{Error, Result};
 use crate::json::JsonValue;
@@ -31,6 +31,17 @@ pub trait Profile: SchemaValidator {
 pub struct VerificationPolicy {
     pub anchored_root: Hash,
     pub anchored_hash_algorithm: HashAlgorithm,
+    /// The leaf ordering the anchoring registry records for this root (section 9.5, H2).
+    ///
+    /// This is the ONLY source of the ordering on the verification path. The envelope's own
+    /// `ordering` member is parsed for shape and never read, for the reason section 7.4 gives
+    /// about `hashAlg` and section 9.5 repeats: a self-describing document cannot authenticate
+    /// its own description.
+    ///
+    /// Stated as honestly as section 7.4 states H2: the anchoring registry is a requirement
+    /// HANDED FORWARD rather than a mechanism this specification designs (section 2.2), so what
+    /// this field models today is the verifier's own configured expectation.
+    pub anchored_ordering: Ordering,
 }
 
 /// A full envelope payload after structural decoding.
@@ -385,6 +396,12 @@ pub fn parse_envelope_value(
         &[
             "canon",
             "hashAlg",
+            // ACCEPTED FOR SHAPE AND DELIBERATELY NOT READ. Both envelope schemas permit this
+            // member, so rejecting it would refuse a conforming envelope; using it would violate
+            // specification section 9.5 H2, which requires a verifier to take the ordering from
+            // the anchoring registry and never from the envelope.
+            // `VerificationPolicy::anchored_ordering` is where it comes from.
+            "ordering",
             "recordType",
             "schemaVersion",
             "typeMap",
@@ -436,6 +453,10 @@ pub fn parse_envelope_value(
         type_map,
         record_id,
         issuer,
+        // NOT taken from the envelope (section 9.5, H2). Parsing cannot know the authoritative
+        // ordering, so the context is built under the default and the verification entry points
+        // replace it with the registry's before anything is rebuilt.
+        ordering: Ordering::default(),
     };
     context.validate()?;
     validate_carrier_floor(&context, leaf_count)?;
@@ -484,9 +505,16 @@ pub fn verify_full(
 ) -> Result<Commitment> {
     check_policy(&copy.context, copy.root, profile, policy)?;
     profile.validate_context(&copy.context)?;
+    // The ordering comes from the REGISTRY and never from the envelope (section 9.5, H2). A full
+    // copy is the case that genuinely needs it structurally: this rebuilds the whole tree, so
+    // the ordering decides both leaf placement and every leaf preimage through DOMAIN.
+    let rebuild_context = CommitmentContext {
+        ordering: policy.anchored_ordering,
+        ..copy.context.clone()
+    };
     let commitment = commit_record(
         &copy.record,
-        &copy.context,
+        &rebuild_context,
         profile,
         profile.resolver(),
         &copy.salts,
@@ -588,12 +616,18 @@ pub fn verify_disclosed(
         if leaf.index >= disclosure.claimed_leaf_count {
             return Err(Error::InvalidLeafIndex);
         }
-        let recomputed = leaf_hash(
+        // Section 10 step 2, and the ONE place a disclosed copy needs the ordering at all.
+        //
+        // It is needed for the LEAF PREIMAGE, exactly as `hashAlg` already is, and for nothing
+        // structural: the index and audit path are carried and the tree is never rebuilt
+        // (section 9.6). It comes from the policy rather than the envelope, per section 9.5 H2.
+        let recomputed = leaf_hash_ordered(
             &leaf.path,
             leaf.tag,
             &leaf.value,
             leaf.salt,
             disclosure.context.hash_algorithm,
+            policy.anchored_ordering,
         )?;
         if !fold_inclusion_proof_untrusted(
             &recomputed,
@@ -774,6 +808,12 @@ fn reserved_leaf_name(path: &Path, reserved_leaf_set: ReservedLeafSet) -> Option
             | "roax.recordId"
             | "roax.issuer.id"
             | "roax.issuer.keyId"
+            // The second conditional reserved leaf (specification section 11.2). It is
+            // recognized here so that a copy legitimately DISCLOSING it is not refused as a
+            // reserved-namespace collision, and its value is deliberately not bound: the leaf
+            // is committed issuer intent and NOT authority, so the ordering still comes from
+            // `VerificationPolicy::anchored_ordering` (section 9.5, H2).
+            | "roax.ordering"
     ) || (reserved_leaf_set == ReservedLeafSet::EnvelopeV2
         && key == "roax.typeMap.id");
     allowed.then_some(key)
@@ -1170,6 +1210,26 @@ fn common_envelope_fields(
             "hashAlg".into(),
             JsonValue::String(context.hash_algorithm.name().into()),
         ),
+    ];
+    if context.ordering != Ordering::default() {
+        // SELF-DESCRIPTION, and NOT AUTHORITY. A verifier takes the ordering from the anchoring
+        // registry (specification section 9.5, H2); the parser accepts this member for shape and
+        // never reads it, and nothing here reads it back to select an ordering.
+        //
+        // Emitted only for a NON-DEFAULT ordering, so a path-ordered envelope stays
+        // byte-identical to what this crate emitted before the axis existed - the same
+        // `ROAX-CANON/1` compatibility rule that gives `Path` the empty domain suffix.
+        // Omitting it on a `hash`-ordered copy would not be silence: both envelope schemas
+        // define the member's ABSENCE as meaning `path`, so such a copy would ASSERT an ordering
+        // it was not issued under. A self-description that lies is worse than none even where
+        // nothing reads it, which is the reasoning section 7.4 used to reject a `roax.hashAlg`
+        // reserved leaf.
+        fields.push((
+            "ordering".into(),
+            JsonValue::String(context.ordering.name().into()),
+        ));
+    }
+    fields.extend([
         (
             "recordType".into(),
             JsonValue::String(context.record_type.clone()),
@@ -1178,7 +1238,7 @@ fn common_envelope_fields(
             "schemaVersion".into(),
             JsonValue::String(context.schema_version.clone()),
         ),
-    ];
+    ]);
     if let Some(descriptor) = &context.type_map {
         fields.push((
             "typeMap".into(),

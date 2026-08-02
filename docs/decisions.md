@@ -12,6 +12,8 @@ It was the last one open, and it was ruled on the same date as A and on the same
 Three things remain genuinely unanswered and none of them is a fork between tabled options: the `Poseidon-BN254` parameterization named inside B, the remap mechanics named inside C, and the gaps in Part 4 - of which the anchoring registry and PDT's 20 endorsed-sample path-kind pairs are the ones other documents cite.
 "No open decisions" does not mean "nothing left to decide", and a reader who reads it that way has been misled by this document rather than by the tree.
 The **ten engineering decisions in Part 2 - D3, D4, D5, D6, D7, D8, D9, D11, D12 and D13 - were ruled on 2026-07-28**, and each carries its reasoning so that it can be overturned on the reasoning rather than on authority.
+**Two of them were amended on 2026-08-02, on the reasoning and by the project owner: D5 and, in consequence, D6.**
+Leaf ordering is now a per-record selectable axis with two first-class options rather than a single fixed rule, which is exactly what the reasoning-over-authority sentence above exists to permit; the amendment is recorded inside each decision rather than by rewriting the original ruling, so what changed and why stays reviewable.
 
 Eight of those ten confirmed what the specification already recommended.
 Two changed it: **D4** moved to D4b, independently random per-leaf salts, and **D9** gained a content-addressed blob binding that is defined but selected by no version-1 profile.
@@ -495,9 +497,10 @@ dogtag reached this same answer for this same reason.
   The floor now has five entries because the type-map work added `roax.typeMap.id` after the salt ruling.
   Specification sections 4.2, 10.2 and 11.2 and the four profile documents carry the combined result.
 
-### D5 - Leaf ordering. **RULED 2026-07-28: D5a, by `encodePath` bytes, as recommended**
+### D5 - Leaf ordering. **RULED 2026-07-28: D5a, by `encodePath` bytes, as recommended. AMENDED 2026-08-02: both orderings available, selected per record**
 
-**Written into the spec:** by `encodePath` bytes (specification section 9), with the residual leak now stated in sections 2.2, 9.3 and 10.1 rather than left implicit.
+**Written into the spec:** by `encodePath` bytes (specification section 9), with the residual leak stated in sections 2.2, 9.4 and 10.1 rather than left implicit.
+**Since the amendment:** `path` and `hash` are both defined, the choice is a per-record input, `path` is the default, and the ordering identifier is bound by the H1/H2/H3 mechanisms of specification section 9.5 plus a conditional `roax.ordering` leaf under section 11.2.
 
 | Option | Consequence |
 |---|---|
@@ -505,7 +508,7 @@ dogtag reached this same answer for this same reason.
 | **D5b. By leaf hash** (dogtag's choice, `merkle.rs:24-26`) | Hides a leaf's position among its siblings, a small privacy gain. Tree shape then depends on salts. |
 | **D5c. Document order** | Fragile: depends on map iteration order, which is exactly the OpenAttestation trap. Not recommended under any reading. |
 
-**Reasoning.**
+**Reasoning for the original ruling, kept because the amendment did not overturn it.**
 D5b buys a genuine but small privacy gain: it hides a leaf's position among its siblings.
 D5a buys a tree shape fully determined by the path set, and wins on three grounds.
 
@@ -517,12 +520,36 @@ And under the D4b ruling above salts are now independently random, so D5b would 
 Under D5a, a disclosure revealing leaves at two paths also reveals how many withheld leaves sort between them.
 In practice this is bounded, because these profiles are published and their path sets are largely known already, but it is a real structural leak and the privacy text must say so plainly rather than letting a reader infer that sorting by path costs nothing.
 
-D5c stays rejected.
-It depends on map iteration order, which is precisely the OpenAttestation trap.
+D5c stays rejected, and the amendment does not revive it.
+It depends on map iteration order, which is precisely the OpenAttestation trap, and nothing about making ordering selectable makes an ordering that is not reproducible from the record any less fragile.
 
-### D6 - Absence proofs. **RULED 2026-07-28: out of scope for version 1, capability deliberately preserved**
+#### The 2026-08-02 amendment
 
-**Written into the spec:** not supported in version 1, with the construction recorded as admitting them (specification sections 2.2 and 9.3).
+**Ruled by the project owner:** "make both available, and encoded in the record, so that decision makers can choose if the record was formed using path ordering or hash ordering."
+
+**What changed.**
+D5b stops being a rejected option and becomes a second first-class one, selected per record and declared, exactly as decision B makes ZK-friendly and non-ZK hashes both first-class and selectable per record.
+D5a stays the default.
+The original reasoning is untouched: D5a still wins on reproducibility and on debuggability, and those are still why it is the default rather than merely the first-listed.
+What the amendment rejects is the step from "D5a wins on balance" to "D5b must not exist", and it rejects it because the balance is a deployment's to strike rather than this document's.
+
+**Why the option is worth the cost.**
+The two orderings differ in exactly one pair of properties and neither dominates.
+`path` admits absence proofs and leaks gap counts; `hash` leaks nothing about position and forecloses absence proofs.
+Before the amendment a deployment needing gap privacy had no answer at all, and specification section 2.2 listed the leak among the properties the design does not provide.
+It now has one, at a stated price.
+
+**What it costs, stated rather than elided.**
+A second ordering doubles the ordering-sensitive surface of every implementation and of the conformance corpus, and it makes tree shape effectively random per record for `hash`-ordered deployments, which is the debugging cost the original reasoning named.
+That cost is real and it is why the corpus carries `hash`-ordered vectors rather than leaving the second ordering asserted only in prose.
+
+**Two things the amendment deliberately does not do.**
+It does not remove or downgrade `path`, which stays the default and keeps every property the original ruling bought.
+And it does not change what any already-issued record computes: specification section 9.5 records why `path` ordering contributes an empty domain suffix and why `roax.ordering` is emitted only for non-default orderings, both so that `ROAX-CANON/1` continues to mean one construction for records already issued under it.
+
+### D6 - Absence proofs. **RULED 2026-07-28: out of scope for version 1, capability deliberately preserved. AMENDED 2026-08-02: preserved for `path`-ordered records only**
+
+**Written into the spec:** not supported in version 1, with the construction recorded as admitting them (specification sections 2.2 and 9.4).
 
 **Reasoning.**
 Absence proofs fall out of D5a nearly free, so the cost of keeping the door open is close to zero and the specification records that the tree construction permits them.
@@ -532,6 +559,20 @@ That is a product and legal decision rather than a cryptographic one, and it is 
 
 The version-1 specification therefore says three things together: the construction admits absence proofs, this version does not define them, and defining them requires a clinical-liability decision.
 That is honest, it forecloses nothing, and it stops a future implementer from reading the omission as an oversight and adding them unilaterally.
+
+#### The 2026-08-02 amendment
+
+**D6 is amended because D5 was, and the consequence is not symmetrical with D5's.**
+D5's amendment adds an option; D6's records that one of those options **removes a capability permanently**.
+
+The capability is preserved **for `path`-ordered records** and is **unavailable for `hash`-ordered ones**.
+Under `hash` ordering two adjacent leaf hashes bound an interval in hash space, and no argument runs from "no leaf hash lies between these two" to "no path lies between these two", because hash order and path order are unrelated.
+So this is impossibility rather than omission, and no later revision can restore it for a record already issued that way: the root is fixed and the tree order is already hash order.
+
+**The version-1 statement therefore gains a fourth part**, and specification section 2.2 carries all four.
+An implementer who found only "not supported in v1" was already at risk of reading the omission as an oversight, which is why the first three parts exist.
+A deployment that reads "not supported in v1" and then selects `hash` ordering for its privacy is at the mirror-image risk: it would be foreclosing a capability it believed it was merely postponing, and it would find out only when it tried to use it against records it can no longer reissue.
+That is exactly the foreclosure specification section 12.2 tells implementers to design out, so the trade is stated at the point of choice in section 9.4 rather than only here.
 
 ### D7 - Unknown paths not in the type map. **RULED 2026-07-28: D7a, fail closed, as recommended**
 
@@ -560,7 +601,7 @@ Retagging a path the map already covers changes the root of every already-issued
 
 ### D8 - What goes inside the root. **RULED 2026-07-28: as recommended, plus a mandatory corpus vector**
 
-**Written into the spec:** `canon` is bound through the domain string in every leaf; `roax.recordType`, `roax.schemaVersion`, `roax.typeMap.id`, `roax.recordId` and `roax.issuer.id` are the five mandatory reserved leaves; `roax.issuer.keyId` is the conditional reserved leaf; routing hints stay outside; and outside-the-root fields are hints and never authority (specification sections 8, 11.2 and 11.3).
+**Written into the spec:** `canon` is bound through the domain string in every leaf; `roax.recordType`, `roax.schemaVersion`, `roax.typeMap.id`, `roax.recordId` and `roax.issuer.id` are the five mandatory reserved leaves; `roax.issuer.keyId` is a conditional reserved leaf, joined by `roax.ordering` under the 2026-08-02 amendment to D5 above; routing hints stay outside; and outside-the-root fields are hints and never authority (specification sections 8, 11.2 and 11.3).
 
 **The tension is real in both directions and dogtag hit both ends.**
 
