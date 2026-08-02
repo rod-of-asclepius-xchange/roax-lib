@@ -98,7 +98,7 @@ Kotlin's runner probes BOTH names under `ROAX_REFERENCE_RECORDS`, so one directo
 `swift/` is a SwiftPM package: `Sources/ROAXCanon` is the library, `Sources/ROAXCanonCorpus` is the corpus runner, `Sources/roax-conformance` is its command-line front end and `Tests/ROAXCanonTests` is the suite.
 See [`swift/README.md`](swift/README.md) and [`swift/FINDINGS.md`](swift/FINDINGS.md).
 Build and gate it with `swift build --package-path swift`, `swift test --package-path swift` and `swift run --package-path swift roax-conformance`.
-It passes 501 of 501 vectors with a reference checkout and reports exactly the four class-10 vectors NOT RUN without one, exiting 2 rather than 0 so a bare run does not read as a pass.
+It passes 504 of 504 vectors with a reference checkout and reports exactly the four class-10 vectors NOT RUN without one, exiting 2 rather than 0 so a bare run does not read as a pass.
 
 **The runner is a LIBRARY target rather than only an executable, and that is deliberate**: it makes `swift test` a real gate over the committed corpus instead of a second suite that could pass while the corpus failed.
 
@@ -121,7 +121,7 @@ Keep those two codes apart when you touch either.
 
 `kotlin/` is a two-module Gradle build: `roax-canon` is the library and its tests, and `roax-canon-android` packages the same `src/main` as an AAR without a second copy of the code.
 See [`kotlin/README.md`](kotlin/README.md), and [`kotlin/FINDINGS.md`](kotlin/FINDINGS.md) for what the build found.
-Run it with `gradle -p kotlin :roax-canon:test`, which runs the corpus and every other test; it passes 501 of 501 vectors with zero NOT RUN once `ROAX_REFERENCE_RECORDS` is set.
+Run it with `gradle -p kotlin :roax-canon:test`, which runs the corpus and every other test; it passes 504 of 504 vectors with zero NOT RUN once `ROAX_REFERENCE_RECORDS` is set.
 
 **Three things about this module are easy to get wrong.**
 
@@ -132,7 +132,7 @@ Run it with `gradle -p kotlin :roax-canon:test`, which runs the corpus and every
 - **The Unicode version is a property of the runtime and cannot be pinned from inside the library.**
   Section 6.1 pins 15.1; JDK 17 ships Unicode 13.0 and JDK 25 ships 16.0, and no installed JDK has 15.1.
   `Nfc` is therefore injectable and declares its version, and the corpus runner prints the comparison every run.
-  Measured: all 501 vectors pass under both JDKs, and the digest over the NFC forms of every string in the corpus is byte-identical on both, pinned as a live guard by `PlatformNfcTablesTest`; `kotlin/FINDINGS.md` section 2 owns the counts.
+  Measured: all 504 vectors pass under both JDKs, and the digest over the NFC forms of every string in the corpus is byte-identical on both, pinned as a live guard by `PlatformNfcTablesTest`; `kotlin/FINDINGS.md` section 2 owns the counts.
   **That digest is over the corpus's strings, so it moves whenever the corpus grows.**
   Re-derive it by running the test on BOTH JDKs and re-pinning only if they agree - re-pinning from one runtime silently retires the cross-version comparison, which is the whole point of the constant.
   Re-run the other one with `-Proax.testJdk=25`.
@@ -169,6 +169,45 @@ Add a group to the corpus file and every runner goes red until it is consumed - 
 `--draw-salts` redraws EVERY committed set, which changes every root in the corpus and buries an additive change in a corpus-wide diff.
 `TREE_LEAF_DOMAIN_VERSION` is pinned at `1.0.0` and deliberately decoupled from `CORPUS_VERSION` for the same reason: it used to interpolate the corpus version, so any addition rewrote all 173 tree, 165 inclusion and 11 negative-proof vectors.
 Do not re-couple them.
+
+## Leaf ordering is SELECTABLE per record, and `path` is the default
+
+**Specification section 9 defines two orderings and the amended decision D5 rules both first-class**, mirroring decision B's shape for hash algorithms: `path` sorts leaves by ascending `encodePath` bytes, `hash` by ascending `leafHash` bytes.
+The trade is a genuine one and neither dominates: `path` admits absence proofs and leaks gap counts, `hash` leaks nothing about position and **forecloses absence proofs permanently** for records issued under it.
+Decision D6 is amended to say so - the capability is preserved for `path`-ordered records and is impossible rather than undefined for `hash`-ordered ones.
+
+**The whole change is ADDITIVE to the committed corpus, and the reason is worth keeping.**
+`path` contributes the EMPTY domain suffix, so a path-ordered record's `DOMAIN` is byte-identical to what `ROAX-CANON/1` computed before the axis existed, and `roax.ordering` is emitted only for a non-default ordering.
+Not one committed expected value moved: 501 vectors to 504, with 174 existing vectors gaining a declared `ordering` field.
+**Do not "fix" that asymmetry into symmetry.**
+Giving `path` a non-empty suffix, or emitting the leaf always, changes every leaf hash of every record already issued under `ROAX-CANON/1`, which is a version-2 change wearing a version-1 label.
+It is also infeasible in this tree: the four class-10 vectors cannot be recomputed without the gitignored reference checkout, so a build that moved them would delete them.
+
+**Four things about the implementation are easy to get wrong.**
+
+- **Salts are assigned in `encodePath` order under BOTH orderings**, and only tree PLACEMENT differs.
+  A leaf hash is computed over its salt, so assigning salts in tree order is circular under `hash`.
+  Kotlin's `commitWithSaltsByPath` learns the order from a placeholder-salt pass and then consumes real salts positionally; once `commit` returned tree order that pass gave a hash order over placeholder salts, and every salt would have paired with the wrong leaf and produced a plausible wrong root rather than an error.
+  Under `path` the fix is the identity, which is why nothing could see it before.
+- **Equal leaf hashes are REJECTED under `hash` ordering, never tie-broken.**
+  Paths are already unique and every variable component of the section 8 preimage is length-prefixed, so two equal hashes are a collision; tie-breaking by path would absorb evidence of a broken hash into a well-defined tree and hand back a root.
+- **`roax.ordering` is a reserved leaf and is NOT AUTHORITY, and both halves must be stated together.**
+  It departs from section 7.4's rejection of a `roax.hashAlg` leaf deliberately, and section 11.2 argues the departure: 7.4's leaf was dangerous because weak hash algorithms exist and it enabled a downgrade, whereas both orderings are equally strong, so this one is redundant rather than dangerous and what it buys is committed issuer intent.
+  A verifier MUST take the ordering from the anchoring registry (section 9.5, H2), never from the leaf or the envelope member.
+  Rust models this properly: the envelope's `ordering` member is accepted for shape and never read, and `VerificationPolicy::anchored_ordering` is the only source.
+- **Where the ordering is needed is narrower than it looks, and section 9.6 owns it.**
+  A DISCLOSED copy carries each leaf's index and the tree is never rebuilt, so the ordering is needed for the **leaf preimage** only - exactly as `hashAlg` already is - and for nothing structural.
+  That is what makes `hash` ordering's position privacy real: a disclosed index is a position in leaf-hash order and reveals nothing about record shape.
+  Do not describe H1 as buying more than it does: a leaf is bound to exactly one ordering, so the same leaf set cannot be reassembled into the other tree, and that is real and narrow.
+
+**Class 21 is the enforcement.**
+Three vectors, each one record under BOTH orderings, asserting two roots that differ AND two **disjoint** leaf-hash sets.
+Disjointness is the stronger assertion and is what H1 buys; a runner checking only the roots would pass an implementation that permuted one leaf set into the other tree.
+One salt set serves both sides, drawn over the hash-ordered superset, because two sets would make the roots differ for a reason unrelated to ordering.
+
+**Adding a group went red in every runner before it went green, which is the intended order.**
+Rust's `deny_unknown_fields`, and the explicit consumed-group lists in the other four plus `check_corpus.mjs`, all failed until each consumed `ordering`.
+**The per-vector `ordering` FIELD needed a separate guard**, because a field inside a group a runner already reads is invisible to the group check: every runner now ASSERTS the declaration and refuses a vector that omits it.
 
 ## The type-map binding is triggered by what is COMMITTED, in all five libraries
 

@@ -115,6 +115,11 @@ What remains open under B is the `Poseidon-BN254` parameterization, which is not
 **The ten further decisions were ruled on 2026-07-28** and the specification is written on those rulings.
 Eight confirmed what it already recommended.
 Two changed it: salts are now one independent CSPRNG draw per leaf with no master salt and no derivation, and a content-addressed blob binding is defined without being selected by any version-1 profile.
+
+**Two of those ten were amended on 2026-08-02, on the reasoning rather than by authority.**
+**D5 - leaf ordering - now takes B's shape**: `path` ordering by encoded path and `hash` ordering by leaf hash are both first-class and selected per record, with `path` the default, and the ordering identifier is folded into the same domain string the algorithm identifier is.
+It is likewise not bound by a leaf a verifier may rely on: the ordering is committed as `roax.ordering` for a non-default ordering, and the specification states in the same breath that the leaf is committed issuer intent and **not authority**, which comes from the anchoring registry.
+The choice is a real trade rather than a preference, so **D6 - absence proofs - is amended in consequence**: the capability stays preserved for `path`-ordered records and is **impossible rather than undefined** for `hash`-ordered ones, which is what a deployment is actually choosing between when it picks an ordering.
 Specification section 15 tables where each ruling lands, and `docs/decisions.md` part 2 gives every one of them with its reasoning, so any of them can be overturned on the reasoning rather than on authority.
 
 **One further question was identified after those rulings and was ruled on 2026-07-30: D14** - whether the type-map lookup matches over an NFC-normalized key or over the bytes as received.

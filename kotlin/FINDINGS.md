@@ -2,7 +2,7 @@
 
 Written while building an independent library from [`docs/spec/roax-canon-1.md`](../docs/spec/roax-canon-1.md) alone, under ruled decision Da.
 
-**Result: 501 of 501 committed corpus vectors pass, with zero NOT RUN**, producing roots byte-identical to the Rust, TypeScript, Python and Swift libraries wherever the corpus covers a behaviour.
+**Result: 504 of 504 committed corpus vectors pass, with zero NOT RUN**, producing roots byte-identical to the Rust, TypeScript, Python and Swift libraries wherever the corpus covers a behaviour.
 It was 488 when this document was written, and section 8 below records what the vectors added since then found in this module.
 Two class-5 vectors need a reading of the empty-container rule that the specification does not support, which is the already-recorded corpus defect restated in section 2 below.
 
@@ -59,7 +59,7 @@ Section 6.1 anticipates this and makes a mismatch detectable **by declaration** 
 
 **What the gap actually costs was measured rather than assumed, twice.**
 
-The whole test suite runs on either JDK - `gradle -p kotlin -Proax.testJdk=25 :roax-canon:test` - and **all 501 vectors pass under both**, at Unicode 13.0 and at 16.0.
+The whole test suite runs on either JDK - `gradle -p kotlin -Proax.testJdk=25 :roax-canon:test` - and **all 504 vectors pass under both**, at Unicode 13.0 and at 16.0.
 Separately, NFC was applied to every string appearing anywhere in the committed corpus, and the digest over the normalized set is **byte-identical** on both JDKs.
 
 **That second measurement is a live guard rather than a one-time run, and it is [`PlatformNfcTablesTest`](roax-canon/src/test/kotlin/io/roax/canon/PlatformNfcTablesTest.kt).**

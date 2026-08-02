@@ -132,7 +132,7 @@ Until then the gate stays open, and no document may describe the corpus as valid
 
 ## 3. Mandatory vector classes
 
-**Twenty classes.**
+**Twenty-one classes.**
 A class with no vectors is a coverage gap and the corpus build MUST report it rather than passing silently.
 
 The count is stated because a gap check built off it is the intended use, and a stale count means the highest-numbered class is skipped silently.
@@ -636,6 +636,34 @@ Two shipped libraries held mutually exclusive issuance rules: the TypeScript lib
 Both passed all 488 vectors.
 No verifying-side vector could have found that, because neither library was ever asked to produce anything.
 Section 11.2 settles it - the leaf is emitted always - and the Python refusal was narrowed to what it actually needed, which is artifact resolution and not issuance.
+
+### Class 21 - leaf ordering, both orderings over one record
+
+**Specification section 9 makes leaf ordering a per-record choice between `path` and `hash`, and this class is what stops the second ordering existing only in prose.**
+It mirrors decision B's shape: ZK-friendly and non-ZK hashes are both first-class and selectable per record, and the amended decision D5 rules ordering the same kind of axis.
+
+Each vector names ONE record, ONE salt set and ONE identity, and carries what that record commits under BOTH orderings: the leaf count, the root, every leaf hash in TREE order, and every display path in TREE order.
+
+> **A vector MUST carry both sides.**
+> A vector carrying one asserts nothing about the axis it exists to test, and `schemas/conformance-corpus-1.0.json` makes the omission unrepresentable rather than discouraged.
+
+**Four things about this class are easy to get wrong.**
+
+- **ONE salt set serves both sides, and two would make the class vacuous.**
+  The set is drawn over the HASH-ordered leaf set, which is a superset: that side also emits the conditional `roax.ordering` leaf (specification section 11.2).
+  A path-keyed set is read by path, so the extra entry is simply never consulted on the path-ordered side.
+  Two salt sets would make the two roots differ for a reason that has nothing to do with ordering, which is exactly the confounding this class exists to exclude.
+- **The two leaf-hash sets MUST be disjoint, and that is a stronger assertion than the roots differing.**
+  The ordering is inside `DOMAIN` and therefore inside every leaf preimage (section 9.5, H1), so no leaf hash survives a change of ordering.
+  A runner that asserted only the roots would pass an implementation that permuted one leaf set into the other tree, which is precisely what H1 exists to make impossible.
+- **`roax.ordering` appears under `hash` and under nothing else.**
+  The leaf is conditional for the same `ROAX-CANON/1` compatibility reason `path` contributes the empty domain suffix, so the two sides differ in leaf COUNT as well as in order.
+  A runner reproducing both roots while emitting the leaf on both sides would have the wrong leaf count on one and fail.
+- **Salts are assigned in `encodePath` order on BOTH sides.**
+  A leaf hash is computed over its salt, so assigning salts in tree order would be circular under `hash` ordering.
+  Section 9 makes the rule normative; the Kotlin library's two-pass salt pairing was silently wrong under `hash` ordering until this class was built, which is the defect shape this class catches.
+
+**The builder refuses to emit a vector whose two roots agree**, so a corpus that stopped discriminating the two orderings fails the build rather than reporting a green class.
 
 ## 4. Seed material that already exists
 

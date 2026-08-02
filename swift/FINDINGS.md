@@ -1,6 +1,6 @@
 # What the Swift build found
 
-**Status:** the Swift library passes all 501 committed corpus vectors, with class 10 run against the pinned reference checkout.
+**Status:** the Swift library passes all 504 committed corpus vectors, with class 10 run against the pinned reference checkout.
 It was 488 when this document was written; corpus classes 14, 17, 18 and 20 grew afterwards, and findings 10 and 11 below are why.
 This document records what building it independently from `docs/spec/roax-canon-1.md` surfaced.
 
@@ -227,7 +227,7 @@ Measured by running this library both ways:
 
 | Reading | Result |
 |---|---|
-| Corpus reading, tags 6 and 7 assigned without map authorization | 501 pass, 0 fail |
+| Corpus reading, tags 6 and 7 assigned without map authorization | 504 pass, 0 fail |
 | Specification reading, section 3.3 as written | 499 pass, **2 fail** - `record-structure-empty-array` and `record-structure-empty-object` |
 
 Under specification section 1.1 that is a release-blocking corpus defect and the specification governs.
@@ -325,7 +325,7 @@ The residual both-absent case is still unreachable for the reason this finding g
 Stated because a findings document that lists only hits is not checkable.
 
 - **No disagreement with any committed vector**, under the corpus reading of finding 8.
-  All 501 pass, including the four class-10 vectors against the reference checkout at the pinned commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`.
+  All 504 pass, including the four class-10 vectors against the reference checkout at the pinned commit `09fa75eef40ad7c44a03860272c4d6e6e0f0ddfa`.
   The shipped vaccination sample commits at 91 leaves without an issuer key identifier and 92 with one; recovery commits at 69 and 70.
 - **No disagreement about the two vectors that discriminate ruled decision D14a.**
   `normalization-nfc-key-end-to-end` and `record-guard-kelvin-key` both resolve through NFC, and both would fail closed under raw matching.

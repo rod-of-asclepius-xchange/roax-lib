@@ -10,11 +10,11 @@ A library produced by reading an existing one passes the corpus while destroying
 
 ## Status
 
-**501 of 501 committed corpus vectors pass**, with class 10 run against the pinned reference checkout.
+**504 of 504 committed corpus vectors pass**, with class 10 run against the pinned reference checkout.
 
 | Measure | Result |
 |---|---|
-| Corpus vectors | 501 pass, 0 fail, 0 NOT RUN with a reference checkout. The runner prints 503 outcomes, because each class-20 vector asserts on both copy kinds |
+| Corpus vectors | 504 pass, 0 fail, 0 NOT RUN with a reference checkout. The runner prints more outcomes than vectors, because each class-20 vector asserts on both copy kinds and each class-21 vector asserts on both leaf orderings |
 | Unit and gap tests | 38 pass |
 | Vaccination sample | commits at 91 leaves without an issuer key identifier, 92 with one |
 | Recovery sample | commits at 69 leaves without an issuer key identifier, 70 with one |
