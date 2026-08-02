@@ -398,18 +398,8 @@ final class CorpusGapTests: XCTestCase {
         }
     }
 
-    // MARK: the type-map binding, which no committed vector can reach
+    // MARK: the ordering axis, which no committed round-trip vector can reach
 
-    /// **The presenter must not be able to decide whether a check runs.**
-    ///
-    /// Every committed envelope fixture is `schemas/envelope-1.0.json` and none
-    /// carries a `typeMap` member, so the corpus cannot reach any of this. The
-    /// hazard is specific: `roax.typeMap.id` is mandatory to disclose *by
-    /// arithmetic* (`docs/profiles/*.md` section 4) because it selects and
-    /// authenticates the exact map, and type-map selection is what decides how
-    /// a field is typed and canonicalized. A binding gated on the outer,
-    /// holder-supplied `typeMap` member is switched off by the party it
-    /// constrains.
     /// The ordering axis, pinned HERE because no corpus vector reaches it.
     ///
     /// Every class-20 round-trip vector is path-ordered, so nothing in the corpus
@@ -468,6 +458,18 @@ final class CorpusGapTests: XCTestCase {
         }
     }
 
+    // MARK: the type-map binding, which no committed vector can reach
+
+    /// **The presenter must not be able to decide whether a check runs.**
+    ///
+    /// Every committed envelope fixture is `schemas/envelope-1.0.json` and none
+    /// carries a `typeMap` member, so the corpus cannot reach any of this. The
+    /// hazard is specific: `roax.typeMap.id` is mandatory to disclose *by
+    /// arithmetic* (`docs/profiles/*.md` section 4) because it selects and
+    /// authenticates the exact map, and type-map selection is what decides how
+    /// a field is typed and canonicalized. A binding gated on the outer,
+    /// holder-supplied `typeMap` member is switched off by the party it
+    /// constrains.
     func testTypeMapIdBindingIsDrivenByTheCommittedLeafNotTheOuterMember() throws {
         let committer = try syntheticCommitter()
         let identity = RecordIdentity(
@@ -676,7 +678,7 @@ final class CorpusGapTests: XCTestCase {
                 XCTAssertEqual(($0 as? ROAXError)?.reason, "malformed-json", extra)
             }
         }
-        // `issuer.keyId` is the conditional leaf, and a wrong-typed one must not
+        // `issuer.keyId` is a conditional leaf, and a wrong-typed one must not
         // read as the absence that means "no leaf".
         XCTAssertThrowsError(try Envelope.parse(jsonText: """
         {"canon":"ROAX-CANON/1","hashAlg":"SHA-256",

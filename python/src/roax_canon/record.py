@@ -54,7 +54,7 @@ __all__ = [
 ]
 
 #: The reserved leaf set `schemas/envelope-1.0.json` governs: four always-emitted leaves
-#: plus the one conditional leaf.
+#: plus the conditional ones section 11.2 states.
 #: This is what the committed conformance corpus was built against.
 RESERVED_V1 = "envelope-1.0"
 
@@ -75,7 +75,7 @@ RESERVED_V2 = "envelope-2.0"
 class RecordIdentity:
     """The envelope fields that are committed inside the root.
 
-    ``issuer_key_id`` is the one conditional leaf: **an absent ``issuer.keyId`` emits no
+    ``issuer_key_id`` is a conditional leaf: **an absent ``issuer.keyId`` emits no
     leaf**, and it MUST NOT be emitted as a NULL leaf or as an empty string, because those
     are three different roots and only one of them can be right (specification section
     11.2).

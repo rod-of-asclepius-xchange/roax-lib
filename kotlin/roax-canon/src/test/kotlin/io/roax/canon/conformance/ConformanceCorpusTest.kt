@@ -476,7 +476,7 @@ class ConformanceCorpusTest {
         )
     }
 
-    // ------------------------------------------------------ class 12: cross-record unlinkability --
+    // ---------------------------------------------------------- class 21: leaf ordering, both --
 
     @Test
     fun `ordering vectors`() {
@@ -536,7 +536,7 @@ class ConformanceCorpusTest {
         Report.pass("ordering", n)
     }
 
-    // ------------------------------------------------------- class 12: unlinkability --
+    // ------------------------------------------------------ class 12: cross-record unlinkability --
 
     @Test
     fun `unlinkability vectors`() {

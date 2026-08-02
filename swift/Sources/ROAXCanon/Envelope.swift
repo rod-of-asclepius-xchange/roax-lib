@@ -567,10 +567,10 @@ public struct EnvelopeVerifier<H: ROAXHash> {
         } else if typeMapBinding == .required {
             throw ROAXError.typeMapNotNamed
         }
-        // `roax.issuer.keyId` is deliberately NOT bound: it is the one
-        // conditional leaf and the one reserved leaf that is OPTIONAL to
-        // disclose, because requiring it would break key rotation on an
-        // already-anchored record (section 11.2).
+        // `roax.issuer.keyId` is deliberately NOT bound: it is one of the two
+        // conditional leaves and is OPTIONAL to disclose, because requiring it
+        // would break key rotation on an already-anchored record (section
+        // 11.2).
 
         // Step 3: select the floor from the COMMITTED recordType leaf.
         //

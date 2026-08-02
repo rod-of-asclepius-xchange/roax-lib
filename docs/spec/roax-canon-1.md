@@ -261,7 +261,7 @@ Section 14.2 explains why ROAX does not inherit that.
 
 **A record that contributes zero leaves of its own MUST be rejected at issuance rather than anchored.**
 The rejection is on the record's own contribution, because the union above always carries the reserved leaves, so the tree itself is never empty: its floor is 6 leaves, being the five always-emitted reserved leaves plus at least one from the record.
-Section 11.2 gives the reserved set and states which one is conditional.
+Section 11.2 gives the reserved set and states which of them are conditional.
 
 ---
 

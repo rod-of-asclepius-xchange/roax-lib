@@ -529,7 +529,7 @@ object EnvelopeVerifier {
      * vectors are **accepted**.
      *
      * Compared under NFC on both sides, because a STRING leaf commits its normalized form.
-     * `roax.issuer.keyId` is deliberately NOT bound: it is the one conditional leaf, so binding it
+     * `roax.issuer.keyId` is deliberately NOT bound: it is a conditional leaf, so binding it
      * would turn an absent key identifier into a mismatch and break key rotation on an
      * already-anchored record (section 11.2).
      */

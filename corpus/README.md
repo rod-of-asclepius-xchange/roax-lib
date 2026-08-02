@@ -47,7 +47,7 @@ The exit status distinguishes the three gate outcomes:
 On the committed tree, the fully configured command above measures 504 vectors, 1,186 implementation-B assertions, and 112 JSON Schema verdicts.
 **Each of the last two needs an input that lives outside this tree, and the two are missing in different ways**, neither of which is drift.
 Without the pinned third-party reference checkout, `check_corpus.mjs` still runs and passes 1,178 assertions while reporting class 10's four vectors NOT RUN; supplying the checkout adds the 8 assertions those vectors carry.
-Without an Ajv 8 and `ajv-formats` installed outside this tree and named by `--modules` or `ROAX_NODE_MODULES`, `validate_schemas.mjs` emits no verdict at all and exits 2, which `run.sh` reports as step 4 NOT RUN rather than as a lower count; with one it emits 97 verdict lines - the corpus file, the four corpus type maps, the 69 envelope fixtures and its 38 conditional probes - and exits 0.
+Without an Ajv 8 and `ajv-formats` installed outside this tree and named by `--modules` or `ROAX_NODE_MODULES`, `validate_schemas.mjs` emits no verdict at all and exits 2, which `run.sh` reports as step 4 NOT RUN rather than as a lower count; with one it emits 112 verdict lines - the corpus file, the four corpus type maps, the 69 envelope fixtures and its 38 conditional probes - and exits 0.
 
 `build_corpus.py --check` and `check_corpus.mjs` use the same three-way status.
 In particular, each exits 2 when the committed external record vectors were not checked.
@@ -357,7 +357,7 @@ Two consequences an implementer needs, and unlike step 3 both ARE observable in 
 
 `profile-unknown` is unaffected and still fires on the outer `recordType` before any of this.
 It is the verifier's own allow-list - the same shape as the `hashAlg` allow-list of section 7.4 H3 - and settles whether this verifier can proceed at all rather than which policy to apply.
-`roax.issuer.keyId` is deliberately not bound, being the one conditional leaf.
+`roax.issuer.keyId` is deliberately not bound, being a conditional leaf (specification section 11.2).
 
 ### Class 13 is partial
 

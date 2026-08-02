@@ -39,7 +39,7 @@ data class RecordIdentity(
     val schemaVersion: String,
     val recordId: String,
     val issuerId: String,
-    /** The one reserved leaf whose *presence* varies. Absent means **no leaf**. */
+    /** A reserved leaf whose *presence* varies (section 11.2). Absent means **no leaf**. */
     val issuerKeyId: String? = null,
     /** Required under [EnvelopeProfile.V2_TYPE_MAP_BOUND], absent under V1. */
     val typeMapId: String? = null,

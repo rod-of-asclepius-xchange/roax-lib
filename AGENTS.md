@@ -392,7 +392,8 @@ These are the things a future agent is most likely to get wrong.
   Reserved `roax.*` leaves join the record's leaves before the sort (spec sections 3.3 and 11.2).
   A flattener that walks the record only produces a different root.
   Each reserved path is a **single `KEY` segment carrying the literal dotted name**, so `roax.recordType` is one segment `KEY("roax.recordType")` and *not* two.
-  There are five mandatory reserved leaves, including `roax.typeMap.id`, plus `roax.issuer.keyId`, which is the one conditional leaf: absent means no leaf, not a NULL leaf.
+  There are five mandatory reserved leaves, including `roax.typeMap.id`, plus TWO conditional ones: `roax.issuer.keyId` and `roax.ordering`, each of which emits no leaf when it is absent rather than a NULL leaf.
+  Specification section 11.2 owns that statement and puts the reserved count at 5, 6 or 7; cite it rather than restating a count here.
   The tree floor is therefore 6.
 
 - **The reserved-namespace guard tests the NFC-normalized key of the FIRST segment** for the ASCII prefix `roax.` (spec section 11.2).
@@ -489,7 +490,7 @@ These are the things a future agent is most likely to get wrong.
   Section 11.3 says fields outside the root are hints; section 11.2 commits `recordType`, `schemaVersion`, `typeMap.id`, `recordId` and `issuer.id` as leaves so a disclosed copy can be checked against them.
   The outer `recordType` is what SELECTS the profile floor, and PDT's floor is a strict subset of recovery's, so an unbound one lets a holder relabel a recovery copy as PDT, withhold `validUntil`, and still have every inclusion proof verify against the genuine root.
   Compare under NFC on both sides: a STRING leaf commits its normalized form.
-  `roax.issuer.keyId` MUST NOT be bound - it is the conditional leaf.
+  `roax.issuer.keyId` MUST NOT be bound - it is a conditional leaf, so binding it would turn an absent key identifier into a mismatch.
 
 - **A selective disclosure derives its context from the sealed commitment.**
   Accepting a second caller-supplied context lets safe values from two issuances be mixed into an envelope that its own verifier rejects at outer-identity binding.

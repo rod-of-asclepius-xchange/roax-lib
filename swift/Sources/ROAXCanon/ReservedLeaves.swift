@@ -13,15 +13,18 @@ public struct RecordIdentity: Equatable {
     public let schemaVersion: String
     public let recordId: String
     public let issuerId: String
-    /// The one conditional leaf: absent means no leaf, not a NULL leaf and not
-    /// an empty string.
+    /// A conditional leaf (section 11.2): absent means no leaf, not a NULL leaf
+    /// and not an empty string.
     public let issuerKeyId: String?
     /// Present under `schemas/envelope-2.0.json`, absent under 1.0.
     ///
     /// The committed corpus predates this leaf, so every corpus vector runs
-    /// with it nil and the reserved set is 4 or 5. An envelope carrying a
-    /// `typeMap` member raises the always-emitted set to 5 and the tree floor
-    /// to 6, which is what `docs/type-maps.md` section 4 describes.
+    /// with it nil, leaving a reserved set of the four always-emitted leaves
+    /// plus zero, one or both of the conditional ones - class 21's
+    /// hash-ordered `with-key-id` side is where both appear together. An
+    /// envelope carrying a `typeMap` member raises the always-emitted set to 5
+    /// and the tree floor to 6, which is what `docs/type-maps.md` section 4
+    /// describes.
     public let typeMapId: String?
     /// The record's leaf ordering, committed at `roax.ordering` (section 11.2).
     ///

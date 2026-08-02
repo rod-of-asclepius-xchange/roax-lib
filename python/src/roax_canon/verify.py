@@ -154,7 +154,7 @@ _REQUIRED_MEMBERS = (
 _SEED_MEMBERS = ("masterSalt", "salt", "seed", "saltSeed", "kdfKey")
 
 #: The reserved paths whose committed leaf is bound to an outer envelope field.
-#: ``roax.issuer.keyId`` is deliberately absent: it is the one conditional leaf, and an
+#: ``roax.issuer.keyId`` is deliberately absent: it is a conditional leaf, and an
 #: absent one emits no leaf at all (specification section 11.2).
 _IDENTITY_BINDINGS_V1 = (
     ("roax.recordType", ("recordType",)),

@@ -765,7 +765,7 @@ test("a seed inside a disclosed leaf's value object names rule 3 rather than the
 test('a present-but-non-string optional member reads as absent, at every site', () => {
   // The deliberate leniency of `optionalString`, pinned so that centralizing the three reads did
   // not widen it and cannot later narrow it by accident. These members are hints outside the root
-  // (section 11.3), and `keyId` is the one conditional reserved leaf.
+  // (section 11.3), and `keyId` is a conditional reserved leaf (section 11.2).
   const full = issued();
   const issuer = withMember(memberValue(full.document, 'issuer'), 'keyId', {
     kind: 'number',

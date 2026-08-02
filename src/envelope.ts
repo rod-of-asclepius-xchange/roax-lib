@@ -299,10 +299,10 @@ function requiredString(object: JsonValue, name: string): string {
  * **A present-but-non-string member reads as absent rather than as a rejection, and that leniency
  * lives here alone.** Every one of these members - `issuer.keyId`, `anchor.txHash`,
  * `anchor.anchoredAt` and a disclosed leaf's `displayPath` - is either a hint outside the root
- * (specification section 11.3) or, in `keyId`'s case, the one conditional reserved leaf whose
- * absence means no leaf rather than a NULL leaf. Three hand-rolled copies of this read had the
- * leniency written into each of them, where a reader had to compare them to see it was the same
- * rule.
+ * (specification section 11.3) or, in `keyId`'s case, a conditional reserved leaf whose
+ * absence means no leaf rather than a NULL leaf (section 11.2). Three hand-rolled copies of this
+ * read had the leniency written into each of them, where a reader had to compare them to see it
+ * was the same rule.
  */
 function optionalString(object: JsonValue, name: string): string | undefined {
   const v = memberOf(object, name);
@@ -982,8 +982,9 @@ function verifyDisclosedCopy(
         'discriminator that separates the two. Set requireTypeMapIdentity to reject the pair.',
     );
   }
-  // `roax.issuer.keyId` is deliberately NOT bound. It is the one conditional leaf, and requiring
-  // its disclosure would permanently bind an anchored record to the key it was issued under.
+  // `roax.issuer.keyId` is deliberately NOT bound. It is a conditional leaf (section 11.2), and
+  // requiring its disclosure would permanently bind an anchored record to the key it was issued
+  // under.
   for (const [path, outerValue, label] of bindings) {
     const leaf = committedByPath.get(toHex(encodePath(path)));
     if (leaf === undefined) {
