@@ -1,7 +1,7 @@
 use roax_canon::{
     disclose, fold_inclusion_proof_untrusted, issue_full_copy, merkle_tree_hash, parse_envelope,
     verify_disclosed, CommitmentContext, Disclosure, Error, Hash, HashAlgorithm, Issuer, JsonKind,
-    JsonValue, Path, Profile, ReservedLeafSet, SchemaValidator, TypeResolver, TypeTag,
+    JsonValue, Ordering, Path, Profile, ReservedLeafSet, SchemaValidator, TypeResolver, TypeTag,
     VerificationPolicy,
 };
 
@@ -97,6 +97,7 @@ fn context() -> CommitmentContext {
             id: "did:example:issuer".into(),
             key_id: None,
         },
+        ordering: Ordering::default(),
     }
 }
 
@@ -175,6 +176,7 @@ fn untrusted_fold_accepts_the_documented_forged_size_but_disclosure_does_not() {
         VerificationPolicy {
             anchored_root: root,
             anchored_hash_algorithm: HashAlgorithm::Sha256,
+            anchored_ordering: Ordering::default(),
         },
     )
     .expect_err("the safe boundary must recompute the leaf hash");
@@ -195,6 +197,7 @@ fn disclosed_record_paths_cannot_enter_any_reserved_subtree() {
                 VerificationPolicy {
                     anchored_root: [0; 32],
                     anchored_hash_algorithm: HashAlgorithm::Sha256,
+                    anchored_ordering: Ordering::default(),
                 },
             ),
             Err(Error::ReservedNamespaceCollision)
@@ -306,6 +309,7 @@ fn profile_floor_cannot_promote_a_reserved_leaf() {
             VerificationPolicy {
                 anchored_root: commitment.root(),
                 anchored_hash_algorithm: HashAlgorithm::Sha256,
+                anchored_ordering: Ordering::default(),
             },
         ),
         Err(Error::ReservedNamespaceCollision)

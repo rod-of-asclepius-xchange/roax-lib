@@ -32,7 +32,73 @@ impl HashAlgorithm {
 
     #[must_use]
     pub fn domain(self) -> Vec<u8> {
-        format!("{CANON_VERSION}/{}", self.name()).into_bytes()
+        self.domain_for(Ordering::default())
+    }
+
+    /// `DOMAIN`, algorithm-qualified AND ordering-qualified (specification section 8).
+    ///
+    /// One string with one length prefix: `ORD` is part of the domain rather than a component
+    /// of its own.
+    #[must_use]
+    pub fn domain_for(self, ordering: Ordering) -> Vec<u8> {
+        format!(
+            "{CANON_VERSION}/{}{}",
+            self.name(),
+            ordering.domain_suffix()
+        )
+        .into_bytes()
+    }
+}
+
+/// Leaf ordering, selected per record (specification section 9).
+///
+/// Two first-class options, exactly as decision B makes ZK-friendly and non-ZK hashes both
+/// first-class and selectable per record; the amended decision D5 rules ordering the same kind
+/// of axis. `Path` is the DEFAULT, and it is the same default in all five libraries because
+/// section 9 makes that normative: a default differing between implementations would be the
+/// silent divergence this project exists to prevent.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Ordering {
+    /// Ascending `encodePath` bytes. Admits absence proofs, leaks gap counts.
+    #[default]
+    Path,
+    /// Ascending `leafHash` bytes. Leaks nothing about position, forecloses absence proofs.
+    Hash,
+}
+
+impl Ordering {
+    /// Fail closed on an ordering this version does not define.
+    ///
+    /// This is H3 of specification section 9.5 at its narrowest: an unregistered ordering is
+    /// refused rather than approximated by the default.
+    pub fn parse(value: &str) -> Result<Self> {
+        match value {
+            "path" => Ok(Self::Path),
+            "hash" => Ok(Self::Hash),
+            other => Err(Error::UnsupportedOrdering(other.to_owned())),
+        }
+    }
+
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Path => "path",
+            Self::Hash => "hash",
+        }
+    }
+
+    /// The domain suffix this ordering contributes to `DOMAIN` (sections 8 and 9).
+    ///
+    /// The asymmetry is a stated compatibility rule rather than an accident, and section 9.5
+    /// argues it: `Path` contributes the EMPTY string so that a path-ordered record's domain
+    /// string is byte-identical to what `ROAX-CANON/1` specified before this axis existed.
+    /// Read the suffix from here; never derive it from the name.
+    #[must_use]
+    pub const fn domain_suffix(self) -> &'static str {
+        match self {
+            Self::Path => "",
+            Self::Hash => "/hash",
+        }
     }
 }
 
@@ -150,6 +216,13 @@ pub struct CommitmentContext {
     pub type_map: Option<TypeMapDescriptor>,
     pub record_id: String,
     pub issuer: Issuer,
+    /// The leaf ordering this record is committed under (specification section 9).
+    ///
+    /// It decides tree placement, it enters every leaf preimage through `DOMAIN`, and it
+    /// decides whether the conditional `roax.ordering` leaf is emitted (section 11.2). That
+    /// last one is why it lives on the context rather than being passed separately: the leaf
+    /// SET depends on it, so a second source could disagree with the one that built the tree.
+    pub ordering: Ordering,
 }
 
 impl CommitmentContext {
@@ -386,10 +459,26 @@ pub fn leaf_hash(
     salt: Salt,
     algorithm: HashAlgorithm,
 ) -> Result<Hash> {
+    leaf_hash_ordered(path, tag, value, salt, algorithm, Ordering::default())
+}
+
+/// The leaf preimage under an explicit leaf ordering.
+///
+/// `ordering` reaches this preimage ONLY through `DOMAIN` (specification section 9.5, H1),
+/// which is why a leaf is ordering-sensitive even though it carries no tree: a copy issued
+/// under one ordering and verified under the other fails here rather than at the tree.
+pub fn leaf_hash_ordered(
+    path: &Path,
+    tag: TypeTag,
+    value: &LeafValue,
+    salt: Salt,
+    algorithm: HashAlgorithm,
+    ordering: Ordering,
+) -> Result<Hash> {
     if tag != value.tag() {
         return Err(Error::TypeMismatch { tag });
     }
-    let domain = algorithm.domain();
+    let domain = algorithm.domain_for(ordering);
     let encoded_path = path.encode()?;
     let encoded_value = value.encode()?;
     let domain_length = u32::try_from(domain.len())
@@ -474,12 +563,13 @@ fn commit_prepared(
                 "one salt was assigned to more than one leaf".into(),
             ));
         }
-        let hash = leaf_hash(
+        let hash = leaf_hash_ordered(
             &leaf.path,
             leaf.tag,
             &leaf.value,
             salt,
             context.hash_algorithm,
+            context.ordering,
         )?;
         leaves.push(CanonicalLeaf {
             path: leaf.path,
@@ -493,7 +583,28 @@ fn commit_prepared(
     if salts.len() != leaves.len() {
         return Err(Error::ExtraSaltPath);
     }
-    leaves.sort_by(|left, right| left.encoded_path.cmp(&right.encoded_path));
+    // TREE order. Salt assignment above is by path under BOTH orderings (specification
+    // section 9) and cannot be otherwise: a leaf hash is computed over its salt, so pairing in
+    // tree order would be circular under `Hash`.
+    //
+    // Equal leaf hashes are REJECTED rather than tie-broken. Paths are unique already and every
+    // variable component of the section 8 preimage is length-prefixed, so two equal hashes over
+    // distinct paths are a collision; breaking the tie by path would absorb evidence of a broken
+    // hash into a well-defined tree and hand back a root, which section 9 forbids by name.
+    match context.ordering {
+        Ordering::Path => {
+            leaves.sort_by(|left, right| left.encoded_path.cmp(&right.encoded_path));
+        }
+        Ordering::Hash => {
+            let mut seen = HashSet::new();
+            for leaf in &leaves {
+                if !seen.insert(leaf.hash) {
+                    return Err(Error::LeafHashCollision);
+                }
+            }
+            leaves.sort_by_key(|leaf| leaf.hash);
+        }
+    }
     let hashes: Vec<Hash> = leaves.iter().map(|leaf| leaf.hash).collect();
     Ok(Commitment {
         context: context.clone(),
@@ -584,6 +695,14 @@ fn reserved_leaves(context: &CommitmentContext) -> Result<Vec<UnsaltedLeaf>> {
     if let Some(key_id) = &context.issuer.key_id {
         values.push(("roax.issuer.keyId", key_id.clone()));
     }
+    // The SECOND conditional reserved leaf (specification section 11.2). Emitted only for a
+    // non-default ordering; a path-ordered record emits NO ordering leaf and must not emit
+    // "path", a NULL or an empty string in its place. NOT AUTHORITY: it is written from the
+    // context and never read back to select an ordering, and section 11.2 argues why committing
+    // it is not section 7.4's rejected `roax.hashAlg` leaf under a new name.
+    if context.ordering != Ordering::default() {
+        values.push(("roax.ordering", context.ordering.name().to_owned()));
+    }
     Ok(values
         .into_iter()
         .map(|(key, value)| UnsaltedLeaf {
@@ -620,7 +739,8 @@ fn ensure_unique_encoded_paths<'a>(leaves: impl Iterator<Item = &'a UnsaltedLeaf
 #[cfg(test)]
 mod tests {
     use super::{
-        leaf_hash, CommitmentContext, HashAlgorithm, Issuer, ReservedLeafSet, Salt, CANON_VERSION,
+        leaf_hash, CommitmentContext, HashAlgorithm, Issuer, Ordering, ReservedLeafSet, Salt,
+        CANON_VERSION,
     };
     use crate::{LeafValue, Path, Segment, TypeTag};
 
@@ -645,6 +765,7 @@ mod tests {
                 id: "issuer".into(),
                 key_id: None,
             },
+            ordering: Ordering::default(),
         };
         assert!(context.validate().is_err());
     }

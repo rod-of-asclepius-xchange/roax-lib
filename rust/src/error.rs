@@ -50,6 +50,17 @@ pub enum Error {
     #[error("unsupported ROAX-CANON/1 hash algorithm {0}")]
     UnsupportedAlgorithm(String),
 
+    /// An ordering this version does not define. H3 of specification section 9.5 at its
+    /// narrowest: refused rather than approximated by the default.
+    #[error("unsupported ROAX-CANON/1 leaf ordering {0}")]
+    UnsupportedOrdering(String),
+
+    /// Two leaves of one record share a leaf hash under `hash` ordering. Paths are already
+    /// unique, so this is a collision rather than a tie, and specification section 9 requires
+    /// rejection rather than a tie-break.
+    #[error("two leaves of this record have the same leaf hash")]
+    LeafHashCollision,
+
     #[error("BLOB_REF is registered but no version-1 profile selects it")]
     BlobRefNotSelectable,
 
@@ -178,6 +189,8 @@ impl Error {
             Self::InvalidBase64 => "invalid-base64",
             Self::InvalidHex => "invalid-hex",
             Self::UnsupportedAlgorithm(_) => "algorithm-unsupported",
+            Self::UnsupportedOrdering(_) => "ordering-not-defined",
+            Self::LeafHashCollision => "leaf-hash-collision",
             Self::BlobRefNotSelectable => "blob-ref-unbound",
             Self::InvalidSaltLength => "invalid-salt-length",
             Self::MissingSalt(_) => "missing-salt",

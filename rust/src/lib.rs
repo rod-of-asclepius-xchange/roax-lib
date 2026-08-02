@@ -20,8 +20,8 @@ pub mod type_map;
 pub mod value;
 
 pub use commitment::{
-    generate_salts, leaf_hash, CanonicalLeaf, Commitment, CommitmentContext, HashAlgorithm, Issuer,
-    ReservedLeafSet, Salt, SaltMap, SchemaValidator,
+    generate_salts, leaf_hash, leaf_hash_ordered, CanonicalLeaf, Commitment, CommitmentContext,
+    HashAlgorithm, Issuer, Ordering, ReservedLeafSet, Salt, SaltMap, SchemaValidator,
 };
 pub use envelope::{
     commit_full_copy_with_salts, disclose, issue_full_copy, issue_full_copy_with_salts,

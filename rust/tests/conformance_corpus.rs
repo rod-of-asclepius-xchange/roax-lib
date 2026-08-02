@@ -1,10 +1,10 @@
 use roax_canon::{
     audit_path, commit_full_copy_with_salts, disclose, fold_inclusion_proof_untrusted,
-    generate_salts, issue_full_copy_with_salts, leaf_hash, merkle_tree_hash, parse_envelope_value,
-    reserved_leaf_set_for, verify_disclosed, verify_full, CommitmentContext, Error, HashAlgorithm,
-    Issuer, JsonKind, JsonValue, LeafValue, ParsedEnvelope, Path, Profile, ReservedLeafSet, Salt,
-    SaltMap, SchemaValidator, Segment, TypeResolver, TypeTag, VerificationPolicy, CANON_VERSION,
-    UNICODE_VERSION,
+    generate_salts, issue_full_copy_with_salts, leaf_hash, leaf_hash_ordered, merkle_tree_hash,
+    parse_envelope_value, reserved_leaf_set_for, verify_disclosed, verify_full, CommitmentContext,
+    Error, HashAlgorithm, Issuer, JsonKind, JsonValue, LeafValue, Ordering, ParsedEnvelope, Path,
+    Profile, ReservedLeafSet, Salt, SaltMap, SchemaValidator, Segment, TypeResolver, TypeTag,
+    VerificationPolicy, CANON_VERSION, UNICODE_VERSION,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -15,7 +15,7 @@ use std::fs;
 use std::path::{Path as FsPath, PathBuf};
 use unicode_normalization::UnicodeNormalization;
 
-const CLASS_COUNT: u8 = 20;
+const CLASS_COUNT: u8 = 21;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,6 +51,7 @@ struct Vectors {
     normalization: Vec<Value>,
     envelope: Vec<Value>,
     round_trip: Vec<Value>,
+    ordering: Vec<Value>,
 }
 
 #[derive(Debug, Default)]
@@ -610,6 +611,7 @@ fn v1_context(
             id: issuer_id.to_owned(),
             key_id: issuer_key_id.map(str::to_owned),
         },
+        ordering: Ordering::default(),
     }
 }
 
@@ -622,6 +624,13 @@ fn reserved_paths(context: &CommitmentContext) -> Vec<Path> {
     ];
     if context.issuer.key_id.is_some() {
         keys.push("roax.issuer.keyId");
+    }
+    // The SECOND conditional reserved leaf: emitted for a non-default ordering and for nothing
+    // else (specification section 11.2). This list mirrors the library's own `reserved_leaves`,
+    // so a leaf added there has to be added here too or the salt set drawn from these paths is
+    // short by one and the commitment fails with a missing salt.
+    if context.ordering != Ordering::default() {
+        keys.push("roax.ordering");
     }
     keys.into_iter()
         .map(|key| Path::from_segments(vec![Segment::Key(key.into())]))
@@ -814,6 +823,7 @@ fn verify_legacy_envelope(bytes: &[u8], maps: &HashMap<String, LegacyTypeMap>) -
                     let policy = VerificationPolicy {
                         anchored_root: copy.root(),
                         anchored_hash_algorithm: HashAlgorithm::Sha256,
+                        anchored_ordering: Ordering::default(),
                     };
                     verify_full(&copy, &profile, policy)
                         .map(|_| ())
@@ -849,6 +859,7 @@ fn verify_legacy_envelope(bytes: &[u8], maps: &HashMap<String, LegacyTypeMap>) -
                 let policy = VerificationPolicy {
                     anchored_root: disclosure.root(),
                     anchored_hash_algorithm: HashAlgorithm::Sha256,
+                    anchored_ordering: Ordering::default(),
                 };
                 verify_disclosed(&disclosure, &profile, policy)
                     .map_err(|error| legacy_envelope_reason(&error).to_owned())
@@ -1110,6 +1121,7 @@ fn round_trip_context(vector: &Value) -> CommitmentContext {
                 .and_then(Value::as_str)
                 .map(str::to_owned),
         },
+        ordering: Ordering::default(),
     }
 }
 
@@ -1177,14 +1189,34 @@ fn comparable_json(value: &JsonValue) -> Value {
     }
 }
 
+/// The ordering a vector DECLARES (specification section 9).
+///
+/// Read rather than tolerated: `deny_unknown_fields` is this runner's group guard, but it sees
+/// vector GROUPS, not fields inside a group already consumed. A `hash`-ordered vector added to
+/// an ordering-sensitive group would otherwise be computed as `path` and reported green.
+fn declared_ordering(vector: &Value) -> Ordering {
+    let declared = optional_field(vector, "ordering")
+        .and_then(Value::as_str)
+        .unwrap_or_else(|| {
+            panic!(
+                "{} is in an ordering-sensitive group and declares no ordering; specification \
+                 section 9 requires the ordering to be explicit",
+                string_field(vector, "name")
+            )
+        });
+    Ordering::parse(declared).expect("a registered leaf ordering")
+}
+
 fn context_from_vector(vector: &Value) -> CommitmentContext {
-    v1_context(
+    let mut context = v1_context(
         string_field(vector, "recordType"),
         string_field(vector, "schemaVersion"),
         string_field(vector, "recordId"),
         string_field(vector, "issuerId"),
         optional_field(vector, "issuerKeyId").and_then(Value::as_str),
-    )
+    );
+    context.ordering = declared_ordering(vector);
+    context
 }
 
 fn commit_corpus_record(
@@ -1225,6 +1257,7 @@ fn vector_count(vectors: &Vectors) -> usize {
         + vectors.normalization.len()
         + vectors.envelope.len()
         + vectors.round_trip.len()
+        + vectors.ordering.len()
 }
 
 #[test]
@@ -1232,13 +1265,13 @@ fn vector_count(vectors: &Vectors) -> usize {
 fn committed_conformance_corpus() {
     let root = repository_root();
     let corpus = read_corpus(&root);
-    assert_eq!(corpus.version, "1.1.0");
+    assert_eq!(corpus.version, "1.2.0");
     assert_eq!(corpus.canon, CANON_VERSION);
     assert_eq!(corpus.unicode_version, UNICODE_VERSION);
     assert_eq!(corpus.hash_alg, HashAlgorithm::Sha256.name());
     assert_eq!(
         vector_count(&corpus.vectors),
-        501,
+        504,
         "every committed vector array must be consumed"
     );
 
@@ -1312,8 +1345,17 @@ fn committed_conformance_corpus() {
             let value = leaf_value_from_carrier(selected_tag, optional_field(vector, "value"))?;
             let salt = Salt::from_hex(string_field(vector, "saltHex"))
                 .map_err(|error| error.to_string())?;
-            leaf_hash(&path, selected_tag, &value, salt, HashAlgorithm::Sha256)
-                .map_err(|error| error.to_string())
+            // A leaf vector is ordering-sensitive even though it carries no tree: the ordering
+            // reaches the preimage through DOMAIN (specification section 9.5, H1).
+            leaf_hash_ordered(
+                &path,
+                selected_tag,
+                &value,
+                salt,
+                HashAlgorithm::Sha256,
+                declared_ordering(vector),
+            )
+            .map_err(|error| error.to_string())
         });
         match result {
             Ok(hash) => report.check(
@@ -1545,6 +1587,138 @@ fn committed_conformance_corpus() {
                 );
             }
             Err(error) => report.fail(class, format!("{name} record commitment: {error}")),
+        }
+    }
+
+    // Class 21. One record issued under BOTH leaf orderings (specification section 9).
+    //
+    // The vector carries both roots, both leaf-hash sequences in TREE order and both leaf
+    // counts, so this class cannot be passed by computing one ordering. The cross-ordering
+    // assertions are what would still catch an implementation reproducing both roots by
+    // accident: the two leaf-hash SETS must be disjoint, because the ordering is inside DOMAIN
+    // and therefore inside every leaf preimage (section 9.5, H1).
+    for vector in &corpus.vectors.ordering {
+        let (class, name) = vector_identity(vector);
+        let record = match load_record_for_vector(&root, vector) {
+            Ok(Some(record)) => record,
+            Ok(None) => {
+                report.skip(class, format!("{name}: record fixture unavailable"));
+                continue;
+            }
+            Err(error) => {
+                report.fail(class, format!("{name} record load: {error}"));
+                continue;
+            }
+        };
+        let Some(map) = maps.get(string_field(vector, "recordType")) else {
+            report.fail(class, format!("{name}: legacy type map is missing"));
+            continue;
+        };
+        let sides = field(vector, "orderings")
+            .as_object()
+            .expect("orderings object");
+        let mut seen: BTreeMap<String, (String, Vec<String>)> = BTreeMap::new();
+        for (ordering_name, expected) in sides {
+            let ordering = Ordering::parse(ordering_name).expect("a registered leaf ordering");
+            let mut context = v1_context(
+                string_field(vector, "recordType"),
+                string_field(vector, "schemaVersion"),
+                string_field(vector, "recordId"),
+                string_field(vector, "issuerId"),
+                optional_field(vector, "issuerKeyId").and_then(Value::as_str),
+            );
+            context.ordering = ordering;
+            // ONE salt set serves both sides: salts are assigned in encodePath order under BOTH
+            // orderings (section 9), and the committed set is drawn over the hash-ordered
+            // superset, which also carries the roax.ordering leaf.
+            let committed = ordered_v1_paths(&record, &context).and_then(|ordered_paths| {
+                let salt_document: Value = serde_json::from_slice(
+                    &fs::read(root.join(string_field(vector, "saltsFile")))
+                        .map_err(|error| error.to_string())?,
+                )
+                .map_err(|error| error.to_string())?;
+                let all_salts = salt_map_from_document(
+                    &salt_document,
+                    string_field(vector, "saltPairing"),
+                    &ordered_paths,
+                )?;
+                // Select the salts for THIS side's leaf set, rather than handing the whole
+                // committed set over. The set is drawn over the hash-ordered superset, which
+                // carries a `roax.ordering` salt the path-ordered side has no leaf for, and
+                // this library rejects a salt set with a path that is not a leaf. That guard
+                // is correct and stays: an issuer selects the salts for the record it is
+                // committing, which is what this reproduces.
+                let mut salts = SaltMap::new();
+                for path in &ordered_paths {
+                    salts
+                        .insert(
+                            path.clone(),
+                            all_salts.get(path).map_err(|e| e.to_string())?,
+                        )
+                        .map_err(|error| error.to_string())?;
+                }
+                commit_full_copy_with_salts(&record, &context, &LegacyProfile::new(map), &salts)
+                    .map_err(|error| error.to_string())
+            });
+            match committed {
+                Ok(commitment) => {
+                    report.check(
+                        class,
+                        name,
+                        &format!("{ordering_name} leafCount"),
+                        commitment.leaves().len(),
+                        usize::try_from(integer_field(expected, "leafCount"))
+                            .expect("leaf count fits usize"),
+                    );
+                    report.check(
+                        class,
+                        name,
+                        &format!("{ordering_name} root"),
+                        hex::encode(commitment.root()),
+                        string_field(expected, "root").to_owned(),
+                    );
+                    let hashes: Vec<String> = commitment
+                        .leaves()
+                        .iter()
+                        .map(|leaf| hex::encode(leaf.hash()))
+                        .collect();
+                    let want: Vec<String> = field(expected, "leafHashes")
+                        .as_array()
+                        .expect("leafHashes array")
+                        .iter()
+                        .map(|v| v.as_str().expect("hex string").to_owned())
+                        .collect();
+                    report.check(
+                        class,
+                        name,
+                        &format!("{ordering_name} leafHashes"),
+                        hashes.join(","),
+                        want.join(","),
+                    );
+                    seen.insert(
+                        ordering_name.clone(),
+                        (hex::encode(commitment.root()), hashes),
+                    );
+                }
+                Err(error) => {
+                    report.fail(class, format!("{name} {ordering_name}: {error}"));
+                }
+            }
+        }
+        if let (Some(path_side), Some(hash_side)) = (seen.get("path"), seen.get("hash")) {
+            report.check(
+                class,
+                name,
+                "roots differ",
+                path_side.0 != hash_side.0,
+                true,
+            );
+            let overlap: Vec<&String> = path_side
+                .1
+                .iter()
+                .filter(|h| hash_side.1.contains(h))
+                .collect();
+            report.check(class, name, "leaf hashes disjoint", overlap.len(), 0);
         }
     }
 
@@ -1799,6 +1973,7 @@ fn committed_conformance_corpus() {
         let policy = VerificationPolicy {
             anchored_root: commitment.root(),
             anchored_hash_algorithm: HashAlgorithm::Sha256,
+            anchored_ordering: Ordering::default(),
         };
         for (field_name, produced, verified) in [
             (
