@@ -70,8 +70,12 @@ Twice in the same design is a pattern, which is why the rule is written down rat
 
 **Decision D4 has since been ruled D4b**, so `masterSalt` no longer exists anywhere in the design and neither foreclosure is reachable today.
 That does not retire the rule.
-It retires this example, which is kept because it is the clearest one available and because the rule still binds on decision C, which remains open (`docs/decisions.md` Part 1).
-Decision A was ruled on 2026-08-02 and no longer holds anything open here, but the rule bound on it until that date, which is the point: the corpus never encoded a side of it.
+It retires this example, which is kept because it is the clearest one available and because the rule still binds.
+**What it binds on has changed, and the change is worth stating rather than leaving a reader to notice the citation is stale.**
+Every decision in `docs/decisions.md` is now ruled, so the rule no longer holds a lettered decision open anywhere.
+It binds instead on what is unsettled beneath those rulings, and three of those reach this document directly: the `Poseidon-BN254` parameterization under decision B, which is registered and forbidden rather than parameterized; PDT's 20 endorsed-sample path-kind pairs, which is why class 10 is 2 of 3 records; and the anchoring registry, which specification section 2.2 leaves undesigned and which is exactly why class 18 carries no registry rows.
+Decisions A and C were both ruled on 2026-08-02 and no longer hold anything open here, but the rule bound on each until that date, which is the point: the corpus never encoded a side of either.
+C is the sharper of the two, because a migration path is the kind of thing a corpus invents fixtures for, and none were ever written.
 D14 was the third case the rule held open, and it shows the rule working end to end: the class-19 key vector was withheld while D14 was open and was built under the ruling on 2026-07-30, so no implementation ever inherited an unruled answer from a data file.
 
 **This is a future-proofing constraint, not a tidiness one**, and it connects directly to specification section 12.2.

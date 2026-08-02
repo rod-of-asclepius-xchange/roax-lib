@@ -58,7 +58,7 @@ The Unicode version is pinned at 15.1 by specification section 6.1.
 |---|---|
 | [`src/README.md`](src/README.md) | The TypeScript library: what it is, how to run it, and the four traps JavaScript sets for this design. |
 | [`docs/typescript-implementation-findings.md`](docs/typescript-implementation-findings.md) | **Where that independent build disagreed with the corpus, and where the specification admitted two honest readings.** Worth more than the code. |
-| [`docs/decisions.md`](docs/decisions.md) | **The decisions, ruled and open, each with its reasoning.** One is still open, C, and it belongs to the project owner. Start here if you are reviewing rather than implementing. |
+| [`docs/decisions.md`](docs/decisions.md) | **Every decision, each with its reasoning and the options it was chosen from.** All four owner decisions are ruled; what remains unsettled is narrower than a decision and is named there. Start here if you are reviewing rather than implementing. |
 | [`docs/spec/roax-canon-1.md`](docs/spec/roax-canon-1.md) | The protocol. Precise enough to implement from. Section 2 says what it does not solve; section 14 reconciles it against dogtag. |
 | [`docs/profiles/`](docs/profiles/) | The `recordType` registry, one document per record family, because the four families registered today do **not** share one concrete object. |
 | [`docs/type-maps.md`](docs/type-maps.md) | The published type-map artifacts, exact coverage, unresolved schema gaps and issuer extension lifecycle. |
@@ -81,18 +81,28 @@ That finding is what the whole design rests on.
 
 A fair reading of OpenAttestation is that a byte-compatible verifier for it **is** buildable in any of these languages.
 The problem is not that it is impossible - it is that doing so means emulating a reconstructed JavaScript compatibility profile at a pinned dependency set, rather than implementing a language-neutral specification.
-See decision C.
+**Decision C ruled on 2026-08-02 that this project will not build one**, and that already-issued documents are remapped into this protocol instead.
+The feasibility finding stands: the bridge is buildable, and building it is what the ruling declines.
 
-## What is not decided
+## What is decided, and what is left beneath the rulings
 
-One of the four decisions that belong to the project owner is open, and it is not quietly settled anywhere in these documents:
+**All four decisions that belong to the project owner are now ruled**, and what is still unanswered is narrower than a decision rather than a fork between tabled options.
+`docs/decisions.md` names each remaining gap; the two that other documents cite are the `Poseidon-BN254` parameterization under B and the remap mechanics under C.
 
-- **C** - what happens to the Singapore healthcerts already issued under OpenAttestation.
+**C was ruled on 2026-08-02: remap into this protocol, translation deferred.**
+Healthcerts already issued under OpenAttestation are **remapped into ROAX** - re-submitted to this standard and re-derived under ROAX canonicalization - rather than bridged.
+This project builds and maintains no OpenAttestation verifier.
+A translation method is **deferred rather than refused**, exactly as under A.
+**The consequence a reader relying on an existing document must be told:** a remap produces a **new root**, and the anchored OpenAttestation root is not preserved, so a proof against the old root stays a proof of the old bytes.
+Two of the three states the audit called unportable are rejected at the input boundary by specification section 3.2 - duplicate member names and unpaired surrogate escapes - so a remap fails closed on them rather than dropping them quietly.
+**That two-of-three split holds only if the remap reads the serialized document**, which is inferred rather than fixed since no remap tool is specified: reading a language-parsed object instead gets duplicate names already collapsed to last-wins, which makes the split one of three.
+The third, `undefined` and sparse-array holes, has **no answer today**: section 3.2 lists it, but the state has no JSON representation, so it is already gone by the time a remap reads serialized bytes.
+`docs/decisions.md` decision C carries that gap in full, including why a serialized redaction hole becomes a committed `NULL` leaf.
 
 **A was ruled on 2026-08-02: not now, and deliberately kept possible.**
 roax-lib adopts no EU credential format and builds no export codec; material issued under another regime is **re-submitted to this standard** rather than translated.
 A translation method is **deferred rather than refused**, and that is what makes the ruling more than a "no": it carries a standing constraint that a disclosure unit stays a single leaf, independently verifiable from its own audit path, so a future SD-JWT mapping remains buildable instead of needing a retrofit.
-It does **not** decide C, and the re-submission logic is not extended to already-issued OpenAttestation healthcerts by inference.
+A and C were ruled on the same date and share that principle - conform to this standard now, keep translation possible later - but **neither decided the other**, and `docs/decisions.md` keeps them apart deliberately.
 
 **D was ruled on 2026-07-29.**
 ROAX uses five independent, corpus-enforced libraries rather than a shared core, as recorded in `docs/decisions.md` decision D.
@@ -119,7 +129,7 @@ It is in `docs/decisions.md` part 2a.
 ```
 docs/spec/          the protocol specification
 docs/profiles/      one document per record family
-docs/decisions.md   settled, open, and the reasoning
+docs/decisions.md   every decision, what is left beneath the rulings, and why
 docs/type-maps.md   type-map coverage, gaps and issuer extensions
 docs/conformance-corpus.md
 schemas/            JSON Schemas
