@@ -314,7 +314,31 @@ The refusal now reads like the one immediately above it, which refuses an issuan
 
 ---
 
-## 11. What was measured
+## 11. DEFECT IN THIS LIBRARY: it issued a hash-ordered envelope and then refused it
+
+**Found by hand, because no corpus vector can reach it.**
+Every conformance corpus class-20 round-trip vector is `path`-ordered, so nothing in the corpus asks an implementation to PRODUCE a `hash`-ordered envelope and verify it.
+This is the same blind spot class 20 was written for, one axis over.
+
+Making issuance ordering-aware broke verification in two independent places, and each would have been enough on its own.
+
+- **The envelope's known-member list did not know the member issuance had just emitted.**
+  `issueFullCopy` emits `ordering` for a non-default ordering, and the reader rejected it as an unknown member.
+  Both envelope schemas permit it, so refusing it also refused a conforming envelope this library did not issue.
+- **The verifier rebuilt a full copy under the default ordering.**
+  `verifyEnvelope` re-flattens and re-commits the record, so with the ordering taken from nothing it rebuilt a `path`-ordered tree over a `hash`-ordered envelope and reported `leaf-count-mismatch` - the ordering leaf of section 11.2 is committed under `hash` and not under `path`, so the counts differ by one before the roots are ever compared.
+
+Both are fixed, and the ordering now comes from `VerifierConfig.anchoredOrdering`, which is section 9.5's H2: the anchoring registry, never the envelope.
+
+**Stated at the strength of the evidence: neither refusal names the ordering.**
+A registry misconfiguration surfaces as `salt-missing-for-leaf` or `leaf-count-mismatch` depending on which way it disagrees, and both fail closed, so this is a diagnosability gap rather than a correctness one.
+It is recorded because this repository keeps `type-map-not-named` and `outer-identity-mismatch` apart for exactly this reason, and a deployment debugging its own registry gets no signal from either code today.
+
+**What pins it now, since nothing in the corpus does.**
+`test/unit.ts` issues under each ordering and verifies under each registry answer, asserting all four cells rather than the two that pass.
+The other four libraries carry the same pin in their own suites, for the same reason.
+
+## 12. What was measured
 
 Node v22.21.0, TypeScript 5.9.3, `SHA-256`, corpus `1.1.0`.
 
