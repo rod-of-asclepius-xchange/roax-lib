@@ -63,7 +63,18 @@ from .errors import (
 from .flatten import RESERVED_KEY_PREFIX, check_reserved_namespace, flatten
 from .hashes import DEFAULT_HASH_ALG, DEFINED_ALGORITHMS, REGISTERED_ALGORITHMS, get_hash
 from .jsonio import JsonNumber, json_kind, load_file, loads
-from .leaf import CANON, SALT_BYTES, Leaf, domain_string, leaf_hash
+from .leaf import (
+    CANON,
+    DEFAULT_ORDERING,
+    ORDERING_DOMAIN_SUFFIX,
+    ORDERING_HASH,
+    ORDERING_PATH,
+    SALT_BYTES,
+    Leaf,
+    check_ordering,
+    domain_string,
+    leaf_hash,
+)
 from .numbers import DIGIT_BOUND, canonical_decimal, canonical_integer
 from .path import Index, Key, MAX_INDEX_EXCLUSIVE, display_path, encode_path
 from .profiles import DEFAULT_PROFILES, Profile, ProfileRegistry
@@ -139,6 +150,11 @@ __all__ = [
     "SALT_BYTES",
     "domain_string",
     "leaf_hash",
+    "check_ordering",
+    "DEFAULT_ORDERING",
+    "ORDERING_PATH",
+    "ORDERING_HASH",
+    "ORDERING_DOMAIN_SUFFIX",
     "merkle_tree_head",
     "audit_path",
     "verify_inclusion",

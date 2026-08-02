@@ -58,6 +58,12 @@ class ErrorCode:
     TYPE_MAP_REJECTED = "type-map-rejected"
 
     # Sections 6.1 and 7.4, registered but unusable selections.
+    # Specification section 9. An ordering this version does not define, which is H3 of
+    # section 9.5 at its narrowest, and two leaves of one record sharing a leaf hash under
+    # `hash` ordering - paths are already unique, so that is a collision rather than a tie
+    # and section 9 requires rejection rather than a tie-break.
+    ORDERING_NOT_DEFINED = "ordering-not-defined"
+    LEAF_HASH_COLLISION = "leaf-hash-collision"
     HASH_ALG_UNDEFINED = "hash-alg-undefined"
     HASH_ALG_NOT_ALLOWED = "hash-alg-not-allowed"
     BLOB_REF_NOT_DECLARED = "blob-ref-not-declared"

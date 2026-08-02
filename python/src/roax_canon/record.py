@@ -24,7 +24,13 @@ from .errors import ErrorCode, InputError, RoaxError
 from .flatten import flatten
 from .hashes import DEFAULT_HASH_ALG, get_hash
 from .jsonio import is_json_string, is_record_type_string, is_uri_string
-from .leaf import SALT_BYTES, Leaf, leaf_hash
+from .leaf import (
+    DEFAULT_ORDERING,
+    SALT_BYTES,
+    Leaf,
+    check_ordering,
+    leaf_hash,
+)
 from .path import Key, Segment, display_path, encode_path
 from .text import nfc
 from .tree import merkle_tree_head
@@ -94,6 +100,22 @@ class RecordIdentity:
     issuer_key_id: str | None = None
     type_map_id: str | None = None
     type_map_version: str | None = None
+    #: The record's leaf ordering, committed at ``roax.ordering`` (specification section 11.2).
+    #:
+    #: The SECOND conditional reserved leaf. It is emitted only when the ordering is not the
+    #: default ``path``; a path-ordered record emits NO ordering leaf and must not emit
+    #: ``"path"``, a NULL or an empty string in its place, because those are different roots
+    #: and only one can be right. The conditionality is the same ``ROAX-CANON/1``
+    #: compatibility rule that gives ``path`` an empty domain suffix, and section 11.2 argues
+    #: it rather than leaving it to be reverse-engineered.
+    #:
+    #: THIS LEAF IS NOT AUTHORITY. It is written from the ordering supplied here and is never
+    #: read back to select one: a verifier takes the ordering from the anchoring registry
+    #: (section 9.5, H2). Section 11.2 argues why committing it is not section 7.4's rejected
+    #: ``roax.hashAlg`` leaf under a new name - weak hash algorithms exist so that leaf enabled
+    #: a downgrade, whereas both orderings are equally strong, so this one is redundant rather
+    #: than dangerous and what it buys is committed issuer intent.
+    ordering: str = DEFAULT_ORDERING
 
     def __post_init__(self) -> None:
         """Reject a JSON-number carrier anywhere an identity requires a string.
@@ -168,6 +190,8 @@ def reserved_leaves(identity: RecordIdentity, *, reserved_set: str = RESERVED_V1
     out.append(Leaf((Key("roax.issuer.id"),), STRING, identity.issuer_id))
     if identity.issuer_key_id is not None:
         out.append(Leaf((Key("roax.issuer.keyId"),), STRING, identity.issuer_key_id))
+    if check_ordering(identity.ordering) != DEFAULT_ORDERING:
+        out.append(Leaf((Key("roax.ordering"),), STRING, identity.ordering))
     return out
 
 
@@ -355,6 +379,43 @@ class BuiltRecord:
         raise RoaxError(ErrorCode.SALT_MISSING_FOR_LEAF, f"no leaf at {display_path(segments)!r}")
 
 
+def _tree_order(
+    ordering: str,
+    encoded_paths: tuple[bytes, ...],
+    leaves: tuple[Leaf, ...],
+    salts: tuple[bytes, ...],
+    hashes: tuple[bytes, ...],
+) -> tuple[tuple[bytes, ...], tuple[Leaf, ...], tuple[bytes, ...], tuple[bytes, ...]]:
+    """Reorder from salt-assignment order into TREE order (specification section 9).
+
+    ``path`` is the identity, because salt-assignment order already is ``encodePath`` order.
+    ``hash`` sorts by ascending leaf-hash bytes.
+
+    A leaf's INDEX is its position in the tree, because that is what a disclosed copy carries
+    and what an audit path is drawn against, so every parallel tuple is reordered together.
+
+    Equal leaf hashes are REJECTED rather than tie-broken. Paths are unique already and every
+    variable component of the section 8 preimage is length-prefixed, so two equal hashes over
+    distinct paths are a collision; breaking the tie by path would absorb evidence of a broken
+    hash into a well-defined tree and hand back a root, which section 9 forbids by name.
+    """
+    if check_ordering(ordering) == DEFAULT_ORDERING:
+        return encoded_paths, leaves, salts, hashes
+    if len(set(hashes)) != len(hashes):
+        raise RoaxError(
+            ErrorCode.LEAF_HASH_COLLISION,
+            "two leaves of this record have the same leaf hash; paths are unique, so this is a "
+            "hash collision rather than a tie to break",
+        )
+    order = sorted(range(len(hashes)), key=lambda i: hashes[i])
+    return (
+        tuple(encoded_paths[i] for i in order),
+        tuple(leaves[i] for i in order),
+        tuple(salts[i] for i in order),
+        tuple(hashes[i] for i in order),
+    )
+
+
 def build_tree(
     record: Any,
     identity: RecordIdentity,
@@ -364,11 +425,26 @@ def build_tree(
     hash_alg: str = DEFAULT_HASH_ALG,
     reserved_set: str = RESERVED_V1,
     authorize_empty_containers: bool = True,
+    ordering: str | None = None,
 ) -> BuiltRecord:
     """Flatten, union, order, hash and merklize.
 
     This is the whole of steps (A) through (D) of specification section 3.1.
+
+    ``ordering`` defaults to the identity's, which itself defaults to ``path``. Passing it
+    explicitly is an override, and a value disagreeing with the identity is refused rather
+    than silently preferred: the identity is what decides whether ``roax.ordering`` is
+    committed, so two sources disagreeing would emit a leaf naming one ordering while the
+    tree used the other.
     """
+    if ordering is None:
+        ordering = identity.ordering
+    elif check_ordering(ordering) != identity.ordering:
+        raise RoaxError(
+            ErrorCode.ORDERING_NOT_DEFINED,
+            f"ordering {ordering!r} disagrees with the identity's {identity.ordering!r}; "
+            f"the identity decides whether roax.ordering is committed, so the two cannot differ",
+        )
     # RESERVED_V2 IS PERMITTED HERE, and the refusal that used to sit at this line was a
     # defect rather than a conservative choice.
     #
@@ -398,14 +474,22 @@ def build_tree(
         authorize_empty_containers=authorize_empty_containers,
     )
     all_leaves = record_leaves + reserved_leaves(identity, reserved_set=reserved_set)
-    ordered = order_leaves(all_leaves)
+    # SALT-ASSIGNMENT order, which is ascending encodePath under BOTH orderings (specification
+    # section 9). It cannot be tree order under `hash`: a leaf hash is computed over its salt,
+    # so pairing salts in tree order would be circular and unimplementable.
+    assigned = order_leaves(all_leaves)
 
-    encoded_paths = tuple(pair[0] for pair in ordered)
-    leaves = tuple(pair[1] for pair in ordered)
-    drawn = tuple(salts.salt_for(path, leaf) for path, leaf in zip(encoded_paths, leaves))
-    hashes = tuple(
-        leaf_hash(leaf.path, leaf.tag, leaf.value, salt, hasher=hasher)
-        for leaf, salt in zip(leaves, drawn)
+    assigned_paths = tuple(pair[0] for pair in assigned)
+    assigned_leaves = tuple(pair[1] for pair in assigned)
+    assigned_salts = tuple(
+        salts.salt_for(path, leaf) for path, leaf in zip(assigned_paths, assigned_leaves)
+    )
+    assigned_hashes = tuple(
+        leaf_hash(leaf.path, leaf.tag, leaf.value, salt, hasher=hasher, ordering=ordering)
+        for leaf, salt in zip(assigned_leaves, assigned_salts)
+    )
+    encoded_paths, leaves, drawn, hashes = _tree_order(
+        ordering, assigned_paths, assigned_leaves, assigned_salts, assigned_hashes
     )
     root = merkle_tree_head(hashes, hasher=hasher)
     return BuiltRecord(
