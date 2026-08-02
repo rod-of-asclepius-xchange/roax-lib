@@ -328,8 +328,25 @@ fn ordering_comes_from_the_registry_and_a_disagreeing_one_is_refused() {
     for issued in [Ordering::Path, Ordering::Hash] {
         let mut issued_context = context();
         issued_context.ordering = issued;
-        let (_, commitment) =
+        let (full, commitment) =
             issue_full_copy(&record, &issued_context, &StringProfile).expect("commitment");
+
+        // The outer member is SELF-DESCRIPTION and is asserted here because no verifier reads it,
+        // so nothing else in this suite can see it go missing. Both envelope schemas define its
+        // ABSENCE as meaning `path`, so a hash-ordered copy without it would assert an ordering
+        // it was not issued under.
+        let full_json = full.to_json_value();
+        let JsonValue::Object(ref members) = full_json else {
+            panic!("a full copy is a JSON object");
+        };
+        let declared = members.iter().find(|(name, _)| name == "ordering");
+        match issued {
+            Ordering::Path => assert!(declared.is_none(), "a path-ordered copy emits no member"),
+            Ordering::Hash => assert_eq!(
+                declared.map(|(_, value)| value),
+                Some(&JsonValue::String("hash".into())),
+            ),
+        }
 
         // Specification section 11.2: the ordering leaf is committed for `hash` and for nothing
         // else, so the two orderings differ in leaf COUNT as well as in placement.

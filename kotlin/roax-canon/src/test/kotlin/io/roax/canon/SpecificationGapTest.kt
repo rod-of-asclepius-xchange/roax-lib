@@ -268,6 +268,15 @@ class SpecificationGapTest {
             assertEquals(ordering == Ordering.HASH, paths.contains(Reserved.ORDERING))
 
             val json = EnvelopeWriter.fullCopy(commitment, recordBytes, nfc)
+            // The outer member is SELF-DESCRIPTION and is asserted here because no verifier reads
+            // it, so nothing else in this suite can see it go missing. Both envelope schemas
+            // define its ABSENCE as meaning `path`, so a hash-ordered copy without it would
+            // assert an ordering it was not issued under.
+            val head = JsonReader.parse(json.toByteArray()) as io.roax.canon.json.JsonObject
+            assertEquals(
+                if (ordering == Ordering.PATH) null else ordering.id,
+                (head["ordering"] as? io.roax.canon.json.JsonString)?.value,
+            )
             // H2: the ordering comes from the anchoring registry. BOTH answers are exercised, so
             // the refusal of the wrong one is evidence rather than an untested branch (9.5).
             for (registrySays in listOf(Ordering.PATH, Ordering.HASH)) {

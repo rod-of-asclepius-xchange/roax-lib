@@ -207,6 +207,12 @@ Each library now takes the ordering from its own registry field (`anchoredOrderi
 **No corpus vector reaches any of this**, because no class-20 vector is `hash`-ordered, so it was found by issuing one by hand and is pinned by nothing in the corpus today.
 Rust needed a second fix on the same path: it recognized only a fixed set of reserved keys on a disclosed leaf, so a copy legitimately disclosing `roax.ordering` was refused as a namespace collision, while the other four use a prefix test and were unaffected.
 
+**The ISSUE path had its own version of the same gap, on the outer `ordering` member rather than on the leaf.**
+TypeScript emitted it for a non-default ordering while Python, Kotlin and Rust - the other three JSON emitters - emitted nothing, and both envelope schemas define the member's ABSENCE as meaning `path`, so those copies ASSERTED an ordering they were not issued under.
+All four now emit it for `hash` and for nothing else, which keeps a path-ordered envelope byte-identical to what each issued before the axis existed; Swift serializes no envelope, so it holds whatever a caller writes.
+**No verifier reads it and that is unchanged**: it is SELF-DESCRIPTION, the registry stays the sole authority, and the reason to emit it at all is that a self-description which lies is worse than none - section 7.4's own reasoning for rejecting a `roax.hashAlg` leaf.
+Nothing in the corpus could see this either, for the same reason as the verify-path defect, so each library asserts the member in its own ordering test.
+
 **Class 21 is the enforcement.**
 Three vectors, each one record under BOTH orderings, asserting two roots that differ AND two **disjoint** leaf-hash sets.
 Disjointness is the stronger assertion and is what H1 buys; a runner checking only the roots would pass an implementation that permuted one leaf set into the other tree.

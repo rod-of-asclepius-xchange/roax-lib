@@ -443,6 +443,13 @@ class TestRecordAndEnvelope(unittest.TestCase):
         for ordering in ("path", "hash"):
             built = issue(self.record, replace(IDENTITY, ordering=ordering), resolver())
             envelope = full_copy(built)
+            # The outer member is SELF-DESCRIPTION and is asserted here because no verifier
+            # reads it, so nothing else in this suite can see it go missing. Both envelope
+            # schemas define its ABSENCE as meaning `path`, so a hash-ordered copy without it
+            # would assert an ordering it was not issued under.
+            self.assertEqual(
+                envelope.get("ordering"), None if ordering == "path" else ordering
+            )
             # H2: the ordering comes from the anchoring registry. BOTH registry answers are
             # exercised, so the refusal of the wrong one is evidence rather than an untested
             # branch (specification section 9.5).

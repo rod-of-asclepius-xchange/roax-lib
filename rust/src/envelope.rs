@@ -1210,6 +1210,26 @@ fn common_envelope_fields(
             "hashAlg".into(),
             JsonValue::String(context.hash_algorithm.name().into()),
         ),
+    ];
+    if context.ordering != Ordering::default() {
+        // SELF-DESCRIPTION, and NOT AUTHORITY. A verifier takes the ordering from the anchoring
+        // registry (specification section 9.5, H2); the parser accepts this member for shape and
+        // never reads it, and nothing here reads it back to select an ordering.
+        //
+        // Emitted only for a NON-DEFAULT ordering, so a path-ordered envelope stays
+        // byte-identical to what this crate emitted before the axis existed - the same
+        // `ROAX-CANON/1` compatibility rule that gives `Path` the empty domain suffix.
+        // Omitting it on a `hash`-ordered copy would not be silence: both envelope schemas
+        // define the member's ABSENCE as meaning `path`, so such a copy would ASSERT an ordering
+        // it was not issued under. A self-description that lies is worse than none even where
+        // nothing reads it, which is the reasoning section 7.4 used to reject a `roax.hashAlg`
+        // reserved leaf.
+        fields.push((
+            "ordering".into(),
+            JsonValue::String(context.ordering.name().into()),
+        ));
+    }
+    fields.extend([
         (
             "recordType".into(),
             JsonValue::String(context.record_type.clone()),
@@ -1218,7 +1238,7 @@ fn common_envelope_fields(
             "schemaVersion".into(),
             JsonValue::String(context.schema_version.clone()),
         ),
-    ];
+    ]);
     if let Some(descriptor) = &context.type_map {
         fields.push((
             "typeMap".into(),

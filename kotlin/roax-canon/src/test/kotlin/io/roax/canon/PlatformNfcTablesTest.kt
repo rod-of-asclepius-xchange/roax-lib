@@ -201,13 +201,14 @@ class PlatformNfcTablesTest {
          * Measured by running this test; see the class documentation for how to re-derive it.
          *
          * **Identical on JDK 17 (Unicode 13.0) and JDK 25 (Unicode 16.0)**, which is the
-         * measurement, and the corroborating counts below are identical on both too: of 17,517
+         * measurement, and the corroborating counts below are identical on both too: of 18,066
          * strings, 54 are non-ASCII and 23 are changed by NFC, and 0 were skipped for carrying a
          * lone surrogate.
          *
-         * RE-DERIVED when the corpus grew class 20 and the type-map binding fixtures, and re-run
-         * on both JDKs before re-pinning, exactly as [COUNT_DRIFT] requires. The total moved from
-         * 14,836 to 17,517 because the new fixtures added strings; the non-ASCII and
+         * RE-DERIVED whenever the corpus grows, and re-run on BOTH JDKs before re-pinning,
+         * exactly as [COUNT_DRIFT] requires. The total moved from 14,836 to 17,517 when class 20
+         * and the type-map binding fixtures landed, and from 17,517 to 18,066 when class 21 and
+         * the per-vector `ordering` declarations did. Across both moves the non-ASCII and
          * changed-by-NFC counts did NOT move, because every added string is ASCII, which is the
          * corroboration that the input set grew rather than the tables changing.
          */

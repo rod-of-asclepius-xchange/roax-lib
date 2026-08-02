@@ -64,12 +64,14 @@ Separately, NFC was applied to every string appearing anywhere in the committed 
 
 **That second measurement is a live guard rather than a one-time run, and it is [`PlatformNfcTablesTest`](roax-canon/src/test/kotlin/io/roax/canon/PlatformNfcTablesTest.kt).**
 Leaving it as prose would have left the property unguarded, and it is the one claim here that least deserves that: it rots silently the first time a JDK or an Android ICU changes how NFC normalizes, which is precisely the divergence this protocol exists to prevent.
-The test pins the digest `4d02818303f50a85f439b01b7c9b6ba71fe0a533be171715217c39224a9549bf` together with the counts that corroborate it, and **running it under both JDKs IS the cross-version comparison**, because a single JVM cannot compare two table versions.
+The test pins the digest `7e7e6e4fbc860336d5c9dcc79e94b4f851b55ce08dd3cf8325359be0c9e4377a` together with the counts that corroborate it, and **running it under both JDKs IS the cross-version comparison**, because a single JVM cannot compare two table versions.
 The constant is deliberately not keyed on the probed `unicodeVersion`, since a per-version table would degrade the guard into "each runtime agrees with itself".
 
 Its input set is `corpus/conformance-corpus-1.0.json` plus `corpus/fixtures/records`, `corpus/fixtures/envelopes` and `corpus/type-maps`, taking object member keys as well as string values because the key site is half of what specification section 5.1 hashes and half of what class 19 tests.
-That yields **14,836 strings, of which 54 are non-ASCII and 23 are changed by NFC**, with none skipped for carrying a lone surrogate, and every one of those four figures is identical on JDK 17.0.19 and JDK 25.0.2.
-The hand-run figure of 14,826 recorded before the guard existed came from a slightly different enumeration, and the two agree on the 54 and the 23, which are the only strings the measurement can turn on.
+That yields **18,066 strings, of which 54 are non-ASCII and 23 are changed by NFC**, with none skipped for carrying a lone surrogate, and every one of those four figures is identical on both JDKs.
+**The total tracks the corpus and the other three figures do not, which is the corroboration rather than a coincidence.**
+It was 14,836 when this guard was written, moved to 17,517 when class 20 and the type-map binding fixtures landed, and moved to 18,066 when class 21 and the per-vector `ordering` declarations did; the non-ASCII and changed-by-NFC counts held at 54 and 23 across both moves, because every string those changes added is ASCII, so what grew is the input set rather than the tables.
+The hand-run figure of 14,826 recorded before the guard existed came from a slightly different enumeration, and it agreed on the 54 and the 23, which are the only strings the measurement can turn on.
 
 That brackets the 15.1 pin from both sides, which is a slightly stronger demonstration than the one `corpus/README.md` already records for Node 16.0 against Python 15.1.
 **It is not a demonstration that a version mismatch is detectable**, which class 16 already says it is not: no character whose NFC form changed between these releases has been identified for this corpus.
