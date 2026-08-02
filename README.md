@@ -34,7 +34,8 @@ That registry is [`docs/profiles/`](docs/profiles/), one document per `recordTyp
 1. **A profile document** under `docs/profiles/`, declaring at minimum its `schemaVersion`, its type-map scope and its non-redactable path set ([`docs/profiles/README.md`](docs/profiles/README.md); specification section 10.2).
    This is not a formality: a syntactically valid `recordType` with no profile document is not a valid record, and the non-redactable floor is decided here.
 2. **A type-map artifact** in the format of [`schemas/type-map-artifact-1.0.json`](schemas/type-map-artifact-1.0.json), plus its row in [`type-maps/registry-1.0.0.json`](type-maps/registry-1.0.0.json).
-   `node tools/check-type-maps.mjs` validates the artifacts and the registry against the committed tree using nothing outside it.
+   `node tools/check-type-maps.mjs` validates the artifacts and the registry against the committed tree, with no reference checkout and no dependency on the generator.
+   It takes Ajv 8 and `ajv-formats` from a directory outside the tree named by `ROAX_AJV`, and `--skip-schema-validation` runs the dependency-free subset without them ([`docs/type-maps.md`](docs/type-maps.md) section 6).
 3. **Registering that profile with a verifier**, which every library takes as *configuration* rather than as a source edit.
    Rust ships no profile implementation at all - `Profile` is a trait the caller implements ([`rust/src/envelope.rs:17`](rust/src/envelope.rs)), so even the Singapore profiles are caller-side there.
    The other four ship the registry as an overridable default: TypeScript's `knownProfiles` and `floorFor` config ([`src/envelope.ts:616`](src/envelope.ts) and `:971`), Python's `ProfileRegistry.with_profile`, Swift's public `ProfileRegistry(profiles:)` beside its `versionOne` default, and Kotlin's `ProfileRegistry.with` beside `ProfileRegistry.DEFAULT`.
@@ -47,7 +48,8 @@ Authoring and validating an artifact is unaffected, and the committed artifacts 
 
 **Jurisdiction-neutral and language-neutral are two separate claims here, and only the first is about profiles.**
 The second is why [`docs/spec/roax-canon-1.md`](docs/spec/roax-canon-1.md) section 13 rejects JCS and dCBOR: their number models are artifacts of a particular language runtime.
-The protocol is built on RFC 9162, RFC 4648, BCP 14 and Unicode 15.1 NFC, listed in specification section 16.
+The protocol is built on RFC 9162, RFC 4648, BCP 14 and Unicode NFC, listed in specification section 16.
+The Unicode version is pinned at 15.1 by specification section 6.1.
 
 ## Start here
 

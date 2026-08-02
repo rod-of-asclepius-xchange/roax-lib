@@ -26,7 +26,7 @@ Three facts were verified against the code and are what the framing may claim; d
   **No library embeds or loads a published `type-maps/` artifact** - every `type-maps/` string in library source is a doc comment, and the resolver is caller-supplied.
 - **The honest limit that must travel with the claim:** GENERATING a type-map artifact from a JSON Schema does not work today, because `tools/build-type-maps.mjs` fails closed on the merged object states.
   Cite that figure as a LOWER BOUND of at least 34 and never as a count, for the reason the type-map section below already gives.
-  Authoring and validating one is unaffected and `node tools/check-type-maps.mjs` passes on the committed tree with nothing outside it.
+  Authoring and validating one is unaffected and `node tools/check-type-maps.mjs` passes on the committed tree, with no reference checkout - it does need Ajv 8 and `ajv-formats` installed outside the tree and named by `ROAX_AJV`, and `--skip-schema-validation` runs the dependency-free subset.
   Stating extensibility without that caveat is the overstatement this repository keeps catching.
 
 **Do not conflate jurisdiction-neutral with language-neutral.**
