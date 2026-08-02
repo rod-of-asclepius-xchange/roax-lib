@@ -5,8 +5,9 @@ Open protocol standards and multi-language libraries for **human healthcare reco
 The goal is a language-neutral way to canonically serialize, merklize, anchor and selectively disclose real health records, integrating with ROAX.
 **It is an international protocol that carries per-jurisdiction profiles, rather than one jurisdiction's format.**
 A record family is named in lowercase reverse-DNS form and joins by a registry entry, so `hl7.fhir.bundle` and `sg.gov.moh.vaccination-healthcert` sit side by side as profiles of one protocol.
-Of the four profiles registered today, `hl7.fhir.bundle` is HL7 FHIR 4.0.1, an international standard rather than a national one; Singapore MOH's PDT, recovery and vaccination healthcerts are the **first national jurisdiction worked end to end**, and all three are registered profiles with published type maps that the libraries implement.
+Of the four profiles registered today, `hl7.fhir.bundle` is HL7 FHIR 4.0.1, an international standard rather than a national one; Singapore MOH's PDT, recovery and vaccination healthcerts are the **first national jurisdiction worked end to end**, and all three are registered profiles with published type maps.
 One measured gap remains there and it is a profile question rather than a support one: PDT's endorsed sample is not yet committable in the conformance corpus, pending a versioned composition profile nobody has ruled ([`docs/type-maps.md`](docs/type-maps.md) section 1.2).
+No library embeds or implements those artifacts: each takes its type-map resolver from the caller, which the section below measures in all five.
 
 Status: **implementation phase.**
 The specifications and schemas were drafted and reviewed before any library existed, deliberately, so that the design could be settled before the implementations existed to re-litigate it.

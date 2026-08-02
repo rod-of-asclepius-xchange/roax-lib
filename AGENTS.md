@@ -31,7 +31,8 @@ Three facts were verified against the code and are what the framing may claim; d
 
 **Do not conflate jurisdiction-neutral with language-neutral.**
 They are two separate claims: the first is about the profile registry, the second is why section 13 rejects JCS and dCBOR.
-And do not let a reframing read as dropping Singapore support - the three MOH healthcerts are the only national jurisdiction worked end to end, they are fully implemented, and `hl7.fhir.bundle` is the international standard beside them rather than the general case they specialize.
+And do not let a reframing read as dropping Singapore support - the three MOH healthcerts are the only national jurisdiction worked end to end, and `hl7.fhir.bundle` is the international standard beside them rather than the general case they specialize.
+Scope that support as `README.md` does rather than as "fully implemented": recovery and vaccination commit and class 10 is 2 of 3 records, while PDT's endorsed sample stays uncommittable on the 20 `(pattern, kind)` pairs its open root leaves undeclared, pending a versioned composition profile nobody has ruled (`docs/type-maps.md` section 1.2).
 
 **The ruling's figure and the language set do not agree, and that is a real open point rather than a typo.**
 Decision D was ruled to "five independent, corpus-enforced libraries", and its rejected option Db names those five as Rust, TypeScript, Swift, Kotlin and Go.
