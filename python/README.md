@@ -212,8 +212,9 @@ The structured-path DFA artifacts in `type-maps/`, content-ID reproduction, issu
 The short version: no committed corpus vector exercises them, and adding a large unexercised surface to a library whose acceptance criterion is byte-identical agreement on the corpus would be adding untested code, not coverage.
 **That list used to include the whole of `RESERVED_V2`, and the sentence saying so has been narrowed rather than deleted, because the over-broad version was a defect.**
 It read that issuance, envelope emission and verification all reject with `type-map-rejected` "until an artifact-aware resolver can reproduce and select the exact content ID".
-That is false for the producing side: an issuer knows which artifact it used and supplies its content ID, and nothing about committing `roax.typeMap.id` requires fetching or reproducing anything.
-Content-ID reproduction is a VERIFIER's obligation when it selects a map from candidate bytes (specification section 10), and it is still unimplemented here.
+That is false on all three counts, and not only on the producing side: an issuer knows which artifact it used and supplies its content ID, so nothing about committing `roax.typeMap.id` requires fetching or reproducing anything.
+Selecting `RESERVED_V2` on a `VerifierConfig` is likewise an opt-in STRICTNESS rather than a refusal - it requires the outer `typeMap` member and raises the JSON carrier floor to six, and a copy meeting both is accepted on both copy kinds.
+Content-ID reproduction is a VERIFIER's obligation when it selects a map from candidate bytes (specification section 10), and that obligation is what is still unimplemented here.
 The refusal made this package unable to issue any record the current specification admits, because section 11.2 marks that leaf emitted ALWAYS - and the cost was invisible until conformance corpus class 20 asked an implementation to PRODUCE an envelope rather than only to verify one.
 
 **What this package does and does not do about a type map, one line each.**

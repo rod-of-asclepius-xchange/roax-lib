@@ -42,10 +42,21 @@ rebuilds, and on an 8-leaf tree an internal node presented as a leaf with a forg
 ``leafCount`` is therefore **not** authenticated in a disclosed copy and is used for
 nothing here beyond being the tree size RFC 9162 requires as an input.
 
-Envelope 2.0 verification is deliberately fail-closed in this package.
-That version requires exact structured-path DFA selection by the content ID committed at
-``roax.typeMap.id`` under specification section 4.2, while this package implements
-neither published-artifact loading nor content-ID reproduction.
+Selecting :data:`RESERVED_V2` is an opt-in STRICTNESS rather than a refusal, and an earlier
+version of this docstring called it fail-closed.
+It requires the outer ``typeMap`` member and raises the JSON carrier floor to six, and a copy
+satisfying both is ACCEPTED on both copy kinds: measured by verifying the committed
+``typemap-floor-*-complete`` and ``roundtrip-*`` fixtures under it.
+**No corpus vector reaches that measurement**, because the corpus runner verifies every
+envelope vector under its ``VerifierConfig.reserved_set``, which it leaves at the
+:data:`RESERVED_V1` default.
+
+What this package genuinely does not do is the VERIFIER-side obligation of specification
+section 10: fetching the artifact the content ID names, reproducing that content ID from the
+fetched bytes, and comparing the artifact's own ``recordType``, ``schemaVersion`` and
+``typeMapVersion`` against the envelope's.
+`README.md` owns that limit under "What is deliberately not built".
+**This is not envelope-2.0 support and must not be described as such.**
 """
 
 from __future__ import annotations
@@ -192,9 +203,12 @@ class VerifierConfig:
     11.3, and that member's own description in the schema).
     The section 4.2 binding arrived with `schemas/envelope-2.0.json`, which requires the
     member and commits the leaf.
-    This package cannot verify that version yet: it deliberately has no published-DFA
-    artifact loader or content-ID reproduction, so selecting :data:`RESERVED_V2` fails
-    closed rather than trusting a display-pattern resolver by record type.
+    Selecting :data:`RESERVED_V2` here is an opt-in strictness rather than a refusal: it
+    requires that member, raises the JSON carrier floor to six, and accepts a copy meeting
+    both.
+    It does not gain an artifact-aware resolver - ``resolvers`` stays a caller-supplied map
+    per ``recordType``, and the section 10 limit named in this module's docstring still
+    applies.
     """
 
     profiles: ProfileRegistry = DEFAULT_PROFILES

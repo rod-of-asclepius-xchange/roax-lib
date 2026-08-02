@@ -20,10 +20,16 @@ before building the copy.
 Passing ``profile=None`` is reserved for negative fixtures and can produce a copy that
 the verifier rejects.
 
-This module emits envelope 1.0 only.
-Envelope 2.0 requires exact structured-path DFA selection by a reproduced content ID
-under specification section 4.2, so selecting :data:`roax_canon.record.RESERVED_V2`
-rejects until that artifact-aware implementation exists.
+**Both reserved leaf sets are emittable here.**
+Emission needs no artifact: an issuer knows which one it used and supplies its content ID, so
+committing ``roax.typeMap.id`` fetches and reproduces nothing.
+Conformance corpus class 20 drives both emitters below under
+:data:`roax_canon.record.RESERVED_V2`; :func:`_require_emittable_reserved_set` records why the
+refusal that used to sit there was a defect.
+
+Reproducing a content ID from fetched bytes is a VERIFIER's obligation under specification
+section 10 and is still unimplemented; `README.md` owns that limit under "What is deliberately
+not built".
 """
 
 from __future__ import annotations
