@@ -66,7 +66,11 @@ Two legitimate options exist and the choice is a product decision, not an implem
 - **Normalize through a declared, versioned adapter.**
   Downstream code gets genuine FHIR, but the adapter version and both the pre- and post-normalization identities must be explicit, and any existing proof remains a proof of the legacy bytes, not of the rewritten record.
 
-This is folded into decision C in `docs/decisions.md`, since it bears directly on what happens to already-issued Singapore healthcerts.
+This was folded into decision C in `docs/decisions.md`, since it bears directly on what happens to already-issued Singapore healthcerts.
+**C was ruled on 2026-08-02 and the ruling does not choose between the two options above.**
+It rules that already-issued healthcerts are remapped into this protocol rather than bridged, which settles the direction and says nothing about whether a remap also normalizes this layout.
+So the choice above stays live, this document continues to specify preservation, and a normalizing remap would be a semantic rewrite layered on top of the re-derivation rather than the re-derivation alone.
+Do not read the C ruling as having authorized normalization.
 
 ## 3. Type-map scope
 

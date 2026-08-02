@@ -386,7 +386,8 @@ These are the things a future agent is most likely to get wrong.
 - **The corpus may not require what the design has not decided.**
   A required corpus field that presumes one side of an open decision silently rules it (`docs/conformance-corpus.md` section 1.2).
   This happened twice with `masterSalt` before decision D4 was ruled.
-  The rule still binds, because decision C is still open.
+  The rule still binds, but no longer on a lettered decision: every decision in `docs/decisions.md` is ruled as of 2026-08-02.
+  It binds on what is unsettled beneath the rulings, and the three that reach the corpus are the `Poseidon-BN254` parameterization under B, PDT's 20 endorsed-sample pairs, and the undesigned anchoring registry that keeps class 18's registry rows unbuildable.
   D14 is the case that shows it working end to end: the class-19 key vector was withheld while D14 was open and built under the ruling on 2026-07-30, so no implementation ever inherited an unruled answer from a data file.
 
 - **There is no master salt and no KDF.
@@ -538,11 +539,28 @@ Things to know:
   Where something is inferred rather than confirmed, the text says so in the sentence.
   Keep this - the documents are written to be checkable rather than trusted, and a reader who spot-checks one uncited claim loses confidence in all of them.
 
-## The open decisions are open on purpose
+## Every decision is ruled, and what is left is narrower than a decision
 
 `docs/decisions.md` holds four decisions belonging to the project owner (A, B, C, D), plus the ten engineering ones, plus D14 in part 2a.
 
-**One is still open, and it is the owner's - C.**
+**All of them are ruled as of 2026-08-02, and this section heading used to say the opposite.**
+Do not restate "one decision is open" from memory, and do not treat "no open decisions" as "nothing left to decide": what remains is the `Poseidon-BN254` parameterization under B, the remap mechanics under C, and the Part 4 gaps, of which the anchoring registry and PDT's 20 endorsed-sample pairs are the ones other documents cite.
+
+**C was ruled on 2026-08-02**: healthcerts already issued under OpenAttestation are **remapped into this protocol** - re-submitted and re-derived under ROAX canonicalization - rather than bridged, mirrored or read natively, and this project builds and maintains NO OpenAttestation verifier.
+A translation method is deferred rather than refused.
+It is C2 in its stricter form; C1 was rejected on its indefinite two-roots-two-verifiers cost and C3 on the reasoning the document already carried, that a bridge reimplements the exact canonicalization this project exists to escape.
+**Three consequences travel with the ruling and a summary that drops them is an overstatement**: a remap produces a NEW root and does not preserve the anchored OpenAttestation one, so a proof against the old root stays a proof of the old bytes; and the three unportable states do NOT behave alike, which is the next bullet.
+
+**Do not write "ROAX rejects all three unportable states".**
+It is the sentence a summary of the C ruling naturally reaches for and it is wrong on the third.
+Specification section 3.2 lists duplicate keys, unpaired surrogates, and `undefined` plus sparse-array holes.
+The first two are visible in wire text and genuinely fail closed (section 3.2, and section 6.1 for surrogates specifically).
+Do not reach for section 6.4 here: it is the float-parsing hazard and says nothing about either state, and section 4.2's near-identical sentence governs TYPE-MAP ARTIFACT bytes rather than the record.
+The third **cannot fire on a remap's input at all**, for the reason section 3.2 attaches to that very entry - "which have no JSON representation" - so by the time serialized bytes exist the hole is already `null` and the `undefined` member is already absent.
+So a remap commits what the predecessor serializer wrote, and under section 3.3 plus settled point S5 a serialized redaction hole becomes a distinct NULL leaf the issuer never intended.
+That is the OpenAttestation redaction bug surviving as faithfully committed data rather than as a verification failure - which is better behaviour and is NOT a recovery, so do not describe remapping as sidestepping that bug without the second half.
+`docs/decisions.md` Part 4 carries it as a gap.
+
 **A was ruled on 2026-08-02**: no EU credential format is adopted and no export codec is built, material issued under another regime is re-submitted to this standard rather than translated, and a translation method is deferred rather than refused.
 That last clause is what costs something, so the ruling carries a **standing design constraint**: a disclosure unit MUST remain a single leaf, independently verifiable against the root from its own audit path alone.
 Bundling leaves into an indivisible unit, subtree-only disclosure, or a leaf whose verification needs a sibling beyond its own audit path each break it and each need the ruling revisited rather than settled as a design detail.
@@ -561,12 +579,14 @@ The sites are `corpus/tools/roax_ref.py`, `corpus/tools/roax_ref.mjs`, `src/type
 The Kelvin workaround in the synthetic map is gone, and two committed vectors now fail closed under raw matching, so the corpus catches a regression rather than tolerating it.
 Rust's `LookupKeyMode`, `TypeResolver::ensure_lookup_decision_independent` and `Error::LookupNormalizationUndecided` were deleted with the ruling; do not reintroduce a mode enum.
 
-**Do not resolve C in code or prose without an explicit ruling**, and if it is ruled, update `docs/decisions.md` in the same change rather than only the specification.
+**A ruling updates `docs/decisions.md` in the same change rather than only the specification**, and if a decision is ever reopened or a new one raised, the same rule binds.
 A decision that looks settled in the spec but is still marked OPEN in the decisions document is worse than either.
-**A's ruling is the worked example of that rule**: it moved `docs/decisions.md`, `README.md`, `docs/spec/roax-canon-1.md` section 15, `docs/conformance-corpus.md` and this file in one change, because five documents stated the open count and any one left behind would have contradicted the other four.
-**C is not decided by A.**
-A's re-submission answer covers material issued under another regime; whether it extends to the Singapore healthcerts already issued under OpenAttestation was explicitly not inferred, so do not close C by analogy.
-Part 1's owner sections are the owner's and are not edited by ruling work elsewhere in the document.
+**A and C are the worked examples**: each moved `docs/decisions.md`, `README.md`, `docs/spec/roax-canon-1.md` section 15, `docs/conformance-corpus.md` and this file in one change, because those documents each stated the open count and any one left behind would have contradicted the rest.
+C moved `docs/profiles/vaccination-healthcert.md` as well, since that profile had folded a question into C and had to be told the answer - which is that the ruling settles the DIRECTION and does not choose between preserving and normalizing the flattened `fhirBundle.entry[]` layout.
+**A and C were ruled on the same date and neither decided the other**, and that distinction is now easier to lose rather than harder.
+A's re-submission answer covers material issued under another regime and was explicitly not extended by inference to the already-issued Singapore healthcerts; C reaches a compatible answer from the OpenAttestation audit evidence instead.
+They share a principle - conform to this standard now, keep translation possible later - and collapsing them into one ruling discards why each was made.
+Part 1's owner sections are the owner's and are not edited by ruling work elsewhere in the document; the C ruling corrected exactly one sentence inside A's section, the one saying C stays open, and left the rest of that section alone.
 
 ## Validating the schemas
 

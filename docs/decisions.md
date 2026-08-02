@@ -1,26 +1,32 @@
 # Decisions: settled, open, and the reasoning
 
-**Status:** one decision is genuinely open.
-It is in Part 1 and belongs to the project owner - **C**.
+**Status:** every decision in this document has been ruled, including all four that belong to the project owner.
+**Decision C** was ruled on 2026-08-02: healthcerts already issued under OpenAttestation are **remapped into this protocol** rather than bridged, and a translation method is deferred rather than refused.
+It was the last one open, and it was ruled on the same date as A and on the same principle, which Part 1 states and which neither ruling may be read as having settled for the other.
 **D14** was identified on 2026-07-29 while building a conformance vector and was ruled D14a on 2026-07-30; it is in Part 2a with its reasoning.
-Everything else has been ruled.
 **Decision A** was ruled on 2026-08-02: no EU credential format is adopted and material issued elsewhere is re-submitted to this standard, with a translation method deferred rather than refused, under a standing single-leaf disclosure constraint that keeps it buildable.
 **Decision B** was ruled earlier, with the residual open questions named inside it.
 **Decision D** was ruled Da on 2026-07-29: five independent, corpus-enforced libraries.
+
+**What is unsettled is now narrower than a decision, and is recorded as such rather than left implicit.**
+Three things remain genuinely unanswered and none of them is a fork between tabled options: the `Poseidon-BN254` parameterization named inside B, the remap mechanics named inside C, and the gaps in Part 4 - of which the anchoring registry and PDT's 20 endorsed-sample path-kind pairs are the ones other documents cite.
+"No open decisions" does not mean "nothing left to decide", and a reader who reads it that way has been misled by this document rather than by the tree.
 The **ten engineering decisions in Part 2 - D3, D4, D5, D6, D7, D8, D9, D11, D12 and D13 - were ruled on 2026-07-28**, and each carries its reasoning so that it can be overturned on the reasoning rather than on authority.
 
 Eight of those ten confirmed what the specification already recommended.
 Two changed it: **D4** moved to D4b, independently random per-leaf salts, and **D9** gained a content-addressed blob binding that is defined but selected by no version-1 profile.
 
-The protocol specification is **written on the recommended answer to each decision that is still open**, so that it is concrete and readable rather than hedged into uselessness.
-That is a drafting choice, not a ruling.
-A specification that hides a live decision behind confident prose is worse than one that names it, so each is named here with its alternatives and their consequences.
+The protocol specification was **written on the recommended answer to each decision while that decision was open**, so that it was concrete and readable rather than hedged into uselessness.
+That was a drafting choice, not a ruling, and it describes nothing today: no decision is open, so the specification is written on rulings throughout.
+The sentence is kept in the past tense rather than deleted, because it explains how the document came to be worded and because it binds again the moment a decision is reopened or a new one is raised.
+A specification that hides a live decision behind confident prose is worse than one that names it, so each is named here with its alternatives and their consequences, and each ruling is recorded above the option table it was chosen from.
 
 `docs/conformance-corpus.md` class 19 defines the vector that settles D14, and it is built now that D14 is ruled; `corpus/README.md` records the two vectors that discriminate the two readings.
 
 **A decision that looks settled in the specification but is still marked OPEN here is worse than either**, so the two documents move together in one change.
 That warning is in this document because it has already been a problem.
 It applies in both directions, which is why the A ruling moved `README.md`, `docs/spec/roax-canon-1.md` section 15, `docs/conformance-corpus.md` and `AGENTS.md` in the same change as this one.
+The C ruling moved the same four documents plus `docs/profiles/vaccination-healthcert.md`, which folded a question into C and therefore had to be told the answer.
 
 ## Numbering
 
@@ -86,9 +92,11 @@ The source-2 reproductions are carried from the audit and were not independently
 
 ## Part 1 - The four decisions that belong to the project owner
 
-One of them - C - has not been ruled on.
-**A, B and D have been ruled**, and are kept here rather than moved to Part 3 because the option records and their reasoning belong with the other owner decisions.
+**All four have been ruled.**
+They are kept here rather than moved to Part 3 because the option records and their reasoning belong with the other owner decisions.
 A was ruled on 2026-08-02 and is the case this document had already said was worth stating explicitly: not now, and deliberately kept possible.
+C was ruled on the same date, and reaches the same shape from different evidence: remap into this protocol now, translation deferred rather than refused.
+**That the two agree is not evidence that either decided the other**, and each section says so in its own words, because two rulings on one date is exactly the setup a later reader collapses into one.
 
 ### Decision A - Does roax-lib need EU recognition? **RULED 2026-08-02: not now, and deliberately kept possible**
 
@@ -128,8 +136,10 @@ Specification section 10 already carries, for each revealed leaf, its own salt a
 Anything more specific than the granularity rule above would be inventing capability this ruling did not grant, and the evidence for a mapping table is a standard nobody has committed to reading.
 
 **What this does not decide.**
-It does not decide **Decision C**, which stays open below.
-The re-submission logic may or may not extend to the Singapore healthcerts already issued under OpenAttestation, and that extension is not inferred here.
+It does not decide **Decision C**, which was ruled separately below on the same date.
+The re-submission logic may or may not extend to the Singapore healthcerts already issued under OpenAttestation, and that extension is **not** inferred here.
+This paragraph is corrected only where the C ruling made it false - it previously said C stays open - and is otherwise left as written, because its point survives the ruling and is now the thing that keeps the two apart.
+C reaches a compatible answer on its own evidence rather than by inheriting this one.
 
 **Written into the spec:** nothing, and that is now the ruled state rather than an unresolved one.
 The specification defines no export profile and takes no position on EU recognition, which is correct under this ruling; section 15 records it as ruled.
@@ -243,16 +253,78 @@ What does not survive untouched is the byte-string preimage, which is precisely 
 **Evidence note:** the timings are carried from the canonicalization research, which benchmarked `light-poseidon` 0.3 with `Poseidon::<Fr>::new_circom(n)` over `ark_bn254::Fr` - the exact primitive dogtag uses - and validated its harness by reproducing dogtag's own pinned anchor vector.
 They were **not** re-run while writing this document.
 
-### Decision C - What happens to the Singapore healthcerts already issued under OpenAttestation? **OPEN**
+### Decision C - What happens to the Singapore healthcerts already issued under OpenAttestation? **RULED 2026-08-02: remapped into this protocol, translation deferred**
+
+**The ruling, stated precisely before it is quoted.**
+Healthcerts already issued under OpenAttestation are **remapped into this protocol**: the record is re-submitted to ROAX-CANON/1 and re-derived under ROAX canonicalization.
+It is not bridged, not mirrored and not read natively.
+This project builds, reimplements and maintains **no** OpenAttestation verifier.
+A translation method is **deferred, not refused**: it may be built later, and until then nothing here may be built in a way that forecloses it.
+
+The project owner's words, on 2026-08-02:
+
+> "Decision C - they just have to be remapped into our protocol.
+> We will support translation in a later date."
+
+**Which option this is.**
+It is **C2**, in its stricter form.
+C2 as tabled is "ROAX-only for new issuance, with importers for OA documents", and the ruling keeps that end state while narrowing the mechanism.
+"Importer" could have been read as tooling that carries some part of the OpenAttestation identity forward; a remap carries none of it.
+The old wrapper is not preserved, and neither is the old root.
+
+**C1 is rejected.**
+Its tabled cost is two roots and two verifiers **indefinitely**, and that is the word the ruling refuses, for the same reason A refused A1's "permanently".
+
+**C3 is rejected, on the reasoning this section already carried.**
+A verifier bridge means reimplementing the exact canonicalization this project exists to escape, against a historically reconstructed JavaScript compatibility profile rather than a language-neutral specification.
+The feasibility finding below is unchanged by the rejection: the bridge is buildable, and building it is what the ruling declines.
+
+**This is the same principle as decision A, applied a second time.**
+A ruled that material issued under another regime is re-submitted to this standard rather than translated; C rules that material issued under the predecessor regime is too.
+Both defer a translation method rather than refusing it.
+The shared principle is worth naming once: **conform to this standard now, and keep a translation layer possible as a later option rather than a commitment.**
+**Neither ruling decides the other**, and they are recorded separately on purpose.
+A's own "what this does not decide" paragraph declined to extend its re-submission answer to already-issued healthcerts by inference, and C reaches the same answer on its own evidence, which is the audit findings below rather than the EU format question.
+Reading either as having settled the other discards the reason each was ruled.
 
 **Written into the spec:** nothing.
-No migration path is specified.
+No migration path is specified, and the ruling does not add one.
+What the specification already says about the states a remap meets is not new text but is now load-bearing for this decision; it is cited below.
 
-| Option | Consequence |
-|---|---|
-| **C1. Dual-issue** - OA wrap for legacy verification, ROAX wrap for portable | No big-bang cutover. Cost: two roots and two verifiers, indefinitely. |
-| **C2. ROAX-only for new issuance**, with importers for OA documents | Clean end state. Cost: migration tooling, and old documents need a verifier that still exists. |
-| **C3. Verifier bridge** - reimplement OA's rules in Rust so ROAX verifiers read old certificates | Reads old certificates natively. Cost: high and fragile, because it means reimplementing the exact canonicalization this project exists to escape. |
+#### What the ruling costs, stated rather than left to be discovered
+
+**A remapped record gets a new root, and the old one is not preserved.**
+This follows by construction rather than from a measurement: nothing is shared between the two leaf constructions.
+ROAX hashes a length-prefixed preimage carrying the RFC 9162 leaf domain byte and an algorithm-qualified `DOMAIN` of `"ROAX-CANON/1/" ‖ hashAlg`, with an independent per-leaf salt, over an RFC 9162 tree (specification sections 8 and 9).
+OpenAttestation salts `` `${typeof value}:${String(value)}` `` and aggregates a sorted hash array under legacy Keccak-256 (Part 0, and the feasibility finding below).
+So anyone relying on an anchored OpenAttestation root must be told plainly that the remap does not preserve it.
+A proof against the old root remains a proof of the old bytes, and it is not a proof of the remapped record.
+
+**Three states have no portable equivalent, and the remap does not treat them alike.**
+The audit named them together; the specification's answer differs per state, and the difference is the part a migration plan has to know:
+
+- **Duplicate JSON member names are rejected.**
+  They are visible in the wire text, and specification section 3.2 requires rejection at the input boundary before any hashing, its abstract model admitting map keys only as unique.
+  A document carrying them fails closed rather than losing a member silently, which is what the audit records OpenAttestation itself doing.
+- **Unpaired UTF-16 surrogates are rejected.**
+  They survive serialization as escapes, so they too reach the input boundary, and specification sections 3.2 and 6.1 both reject them - section 6.1 explicitly before normalization, for the reason it gives, that a JavaScript string can represent one and a Rust string cannot.
+- **`undefined` and sparse-array holes cannot be answered on this input path, and the existing rule does not reach them.**
+  Specification section 3.2 lists them as rejected, and the clause it qualifies them with - "which have no JSON representation" - is why the rejection cannot fire here.
+  A remap reads serialized JSON, by which point a hole has already become `null` and an `undefined`-valued member is simply absent.
+  So the state is unobservable and the rule is unreachable on it.
+  **What a remap does with those two states today is therefore: whatever the OpenAttestation serializer already did, committed as written.**
+  Recovering the issuer's intent needs evidence outside the wire form, and no such mechanism is designed.
+  This is recorded as a gap in Part 4 rather than answered here.
+
+**The OpenAttestation wire bug is half sidestepped, and the half that is not is the one that matters for a remap.**
+The bug is recorded below: redacting an individual array element leaves a hole that serializes as `null`, adding a visible leaf and breaking verification across a JSON round trip.
+What **is** sidestepped is the verification failure itself, because a remap recomputes no OpenAttestation digest and there is no OpenAttestation digest in a remapped record to disagree with itself.
+What is **not** sidestepped is the `null` in the bytes.
+Specification section 3.3 emits a leaf for every scalar, and settled point S5 makes null a leaf distinct from an empty array and an empty object, so a remap of a redacted array commits a NULL leaf that the pre-redaction record did not have and that the issuer did not intend.
+The bug becomes a faithfully committed artifact rather than a verification failure, which is an improvement in behaviour and not a recovery of the lost element.
+This is the same gap as the third bullet above, reached from the other direction.
+
+#### The audit findings this section carried while it was open, kept as the record
 
 **What the audit established about C3's feasibility.**
 A byte-compatible OpenAttestation v2 verifier **is** feasible in Rust, Swift, Kotlin or Go.
@@ -272,14 +344,32 @@ digest before round trip:  6d5d47f4...
 digest after parse:        c2f79bbf...      equal: false
 ```
 
-**A consideration that is easy to miss.**
-The vaccination healthcert's flattened `fhirBundle.entry[]` layout interacts with this decision.
-Normalizing it to genuine FHIR would change every path and therefore every root, so any migration that also normalizes is a semantic rewrite, not a re-wrap.
-See [`profiles/vaccination-healthcert.md`](profiles/vaccination-healthcert.md) section 2.1.
+**Evidence note:** everything in this subsection is carried from the OpenAttestation audit and was **not** re-run while recording this ruling.
+The per-state consequences above are a different matter and were checked against the specification in this tree, at the sections cited.
 
-**This is a product and regulatory decision, not a technical one.**
-All three options are buildable.
-The question is who has to keep verifying what, for how long.
+#### What the ruling does not settle
+
+**It settles the direction and not the mechanics**, and no mechanics are invented here to make it look complete.
+
+- **No remap tool is specified, designed or built**, and this ruling authorizes none by itself.
+  Specifying one is its own piece of work, and it inherits the two unrecoverable states above as a stated input rather than discovering them.
+- **Whether a remap also normalizes the vaccination healthcert's flattened `fhirBundle.entry[]` layout is not decided.**
+  This paragraph previously described that layout as interacting with an open C, and the ruling does not resolve it: "remap into this protocol" says nothing about which of the two options in [`profiles/vaccination-healthcert.md`](profiles/vaccination-healthcert.md) section 2.1 a remap takes.
+  Normalizing to genuine FHIR would change every path and therefore every root, so a normalizing remap is a semantic rewrite on top of a re-derivation rather than a re-derivation alone.
+  That profile continues to specify preservation, and a normalizing adapter would still need its version and both identities stated explicitly.
+- **The retention question C1 was weighed against is untouched.**
+  "Who has to keep verifying what, for how long" was described here as the real question, and the ruling answers only the ROAX half of it: this project keeps no OpenAttestation verifier alive.
+  Whether anyone else does, and for how long, is not this document's to rule.
+
+**This was a product and regulatory decision, not a technical one**, which is why all three options were buildable and why the ruling is recorded with the owner's words rather than argued to from the evidence.
+
+| Option | Consequence |
+|---|---|
+| **C1. Dual-issue** - OA wrap for legacy verification, ROAX wrap for portable | No big-bang cutover. Cost: two roots and two verifiers, indefinitely. |
+| **C2. ROAX-only for new issuance**, with importers for OA documents | Clean end state. Cost: migration tooling, and old documents need a verifier that still exists. |
+| **C3. Verifier bridge** - reimplement OA's rules in Rust so ROAX verifiers read old certificates | Reads old certificates natively. Cost: high and fragile, because it means reimplementing the exact canonicalization this project exists to escape. |
+
+The table is kept unchanged as the record of what was weighed, exactly as decision A's is.
 
 ### Decision D - Five independent libraries, or a shared core over a binding layer? **RULED Da**
 
@@ -669,6 +759,7 @@ Recorded so that nobody mistakes a gap for a conclusion.
 | **The five reference implementations share one author.** | They do not share a JSON parser, number representation, Unicode API, map or sort. They do share one reading of the specification. Hence gate 3 in the corpus. |
 | **No character with version-dependent NFC has been identified.** | The Unicode pin is inferred from dogtag having found it necessary in code, not from an exhibited failing character. Conformance class 16 says so explicitly. |
 | **The ROAX chain integration is not designed.** | Anchoring registry shape, batching and revocation semantics are a real design space that no research leg covered. |
+| **The remap mechanics decision C rules toward are not designed**, and two OpenAttestation states cannot be recovered from a wire form. | Decision C is ruled: already-issued healthcerts are remapped into this protocol. No remap tool is specified. Two of the three states the audit called unportable are answered by specification section 3.2 as rejections and are reachable in wire text - duplicate member names and unpaired surrogate escapes - so a remap fails closed on them. The third is not: `undefined` and sparse-array holes have no JSON representation, which is section 3.2's own wording, so by the time a remap reads serialized bytes the hole is already `null` and the `undefined` member is already absent. The rejection rule cannot fire, and a remap commits what the OpenAttestation serializer wrote. Under section 3.3 and settled point S5 that `null` becomes a distinct NULL leaf the issuer never intended, which is the OpenAttestation redaction bug surviving as committed data rather than as a verification failure. Recovering the intent needs evidence outside the wire form, and no such mechanism exists or is designed. Do not write "ROAX rejects all three" - the rule is unreachable on the third. |
 | **The `Poseidon-BN254` parameterization is not pinned.** | Decision B is ruled: both hash families are first-class and selectable per record. What is not settled is the parameterization - field, rate and capacity, round constants, and the byte-string-to-field-element encoding, which the byte-level preimage of specification section 8 does not survive without. Section 7 no longer states a preimage, because D4 was ruled D4b. `ROAX-CANON/1` defines SHA-256 only and registers Poseidon-BN254 with a MUST NOT against issuing under it. No parameterization has been invented to fill the gap. |
 | **Which record families will select Poseidon is unknown.** | Blob handling is an optimization for a SHA-256 record and a requirement for a Poseidon one. D9 is ruled and no longer waits on this: the content-addressed binding is **defined** in `ROAX-CANON/1` and **selected by no version-1 profile**, so the answer to this question decides when a profile selects it rather than whether the binding exists. |
 | **The audit's boundary conclusion was reached without consulting dogtag.** | **Closed.** Checked during this work; the conclusion survives, and dogtag's narrower single-profile shape is explained rather than adopted. See specification section 14.1. |

@@ -33,7 +33,7 @@ Section 11 states what makes that claim checkable, and section 13 states honestl
 12. [Versioning](#12-versioning)
 13. [Why not JCS, dCBOR or RDFC-1.0](#13-why-not-jcs-dcbor-or-rdfc-10)
 14. [Reconciliation with dogtag](#14-reconciliation-with-dogtag)
-15. [Decisions: what is ruled and what is still open](#15-decisions-what-is-ruled-and-what-is-still-open)
+15. [Decisions: what is ruled, and what remains unsettled beneath a ruling](#15-decisions-what-is-ruled-and-what-remains-unsettled-beneath-a-ruling)
 16. [Citations](#16-citations)
 
 ---
@@ -1538,12 +1538,18 @@ This is decision D / D10 and it was ruled to five independent, corpus-enforced b
 
 ---
 
-## 15. Decisions: what is ruled and what is still open
+## 15. Decisions: what is ruled, and what remains unsettled beneath a ruling
 
-**One open decision belongs to the project owner.**
-This specification takes no position on it and defines nothing that depends on it.
+**Every decision is now ruled, including all four belonging to the project owner.**
+What remains unsettled is narrower than a decision and is named below rather than left to be inferred from silence.
 
-- **C** - what happens to the Singapore healthcerts already issued under OpenAttestation.
+**C was ruled on 2026-08-02**, and what it changes in this document is nothing: healthcerts already issued under OpenAttestation are remapped into this protocol rather than bridged, and a translation method is deferred rather than refused.
+This document specifies no migration path, which was already the case and is now the ruled state rather than an unresolved one, and it defines no OpenAttestation compatibility rule of any kind.
+**What the ruling does put weight on is text this document already carried.**
+Section 3.2's rejection list and section 6.1's unpaired-surrogate rule are what a remap meets at the input boundary, so a document carrying duplicate member names or unpaired surrogate escapes fails closed rather than losing them silently.
+Section 3.2 also lists `undefined` and sparse-array holes, and the clause qualifying that entry - "which have no JSON representation" - is why it cannot fire on a serialized document.
+A remap therefore commits whatever the predecessor serializer wrote, which under section 3.3 makes a serialized redaction hole a distinct `NULL` leaf.
+`docs/decisions.md` decision C owns that consequence and records it as a gap; this document is cited by it rather than changed by it.
 
 **A was ruled on 2026-08-02**, and what it changes here is nothing: no EU credential format is adopted, material issued under another regime is re-submitted to this standard rather than translated, and a translation method is deferred rather than refused.
 This document defines no export profile, which was already the case and is now the ruled state rather than an unresolved one.
