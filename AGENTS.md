@@ -19,7 +19,7 @@ That was corrected on 2026-08-02 as a positioning fix, and nothing in the archit
 Three facts were verified against the code and are what the framing may claim; do not restate them from memory, and do not widen them:
 
 - **Nothing hard-codes a jurisdiction.**
-  `docs/spec/roax-canon-1.md` names Singapore in four places and all four are non-normative: the glossary, one envelope example at `recordType`, the decision-C summary and the read-only reference-schema citation.
+  `docs/spec/roax-canon-1.md` names Singapore in three places and all three are non-normative: the glossary, one envelope example at `recordType`, and the read-only reference-schema citation.
   `recordType` is constrained by lowercase reverse-DNS FORM and never by an enum, in both `schemas/envelope-1.0.json` and `schemas/envelope-2.0.json`, and section 12.2 makes `docs/profiles/` the extension point normatively.
 - **Adding a jurisdiction is a profile document plus a type-map artifact plus a registry row, and no library source edit.**
   The profile registry is caller-supplied in all five: Rust ships NO `impl Profile` at all so even the Singapore profiles are caller-side, and the other four ship an overridable default (`src/envelope.ts` `knownProfiles`/`floorFor`, Python `ProfileRegistry.with_profile`, Swift `ProfileRegistry(profiles:)`, Kotlin `ProfileRegistry.with`).
