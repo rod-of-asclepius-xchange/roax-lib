@@ -2,7 +2,11 @@
 
 Open protocol standards and multi-language libraries for **human healthcare records**.
 
-The goal is a language-neutral way to canonically serialize, merklize, anchor and selectively disclose real health records - FHIR, and Singapore MOH's PDT, recovery and vaccination healthcerts - integrating with ROAX.
+The goal is a language-neutral way to canonically serialize, merklize, anchor and selectively disclose real health records, integrating with ROAX.
+**It is an international protocol that carries per-jurisdiction profiles, rather than one jurisdiction's format.**
+A record family is named in lowercase reverse-DNS form and joins by a registry entry, so `hl7.fhir.bundle` and `sg.gov.moh.vaccination-healthcert` sit side by side as profiles of one protocol.
+Of the four profiles registered today, `hl7.fhir.bundle` is HL7 FHIR 4.0.1, an international standard rather than a national one; Singapore MOH's PDT, recovery and vaccination healthcerts are the **first national jurisdiction worked end to end**, and all three are registered profiles with published type maps that the libraries implement.
+One measured gap remains there and it is a profile question rather than a support one: PDT's endorsed sample is not yet committable in the conformance corpus, pending a versioned composition profile nobody has ruled ([`docs/type-maps.md`](docs/type-maps.md) section 1.2).
 
 Status: **implementation phase.**
 The specifications and schemas were drafted and reviewed before any library existed, deliberately, so that the design could be settled before the implementations existed to re-litigate it.
@@ -17,15 +21,43 @@ Python was built afterwards as a further independent library, which makes the la
 The list above happens to hold as many entries as that figure and is not the same set, since Python is in it and Go is not, so the agreement of the two numbers is a coincidence rather than the question closing.
 The counts above are therefore stated by enumeration and no total is restated here: [`docs/decisions.md`](docs/decisions.md) decision D owns that figure, and reconciling it with the language set is a ruling rather than a documentation edit.
 
+## One protocol, per-jurisdiction profiles
+
+**The protocol layer is jurisdiction-neutral by construction, and that is checkable rather than asserted.**
+It commits a typed payload tree, the reserved `roax.*` leaves and an RFC 9162 root, and none of those names a country.
+`recordType` is constrained by *form* - lowercase reverse-DNS - and never by an enumerated list, in both [`schemas/envelope-1.0.json`](schemas/envelope-1.0.json) and [`schemas/envelope-2.0.json`](schemas/envelope-2.0.json), whose own description says the pattern "constrains the FORM only" because the registry "is not a closed universe".
+Specification section 12.2 states the rule normatively: "New profiles and new versions arrive by a registry entry, never by editing this specification."
+That registry is [`docs/profiles/`](docs/profiles/), one document per `recordType`.
+
+**Adding a jurisdiction takes three things, and none of them is a protocol change or a library source edit.**
+
+1. **A profile document** under `docs/profiles/`, declaring at minimum its `schemaVersion`, its type-map scope and its non-redactable path set ([`docs/profiles/README.md`](docs/profiles/README.md); specification section 10.2).
+   This is not a formality: a syntactically valid `recordType` with no profile document is not a valid record, and the non-redactable floor is decided here.
+2. **A type-map artifact** in the format of [`schemas/type-map-artifact-1.0.json`](schemas/type-map-artifact-1.0.json), plus its row in [`type-maps/registry-1.0.0.json`](type-maps/registry-1.0.0.json).
+   `node tools/check-type-maps.mjs` validates the artifacts and the registry against the committed tree using nothing outside it.
+3. **Registering that profile with a verifier**, which every library takes as *configuration* rather than as a source edit.
+   Rust ships no profile implementation at all - `Profile` is a trait the caller implements ([`rust/src/envelope.rs:17`](rust/src/envelope.rs)), so even the Singapore profiles are caller-side there.
+   The other four ship the registry as an overridable default: TypeScript's `knownProfiles` and `floorFor` config ([`src/envelope.ts:616`](src/envelope.ts) and `:971`), Python's `ProfileRegistry.with_profile`, Swift's public `ProfileRegistry(profiles:)` beside its `versionOne` default, and Kotlin's `ProfileRegistry.with` beside `ProfileRegistry.DEFAULT`.
+   No library embeds or loads a published type-map artifact; the resolver is supplied by the caller in all five.
+
+**One honest limit, because an unqualified claim of extensibility is exactly the defect this repository keeps catching.**
+*Generating* a type-map artifact from a JSON Schema does not work today: `tools/build-type-maps.mjs` fails closed on merged object states that need combinator-aware evaluation, so neither regeneration nor `--check` runs ([`docs/type-maps.md`](docs/type-maps.md) sections 1.6 and 6).
+At least 34 such states were measured on the pinned reference checkout, and that figure is a lower bound rather than a count: it predates a widening of the branch selection and has not been re-measured, because the checkout is outside this repository.
+Authoring and validating an artifact is unaffected, and the committed artifacts stay authoritative, but a new family whose map would be derived from a schema meets that block.
+
+**Jurisdiction-neutral and language-neutral are two separate claims here, and only the first is about profiles.**
+The second is why [`docs/spec/roax-canon-1.md`](docs/spec/roax-canon-1.md) section 13 rejects JCS and dCBOR: their number models are artifacts of a particular language runtime.
+The protocol is built on RFC 9162, RFC 4648, BCP 14 and Unicode 15.1 NFC, listed in specification section 16.
+
 ## Start here
 
 | Read | For |
 |---|---|
 | [`src/README.md`](src/README.md) | The TypeScript library: what it is, how to run it, and the four traps JavaScript sets for this design. |
 | [`docs/typescript-implementation-findings.md`](docs/typescript-implementation-findings.md) | **Where that independent build disagreed with the corpus, and where the specification admitted two honest readings.** Worth more than the code. |
-| [`docs/decisions.md`](docs/decisions.md) | **The decisions, ruled and open, each with its reasoning.** Two are still open, A and C, and both belong to the project owner. Start here if you are reviewing rather than implementing. |
+| [`docs/decisions.md`](docs/decisions.md) | **The decisions, ruled and open, each with its reasoning.** One is still open, C, and it belongs to the project owner. Start here if you are reviewing rather than implementing. |
 | [`docs/spec/roax-canon-1.md`](docs/spec/roax-canon-1.md) | The protocol. Precise enough to implement from. Section 2 says what it does not solve; section 14 reconciles it against dogtag. |
-| [`docs/profiles/`](docs/profiles/) | One document per record family, because the four families do **not** share one concrete object. |
+| [`docs/profiles/`](docs/profiles/) | The `recordType` registry, one document per record family, because the four families registered today do **not** share one concrete object. |
 | [`docs/type-maps.md`](docs/type-maps.md) | The published type-map artifacts, exact coverage, unresolved schema gaps and issuer extension lifecycle. |
 | [`docs/conformance-corpus.md`](docs/conformance-corpus.md) | What cross-language agreement has to be proven against, and why that is a release gate rather than decoration. |
 | [`schemas/`](schemas/) | JSON Schemas for the envelope, the type map and the conformance corpus. |
@@ -50,10 +82,14 @@ See decision C.
 
 ## What is not decided
 
-Two of the four decisions that belong to the project owner are open, and neither is quietly settled anywhere in these documents:
+One of the four decisions that belong to the project owner is open, and it is not quietly settled anywhere in these documents:
 
-- **A** - whether roax-lib needs EU recognition, which would mandate SD-JWT VC and ISO mdoc export profiles.
 - **C** - what happens to the Singapore healthcerts already issued under OpenAttestation.
+
+**A was ruled on 2026-08-02: not now, and deliberately kept possible.**
+roax-lib adopts no EU credential format and builds no export codec; material issued under another regime is **re-submitted to this standard** rather than translated.
+A translation method is **deferred rather than refused**, and that is what makes the ruling more than a "no": it carries a standing constraint that a disclosure unit stays a single leaf, independently verifiable from its own audit path, so a future SD-JWT mapping remains buildable instead of needing a retrofit.
+It does **not** decide C, and the re-submission logic is not extended to already-issued OpenAttestation healthcerts by inference.
 
 **D was ruled on 2026-07-29.**
 ROAX uses five independent, corpus-enforced libraries rather than a shared core, as recorded in `docs/decisions.md` decision D.

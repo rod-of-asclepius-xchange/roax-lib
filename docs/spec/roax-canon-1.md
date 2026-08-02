@@ -44,7 +44,7 @@ The key words MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT, SHOULD, SHOULD NOT, RE
 
 | Term | Meaning |
 |---|---|
-| **record** | The input document: a FHIR resource or a Singapore MOH healthcert. See the four profile documents under `docs/profiles/`. |
+| **record** | The input document: a JSON document belonging to a registered `recordType`, whatever jurisdiction or standards body defines that family. The profiles registered today are HL7 FHIR 4.0.1 and the three Singapore MOH healthcerts. See the profile documents under `docs/profiles/`, which are the registry rather than a closed set (section 12.2). |
 | **leaf** | One `(path, typeTag, value, salt)` tuple, and its 32-byte hash. |
 | **path** | The location of a leaf in the record, as a sequence of typed segments. |
 | **root** | The 32-byte Merkle Tree Head over all of a record's leaves. |
@@ -1540,11 +1540,15 @@ This is decision D / D10 and it was ruled to five independent, corpus-enforced b
 
 ## 15. Decisions: what is ruled and what is still open
 
-**Two of the open decisions belong to the project owner.**
-This specification takes no position on any of them and defines nothing that depends on one.
+**One open decision belongs to the project owner.**
+This specification takes no position on it and defines nothing that depends on it.
 
-- **A** - whether roax-lib needs EU recognition, which would mandate SD-JWT VC and ISO mdoc export profiles.
 - **C** - what happens to the Singapore healthcerts already issued under OpenAttestation.
+
+**A was ruled on 2026-08-02**, and what it changes here is nothing: no EU credential format is adopted, material issued under another regime is re-submitted to this standard rather than translated, and a translation method is deferred rather than refused.
+This document defines no export profile, which was already the case and is now the ruled state rather than an unresolved one.
+The ruling does carry one standing constraint that a future revision of this document could violate: a disclosure unit must remain a single leaf, independently verifiable against the root from its own audit path alone, which is what section 10 already does.
+`docs/decisions.md` decision A owns that constraint and the reasoning for it.
 
 **D was ruled on 2026-07-29:** five independent, corpus-enforced libraries rather than a shared core over a binding layer.
 A further question, D14, was identified after the engineering rulings below and was ruled on 2026-07-30; it is stated at the end of this section.

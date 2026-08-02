@@ -1,7 +1,14 @@
 # Record profiles
 
-There are four profile documents because the four record families **do not share one concrete object.**
+**This directory is the `recordType` registry, and every document in it is a profile *of* one protocol rather than a variant of it.**
+Two kinds of author are represented today: an international standards body, through HL7 FHIR 4.0.1, and one national health authority, through the three Singapore MOH healthcerts.
+Nothing in the protocol layer makes that set final.
+[`schemas/envelope-2.0.json`](../../schemas/envelope-2.0.json) constrains `recordType` to a lowercase reverse-DNS *form* rather than to a list, and [ROAX-CANON/1 section 12.2](../spec/roax-canon-1.md#122-future-proofing-is-a-standing-constraint-not-a-section) requires new profiles to arrive by a registry entry here and never by editing the specification.
+A further jurisdiction is therefore a document in this directory plus a type map, and the section below states exactly what such a document must declare.
+
+There are four profile documents **today** because the four record families **do not share one concrete object.**
 They share a boundary, not a schema.
+That is a finding about these four families and it is what a fifth would also have to be measured against, rather than a limit on how many there may be.
 
 That finding is load-bearing, so it is stated here with its evidence rather than assumed.
 
@@ -103,6 +110,9 @@ All four profiles were derived from the reference schemata read in place, read-o
 These four documents cite the reference schemas by file and by the section or definition concerned; line-level citations into `dogtag-mono-repo` appear in [the specification section 14](../spec/roax-canon-1.md#14-reconciliation-with-dogtag).
 
 ## Documents
+
+The registry as it stands.
+One entry is an international standard and three are one jurisdiction's; a further jurisdiction is added here rather than anywhere else.
 
 - [`fhir.md`](fhir.md) - HL7 FHIR 4.0.1, full and lite
 - [`pdt-healthcert.md`](pdt-healthcert.md) - Singapore MOH PDT HealthCert 2.0

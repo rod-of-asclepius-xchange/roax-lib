@@ -1,9 +1,10 @@
 # Decisions: settled, open, and the reasoning
 
-**Status:** two decisions are genuinely open.
-Both are in Part 1 and belong to the project owner - **A** and **C**.
+**Status:** one decision is genuinely open.
+It is in Part 1 and belongs to the project owner - **C**.
 **D14** was identified on 2026-07-29 while building a conformance vector and was ruled D14a on 2026-07-30; it is in Part 2a with its reasoning.
 Everything else has been ruled.
+**Decision A** was ruled on 2026-08-02: no EU credential format is adopted and material issued elsewhere is re-submitted to this standard, with a translation method deferred rather than refused, under a standing single-leaf disclosure constraint that keeps it buildable.
 **Decision B** was ruled earlier, with the residual open questions named inside it.
 **Decision D** was ruled Da on 2026-07-29: five independent, corpus-enforced libraries.
 The **ten engineering decisions in Part 2 - D3, D4, D5, D6, D7, D8, D9, D11, D12 and D13 - were ruled on 2026-07-28**, and each carries its reasoning so that it can be overturned on the reasoning rather than on authority.
@@ -19,6 +20,7 @@ A specification that hides a live decision behind confident prose is worse than 
 
 **A decision that looks settled in the specification but is still marked OPEN here is worse than either**, so the two documents move together in one change.
 That warning is in this document because it has already been a problem.
+It applies in both directions, which is why the A ruling moved `README.md`, `docs/spec/roax-canon-1.md` section 15, `docs/conformance-corpus.md` and `AGENTS.md` in the same change as this one.
 
 ## Numbering
 
@@ -84,13 +86,53 @@ The source-2 reproductions are carried from the audit and were not independently
 
 ## Part 1 - The four decisions that belong to the project owner
 
-Two of them - A and C - have not been ruled on.
-**B and D have been ruled**, and are kept here rather than moved to Part 3 because the option records and their reasoning belong with the other owner decisions.
+One of them - C - has not been ruled on.
+**A, B and D have been ruled**, and are kept here rather than moved to Part 3 because the option records and their reasoning belong with the other owner decisions.
+A was ruled on 2026-08-02 and is the case this document had already said was worth stating explicitly: not now, and deliberately kept possible.
 
-### Decision A - Does roax-lib need EU recognition? **OPEN**
+### Decision A - Does roax-lib need EU recognition? **RULED 2026-08-02: not now, and deliberately kept possible**
 
-**Written into the spec:** nothing.
-The specification takes no position and defines no export profile.
+**The ruling, stated precisely before it is quoted.**
+roax-lib adopts **no** EU credential format and builds **no** export codec.
+A record conforms to ROAX-CANON/1, and material issued under another regime is **re-submitted to this standard** rather than translated into or out of it.
+A translation method is **deferred, not refused**: it may be built later, and until then nothing in this project may be built in a way that forecloses it.
+
+The project owner's words, on 2026-08-02:
+
+> "roax-lib needs EU recognition, they simply have to re-submit them to our standards.
+> Later on we might build a translation method, but for now let's just focus on ourselves."
+
+**This is deliberately none of the three options exactly as written, which is why it is recorded in full rather than as a letter.**
+It is not A2 or A3: no SD-JWT VC or ISO mdoc export profile is adopted, and the "how do you do selective disclosure" answer stays ROAX's own.
+It is not a flat A1 either, because A1's stated consequence is standing outside the EU public-sector acceptance path **permanently**, and that is the one word this ruling refuses.
+It is the case the closing paragraph of this section already identified as materially different from "no" and worth making explicitly.
+The option table below is kept unchanged, as the record of what was considered.
+
+**The standing design constraint this ruling carries, and the part that costs something.**
+"Later on we might build a translation method" is only cheap if the mapping stays possible, and that is much cheaper to preserve as a constraint now than to retrofit.
+If an export profile is ever adopted, the sane design maps **one ROAX leaf onto one SD-JWT disclosure** rather than running two unrelated disclosure systems side by side.
+So this ruling carries one invariant forward, stated so that a violation is recognisable in review rather than discovered during a retrofit:
+
+> **A disclosure unit MUST remain a single leaf, independently verifiable against the root from its own audit path alone.**
+
+Three concrete changes would break it, and each would need this ruling revisited rather than settled as a design detail:
+
+- bundling several leaves into one indivisible disclosure unit, so that revealing one forces revealing another;
+- subtree-only disclosure, where the discloseable unit is a node rather than a leaf;
+- any leaf whose verification depends on a sibling leaf beyond its own RFC 9162 audit path.
+
+**Nothing in ROAX-CANON/1 violates this today**, so the constraint costs nothing to hold and is recorded only because it is invisible until it is expensive.
+Specification section 10 already carries, for each revealed leaf, its own salt and its own RFC 9162 audit path, which is exactly the granularity the mapping would need.
+
+**No claim-name mapping is authored here, and none should be until an export profile is actually chosen.**
+Anything more specific than the granularity rule above would be inventing capability this ruling did not grant, and the evidence for a mapping table is a standard nobody has committed to reading.
+
+**What this does not decide.**
+It does not decide **Decision C**, which stays open below.
+The re-submission logic may or may not extend to the Singapore healthcerts already issued under OpenAttestation, and that extension is not inferred here.
+
+**Written into the spec:** nothing, and that is now the ruled state rather than an unresolved one.
+The specification defines no export profile and takes no position on EU recognition, which is correct under this ruling; section 15 records it as ruled.
 
 | Option | Consequence |
 |---|---|
@@ -111,6 +153,9 @@ Selective disclosure is the affected layer.
 If A2 or A3 is ever chosen, the sane design maps ROAX leaves onto SD-JWT disclosures rather than running two unrelated disclosure systems side by side.
 That mapping is much cheaper to preserve as a design constraint now than to retrofit.
 **A ruling of "not now, but keep it possible" is materially different from "no", and is worth making explicitly.**
+
+That last sentence is the one the 2026-08-02 ruling above discharges, and it is the reason the ruling is recorded as a named case rather than as a letter from the table.
+The urgency it identified is discharged too: the single-leaf disclosure invariant stated above is what preserves the mapping, so the cost this paragraph warned about is now carried as a standing constraint rather than left to be noticed later.
 
 ### Decision B - SHA-256, or Poseidon now? **RULED. Both, permanently.**
 
