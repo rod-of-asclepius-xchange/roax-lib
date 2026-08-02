@@ -549,7 +549,7 @@ Do not restate "one decision is open" from memory, and do not treat "no open dec
 **C was ruled on 2026-08-02**: healthcerts already issued under OpenAttestation are **remapped into this protocol** - re-submitted and re-derived under ROAX canonicalization - rather than bridged, mirrored or read natively, and this project builds and maintains NO OpenAttestation verifier.
 A translation method is deferred rather than refused.
 It is C2 in its stricter form; C1 was rejected on its indefinite two-roots-two-verifiers cost and C3 on the reasoning the document already carried, that a bridge reimplements the exact canonicalization this project exists to escape.
-**Three consequences travel with the ruling and a summary that drops them is an overstatement**: a remap produces a NEW root and does not preserve the anchored OpenAttestation one, so a proof against the old root stays a proof of the old bytes; and the three unportable states do NOT behave alike, which is the next bullet.
+**Three consequences travel with the ruling and a summary that drops them is an overstatement**: a remap produces a NEW root and does not preserve the anchored OpenAttestation one, so a proof against the old root stays a proof of the old bytes; the three unportable states do NOT behave alike, which is the next bullet; and the OpenAttestation redaction bug is only HALF sidestepped, which is where that bullet ends.
 
 **Do not write "ROAX rejects all three unportable states".**
 It is the sentence a summary of the C ruling naturally reaches for and it is wrong on the third.

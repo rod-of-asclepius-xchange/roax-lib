@@ -95,6 +95,7 @@ This project builds and maintains no OpenAttestation verifier.
 A translation method is **deferred rather than refused**, exactly as under A.
 **The consequence a reader relying on an existing document must be told:** a remap produces a **new root**, and the anchored OpenAttestation root is not preserved, so a proof against the old root stays a proof of the old bytes.
 Two of the three states the audit called unportable are rejected at the input boundary by specification section 3.2 - duplicate member names and unpaired surrogate escapes - so a remap fails closed on them rather than dropping them quietly.
+**That two-of-three split holds only if the remap reads the serialized document**, which is inferred rather than fixed since no remap tool is specified: reading a language-parsed object instead gets duplicate names already collapsed to last-wins, which makes the split one of three.
 The third, `undefined` and sparse-array holes, has **no answer today**: section 3.2 lists it, but the state has no JSON representation, so it is already gone by the time a remap reads serialized bytes.
 `docs/decisions.md` decision C carries that gap in full, including why a serialized redaction hole becomes a committed `NULL` leaf.
 
