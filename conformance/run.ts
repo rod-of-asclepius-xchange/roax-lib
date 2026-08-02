@@ -25,6 +25,7 @@ import { toHex, fromHex, describeUnicodeEnvironment } from '../src/bytes.js';
 import {
   resolveHashFunction,
   resolveOrdering,
+  ORDERING_DEFAULT,
   type HashAlgName,
   type Ordering,
 } from '../src/hash.js';
@@ -152,6 +153,48 @@ function declaredOrdering(v: { name: string; ordering?: string }): Ordering {
   return resolveOrdering(v.ordering);
 }
 
+/**
+ * The groups whose expected values depend on the leaf ordering, and the ones this runner actually
+ * THREADS the declaration through.
+ *
+ * They are held apart deliberately, because the difference is what the check below exists for: a
+ * group that is ordering-sensitive but not threaded would compute a `hash`-ordered vector as
+ * `path` and report green, which is the quiet-skip defect one loop down from the group guard.
+ */
+const ORDERING_SENSITIVE_GROUPS = [
+  'leaf',
+  'record',
+  'unlinkability',
+  'normalization',
+  'envelope',
+  'roundTrip',
+] as const;
+const ORDERING_THREADED_GROUPS: ReadonlySet<string> = new Set(['leaf', 'record']);
+
+/**
+ * Check EVERY ordering-sensitive vector, not only the ones in a threaded group.
+ *
+ * A vector declaring nothing is a corpus defect. One declaring an ordering its group is not
+ * computed under fails CLOSED here, rather than being silently computed under the default.
+ */
+function checkDeclaredOrderingsSupported(corpus: Corpus): string | undefined {
+  for (const group of ORDERING_SENSITIVE_GROUPS) {
+    for (const raw of corpus.vectors[group] ?? []) {
+      const v = raw as { name: string; ordering?: string };
+      const ordering = declaredOrdering(v);
+      if (ordering !== ORDERING_DEFAULT && !ORDERING_THREADED_GROUPS.has(group)) {
+        return (
+          `${group} vector ${v.name} declares ordering ${ordering}, but this runner computes ` +
+          `the ${group} group under ${ORDERING_DEFAULT} only. Thread the declaration through ` +
+          `that loop before adding such a vector; computing it under the default would report ` +
+          `a green it did not earn.`
+        );
+      }
+    }
+  }
+  return undefined;
+}
+
 function checkEveryGroupIsConsumed(corpus: Corpus): string[] {
   return Object.keys(corpus.vectors).filter((name) => !CONSUMED_GROUPS.includes(name));
 }
@@ -170,6 +213,12 @@ function main(): number {
     console.error(
       '  A group read as absent would report the same green as before it existed.',
     );
+    return 1;
+  }
+
+  const unsupportedOrdering = checkDeclaredOrderingsSupported(corpus);
+  if (unsupportedOrdering !== undefined) {
+    console.error(`FAILED: ${unsupportedOrdering}`);
     return 1;
   }
 

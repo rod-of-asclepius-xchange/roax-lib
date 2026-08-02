@@ -43,6 +43,7 @@ from roax_canon import (
     verify_inclusion,
     VerifierConfig,
 )
+from roax_canon import display_path
 from roax_canon.errors import ErrorCode
 from roax_canon.jsonio import is_uri_string
 from roax_canon.tree import largest_power_of_two_below
@@ -430,6 +431,36 @@ class TestRecordAndEnvelope(unittest.TestCase):
         envelope = full_copy(self.built)
         result = verify_envelope(envelope, self.config)
         self.assertTrue(result.accepted, result.detail)
+
+    def test_hash_ordered_envelope_verifies_under_the_registry_that_names_it(self):
+        """The ordering axis, pinned HERE because no corpus vector reaches it.
+
+        Every class-20 round-trip vector is path-ordered, so nothing in the corpus asks this
+        package to issue a ``hash``-ordered envelope and then verify it. That is the surface on
+        which the TypeScript library was found issuing an envelope its own verifier refused,
+        which is exactly what conformance corpus class 20 exists to catch.
+        """
+        for ordering in ("path", "hash"):
+            built = issue(self.record, replace(IDENTITY, ordering=ordering), resolver())
+            envelope = full_copy(built)
+            # H2: the ordering comes from the anchoring registry. BOTH registry answers are
+            # exercised, so the refusal of the wrong one is evidence rather than an untested
+            # branch (specification section 9.5).
+            for registry_says in ("path", "hash"):
+                cfg = replace(self.config, anchored_ordering=registry_says)
+                result = verify_envelope(envelope, cfg)
+                with self.subTest(issued=ordering, registry=registry_says):
+                    self.assertEqual(result.accepted, registry_says == ordering, result.detail)
+
+    def test_the_ordering_leaf_is_committed_for_hash_and_for_nothing_else(self):
+        """Specification section 11.2: the second conditional reserved leaf."""
+        paths = {}
+        for ordering in ("path", "hash"):
+            built = issue(self.record, replace(IDENTITY, ordering=ordering), resolver())
+            paths[ordering] = [display_path(leaf.path) for leaf in built.leaves]
+        self.assertNotIn("roax.ordering", paths["path"])
+        self.assertIn("roax.ordering", paths["hash"])
+        self.assertEqual(len(paths["hash"]), len(paths["path"]) + 1)
 
     def test_an_empty_object_record_anchors_rather_than_being_rejected(self):
         """The half of `FINDINGS.md` item 14 that section 3.3 actually forbids.

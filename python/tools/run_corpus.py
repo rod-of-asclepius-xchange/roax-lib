@@ -45,6 +45,7 @@ from roax_canon import (  # noqa: E402
     VerifierConfig,
     audit_path,
     build_tree,
+    DEFAULT_ORDERING,
     check_ordering,
     display_path,
     draw_salt,
@@ -326,6 +327,35 @@ def declared_ordering(vector) -> str:
             f"specification section 9 requires the ordering to be explicit"
         )
     return check_ordering(ordering)
+
+
+#: The groups whose expected values depend on the leaf ordering, and the ones this runner actually
+#: THREADS the declaration through. Held apart deliberately: a group that is ordering-sensitive but
+#: not threaded would compute a ``hash``-ordered vector as ``path`` and report green, which is the
+#: quiet-skip defect one loop down from the group guard.
+ORDERING_SENSITIVE_GROUPS = (
+    "leaf", "record", "unlinkability", "normalization", "envelope", "roundTrip",
+)
+ORDERING_THREADED_GROUPS = frozenset({"leaf", "record"})
+
+
+def check_declared_orderings_supported(vectors) -> str | None:
+    """Check EVERY ordering-sensitive vector, not only the ones in a threaded group.
+
+    A vector declaring nothing is a corpus defect. One declaring an ordering its group is not
+    computed under fails CLOSED here rather than being computed under the default.
+    """
+    for group in ORDERING_SENSITIVE_GROUPS:
+        for v in vectors.get(group, []):
+            ordering = declared_ordering(v)
+            if ordering != DEFAULT_ORDERING and group not in ORDERING_THREADED_GROUPS:
+                return (
+                    f"{group} vector {v['name']} declares ordering {ordering}, but this runner "
+                    f"computes the {group} group under {DEFAULT_ORDERING} only. Thread the "
+                    f"declaration through that loop before adding such a vector; computing it "
+                    f"under the default would report a green it did not earn."
+                )
+    return None
 
 
 def run_leaf(vectors, r: Results) -> None:
@@ -945,6 +975,11 @@ def main() -> int:
             + ", ".join(sorted(unconsumed))
         )
         print("  A group read as absent would report the same green as before it existed.")
+        return 1
+
+    unsupported = check_declared_orderings_supported(vectors)
+    if unsupported is not None:
+        print(f"FAILED: {unsupported}")
         return 1
 
     print("ROAX-CANON/1 conformance corpus, Python implementation")

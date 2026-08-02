@@ -77,6 +77,10 @@ public struct CorpusRunner {
                 class: 0, name: "vector-group-coverage")
             return
         }
+        if let unsupported = unsupportedDeclaredOrdering() {
+            report.record(.fail(unsupported), class: 0, name: "declared-ordering-support")
+            return
+        }
         runEncodePath()
         runEncodeValue()
         runReject()
@@ -251,6 +255,38 @@ public struct CorpusRunner {
             )
         }
         return try Ordering.parse(declared)
+    }
+
+    /// The groups whose expected values depend on the leaf ordering, and the ones this
+    /// runner actually THREADS the declaration through.
+    ///
+    /// Held apart deliberately: a group that is ordering-sensitive but not threaded
+    /// would compute a `hash`-ordered vector as `path` and report green, which is the
+    /// quiet-skip defect one loop down from the group guard.
+    static let orderingSensitiveGroups = [
+        "leaf", "record", "unlinkability", "normalization", "envelope", "roundTrip",
+    ]
+    static let orderingThreadedGroups: Set<String> = ["leaf", "record"]
+
+    /// Check EVERY ordering-sensitive vector, not only the ones in a threaded group.
+    ///
+    /// A vector declaring nothing is a corpus defect. One declaring an ordering its
+    /// group is not computed under fails CLOSED here rather than under the default.
+    public func unsupportedDeclaredOrdering() -> String? {
+        for group in Self.orderingSensitiveGroups {
+            for v in vectors(group) {
+                guard let ordering = try? declaredOrdering(v) else {
+                    return "\(name(v)) is in an ordering-sensitive group and declares no ordering"
+                }
+                if ordering != .path && !Self.orderingThreadedGroups.contains(group) {
+                    return "\(group) vector \(name(v)) declares ordering \(ordering.rawValue), "
+                        + "but this runner computes the \(group) group under path only. Thread "
+                        + "the declaration through that loop before adding such a vector; "
+                        + "computing it under the default would report a green it did not earn."
+                }
+            }
+        }
+        return nil
     }
 
     private func runLeaf() {

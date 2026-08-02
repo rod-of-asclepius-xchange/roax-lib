@@ -200,6 +200,13 @@ It is also infeasible in this tree: the four class-10 vectors cannot be recomput
   That is what makes `hash` ordering's position privacy real: a disclosed index is a position in leaf-hash order and reveals nothing about record shape.
   Do not describe H1 as buying more than it does: a leaf is bound to exactly one ordering, so the same leaf set cannot be reassembled into the other tree, and that is real and narrow.
 
+**The VERIFY path is a separate surface from the ISSUE path, and it needed its own field in every library.**
+This is the lesson worth carrying to a third axis.
+Making issuance ordering-aware left every verifier rebuilding a full copy under the default, so the TypeScript library issued a `hash`-ordered envelope and then refused it - twice over, since its member allow-list also did not know the `ordering` member it had just emitted.
+Each library now takes the ordering from its own registry field (`anchoredOrdering`, `anchored_ordering`, `anchorOrdering`, `VerificationPolicy::anchored_ordering`) and never from the envelope, which is H2.
+**No corpus vector reaches any of this**, because no class-20 vector is `hash`-ordered, so it was found by issuing one by hand and is pinned by nothing in the corpus today.
+Rust needed a second fix on the same path: it recognized only a fixed set of reserved keys on a disclosed leaf, so a copy legitimately disclosing `roax.ordering` was refused as a namespace collision, while the other four use a prefix test and were unaffected.
+
 **Class 21 is the enforcement.**
 Three vectors, each one record under BOTH orderings, asserting two roots that differ AND two **disjoint** leaf-hash sets.
 Disjointness is the stronger assertion and is what H1 buys; a runner checking only the roots would pass an implementation that permuted one leaf set into the other tree.
@@ -207,7 +214,11 @@ One salt set serves both sides, drawn over the hash-ordered superset, because tw
 
 **Adding a group went red in every runner before it went green, which is the intended order.**
 Rust's `deny_unknown_fields`, and the explicit consumed-group lists in the other four plus `check_corpus.mjs`, all failed until each consumed `ordering`.
-**The per-vector `ordering` FIELD needed a separate guard**, because a field inside a group a runner already reads is invisible to the group check: every runner now ASSERTS the declaration and refuses a vector that omits it.
+**The per-vector `ordering` FIELD needed a separate guard**, because a field inside a group a runner already reads is invisible to the group check.
+Every runner now checks EVERY vector of the six ordering-sensitive groups and refuses one that omits the declaration.
+**Only `leaf` and `record` actually THREAD the declaration through today**, so the guard is total by failing CLOSED instead: a vector declaring `hash` in `unlinkability`, `normalization`, `envelope` or `roundTrip` makes its runner exit non-zero naming the group, rather than being computed under the default and reported green.
+Thread the declaration through that loop before adding such a vector.
+That split is deliberate and is worth keeping visible - "the runner asserts the declaration" and "the runner computes under the declaration" are different claims, and writing the first while meaning the second is how a guard comes to be trusted for something it does not do.
 
 ## The type-map binding is triggered by what is COMMITTED, in all five libraries
 

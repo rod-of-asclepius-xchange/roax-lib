@@ -34,6 +34,7 @@ import {
   verifyInclusion,
   splitPoint,
   toHex,
+  displayPath,
   hexNibble,
   TypeTag,
   REGISTERED_PROFILES,
@@ -262,6 +263,57 @@ test('a full copy issued by this library verifies against itself', () => {
   // 4 record leaves plus 6 reserved: recordType, schemaVersion, typeMap.id, recordId, issuer.id,
   // issuer.keyId (specification section 11.2).
   assert.equal(result.leafCount, 10);
+});
+
+// The ordering axis, pinned HERE because no corpus vector reaches it: every class-20 round-trip
+// vector is path-ordered, so nothing in the corpus asks this library to issue a hash-ordered
+// envelope and then verify it. This is the surface on which the library once issued an envelope
+// its own verifier refused, which is exactly what conformance corpus class 20 exists to catch.
+test('a hash-ordered envelope issued by this library verifies under the registry that names it', () => {
+  for (const ordering of ['path', 'hash'] as const) {
+    const full = issueFullCopy({
+      record: RECORD,
+      identity: IDENTITY,
+      resolver: SYNTHETIC_MAP,
+      typeMapVersion: TYPE_MAP_VERSION,
+      ordering,
+    });
+    // The member is emitted only for a non-default ordering, so a path-ordered envelope this
+    // library issues is byte-identical to what it issued before the axis existed.
+    const doc = full.document as { kind: 'object'; members: readonly (readonly [string, JsonValue])[] };
+    const members = doc.members.map(([k]) => k);
+    assert.equal(members.includes('ordering'), ordering !== 'path');
+
+    // H2: the ordering comes from the anchoring registry. BOTH registry answers are exercised,
+    // so the refusal of the wrong one is evidence rather than an untested branch.
+    for (const registrySays of ['path', 'hash'] as const) {
+      const config = { ...VERIFIER, anchoredOrdering: registrySays };
+      if (registrySays === ordering) {
+        const result = verifyEnvelope(parseEnvelope(full.document), config);
+        assert.equal(result.kind, 'full');
+      } else {
+        assert.throws(() => verifyEnvelope(parseEnvelope(full.document), config));
+      }
+    }
+  }
+});
+
+test('the ordering leaf is committed for hash ordering and for nothing else (section 11.2)', () => {
+  const paths = (o: 'path' | 'hash') =>
+    issueFullCopy({
+      record: RECORD,
+      identity: IDENTITY,
+      resolver: SYNTHETIC_MAP,
+      typeMapVersion: TYPE_MAP_VERSION,
+      ordering: o,
+    }).commitment.leaves.map((l) => displayPath(l.path));
+  assert.equal(paths('path').includes('roax.ordering'), false);
+  assert.equal(paths('hash').includes('roax.ordering'), true);
+  // Hash ordering commits one leaf MORE than path ordering over identical content, which is
+  // the ordering leaf and nothing else. Salts differ between these two issuances, so the roots
+  // are not compared here; conformance corpus class 21 pins the roots under ONE salt set, which
+  // is what makes the difference attributable to the ordering alone.
+  assert.equal(paths('hash').length, paths('path').length + 1);
 });
 
 test('the typeMap member carries id and version together, and a version is never guessed', () => {

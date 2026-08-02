@@ -107,6 +107,40 @@ object Corpus {
         return Ordering.parse(declared)
     }
 
+    /**
+     * The groups whose expected values depend on the leaf ordering, and the ones the runner
+     * actually THREADS the declaration through.
+     *
+     * Held apart deliberately: a group that is ordering-sensitive but not threaded would compute
+     * a `hash`-ordered vector as `path` and report green, which is the quiet-skip defect one loop
+     * down from the group guard.
+     */
+    val orderingSensitiveGroups: List<String> = listOf(
+        "leaf", "record", "unlinkability", "normalization", "envelope", "roundTrip",
+    )
+    val orderingThreadedGroups: Set<String> = setOf("leaf", "record")
+
+    /**
+     * Check EVERY ordering-sensitive vector, not only the ones in a threaded group.
+     *
+     * A vector declaring nothing is a corpus defect. One declaring an ordering its group is not
+     * computed under fails CLOSED here rather than being computed under the default.
+     */
+    fun unsupportedDeclaredOrdering(): String? {
+        for (group in orderingSensitiveGroups) {
+            for (v in vectors(group)) {
+                val ordering = declaredOrdering(v)
+                if (ordering != Ordering.PATH && group !in orderingThreadedGroups) {
+                    return "$group vector ${str(v, "name")} declares ordering ${ordering.id}, but " +
+                        "this runner computes the $group group under ${Ordering.PATH.id} only. " +
+                        "Thread the declaration through that loop before adding such a vector; " +
+                        "computing it under the default would report a green it did not earn."
+                }
+            }
+        }
+        return null
+    }
+
     /** The groups the corpus carries that [consumedGroups] does not name. */
     fun unconsumedGroups(): List<String> =
         (document["vectors"] as JsonObject).members.map { it.key }

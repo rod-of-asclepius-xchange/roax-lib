@@ -76,6 +76,14 @@ class ConformanceCorpusTest {
      */
     @Test
     fun `every vector group is consumed`() {
+        // Total by construction: every ordering-sensitive vector is checked, and one declaring an
+        // ordering its group is not computed under fails closed rather than being computed under
+        // the default (specification section 9).
+        assertEquals(
+            null,
+            Corpus.unsupportedDeclaredOrdering(),
+            "a vector declares an ordering this runner does not compute its group under",
+        )
         val unconsumed = Corpus.unconsumedGroups()
         assertTrue(
             unconsumed.isEmpty(),

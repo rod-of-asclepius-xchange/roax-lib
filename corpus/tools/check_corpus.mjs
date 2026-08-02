@@ -377,6 +377,34 @@ function declaredOrdering(v) {
   return ref.checkOrdering(v.ordering);
 }
 
+// The groups whose expected values depend on the leaf ordering, and the ones this runner actually
+// THREADS the declaration through. Held apart deliberately, because the difference is the whole
+// point of the check below: a group that is ordering-sensitive but not threaded would compute a
+// `hash`-ordered vector as `path` and report green, which is the quiet-skip defect one loop down
+// from the group guard.
+const ORDERING_SENSITIVE_GROUPS = [
+  "leaf", "record", "unlinkability", "normalization", "envelope", "roundTrip",
+];
+const ORDERING_THREADED_GROUPS = new Set(["leaf", "record"]);
+
+// Every ordering-sensitive vector is checked, not only the ones in a threaded group. A vector that
+// declares nothing is a corpus defect; one that declares an ordering its group is not computed
+// under fails CLOSED here rather than being computed under the wrong one.
+{
+  for (const group of ORDERING_SENSITIVE_GROUPS) {
+    for (const v of V[group] ?? []) {
+      const ordering = declaredOrdering(v);
+      if (ordering !== ref.ORDERING.path && !ORDERING_THREADED_GROUPS.has(group)) {
+        console.error(`FAILED: ${group} vector ${v.name} declares ordering ${ordering}, but this `
+          + `runner computes the ${group} group under ${ref.ORDERING.path} only.`);
+        console.error("  Thread the declaration through that loop before adding such a vector; "
+          + "computing it under the default would report a green it did not earn.");
+        process.exit(1);
+      }
+    }
+  }
+}
+
 for (const v of V.leaf ?? []) {
   const value = "value" in v ? v.value : null;
   // The ordering reaches a LEAF through DOMAIN (spec section 9.5, H1), so a leaf vector is

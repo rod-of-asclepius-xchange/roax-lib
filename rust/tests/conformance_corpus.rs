@@ -1207,6 +1207,55 @@ fn declared_ordering(vector: &Value) -> Ordering {
     Ordering::parse(declared).expect("a registered leaf ordering")
 }
 
+/// The groups whose expected values depend on the leaf ordering, and the ones this runner
+/// actually THREADS the declaration through.
+///
+/// They are held apart deliberately: a group that is ordering-sensitive but not threaded would
+/// compute a `hash`-ordered vector as `path` and report green, which is the quiet-skip defect one
+/// loop down from `deny_unknown_fields`.
+const ORDERING_SENSITIVE_GROUPS: [&str; 6] = [
+    "leaf",
+    "record",
+    "unlinkability",
+    "normalization",
+    "envelope",
+    "roundTrip",
+];
+const ORDERING_THREADED_GROUPS: [&str; 2] = ["leaf", "record"];
+
+/// Check EVERY ordering-sensitive vector, not only the ones in a threaded group.
+///
+/// A vector declaring nothing is a corpus defect. One declaring an ordering its group is not
+/// computed under fails CLOSED here rather than being computed under the default.
+fn check_declared_orderings_supported(vectors: &Vectors) -> Option<String> {
+    let groups: [(&str, &Vec<Value>); 6] = [
+        ("leaf", &vectors.leaf),
+        ("record", &vectors.record),
+        ("unlinkability", &vectors.unlinkability),
+        ("normalization", &vectors.normalization),
+        ("envelope", &vectors.envelope),
+        ("roundTrip", &vectors.round_trip),
+    ];
+    debug_assert_eq!(groups.len(), ORDERING_SENSITIVE_GROUPS.len());
+    for (name, list) in groups {
+        for vector in list {
+            let ordering = declared_ordering(vector);
+            if ordering != Ordering::default() && !ORDERING_THREADED_GROUPS.contains(&name) {
+                return Some(format!(
+                    "{name} vector {} declares ordering {}, but this runner computes the {name} \
+                     group under {} only. Thread the declaration through that loop before adding \
+                     such a vector; computing it under the default would report a green it did \
+                     not earn.",
+                    string_field(vector, "name"),
+                    ordering.name(),
+                    Ordering::default().name(),
+                ));
+            }
+        }
+    }
+    None
+}
+
 fn context_from_vector(vector: &Value) -> CommitmentContext {
     let mut context = v1_context(
         string_field(vector, "recordType"),
@@ -1265,6 +1314,9 @@ fn vector_count(vectors: &Vectors) -> usize {
 fn committed_conformance_corpus() {
     let root = repository_root();
     let corpus = read_corpus(&root);
+    if let Some(message) = check_declared_orderings_supported(&corpus.vectors) {
+        panic!("{message}");
+    }
     assert_eq!(corpus.version, "1.2.0");
     assert_eq!(corpus.canon, CANON_VERSION);
     assert_eq!(corpus.unicode_version, UNICODE_VERSION);

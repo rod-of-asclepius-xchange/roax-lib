@@ -410,6 +410,64 @@ final class CorpusGapTests: XCTestCase {
     /// a field is typed and canonicalized. A binding gated on the outer,
     /// holder-supplied `typeMap` member is switched off by the party it
     /// constrains.
+    /// The ordering axis, pinned HERE because no corpus vector reaches it.
+    ///
+    /// Every class-20 round-trip vector is path-ordered, so nothing in the corpus
+    /// asks this package to issue a `hash`-ordered copy and then verify it. That
+    /// is the surface on which the TypeScript library was found issuing an
+    /// envelope its own verifier refused, which is what class 20 exists to catch.
+    func testHashOrderedDisclosureVerifiesUnderTheRegistryThatNamesIt() throws {
+        let committer = try syntheticCommitter()
+        let record = try JSONScanner.parse(#"{"marker":"m","flag":true}"#)
+
+        for ordering in [Ordering.path, Ordering.hash] {
+            let identity = RecordIdentity(
+                recordType: syntheticIdentity.recordType,
+                schemaVersion: syntheticIdentity.schemaVersion,
+                recordId: syntheticIdentity.recordId,
+                issuerId: syntheticIdentity.issuerId,
+                ordering: ordering
+            )
+            let commitment = try committer.commit(
+                record: record, context: CommitmentContext(identity: identity)
+            )
+            // Section 11.2: the ordering leaf is committed for `hash` and nothing else.
+            let committedPaths = commitment.leaves.map(\.displayPath)
+            XCTAssertEqual(committedPaths.contains("roax.ordering"), ordering == .hash)
+
+            let disclosed = try commitment.disclose(
+                paths: [
+                    [.key("roax.recordType")], [.key("roax.schemaVersion")],
+                    [.key("roax.recordId")], [.key("roax.issuer.id")], [.key("marker")],
+                ],
+                hash: SHA256Hash.self
+            )
+            let envelope = Envelope(
+                recordType: identity.recordType,
+                schemaVersion: identity.schemaVersion,
+                recordId: identity.recordId,
+                issuerId: identity.issuerId,
+                root: commitment.root,
+                leafCount: commitment.leafCount,
+                disclosedLeaves: disclosed
+            )
+
+            // H2: the ordering comes from the anchoring registry. BOTH answers are
+            // exercised, so the refusal of the wrong one is evidence rather than an
+            // untested branch (specification section 9.5).
+            for registrySays in [Ordering.path, Ordering.hash] {
+                let verifier = EnvelopeVerifier<SHA256Hash>(anchoredOrdering: registrySays)
+                if registrySays == ordering {
+                    XCTAssertNoThrow(try verifier.verify(envelope),
+                                     "issued \(ordering.rawValue), registry \(registrySays.rawValue)")
+                } else {
+                    XCTAssertThrowsError(try verifier.verify(envelope),
+                                         "issued \(ordering.rawValue), registry \(registrySays.rawValue)")
+                }
+            }
+        }
+    }
+
     func testTypeMapIdBindingIsDrivenByTheCommittedLeafNotTheOuterMember() throws {
         let committer = try syntheticCommitter()
         let identity = RecordIdentity(
