@@ -808,6 +808,12 @@ fn reserved_leaf_name(path: &Path, reserved_leaf_set: ReservedLeafSet) -> Option
             | "roax.recordId"
             | "roax.issuer.id"
             | "roax.issuer.keyId"
+            // The second conditional reserved leaf (specification section 11.2). It is
+            // recognized here so that a copy legitimately DISCLOSING it is not refused as a
+            // reserved-namespace collision, and its value is deliberately not bound: the leaf
+            // is committed issuer intent and NOT authority, so the ordering still comes from
+            // `VerificationPolicy::anchored_ordering` (section 9.5, H2).
+            | "roax.ordering"
     ) || (reserved_leaf_set == ReservedLeafSet::EnvelopeV2
         && key == "roax.typeMap.id");
     allowed.then_some(key)

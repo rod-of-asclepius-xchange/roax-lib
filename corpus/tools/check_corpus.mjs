@@ -981,6 +981,18 @@ if (EMIT) {
     else put(v, "expectFailClosed");
   }
   for (const v of out.vectors.record ?? []) { put(v, "leafCount"); put(v, "root"); }
+  // Class 21 writes back per SIDE, because each vector carries two of every derived value.
+  // Without this the class-21 fields would be copied through from the input and step 3's
+  // "byte-identical" verdict would over-credit itself over values this run never recomputed.
+  for (const v of out.vectors.ordering ?? []) {
+    for (const ordering of Object.keys(v.orderings ?? {})) {
+      const side = v.orderings[ordering];
+      for (const field of ["leafCount", "root", "leafHashes", "displayPaths"]) {
+        const got = byName.get(`${v.name} ${ordering} ${field}`);
+        if (got !== undefined) side[field] = got;
+      }
+    }
+  }
   // Class 12 and class 19 are absent from this list deliberately. Class 12 derives nothing to
   // write back, and class 19's root is asserted above rather than recomputed into the file.
   for (const v of out.vectors.envelope ?? []) { put(v, "expectAccept"); put(v, "reason"); }

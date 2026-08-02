@@ -204,6 +204,17 @@ Counts are vectors in the file, measured by `build_corpus.py --report`.
 | 20 issue-then-verify round trip | 2 | complete. The only class that runs an implementation against its own PRODUCED envelope - see below |
 | 21 leaf ordering | 3 | complete. One record under BOTH orderings, asserting two roots that differ and two disjoint leaf-hash sets - see below |
 
+### A build without `--references` carries the class-10 vectors forward, and says so
+
+**Before this, `python3 corpus/tools/build_corpus.py` with no reference checkout wrote a corpus with the four class-10 vectors DELETED.**
+Anyone rebuilding for an unrelated reason silently removed the only end-to-end coverage of a real national profile, and the diff looked like an ordinary regeneration.
+They are now carried forward verbatim and the operator is told, by name, that they were not recomputed.
+
+> **The trade this makes, stated rather than left to be found.**
+> The carry-forward reads the file it is about to write, so under `--check` those four vectors are compared against themselves.
+> That inverts the rule `corpus/tools/synthetic_records.py` states for record fixtures - "reading the file would make a hand-edited fixture agree with itself, which is what check mode exists to catch" - and it is accepted here only because the alternative is deleting committed evidence.
+> The run prints the note in BOTH modes and still exits 2, so the self-agreement is disclosed rather than hidden, and a canonicalization change is validated only by a build with `--references`.
+
 ### Class 21 is what stops the second leaf ordering existing only in prose
 
 **Specification section 9 made leaf ordering a per-record choice on 2026-08-02, under the amended decision D5.**
