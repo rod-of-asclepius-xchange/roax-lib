@@ -70,7 +70,8 @@ Twice in the same design is a pattern, which is why the rule is written down rat
 
 **Decision D4 has since been ruled D4b**, so `masterSalt` no longer exists anywhere in the design and neither foreclosure is reachable today.
 That does not retire the rule.
-It retires this example, which is kept because it is the clearest one available and because the rule still binds on decisions A and C, which remain open (`docs/decisions.md` Part 1).
+It retires this example, which is kept because it is the clearest one available and because the rule still binds on decision C, which remains open (`docs/decisions.md` Part 1).
+Decision A was ruled on 2026-08-02 and no longer holds anything open here, but the rule bound on it until that date, which is the point: the corpus never encoded a side of it.
 D14 was the third case the rule held open, and it shows the rule working end to end: the class-19 key vector was withheld while D14 was open and was built under the ruling on 2026-07-30, so no implementation ever inherited an unruled answer from a data file.
 
 **This is a future-proofing constraint, not a tidiness one**, and it connects directly to specification section 12.2.

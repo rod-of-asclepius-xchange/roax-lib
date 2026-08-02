@@ -14,6 +14,26 @@ The specifications came first so the design could be reviewed before the languag
 
 Do not add the Go library without an explicit instruction to do so.
 
+**This is an INTERNATIONAL protocol carrying per-jurisdiction profiles, and the prose used to read as a Singapore one.**
+That was corrected on 2026-08-02 as a positioning fix, and nothing in the architecture moved, because the neutrality was already real and only the framing was wrong.
+Three facts were verified against the code and are what the framing may claim; do not restate them from memory, and do not widen them:
+
+- **Nothing hard-codes a jurisdiction.**
+  `docs/spec/roax-canon-1.md` names Singapore in four places and all four are non-normative: the glossary, one envelope example at `recordType`, the decision-C summary and the read-only reference-schema citation.
+  `recordType` is constrained by lowercase reverse-DNS FORM and never by an enum, in both `schemas/envelope-1.0.json` and `schemas/envelope-2.0.json`, and section 12.2 makes `docs/profiles/` the extension point normatively.
+- **Adding a jurisdiction is a profile document plus a type-map artifact plus a registry row, and no library source edit.**
+  The profile registry is caller-supplied in all five: Rust ships NO `impl Profile` at all so even the Singapore profiles are caller-side, and the other four ship an overridable default (`src/envelope.ts` `knownProfiles`/`floorFor`, Python `ProfileRegistry.with_profile`, Swift `ProfileRegistry(profiles:)`, Kotlin `ProfileRegistry.with`).
+  **No library embeds or loads a published `type-maps/` artifact** - every `type-maps/` string in library source is a doc comment, and the resolver is caller-supplied.
+- **The honest limit that must travel with the claim:** GENERATING a type-map artifact from a JSON Schema does not work today, because `tools/build-type-maps.mjs` fails closed on the merged object states.
+  Cite that figure as a LOWER BOUND of at least 34 and never as a count, for the reason the type-map section below already gives.
+  Authoring and validating one is unaffected and `node tools/check-type-maps.mjs` passes on the committed tree, with no reference checkout - it does need Ajv 8 and `ajv-formats` installed outside the tree and named by `ROAX_AJV`, and `--skip-schema-validation` runs the dependency-free subset.
+  Stating extensibility without that caveat is the overstatement this repository keeps catching.
+
+**Do not conflate jurisdiction-neutral with language-neutral.**
+They are two separate claims: the first is about the profile registry, the second is why section 13 rejects JCS and dCBOR.
+And do not let a reframing read as dropping Singapore support - the three MOH healthcerts are the only national jurisdiction worked end to end, and `hl7.fhir.bundle` is the international standard beside them rather than the general case they specialize.
+Scope that support as `README.md` does rather than as "fully implemented": recovery and vaccination commit and class 10 is 2 of 3 records, while PDT's endorsed sample stays uncommittable on the 20 `(pattern, kind)` pairs its open root leaves undeclared, pending a versioned composition profile nobody has ruled (`docs/type-maps.md` section 1.2).
+
 **The ruling's figure and the language set do not agree, and that is a real open point rather than a typo.**
 Decision D was ruled to "five independent, corpus-enforced libraries", and its rejected option Db names those five as Rust, TypeScript, Swift, Kotlin and Go.
 Python was built afterwards, so the language set is six while the ruled figure stays five.
@@ -366,7 +386,7 @@ These are the things a future agent is most likely to get wrong.
 - **The corpus may not require what the design has not decided.**
   A required corpus field that presumes one side of an open decision silently rules it (`docs/conformance-corpus.md` section 1.2).
   This happened twice with `masterSalt` before decision D4 was ruled.
-  The rule still binds, because decisions A and C are still open.
+  The rule still binds, because decision C is still open.
   D14 is the case that shows it working end to end: the class-19 key vector was withheld while D14 was open and built under the ruling on 2026-07-30, so no implementation ever inherited an unruled answer from a data file.
 
 - **There is no master salt and no KDF.
@@ -522,7 +542,12 @@ Things to know:
 
 `docs/decisions.md` holds four decisions belonging to the project owner (A, B, C, D), plus the ten engineering ones, plus D14 in part 2a.
 
-**Two are still open, and both are the owner's - A and C.**
+**One is still open, and it is the owner's - C.**
+**A was ruled on 2026-08-02**: no EU credential format is adopted and no export codec is built, material issued under another regime is re-submitted to this standard rather than translated, and a translation method is deferred rather than refused.
+That last clause is what costs something, so the ruling carries a **standing design constraint**: a disclosure unit MUST remain a single leaf, independently verifiable against the root from its own audit path alone.
+Bundling leaves into an indivisible unit, subtree-only disclosure, or a leaf whose verification needs a sibling beyond its own audit path each break it and each need the ruling revisited rather than settled as a design detail.
+Nothing violates it today - specification section 10 already discloses per leaf with a per-leaf salt and a per-leaf proof - which is exactly why it is written down: it is invisible until it is expensive.
+Do NOT author a claim-name mapping or an export profile on the strength of it; the constraint is granularity only.
 B was ruled earlier - both hash families are first-class and selectable per record - and what stays open under it is the `Poseidon-BN254` parameterization.
 D was ruled on 2026-07-29 to five independent, corpus-enforced libraries.
 **The ten engineering decisions D3 through D13 were ruled on 2026-07-28** and the specification is written on those rulings rather than on a recommendation; see specification section 15 for the table of where each lands.
@@ -536,9 +561,12 @@ The sites are `corpus/tools/roax_ref.py`, `corpus/tools/roax_ref.mjs`, `src/type
 The Kelvin workaround in the synthetic map is gone, and two committed vectors now fail closed under raw matching, so the corpus catches a regression rather than tolerating it.
 Rust's `LookupKeyMode`, `TypeResolver::ensure_lookup_decision_independent` and `Error::LookupNormalizationUndecided` were deleted with the ruling; do not reintroduce a mode enum.
 
-**Do not resolve A or C in code or prose without an explicit ruling**, and if one is ruled, update `docs/decisions.md` in the same change rather than only the specification.
+**Do not resolve C in code or prose without an explicit ruling**, and if it is ruled, update `docs/decisions.md` in the same change rather than only the specification.
 A decision that looks settled in the spec but is still marked OPEN in the decisions document is worse than either.
-Part 1's A and C sections are the owner's and are not edited by ruling work elsewhere in the document.
+**A's ruling is the worked example of that rule**: it moved `docs/decisions.md`, `README.md`, `docs/spec/roax-canon-1.md` section 15, `docs/conformance-corpus.md` and this file in one change, because five documents stated the open count and any one left behind would have contradicted the other four.
+**C is not decided by A.**
+A's re-submission answer covers material issued under another regime; whether it extends to the Singapore healthcerts already issued under OpenAttestation was explicitly not inferred, so do not close C by analogy.
+Part 1's owner sections are the owner's and are not edited by ruling work elsewhere in the document.
 
 ## Validating the schemas
 
