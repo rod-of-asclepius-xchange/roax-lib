@@ -72,9 +72,11 @@ Those four vectors resolve their records out of the checkout through the `record
 The two authorized-mode rows are a different measurement, in which the two class-5 empty-container records fail closed and the process exits 1 ([`FINDINGS.md`](FINDINGS.md), item 1).
 An unsupported reject-vector shape, an unsupported record-vector envelope carrier, a missing committed type map, or a present reference module that cannot be extracted is a failure and also exits 1.
 
-A record vector carrying `typeMapId` is the other NOT RUN case, and it is deliberately not a failure.
-That field selects envelope 2.0, which this package does not implement, so such a vector is one the runner cannot run rather than one it ran and disagreed with; it reports NOT RUN with the reason and contributes to exit 2.
-No committed corpus 1.0 record vector carries the field, so nothing reaches this path today and none of the figures above move; it becomes reachable on the migration to [`../schemas/conformance-corpus-2.0.json`](../schemas/conformance-corpus-2.0.json), which requires `typeMapId` on every record vector and which the committed corpus does not yet carry ([`AGENTS.md`](../AGENTS.md), "Validating the schemas").
+**A record vector carrying `typeMapId` is RUN rather than reported NOT RUN, and an earlier version of this section said the opposite.**
+The field selects the envelope 2.0 structural reserved leaf set, which this package does issue and verify under, so the runner takes the field and builds the tree with it rather than declining the vector: `_reserved_set` maps its presence to `RESERVED_V2`, and `run_record` passes that into `build_tree` (`tools/run_corpus.py:761-762`, `:528` and `:565`; the class-21 `run_ordering` loop does the same at `:807`).
+A vector whose build is then rejected is recorded as a FAILURE carrying that reason rather than as a NOT RUN, so the reference checkout remains the only per-vector NOT RUN case this runner has.
+What this package genuinely does not do about a type map is the verifier-side artifact work, which is stated under "What is deliberately not built" below rather than as a runner disposition.
+No committed corpus 1.0 record or ordering vector carries the field, so nothing reaches this path today and none of the figures above move; it becomes reachable on the migration to [`../schemas/conformance-corpus-2.0.json`](../schemas/conformance-corpus-2.0.json), which requires `typeMapId` on every record vector and which the committed corpus does not yet carry ([`AGENTS.md`](../AGENTS.md), "Validating the schemas").
 
 ## Running the unit tests
 
