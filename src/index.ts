@@ -63,7 +63,11 @@ export {
   resolveHashFunction,
   domainString,
   CANON_VERSION,
+  resolveOrdering,
+  ORDERING_DEFAULT,
+  ORDERING_DOMAIN_SUFFIX,
   type HashAlgName,
+  type Ordering,
   type HashFunction,
 } from './hash.js';
 export { leafHash, SALT_LENGTH, type Leaf } from './leaf.js';

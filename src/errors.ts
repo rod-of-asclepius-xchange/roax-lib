@@ -34,6 +34,12 @@ export type RoaxErrorCode =
   // Section 7.4 algorithm authority.
   | 'hash-alg-not-allowed'
   | 'hash-alg-unsupported'
+  // Specification section 9. `ordering-not-defined` is an ordering this version does not define,
+  // which is H3 of section 9.5 at its narrowest. `leaf-hash-collision` is two leaves of one record
+  // sharing a leaf hash under `hash` ordering: paths are unique already, so that is a collision
+  // rather than a tie, and section 9 requires rejection rather than a tie-break.
+  | 'ordering-not-defined'
+  | 'leaf-hash-collision'
   // Sections 7.3, 10 and 11 envelope rules.
   | 'envelope-malformed'
   | 'envelope-copy-kind'

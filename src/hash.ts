@@ -65,6 +65,51 @@ export function resolveHashFunction(name: string): HashFunction {
  */
 export const CANON_VERSION = 'ROAX-CANON/1';
 
-export function domainString(hashAlg: HashAlgName): Uint8Array {
-  return utf8(`${CANON_VERSION}/${hashAlg}`);
+/**
+ * Leaf ordering, selected per record (specification section 9).
+ *
+ * Two first-class options, exactly as decision B makes ZK-friendly and non-ZK hashes both
+ * first-class and selectable per record. The amended decision D5 rules ordering the same kind of
+ * axis. `path` is the DEFAULT and every one of the five libraries defaults to it, which is what
+ * section 9 requires: a default that differed between implementations would be the silent
+ * divergence this project exists to prevent.
+ */
+export type Ordering = 'path' | 'hash';
+
+export const ORDERING_DEFAULT: Ordering = 'path';
+
+/**
+ * The domain suffix each ordering contributes to `DOMAIN` (specification sections 8 and 9).
+ *
+ * The asymmetry is a stated compatibility rule rather than an accident, and section 9.5 argues
+ * it: `path` contributes the EMPTY string so that a path-ordered record's domain string is
+ * byte-identical to what `ROAX-CANON/1` specified before this axis existed. Giving `path` a
+ * non-empty suffix would change every leaf hash of every record already issued under that name.
+ * Read the suffix from this table; never derive it from the ordering's name.
+ */
+export const ORDERING_DOMAIN_SUFFIX: Readonly<Record<Ordering, string>> = {
+  path: '',
+  hash: '/hash',
+};
+
+/**
+ * Fail closed on an unregistered ordering rather than falling back to the default.
+ *
+ * This is also H3 of section 9.5 at its narrowest: an ordering absent from what this library
+ * defines is refused rather than approximated.
+ */
+export function resolveOrdering(ordering: string): Ordering {
+  if (ordering !== 'path' && ordering !== 'hash') {
+    fail('ordering-not-defined', `ROAX-CANON/1 defines no leaf ordering named ${ordering}`);
+  }
+  return ordering;
+}
+
+/**
+ * `DOMAIN`, which is algorithm-qualified AND ordering-qualified (specification section 8).
+ *
+ * One string with one length prefix, not two components: `ORD` is part of the domain string.
+ */
+export function domainString(hashAlg: HashAlgName, ordering: Ordering = ORDERING_DEFAULT): Uint8Array {
+  return utf8(`${CANON_VERSION}/${hashAlg}${ORDERING_DOMAIN_SUFFIX[resolveOrdering(ordering)]}`);
 }

@@ -7,10 +7,10 @@
 import { randomBytes } from 'node:crypto';
 import { fail } from './errors.js';
 import { toHex, fromHex } from './bytes.js';
-import { encodePath, type Path } from './path.js';
+import { compareBytes, encodePath, type Path } from './path.js';
 import { leafHash, SALT_LENGTH } from './leaf.js';
 import { buildMerkleTree } from './tree.js';
-import type { HashFunction } from './hash.js';
+import { ORDERING_DEFAULT, resolveOrdering, type HashFunction, type Ordering } from './hash.js';
 import type { RecordIdentity } from './reserved.js';
 import { flattenRecord, leafSet, type EmptyContainerPolicy, type OrderedLeaf } from './flatten.js';
 import type { TypeTagResolver } from './typemap.js';
@@ -111,6 +111,14 @@ export interface CommitOptions {
   readonly identity: RecordIdentity;
   readonly salts: SaltSource;
   readonly emptyContainerPolicy?: EmptyContainerPolicy | undefined;
+  /**
+   * The leaf ordering this commitment is built under (specification section 9).
+   *
+   * Defaults to `path`, which is the specification's default and is the SAME default in all five
+   * libraries. A default that differed between them is precisely the silent divergence this
+   * project exists to prevent, so section 9 makes it normative rather than conventional.
+   */
+  readonly ordering?: Ordering | undefined;
 }
 
 export interface CommittedLeaf extends OrderedLeaf {
@@ -135,13 +143,18 @@ export interface Commitment {
 }
 
 export function commitRecord(record: JsonValue, options: CommitOptions): Commitment {
+  const ordering = resolveOrdering(options.ordering ?? ORDERING_DEFAULT);
   const recordLeaves = flattenRecord(record, {
     resolver: options.resolver,
     emptyContainerPolicy: options.emptyContainerPolicy,
   });
-  const ordered = leafSet(recordLeaves, options.identity);
+  // SALT-ASSIGNMENT order, which is ascending encodePath under BOTH orderings (specification
+  // section 9). It cannot be tree order under `hash`: a leaf hash is computed over its salt, so
+  // pairing salts in tree order would be circular. The identity carries the ordering because the
+  // leaf SET depends on it - `roax.ordering` is emitted for a non-default ordering (section 11.2).
+  const assigned = leafSet(recordLeaves, { ...options.identity, ordering });
 
-  const committed: CommittedLeaf[] = ordered.map((leaf) => {
+  const hashed: CommittedLeaf[] = assigned.map((leaf) => {
     const salt = options.salts.saltFor(leaf.path, leaf.index);
     if (salt === undefined) {
       fail('salt-missing-for-leaf', `no salt for the leaf at index ${leaf.index}`, {
@@ -151,9 +164,11 @@ export function commitRecord(record: JsonValue, options: CommitOptions): Commitm
     return {
       ...leaf,
       salt,
-      hash: leafHash(options.hash, leaf.path, leaf.tag, leaf.value, salt),
+      hash: leafHash(options.hash, leaf.path, leaf.tag, leaf.value, salt, ordering),
     };
   });
+
+  const committed = treeOrder(ordering, hashed);
 
   const tree = buildMerkleTree(
     options.hash,
@@ -167,6 +182,32 @@ export function commitRecord(record: JsonValue, options: CommitOptions): Commitm
       return tree.auditPath(index);
     },
   };
+}
+
+/**
+ * Reorder committed leaves from salt-assignment order into TREE order, and renumber their indices.
+ *
+ * A leaf's `index` is its position IN THE TREE, because that is what a disclosed copy carries and
+ * what an audit path is drawn against, so the renumbering is not cosmetic.
+ *
+ * Equal leaf hashes are REJECTED rather than tie-broken. Paths are unique already and every
+ * variable component of the section 8 preimage is length-prefixed, so two equal hashes over
+ * distinct paths are a collision; breaking the tie by path would absorb evidence of a broken hash
+ * into a well-defined tree and hand back a root, which specification section 9 forbids by name.
+ */
+function treeOrder(ordering: Ordering, leaves: readonly CommittedLeaf[]): CommittedLeaf[] {
+  if (ordering === 'path') return [...leaves];
+  const seen = new Set<string>();
+  for (const leaf of leaves) {
+    const key = toHex(leaf.hash);
+    if (seen.has(key)) {
+      fail('leaf-hash-collision', 'two leaves of this record have the same leaf hash');
+    }
+    seen.add(key);
+  }
+  return [...leaves]
+    .sort((a, b) => compareBytes(a.hash, b.hash))
+    .map((leaf, index) => ({ ...leaf, index }));
 }
 
 export function saltsFromHex(hexes: readonly string[]): Uint8Array[] {

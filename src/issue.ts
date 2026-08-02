@@ -16,7 +16,14 @@
 import { fail } from './errors.js';
 import { toHex } from './bytes.js';
 import { encodePath, displayPath, type Path } from './path.js';
-import { resolveHashFunction, CANON_VERSION, type HashAlgName } from './hash.js';
+import {
+  resolveHashFunction,
+  resolveOrdering,
+  CANON_VERSION,
+  ORDERING_DEFAULT,
+  type HashAlgName,
+  type Ordering,
+} from './hash.js';
 import { commitRecord, FreshSalts, type Commitment, type SaltSource } from './commit.js';
 import type { RecordIdentity } from './reserved.js';
 import { TypeTag, type CarrierValue } from './value.js';
@@ -60,6 +67,17 @@ export interface IssueOptions {
    * reused across leaves or across issuances.
    */
   readonly salts?: SaltSource | undefined;
+  /**
+   * The leaf ordering to issue under (specification section 9).
+   *
+   * Defaults to `path`, the specification's default and the SAME default in all five libraries.
+   * It is threaded through to `commitRecord` and to the reserved leaf set, so an issuance under
+   * `hash` both places its leaves by leaf hash and commits `roax.ordering` (section 11.2).
+   *
+   * The envelope emits it as a discovery hint only. A verifier MUST take the ordering from the
+   * anchoring registry rather than from that member (section 9.5, H2).
+   */
+  readonly ordering?: Ordering | undefined;
 }
 
 export interface FullCopy {
@@ -104,12 +122,15 @@ export function issueFullCopy(options: IssueOptions): FullCopy {
     );
   }
 
+  const ordering = resolveOrdering(options.ordering ?? ORDERING_DEFAULT);
+  const identity: RecordIdentity = { ...options.identity, ordering };
   const commitment = commitRecord(options.record, {
     hash,
     resolver: options.resolver,
-    identity: options.identity,
+    identity,
     salts: options.salts ?? new FreshSalts(),
     emptyContainerPolicy: options.emptyContainerPolicy,
+    ordering,
   });
 
   for (const leaf of commitment.leaves) {
@@ -145,6 +166,18 @@ export function issueFullCopy(options: IssueOptions): FullCopy {
     ['leafCount', { kind: 'number', literal: String(commitment.leafCount) }],
     ['issuer', issuerNode(options.identity)],
   ];
+  if (ordering !== ORDERING_DEFAULT) {
+    // A DISCOVERY HINT and never authority: a verifier takes the ordering from the anchoring
+    // registry (specification section 9.5, H2). It is emitted only for a non-default ordering so
+    // that every path-ordered envelope this library issues stays byte-identical to what it issued
+    // before ordering became selectable, which is the same compatibility rule that gives `path`
+    // the empty domain suffix (section 9.5).
+    members.splice(
+      members.findIndex(([k]) => k === 'recordId'),
+      0,
+      ['ordering', { kind: 'string', value: ordering }],
+    );
+  }
   if (options.anchor !== undefined) {
     // OUTSIDE the root: a routing hint and never authority (specification section 11.3).
     const anchorMembers: [string, JsonValue][] = [
@@ -178,7 +211,7 @@ export function issueFullCopy(options: IssueOptions): FullCopy {
   return {
     document: { kind: 'object', members },
     commitment,
-    identity: options.identity,
+    identity,
     hashAlg,
     root: toHex(commitment.root),
   };
