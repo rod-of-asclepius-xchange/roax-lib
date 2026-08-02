@@ -555,6 +555,7 @@ It is C2 in its stricter form; C1 was rejected on its indefinite two-roots-two-v
 It is the sentence a summary of the C ruling naturally reaches for and it is wrong on the third.
 Specification section 3.2 lists duplicate keys, unpaired surrogates, and `undefined` plus sparse-array holes.
 The first two are visible in wire text and genuinely fail closed (section 3.2, and section 6.1 for surrogates specifically).
+**That two-of-three split holds only if the remap reads the SERIALIZED document**, which is inferred rather than fixed since no remap tool is specified: reading a language-parsed object instead collapses duplicate names to last-wins before the boundary, making it one of three.
 Do not reach for section 6.4 here: it is the float-parsing hazard and says nothing about either state, and section 4.2's near-identical sentence governs TYPE-MAP ARTIFACT bytes rather than the record.
 The third **cannot fire on a remap's input at all**, for the reason section 3.2 attaches to that very entry - "which have no JSON representation" - so by the time serialized bytes exist the hole is already `null` and the `undefined` member is already absent.
 So a remap commits what the predecessor serializer wrote, and under section 3.3 plus settled point S5 a serialized redaction hole becomes a distinct NULL leaf the issuer never intended.

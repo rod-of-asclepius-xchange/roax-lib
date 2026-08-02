@@ -128,7 +128,7 @@ It is in `docs/decisions.md` part 2a.
 ```
 docs/spec/          the protocol specification
 docs/profiles/      one document per record family
-docs/decisions.md   settled, open, and the reasoning
+docs/decisions.md   every decision, what is left beneath the rulings, and why
 docs/type-maps.md   type-map coverage, gaps and issuer extensions
 docs/conformance-corpus.md
 schemas/            JSON Schemas

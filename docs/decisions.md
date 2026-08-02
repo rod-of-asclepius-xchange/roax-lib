@@ -1,4 +1,4 @@
-# Decisions: settled, open, and the reasoning
+# Decisions: what is ruled, what is left beneath the rulings, and the reasoning
 
 **Status:** every decision in this document has been ruled, including all four that belong to the project owner.
 **Decision C** was ruled on 2026-08-02: healthcerts already issued under OpenAttestation are **remapped into this protocol** rather than bridged, and a translation method is deferred rather than refused.
@@ -291,7 +291,7 @@ Reading either as having settled the other discards the reason each was ruled.
 No migration path is specified, and the ruling does not add one.
 What the specification already says about the states a remap meets is not new text but is now load-bearing for this decision; it is cited below.
 
-#### What the ruling costs, stated rather than left to be discovered
+**What the ruling costs, stated rather than left to be discovered.**
 
 **A remapped record gets a new root, and the old one is not preserved.**
 This follows by construction rather than from a measurement: nothing is shared between the two leaf constructions.
@@ -301,7 +301,10 @@ So anyone relying on an anchored OpenAttestation root must be told plainly that 
 A proof against the old root remains a proof of the old bytes, and it is not a proof of the remapped record.
 
 **Three states have no portable equivalent, and the remap does not treat them alike.**
-The audit named them together; the specification's answer differs per state, and the difference is the part a migration plan has to know:
+The audit named them together; the specification's answer differs per state, and the difference is the part a migration plan has to know.
+**These answers assume the remap's input is the serialized document rather than a language-parsed object, and that assumption is inferred rather than fixed**, because no remap tool is specified and nothing here settles which form it reads.
+It is load-bearing and it is not symmetric: a remap that re-runs the OpenAttestation loader and reads the resulting in-memory object gets duplicate member names already collapsed to last-wins, so that state becomes unobservable too and the split below is one of three rather than two of three.
+Whichever form a remap tool ends up reading has to be stated when it is specified.
 
 - **Duplicate JSON member names are rejected.**
   They are visible in the wire text, and specification section 3.2 requires rejection at the input boundary before any hashing, its abstract model admitting map keys only as unique.
@@ -324,7 +327,7 @@ Specification section 3.3 emits a leaf for every scalar, and settled point S5 ma
 The bug becomes a faithfully committed artifact rather than a verification failure, which is an improvement in behaviour and not a recovery of the lost element.
 This is the same gap as the third bullet above, reached from the other direction.
 
-#### The audit findings this section carried while it was open, kept as the record
+**The audit findings this section carried while it was open, kept as the record.**
 
 **What the audit established about C3's feasibility.**
 A byte-compatible OpenAttestation v2 verifier **is** feasible in Rust, Swift, Kotlin or Go.
@@ -347,7 +350,7 @@ digest after parse:        c2f79bbf...      equal: false
 **Evidence note:** everything in this subsection is carried from the OpenAttestation audit and was **not** re-run while recording this ruling.
 The per-state consequences above are a different matter and were checked against the specification in this tree, at the sections cited.
 
-#### What the ruling does not settle
+**What the ruling does not settle.**
 
 **It settles the direction and not the mechanics**, and no mechanics are invented here to make it look complete.
 
