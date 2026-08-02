@@ -23,6 +23,23 @@ public struct RecordIdentity: Equatable {
     /// `typeMap` member raises the always-emitted set to 5 and the tree floor
     /// to 6, which is what `docs/type-maps.md` section 4 describes.
     public let typeMapId: String?
+    /// The record's leaf ordering, committed at `roax.ordering` (section 11.2).
+    ///
+    /// The SECOND conditional reserved leaf. It is emitted only when the
+    /// ordering is not the default `path`; a path-ordered record emits NO
+    /// ordering leaf and must not emit `"path"`, a NULL or an empty string in
+    /// its place, because those are different roots and only one can be right.
+    /// The conditionality is the same `ROAX-CANON/1` compatibility rule that
+    /// gives `path` an empty domain suffix, and section 11.2 argues it.
+    ///
+    /// THIS LEAF IS NOT AUTHORITY. It is written from the ordering supplied here
+    /// and is never read back to select one: a verifier takes the ordering from
+    /// the anchoring registry (section 9.5, H2). Section 11.2 argues why
+    /// committing it is not section 7.4's rejected `roax.hashAlg` leaf under a
+    /// new name - weak hash algorithms exist so that leaf enabled a downgrade,
+    /// whereas both orderings are equally strong, so this one is redundant
+    /// rather than dangerous and what it buys is committed issuer intent.
+    public let ordering: Ordering
 
     public init(
         recordType: String,
@@ -30,7 +47,8 @@ public struct RecordIdentity: Equatable {
         recordId: String,
         issuerId: String,
         issuerKeyId: String? = nil,
-        typeMapId: String? = nil
+        typeMapId: String? = nil,
+        ordering: Ordering = .path
     ) {
         self.recordType = recordType
         self.schemaVersion = schemaVersion
@@ -38,6 +56,7 @@ public struct RecordIdentity: Equatable {
         self.issuerId = issuerId
         self.issuerKeyId = issuerKeyId
         self.typeMapId = typeMapId
+        self.ordering = ordering
     }
 
     /// One reserved leaf: its single-segment path, its tag and its value.
@@ -67,6 +86,9 @@ public struct RecordIdentity: Equatable {
         }
         if let issuerKeyId {
             out.append(ReservedLeaf(key: "roax.issuer.keyId", value: issuerKeyId))
+        }
+        if ordering != .path {
+            out.append(ReservedLeaf(key: "roax.ordering", value: ordering.rawValue))
         }
         return out
     }

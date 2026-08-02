@@ -233,8 +233,11 @@ public struct Committer<H: ROAXHash> {
             throw ROAXError.hashAlgMismatch(declared: context.hashAlg, computing: H.identifier)
         }
 
-        // Sort by ascending encodePath bytes, plain unsigned byte comparison.
-        // Paths are unique by construction, so the order is total and tie-free.
+        // SALT-ASSIGNMENT order: ascending encodePath bytes under BOTH leaf
+        // orderings (specification section 9), plain unsigned byte comparison.
+        // It cannot be tree order under `hash`, because a leaf hash is computed
+        // over its salt and pairing in tree order would be circular. Paths are
+        // unique by construction, so this order is total and tie-free.
         var sortable = flattened.map { leaf -> (encoded: [UInt8], leaf: FlattenedLeaf) in
             (PathEncoding.encode(leaf.segments), leaf)
         }
@@ -261,7 +264,8 @@ public struct Committer<H: ROAXHash> {
                 tag: entry.leaf.tag,
                 encodedValue: entry.leaf.encodedValue,
                 salt: salt,
-                hashAlg: context.hashAlg
+                hashAlg: context.hashAlg,
+                ordering: context.identity.ordering
             )
             leaves.append(Leaf(
                 segments: entry.leaf.segments,
@@ -271,6 +275,23 @@ public struct Committer<H: ROAXHash> {
                 encodedPath: entry.encoded,
                 hash: H.hash(preimage)
             ))
+        }
+
+        // TREE order. `path` is the identity, because salt-assignment order
+        // already is encodePath order. `hash` sorts by ascending leaf-hash bytes.
+        //
+        // Equal leaf hashes are REJECTED rather than tie-broken. Paths are
+        // unique already and every variable component of the section 8 preimage
+        // is length-prefixed, so two equal hashes over distinct paths are a
+        // collision; breaking the tie by path would absorb evidence of a broken
+        // hash into a well-defined tree and hand back a root, which section 9
+        // forbids by name.
+        if context.identity.ordering == .hash {
+            var seen = Set<[UInt8]>()
+            for leaf in leaves where !seen.insert(leaf.hash).inserted {
+                throw ROAXError.leafHashCollision(leaf.displayPath)
+            }
+            leaves.sort { roaxByteCompare($0.hash, $1.hash) < 0 }
         }
 
         let root = MerkleTree.root(leaves.map(\.hash), hash: H.self)

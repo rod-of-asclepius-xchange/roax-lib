@@ -112,6 +112,15 @@ public enum ROAXError: Error, Equatable, CustomStringConvertible {
     /// commitment domained `ROAX-CANON/1/Poseidon-BN254` but hashed with SHA-256
     /// is the issuance spec section 7.4 says MUST NOT be made.
     case hashAlgMismatch(declared: String, computing: String)
+
+    /// An ordering `ROAX-CANON/1` does not define. H3 of specification section
+    /// 9.5 at its narrowest: refused rather than approximated by the default.
+    case orderingNotDefined(String)
+
+    /// Two leaves of one record share a leaf hash under `hash` ordering. Paths
+    /// are already unique, so this is a collision rather than a tie, and
+    /// section 9 requires rejection rather than a tie-break.
+    case leafHashCollision(String)
     /// This verifier requires a copy to name a type map and this one names none.
     ///
     /// A verifier-policy refusal, the same shape as `hashAlgNotAllowed`, and
@@ -159,6 +168,8 @@ public enum ROAXError: Error, Equatable, CustomStringConvertible {
         case .profileUnknown: return "profile-unknown"
         case .hashAlgNotAllowed: return "hash-alg-not-allowed"
         case .hashAlgMismatch: return "hash-alg-mismatch"
+        case .orderingNotDefined: return "ordering-not-defined"
+        case .leafHashCollision: return "leaf-hash-collision"
         case .typeMapNotNamed: return "type-map-not-named"
         case .canonUnknown: return "canon-unknown"
         }
@@ -197,6 +208,10 @@ public enum ROAXError: Error, Equatable, CustomStringConvertible {
         case .minimumDisclosureFloor(let p): return "disclosed copy omits non-redactable path \(p)"
         case .profileUnknown(let t): return "no profile registered for recordType \(t.debugDescription)"
         case .hashAlgNotAllowed(let a): return "hashAlg \(a.debugDescription) is not on the allow-list"
+        case .orderingNotDefined(let name):
+            return "ROAX-CANON/1 defines no leaf ordering named \(name)"
+        case .leafHashCollision(let where_):
+            return "two leaves share a leaf hash at \(where_); paths are unique, so this is a collision"
         case .hashAlgMismatch(let d, let c):
             return "declared hashAlg \(d.debugDescription) but the hash being computed is \(c.debugDescription)"
         case .typeMapNotNamed: return "this verifier requires a type map and the copy names none"

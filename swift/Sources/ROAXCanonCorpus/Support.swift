@@ -197,6 +197,17 @@ func arrayValue(_ value: JSONValue?) -> [JSONValue]? {
     guard case .array(let a)? = value else { return nil }
     return a
 }
+
+/// The members of a JSON object, in document order.
+///
+/// Returns the pair list rather than a dictionary because `JSONValue.object`
+/// keeps member order and duplicate raw keys visible, which is what specification
+/// section 3.2 requires of the reader; collapsing to a dictionary here would
+/// discard both.
+func objectValue(_ value: JSONValue?) -> [(key: String, value: JSONValue)]? {
+    guard case .object(let members)? = value else { return nil }
+    return members
+}
 /// The first field on which a produced envelope differs from a committed one, or nil.
 ///
 /// Field by field rather than by bytes, because this package emits no JSON and because JSON
