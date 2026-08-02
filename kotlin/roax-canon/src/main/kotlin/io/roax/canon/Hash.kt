@@ -85,8 +85,50 @@ const val SALT_LENGTH_BYTES: Int = 16
  * Algorithm-qualified, per sections 7, 7.4 and 8. `hashAlg` is deliberately **not** a leaf: a leaf
  * is hashed under the algorithm it names, so it cannot bind it (section 7.4).
  */
-fun domain(canon: String, hashAlg: String): ByteArray =
-    "$canon/$hashAlg".toByteArray(Charsets.US_ASCII)
+fun domain(canon: String, hashAlg: String, ordering: Ordering = Ordering.PATH): ByteArray =
+    "$canon/$hashAlg${ordering.domainSuffix}".toByteArray(Charsets.US_ASCII)
+
+/**
+ * Leaf ordering, selected per record (specification section 9).
+ *
+ * Two first-class options, exactly as decision B makes ZK-friendly and non-ZK hashes both
+ * first-class and selectable per record; the amended decision D5 rules ordering the same kind of
+ * axis. [PATH] is the DEFAULT, and it is the same default in all five libraries because section 9
+ * makes that normative: a default differing between implementations would be the silent divergence
+ * this project exists to prevent.
+ *
+ * The two differ in exactly one pair of properties and neither dominates. [PATH] admits absence
+ * proofs and leaks gap counts; [HASH] leaks nothing about position and forecloses absence proofs
+ * permanently for records issued under it. Section 9.4 states the trade at the point of choice.
+ */
+enum class Ordering(val id: String, val domainSuffix: String) {
+    /** Ascending `encodePath` bytes. */
+    PATH("path", ""),
+
+    /**
+     * Ascending `leafHash` bytes.
+     *
+     * The suffix asymmetry is a stated compatibility rule rather than an accident, and section 9.5
+     * argues it: [PATH] contributes the EMPTY string so that a path-ordered record's domain string
+     * is byte-identical to what `ROAX-CANON/1` specified before this axis existed. Read the suffix
+     * from this table; never derive it from the name.
+     */
+    HASH("hash", "/hash"),
+    ;
+
+    companion object {
+        /**
+         * Fail closed on an ordering this version does not define.
+         *
+         * H3 of specification section 9.5 at its narrowest: an unregistered ordering is refused
+         * rather than approximated by the default.
+         */
+        fun parse(id: String): Ordering = entries.firstOrNull { it.id == id } ?: fail(
+            Reason.ORDERING_NOT_DEFINED,
+            "ROAX-CANON/1 defines no leaf ordering named $id",
+        )
+    }
+}
 
 /** The canonicalization version this library implements. Bound into every leaf preimage. */
 const val CANON: String = "ROAX-CANON/1"
@@ -118,6 +160,7 @@ fun leafHash(
     canon: String = CANON,
     nfc: Nfc = PlatformNfc,
     allowBlobRef: Boolean = false,
+    ordering: Ordering = Ordering.PATH,
 ): ByteArray {
     if (salt.size != SALT_LENGTH_BYTES) {
         fail(
@@ -129,7 +172,7 @@ fun leafHash(
     val encodedValue = encodeValue(tag, value, nfc, allowBlobRef)
     val preimage = ByteSink(96 + encodedPath.size + encodedValue.size)
         .byte(0x00)
-        .lengthPrefixed32(domain(canon, hash.id))
+        .lengthPrefixed32(domain(canon, hash.id, ordering))
         .lengthPrefixed32(encodedPath)
         .byte(tag.code)
         .lengthPrefixed32(salt)

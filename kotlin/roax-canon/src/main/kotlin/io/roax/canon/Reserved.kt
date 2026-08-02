@@ -52,6 +52,23 @@ data class RecordIdentity(
      * issuance emitting the identifier alone produces a schema-invalid envelope.
      */
     val typeMapVersion: String? = null,
+    /**
+     * The record's leaf ordering, committed at `roax.ordering` (specification section 11.2).
+     *
+     * The SECOND conditional reserved leaf. It is emitted only when the ordering is not the default
+     * [Ordering.PATH]; a path-ordered record emits NO ordering leaf and must not emit `"path"`, a
+     * NULL or an empty string in its place, because those are different roots and only one can be
+     * right. The conditionality is the same `ROAX-CANON/1` compatibility rule that gives `path` an
+     * empty domain suffix, and section 11.2 argues it.
+     *
+     * THIS LEAF IS NOT AUTHORITY. It is written from the ordering supplied here and is never read
+     * back to select one: a verifier takes the ordering from the anchoring registry (section 9.5,
+     * H2). Section 11.2 argues why committing it is not section 7.4's rejected `roax.hashAlg` leaf
+     * under a new name - weak hash algorithms exist so that leaf enabled a downgrade, whereas both
+     * orderings are equally strong, so this one is redundant rather than dangerous and what it buys
+     * is committed issuer intent.
+     */
+    val ordering: Ordering = Ordering.PATH,
 )
 
 /** ROAX-CANON/1 section 11.2. Every reserved leaf is a STRING at a single `KEY` segment. */
@@ -65,6 +82,7 @@ object Reserved {
     const val RECORD_ID = "roax.recordId"
     const val ISSUER_ID = "roax.issuer.id"
     const val ISSUER_KEY_ID = "roax.issuer.keyId"
+    const val ORDERING = "roax.ordering"
 
     /**
      * The reserved leaves for [identity] under [profile], in declaration order.
@@ -92,6 +110,11 @@ object Reserved {
         // An absent issuer.keyId emits NO leaf. It MUST NOT be emitted as a NULL leaf or as an
         // empty string, because those are three different roots and only one of them is right.
         identity.issuerKeyId?.let { out.add(listOf(Segment.Key(ISSUER_KEY_ID)) to it) }
+        // The second conditional leaf, on the same rule: a non-default ordering emits it and the
+        // default emits nothing at all.
+        if (identity.ordering != Ordering.PATH) {
+            out.add(listOf(Segment.Key(ORDERING)) to identity.ordering.id)
+        }
         return out
     }
 

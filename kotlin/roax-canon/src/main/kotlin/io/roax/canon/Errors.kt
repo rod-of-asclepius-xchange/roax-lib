@@ -49,6 +49,19 @@ enum class Reason(val code: String) {
 
     // --- envelope (specification sections 7.3, 10.2, 11.1 and 11.3) ---
     HASH_ALG_NOT_ALLOWED("hash-alg-not-allowed"),
+
+    /**
+     * An ordering `ROAX-CANON/1` does not define. H3 of specification section 9.5 at its narrowest:
+     * refused rather than approximated by the default.
+     */
+    ORDERING_NOT_DEFINED("ordering-not-defined"),
+
+    /**
+     * Two leaves of one record share a leaf hash under `hash` ordering. Paths are already unique,
+     * so this is a collision rather than a tie, and section 9 requires rejection rather than a
+     * tie-break.
+     */
+    LEAF_HASH_COLLISION("leaf-hash-collision"),
     PROFILE_UNKNOWN("profile-unknown"),
     CANON_MISMATCH("canon-mismatch"),
     OUTER_IDENTITY_MISMATCH("outer-identity-mismatch"),

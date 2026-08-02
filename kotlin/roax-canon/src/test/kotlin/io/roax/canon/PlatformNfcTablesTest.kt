@@ -212,9 +212,9 @@ class PlatformNfcTablesTest {
          * corroboration that the input set grew rather than the tables changing.
          */
         private const val PINNED_DIGEST =
-            "0f92652a3fed5ff3d8b39a1cdd55e298f4fc6261c4d5166ebd47659b89012c41"
+            "7e7e6e4fbc860336d5c9dcc79e94b4f851b55ce08dd3cf8325359be0c9e4377a"
 
-        private const val PINNED_TOTAL = 17_517
+        private const val PINNED_TOTAL = 18_066
         private const val PINNED_NON_ASCII = 54
         private const val PINNED_CHANGED_BY_NFC = 23
 
